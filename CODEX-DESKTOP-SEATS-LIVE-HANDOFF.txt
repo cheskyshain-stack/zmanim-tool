@@ -1,0 +1,268 @@
+CODEX DESKTOP HANDOFF: LIVE SHARED SEATING PLANS
+Prepared 2026-10-26
+
+TASK FROM THE USER
+
+The user wants two organizers to work on the same seating page and see each
+other's changes. They asked for this file so Codex Desktop can finish the
+Cloudflare connection and publication. Continue the existing implementation.
+Do not rebuild the website or move it to a new hosting platform.
+
+CURRENT STATUS
+
+Website: https://baismedrashoflakewoodcommons.org/seats/
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Feature branch: feat/seats-live-shared-plans
+Draft pull request: https://github.com/cheskyshain-stack/zmanim-tool/pull/200
+Tested feature-code commit: a31cae6e97bc341640668d0c7cb3e3dc5b08aad7
+Base main commit: 8153717007392d0dc0d5bb96eb1261b6aad864fd
+
+The feature code is pushed to the branch and is locally tested. The PR is a
+draft and has NOT been merged. No production Cloudflare deployment has been
+performed. The current live site is unchanged by this feature.
+
+IMPORTANT: data/seats-sync.json currently contains {"endpoint":""}.
+Online sharing is intentionally disabled until the backend is deployed and
+verified. Do not claim that live sharing is already available on the website.
+
+No Cloudflare credentials were available in this session. The GitHub integration
+also could not list Actions secrets (HTTP 403), so whether a deployment secret
+already exists is unknown. Codex Desktop needs access to the user's Cloudflare
+account, through an existing Wrangler login, a browser-assisted Wrangler login,
+or an appropriately configured deployment token. Desktop does not automatically
+inherit a Cloudflare login from this conversation. Do not ask the user to paste
+passwords or API tokens into chat or this file.
+
+GET THE WORK
+
+First inspect the local working tree and read CLAUDE.md and README.md. Preserve
+any existing user changes. Use a separate worktree if needed.
+
+If this repository is not present, clone it:
+  git clone https://github.com/cheskyshain-stack/zmanim-tool.git
+  cd zmanim-tool
+
+Then fetch and open the prepared branch:
+  git fetch origin
+  git switch feat/seats-live-shared-plans
+  git pull --ff-only
+
+If main has advanced, merge the current main into the feature branch and rerun
+appropriate checks. Do not reset away user work or private seating information.
+Later branch commits may contain only this handoff file; the tested feature-code
+commit is identified above.
+
+REPOSITORY RULES
+
+- No em dash characters anywhere in added code, comments, commits or replies.
+- Use the existing GitHub Pages deployment workflow and domain.
+- Run python build-offline.py after source/CSS changes. It generates import maps,
+  hashed URLs, route HTML, offline CSS and dist/. Do not edit those by hand.
+- Run node scripts/build-schedule-api.mjs with Node 24 after the Python build.
+- Run node --check offline/bundle.js and git diff --check.
+- Verify interface changes in real Chromium and actual generated print PDFs.
+- Preserve scroll position, focus and open panels during redraws.
+- Keep all real names, browser backups, credentials and QA artifacts out of Git.
+- Never clear the user's site data/localStorage to resolve a cache problem.
+
+WHAT IS IMPLEMENTED
+
+- Save to site uploads a selected local plan as an online editable plan.
+- Shared plans lists online plans and opens the same plan on another device.
+- Each organizer enters their display name and the existing Seats PIN, 4444.
+- PIN verification also happens on the server before any plan can be read or
+  changed. This preserves the user's requested simple PIN access model; these
+  are organizer display names, not separate email/password accounts.
+- Sessions expire after 24 hours. Tokens remain in sessionStorage and are never
+  placed in URLs, source configuration, deployment output or downloaded plans.
+- A WebSocket connection broadcasts committed changes immediately.
+- The chart shows the other organizer's name and active seat. An active seat is
+  marked, and another organizer is asked to choose a different seat.
+- Draft keystrokes stay local until Enter, Tab, Save, or selecting another seat.
+- Changes to different seats at the same table merge independently.
+- Each change includes its original value. Same-field conflicts are rejected
+  rather than silently replacing another organizer's newer work.
+- Undo/Redo reverse that organizer's own changes, preserving the other person's
+  work. An undo that would erase a newer edit is refused.
+- Offline edits queue locally and rebase after reconnecting. A conflicting
+  version is retained as an unsynced local copy and a local recovery record.
+- An unfinished seat draft survives remote updates. If that same seat changes
+  while offline, its draft requires review before replacing the new name.
+- Existing local plans and downloaded backups remain usable. Restoring a backup
+  creates independent local plans and does not overwrite an online plan.
+
+FILES TO READ
+
+Frontend integration: js/seats-app.js
+Shared connection, dialogs, queues and presence: js/seats/sharing.js
+Validated individual-field changes: js/seats/shared-model.js
+Seat editor draft protection: js/seats/editor.js
+Backend and deployment guide: worker/seats/README.md
+Cloudflare Worker / Durable Object: worker/seats/worker.js
+Worker deployment configuration: worker/seats/wrangler.jsonc
+Frontend service URL: data/seats-sync.json
+Optional activation workflow: .github/workflows/seats-sync.yml
+Tests: tests/seats-sharing-model.mjs and tests/seats-sharing.cjs
+
+HOSTING DESIGN
+
+The website remains a static GitHub Pages site. The new backend is a SEPARATE
+Cloudflare Worker called zmanim-seats, with a SQLite Durable Object binding
+named SEATS_WORKSPACE and class SeatsWorkspace. A single workspace stores
+online plans and coordinates live updates. No separate database product or PDF
+upload service is required for this request.
+
+The configured Cloudflare account ID is:
+  04b085d9f19ac1ba6d333e0006fc94c1
+
+That account is already used for the site's statistics Worker. Do NOT alter
+zmanim-traffic, its CF_API_TOKEN secret, its ARCHIVE binding, or its cron schedule.
+Do not use the separate Shul View account or migrate other services.
+
+Production ALLOWED_ORIGIN is:
+  https://baismedrashoflakewoodcommons.org
+
+All plan reads and writes require a valid server session. CORS is an additional
+origin restriction, not the authentication mechanism. The Worker limits failed
+PIN attempts and disables production request logging. Do not log names or tokens.
+
+FINISH DEPLOYMENT, RECOMMENDED DESKTOP PATH
+
+1. Confirm access to the configured Cloudflare account. Reuse an existing
+   authorized Wrangler login if available. Otherwise run the normal Wrangler
+   browser sign-in and let the user complete it:
+     npx wrangler@4.152.0 login
+
+   Never obtain account credentials by reading secret files or copying them into
+   chat. A configured token should be used through the CLI's environment.
+
+2. Inspect the existing account and confirm that zmanim-seats is this feature,
+   not an unrelated existing service. Preserve all unrelated Workers and data.
+
+3. Check packaging without publishing:
+     npx wrangler@4.152.0 deploy --dry-run --config worker/seats/wrangler.jsonc
+
+4. Deploy the backend:
+     npx wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+
+   This creates the new SQLite Durable Object migration v1. If Cloudflare requires
+   account setup, enabling a workers.dev subdomain, or a billing/plan decision,
+   explain its actual response and let the user handle that account step. Do not
+   silently change plans or make an unsupported cost promise.
+
+5. Use the ACTUAL workers.dev URL returned by Wrangler. Do not guess its address.
+   Verify the server's origin restrictions and that unauthenticated GET /api/plans
+   returns 401 from the allowed origin, while other origins are refused.
+   Verify PIN sign-in, authenticated storage and the WebSocket connection before
+   enabling online sharing on the real website. See the local tests for the API.
+
+6. Edit the SOURCE file data/seats-sync.json to use that verified service origin:
+     {"endpoint":"https://ACTUAL-RETURNED-WORKER-ADDRESS"}
+
+   Do not leave the placeholder above in the file. Do not change only dist/:
+   a later normal site build would otherwise disable the feature again.
+   Do not put PINs, session tokens or Cloudflare API tokens in this JSON file.
+
+7. Build and test, commit the source configuration and any fixes, and update PR
+   #200. Once ready, mark the PR ready, merge the tested change into main, and
+   let .github/workflows/pages.yml publish the website. Follow the repository's
+   established GitHub workflow and exact-head checks. The user has requested
+   this feature and its deployment; no additional conceptual feature approval
+   is needed. Handle native authorization requirements normally.
+
+8. Confirm the Pages deployment succeeds and the live asset hashes and service
+   configuration match the built source. Check the live Seats page with two
+   organizer sessions. Do not claim completion while only localhost is working.
+
+ALTERNATIVE: GITHUB ACTIVATION WORKFLOW
+
+worker/seats/README.md explains the optional Activate shared seating plans
+workflow. It is currently part of the draft PR, so it must be on main before
+it appears as an available manual workflow on the default branch.
+
+It requires a repository Actions secret named CLOUDFLARE_API_TOKEN for the
+configured account, with Workers deployment permissions. It deploys the separate
+Worker, verifies server PIN protection/authenticated storage, commits the returned
+URL to data/seats-sync.json and publishes GitHub Pages. Use an existing suitable
+secret if already configured; otherwise the account owner must add it securely
+in GitHub Settings, Secrets and variables, Actions. Never copy the token into a
+workflow input, this file, source code, an issue or chat.
+
+TESTS THAT PASSED IN THIS SESSION
+
+- 50 Node model and required schedule tests, including five shared-merge tests.
+- Full Seats browser regression suite.
+- Full desktop pane, drag/drop, copy, undo/redo, scrolling and mobile suite.
+- Eighteen actual PDF cases covering safe edges, Letter/11x17, automatic Letter,
+  Tabloid, Legal, A4 and A5 fitting, larger margins, normal/rotated text proportions
+  and the square Rav shtender.
+- A real local Workerd service with two isolated Chromium sessions: server PIN
+  checks, shared-plan creation/opening, presence, simultaneous seat assignments,
+  draft preservation, safe Undo/Redo, actual offline queueing, reconnect, conflicts,
+  recovery copies, stale draft warnings, reload persistence, phone layout and a
+  valid large import near 2,000 names in durable storage.
+- Worker dry-run packaging, offline/API builds, bundle syntax, diff checks and
+  activation workflow YAML/shell syntax. Production activation remains untested
+  because no Cloudflare deployment credentials were available here.
+
+REPRODUCE THE CHECKS
+
+Use Node 24 and Python 3:
+  python build-offline.py
+  node scripts/build-schedule-api.mjs
+  node --check offline/bundle.js
+  git diff --check
+  node --test tests/seats-sharing-model.mjs tests/seats-model.mjs tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
+  node tests/seats-browser.cjs
+  node tests/seats-desktop.cjs
+  node tests/seats-print.cjs
+
+The browser suites require Playwright and Chromium. CHROME_BIN can specify an
+existing Chromium executable. PDF checks also use Poppler, Pillow and PyMuPDF.
+
+To run the real shared-editing test, install the pinned Wrangler outside the repo:
+  npm install --prefix /tmp/seats-shared-runtime --no-package-lock --no-audit --no-fund wrangler@4.152.0
+  SEATS_WRANGLER_BIN=/tmp/seats-shared-runtime/node_modules/.bin/wrangler node tests/seats-sharing.cjs
+
+Adjust paths/environment syntax for the Desktop operating system. The test starts
+fresh random local ports and temporary storage, so it requires no production
+credentials and does not upload names to Cloudflare. Keep QA artifacts outside Git.
+
+IMPORTANT DATA AND LAYOUT DETAILS
+
+The user's actual names and assignments currently live in their own browser:
+  lakewood-commons-seats-v1
+
+Shared metadata uses:
+  lakewood-commons-seats-shared-v1
+
+Do not replace the user's browser data with a synthetic test fixture. Existing
+local plans do not upload just because the service becomes available. After
+activation the organizer opens their existing plan and explicitly saves it online.
+
+Keep the existing 34-table layout, 157-seat capacity including the Rav, plan name
+7:30 מנין, centered Aron, square Rav shtender, attached bookcases, small table/wall
+gaps, equal ordinary row spacing, one-direction chairs, names inside tables,
+solid outlines, and existing print fitting. No room redesign is part of this task.
+
+USER INSTRUCTIONS AFTER ACTIVATION
+
+Organizer 1:
+- Open the existing Seats page and current seating plan.
+- Choose Save to site, enter a name and the Seats PIN, and save this plan online.
+
+Organizer 2:
+- Open Seats on the other device and enter the existing PIN.
+- Open Save to site / Shared plans, enter their own display name and the PIN.
+- OPEN the plan Organizer 1 already saved. Do not publish a second blank plan.
+
+Both should now see Saved online, the other organizer's presence and committed
+changes. The same shared plan can be reopened later. Existing printing and
+backup downloads remain available.
+
+FINISHING RESPONSE
+
+Tell the user exactly what is live and how both organizers open the same plan.
+If account authorization prevents deployment, state that specific missing step
+and provide the concrete prepared PR and setup path. Do not say it is live or
+finished while the production endpoint is still empty.
