@@ -201,7 +201,6 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print{display:flex!important;flex-direction:column;width:var(--seats-page-width);height:var(--seats-page-height);break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
   #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}
   #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
-  #seats-print p{font:8pt/1.4 Arial,sans-serif;text-align:right;margin:0;color:#000}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-item{cursor:default}
   #seats-print .shtender-surface{vector-effect:non-scaling-stroke}

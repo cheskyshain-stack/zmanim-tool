@@ -64,9 +64,11 @@ const server = http.createServer((req,res) => {
     assert.ok(Math.max(...aisleGaps)-Math.min(...aisleGaps)<.1,'The main aisle widths should match on screen');
     const rowGaps=await page.locator('.room-stage').evaluate(stage=>{
       const box=id=>stage.querySelector('[data-item="'+id+'"] .table-surface').getBoundingClientRect();
-      return [['A1','A2'],['A7','A8'],['B7','B8'],['B8','B9'],['C7','C8'],['C8','C9'],['D7','D8']].map(([before,after])=>box(after).top-box(before).bottom);
+      return [['A7','A8'],['B7','B8'],['B8','B9'],['C7','C8'],['C8','C9'],['D7','D8']].map(([before,after])=>box(after).top-box(before).bottom);
     });
-    assert.ok(Math.max(...rowGaps)-Math.min(...rowGaps)<.1,'Rear table gaps should match the normal row gaps');
+    assert.ok(Math.max(...rowGaps)-Math.min(...rowGaps)<.1,'Rear table gaps should be equal');
+    assert.ok(starting.plans[0].tables.filter(table=>/^[BC]9$/.test(table.id)).every(table=>table.y===818));
+    assert.equal(await page.locator('#seats-print header p').count(),0,'Only the plan title should be in the print header');
     await page.screenshot({path:path.join(output,'default-room.png'),fullPage:true});
     assert.equal(await page.locator('.room-stage .walkway text,.room-stage .room-opening text,.room-stage .room-door text,.room-stage [data-item^="rear-case-"] text').count(),0);
     assert.equal(await page.locator('.room-stage #room-item-main-amud path').count(),0);
@@ -344,7 +346,7 @@ const server = http.createServer((req,res) => {
       assert.match(info,/Pages:\s+1\b/); assert.match(info,paper==='letter'?/Page size:\s+792 x 612 pts/:/Page size:\s+1224 x 792 pts/);
       assert.match(text.replace(/\s+/g,' '),/Yosef Cohen/); assert.match(text.replace(/\s+/g,' '),/Moshe Levi/);
       assert.match(text.replace(/\s+/g,' '),/Shmuel/); assert.match(text,/[א-ת]/);
-      assert.doesNotMatch(text,/Upload names|Save plan|Set seats for a column|Saved in this browser/);
+      assert.doesNotMatch(text,/Upload names|Save plan|Set seats for a column|Saved in this browser|Bais Medrash of Lakewood Commons|seats ·|assigned/);
       assert.doesNotMatch(text,/WALKWAY|Open entrance|Door|BACK|Back sefarim|Left sefarim|Right sefarim/);
       for(const label of ['A8','B9','C9','D8']) assert.ok(text.includes(label),label+' missing from '+paper);
       execFileSync('pdftoppm',['-scale-to','1600','-singlefile','-png',pdf,path.join(output,'print-'+paper)]);
@@ -379,7 +381,24 @@ const server = http.createServer((req,res) => {
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v9'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v10'),storageKey),JSON.stringify(legacy));await migration.close();
+    const version9=structuredClone(starting),prior=version9.plans[0];prior.layoutVersion=9;
+    for(const table of prior.tables){const row=Number(table.id.slice(1));if(row>=7)table.y=598+(row-7)*80;}
+    for(const cabinet of prior.objects.filter(object=>object.id.startsWith('rear-case-side-'))){cabinet.y=678;cabinet.height=258;}
+    prior.people=[{id:'parent',name:'Existing Cohen'},{id:'child',name:'Existing Cohen'}];
+    prior.tables.find(table=>table.id==='A8').seats[0]='parent';prior.tables.find(table=>table.id==='B9').seats[0]='child';
+    prior.tables.find(table=>table.id==='A3').height=48;
+    const savedMigration=await browser.newContext();await savedMigration.addInitScript(({key,state})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(state));},{key:storageKey,state:version9});
+    const savedPage=await savedMigration.newPage();await savedPage.goto(origin+'/seats/');await savedPage.locator('.room-stage .table-item').first().waitFor();
+    await savedPage.getByRole('button',{name:'Save plan',exact:true}).click();
+    const latest=await savedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),byId=id=>latest.plans[0].tables.find(table=>table.id===id);
+    assert.equal(latest.plans[0].layoutVersion,10);assert.deepEqual(latest.plans[0].people,prior.people);
+    assert.equal(byId('A8').seats[0],'parent');assert.equal(byId('B9').seats[0],'child');
+    assert.equal(byId('A8').y,708);assert.equal(byId('B9').y,818);assert.equal(byId('A3').height,48);
+    const retainedNames=await savedPage.locator('.room-stage .seat-name').evaluateAll(nodes=>nodes.map(node=>[...node.querySelectorAll('tspan')].map(span=>span.textContent).join(' ')));
+    assert.equal(retainedNames.filter(name=>name==='Existing Cohen').length,2);
+    assert.equal(await savedPage.evaluate(key=>localStorage.getItem(key+'-before-room-v10'),storageKey),JSON.stringify(version9));
+    await savedMigration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('.room-stage .table-item').first().waitFor();
