@@ -167,6 +167,7 @@ function seatsStart(root, unlockKey) {
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + entry.count + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
+      const labelY = table.y < SEATS_BOUNDS.top + 18 ? SEATS_BOUNDS.top - 5 - table.y : -5;
       const seats = Array.from({ length: count }, (_, index) => {
         const name = people.get(table.seats[index]);
         return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
@@ -177,7 +178,7 @@ function seatsStart(root, unlockKey) {
       }).join('');
       return `<g ${controls(table)} transform="translate(${table.x} ${table.y})" class="room-item table-item${interactive && selected === table.id ? ' selected' : ''}">
         <rect class="table-surface" width="${table.width}" height="${table.height}" rx="2"/>
-        <g class="drag-handle" aria-label="Move table"><rect x="${table.width / 2 - 24}" y="-18" width="48" height="17" fill="transparent"/><text class="table-label" x="${table.width / 2}" y="-5" text-anchor="middle">${html(table.label)}</text></g>
+        <g class="drag-handle" aria-label="Move table"><rect x="${table.width / 2 - 24}" y="${labelY - 13}" width="48" height="17" fill="transparent"/><text class="table-label" x="${table.width / 2}" y="${labelY}" text-anchor="middle">${html(table.label)}</text></g>
         ${count ? seats : `<text class="pending-seats" x="${table.width / 2}" y="${table.height / 2 + 4}" text-anchor="middle">${table.count === null ? 'Set seat count' : 'No seats'}</text>`}
       </g>`;
     }).join('');

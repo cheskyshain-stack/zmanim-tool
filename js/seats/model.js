@@ -4,18 +4,20 @@ export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 48;
 export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
-export const SEATS_LAYOUT_VERSION = 11;
-export const SEATS_CROSS_WALKWAY = { top: 578, bottom: 640 };
+export const SEATS_LAYOUT_VERSION = 12;
+export const SEATS_TABLE_WALL_GAP = 8;
+export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_ROW_GAP = 48, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
-const seatsRowY = row => row >= 7 ? SEATS_CROSS_WALKWAY.bottom + (row - 7) * SEATS_ROW_PITCH : SEATS_BOUNDS.top + (row - 1) * SEATS_ROW_PITCH;
-const SEATS_COLUMN_GAP = (SEATS_BOUNDS.right - SEATS_BOUNDS.left - SEATS_STANDARD_WIDTH * 4) / 3;
-const SEATS_COLUMN_CENTERS = { A: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH / 2,
-  B: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH * 1.5 + SEATS_COLUMN_GAP,
-  C: SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 1.5 - SEATS_COLUMN_GAP,
-  D: SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH / 2 };
+const SEATS_TABLE_LEFT = SEATS_BOUNDS.left + SEATS_TABLE_WALL_GAP, SEATS_TABLE_RIGHT = SEATS_BOUNDS.right - SEATS_TABLE_WALL_GAP;
+const seatsRowY = row => row >= 7 ? SEATS_CROSS_WALKWAY.bottom + (row - 7) * SEATS_ROW_PITCH : SEATS_BOUNDS.top + SEATS_TABLE_WALL_GAP + (row - 1) * SEATS_ROW_PITCH;
+const SEATS_COLUMN_GAP = (SEATS_TABLE_RIGHT - SEATS_TABLE_LEFT - SEATS_STANDARD_WIDTH * 4) / 3;
+const SEATS_COLUMN_CENTERS = { A: SEATS_TABLE_LEFT + SEATS_STANDARD_WIDTH / 2,
+  B: SEATS_TABLE_LEFT + SEATS_STANDARD_WIDTH * 1.5 + SEATS_COLUMN_GAP,
+  C: SEATS_TABLE_RIGHT - SEATS_STANDARD_WIDTH * 1.5 - SEATS_COLUMN_GAP,
+  D: SEATS_TABLE_RIGHT - SEATS_STANDARD_WIDTH / 2 };
 const SEATS_BACK_CABINETS = [
   { id: 'rear-case-left', type: 'cabinet', label: 'Back sefarim (left)', x: 17, y: 936, width: 204, height: 24 },
   { id: 'rear-case-center', type: 'cabinet', label: 'Back sefarim (center)', x: 311, y: 936, width: 578, height: 24 },
@@ -32,7 +34,7 @@ export function seatsItems(plan) {
 
 export function seatsFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1');
-  const center = SEATS_ROOM.width / 2, aronWidth = 72, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
+  const center = SEATS_ROOM.width / 2, aronWidth = 72, right = c1?.x ?? SEATS_TABLE_RIGHT - SEATS_STANDARD_WIDTH * 2;
   const aronRight = center + aronWidth / 2, gap = right - aronRight;
   const ravWidth = Math.min(40, Math.max(30, gap - 16));
   return { aron: { x: center - aronWidth / 2, y: 70, width: aronWidth, height: 48 },
@@ -62,7 +64,7 @@ export function seatsSyncRear(plan) {
     const table = plan.tables.find(entry => entry.id === id);
     if (!table) continue;
     table.anchor = 'right';
-    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : SEATS_BOUNDS.left + SEATS_SEAT_WIDTH * 5) : 1159;
+    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : SEATS_TABLE_LEFT + SEATS_SEAT_WIDTH * 5) : 1159 - SEATS_TABLE_WALL_GAP;
     table.x = edge - table.width;
   }
 }
@@ -80,8 +82,8 @@ function seatsBalanceColumns(plan) {
   const reference = column => plan.tables.find(table => table.id === column + '3')
     || plan.tables.find(table => table.column === column && table.id !== column + '1');
   const a = reference('A'), b = reference('B'), c = reference('C'), d = reference('D');
-  const left = a ? a.x + a.width : SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH;
-  const right = d?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH;
+  const left = a ? a.x + a.width : SEATS_TABLE_LEFT + SEATS_STANDARD_WIDTH;
+  const right = d?.x ?? SEATS_TABLE_RIGHT - SEATS_STANDARD_WIDTH;
   const bWidth = b?.width ?? SEATS_STANDARD_WIDTH, cWidth = c?.width ?? SEATS_STANDARD_WIDTH;
   const gap = Math.max(0, (right - left - bWidth - cWidth) / 3);
   for (const [column, anchor, center] of [['B', b, left + gap + bWidth / 2], ['C', c, right - gap - cWidth / 2]]) {
@@ -99,10 +101,10 @@ function seatsRearLayout(plan) {
   seatsSyncRear(plan);
   const fixtures = [
     ...SEATS_BACK_CABINETS,
-    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsRowY(8), width: 24, height: 936 - seatsRowY(8) },
-    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsRowY(8), width: 24, height: 936 - seatsRowY(8) },
+    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsRowY(8) - SEATS_TABLE_WALL_GAP, width: 24, height: 936 - seatsRowY(8) + SEATS_TABLE_WALL_GAP },
+    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsRowY(8) - SEATS_TABLE_WALL_GAP, width: 24, height: 936 - seatsRowY(8) + SEATS_TABLE_WALL_GAP },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
-    { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 156, width: 64, height: 48 },
+    { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 164, width: 64, height: 48 },
   ];
   for (const fixture of fixtures) if (!plan.objects.some(object => object.id === fixture.id)) plan.objects.push({ ...fixture });
   seatsSyncFront(plan);
@@ -115,7 +117,7 @@ function seatsDefaultTable(column, row) {
   const width = count * SEATS_SEAT_WIDTH;
   const center = SEATS_COLUMN_CENTERS[column];
   return { id: column + row, label: column + row, column, anchor, autoSize: true,
-    x: anchor === 'left' ? 17 : anchor === 'right' ? 1183 - width : center - width / 2,
+    x: anchor === 'left' ? SEATS_TABLE_LEFT : anchor === 'right' ? SEATS_TABLE_RIGHT - width : center - width / 2,
     y: seatsRowY(row),
     width, height: SEATS_TABLE_HEIGHT, count, seats: Array(count).fill(null) };
 }
@@ -186,13 +188,39 @@ function seatsEvenRows(plan) {
   for (const [column, id] of [['A', 'rear-case-side-left'], ['D', 'rear-case-side-right']]) {
     const cabinet = plan.objects.find(object => object.id === id), row8 = plan.tables.find(table => table.id === column + '8');
     if (cabinet && row8 && Math.abs(cabinet.y + cabinet.height - 936) < .001) {
-      cabinet.y = row8.y; cabinet.height = 936 - row8.y;
+      cabinet.y = row8.y - SEATS_TABLE_WALL_GAP; cabinet.height = 936 - cabinet.y;
     }
   }
   const amud = plan.objects.find(object => object.id === 'main-amud' && object.type === 'amud');
   if (amud?.y === 148) amud.y = 156;
   const bimah = plan.objects.find(object => object.type === 'bimah' && object.x === 548 && object.y === 420 && object.width === 104 && object.height === 90);
   if (bimah) bimah.y = 444;
+}
+
+function seatsSeparateTables(plan) {
+  const minTop = SEATS_BOUNDS.top + SEATS_TABLE_WALL_GAP;
+  const before = new Map(plan.tables.map(table => [table.id, { x: table.x, y: table.y, width: table.width }]));
+  for (const table of plan.tables) {
+    if (table.width <= SEATS_TABLE_RIGHT - SEATS_TABLE_LEFT) table.x = Math.max(SEATS_TABLE_LEFT, Math.min(SEATS_TABLE_RIGHT - table.width, table.x));
+    const match = /^([ABCD])([1-9])$/.exec(table.id), row = match ? Number(match[2]) : null;
+    const oldTop = row >= 7 ? 640 + (row - 7) * SEATS_ROW_PITCH : 70 + (row - 1) * SEATS_ROW_PITCH;
+    const maxTop = SEATS_BOUNDS.bottom - table.height - 14;
+    if (match && table.column === match[1] && Math.abs(table.y - oldTop) < .001) table.y = Math.min(maxTop, table.y + SEATS_TABLE_WALL_GAP);
+    else if (table.y < minTop && maxTop >= minTop) table.y = minTop;
+  }
+  const a6 = plan.tables.find(table => table.id === 'A6'), oldA6 = before.get('A6');
+  for (const id of ['A7', 'A8', 'D7', 'D8']) {
+    const table = plan.tables.find(table => table.id === id), old = before.get(id);
+    if (!table) continue;
+    if (id[0] === 'A' && a6 && oldA6 && Math.abs(old.x + old.width - oldA6.x - oldA6.width) < .001) table.x = a6.x + a6.width - table.width;
+    if (id[0] === 'D' && Math.abs(old.x + old.width - 1159) < .001) table.x = 1159 - SEATS_TABLE_WALL_GAP - table.width;
+  }
+  const moved = ['A3', 'D3'].some(id => { const table = plan.tables.find(table => table.id === id); return table && table.x !== before.get(id).x; });
+  if (moved) seatsBalanceColumns(plan); else seatsSyncFront(plan);
+  const amud = plan.objects.find(object => object.id === 'main-amud' && object.type === 'amud');
+  if (amud?.y === 156) amud.y = 164;
+  const bimah = plan.objects.find(object => object.type === 'bimah' && object.x === 548 && object.y === 444 && object.width === 104 && object.height === 90);
+  if (bimah) bimah.y = 452;
 }
 
 export function seatsUpgradePlan(plan) {
@@ -254,7 +282,8 @@ export function seatsUpgradePlan(plan) {
     seatsSyncFront(plan);
   }
   if (previousVersion < 10) seatsSpreadRearRows(plan);
-  seatsEvenRows(plan);
+  if (previousVersion < 11) seatsEvenRows(plan);
+  seatsSeparateTables(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -270,7 +299,7 @@ export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
     for (let row = 1; row <= rows; row++) tables.push(seatsDefaultTable(column, row));
   });
   const plan = { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION, tables,
-    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 444, width: 104, height: 90 }],
+    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 452, width: 104, height: 90 }],
     people: [], paper: 'letter', monochrome: true };
   seatsRearLayout(plan);
   seatsSyncAisleTables(plan);
@@ -433,7 +462,7 @@ export function seatsNormalizeState(input) {
       return { ...base, count: 1, seats: [...seats] };
     });
     const name = str(raw.name, 80, 'plan name');
-    return { id, name: /^main shul$/i.test(name) ? SEATS_DEFAULT_NAME : name, layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    return { id, name: /^main shul$/i.test(name) ? SEATS_DEFAULT_NAME : name, layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');
