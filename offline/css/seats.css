@@ -70,7 +70,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-diagram.monochrome{color:#111;--seat-fill:#fff;--table-fill:#fff;--object-fill:#fff}
 .room-boundary{fill:#fff;stroke:currentColor;stroke-width:3}
 .aron{fill:var(--table-fill);stroke:currentColor;stroke-width:1.5}
-.aron-label{font:600 20px Georgia,'David Libre',serif;fill:currentColor}
+.aron-label,.room-landmark>.seat-name{font-family:Georgia,'David Libre',serif;font-weight:600;fill:currentColor}
+.aron-label{font-size:20px}
 .column-label{font:600 13px Georgia,serif;fill:currentColor}
 .entrance{stroke:#fff;stroke-width:7;fill:none}
 .entrance-label{font:12px Arial,sans-serif;fill:currentColor}
