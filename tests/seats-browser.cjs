@@ -46,6 +46,21 @@ const server = http.createServer((req,res) => {
     const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.equal(c1.x+c1.width,d1.x);
     for(const id of ['B2','C2','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     await page.screenshot({path:path.join(output,'default-room.png'),fullPage:true});
+    assert.equal(await page.locator('.room-stage .walkway text,.room-stage .room-opening text,.room-stage .room-door text,.room-stage [data-item^="rear-case-"] text').count(),0);
+    assert.equal(await page.locator('.room-stage #room-item-main-amud path').count(),0);
+    const square=await page.locator('.room-stage .shtender-surface').boundingBox();
+    assert.ok(Math.abs(square.width-square.height)<.1,'The Rav shtender should be square');
+    for(const id of ['A7','B7','C7','D7'])assert.equal(starting.plans[0].tables.find(table=>table.id===id).y,598);
+    await page.locator('#selected-item').selectOption('rear-case-center');
+    assert.ok(await page.locator('#item-width').isDisabled());assert.ok(await page.locator('#item-height').isDisabled());
+    assert.equal(await page.locator('#item-x,[data-action="remove-item"]').count(),0);
+    const backCase=page.locator('.room-stage [data-item="rear-case-center"]'),backBefore=(await state()).plans[0].objects.find(object=>object.id==='rear-case-center');
+    await backCase.focus();await page.keyboard.press('ArrowLeft');
+    await backCase.scrollIntoViewIfNeeded();const backBox=await backCase.boundingBox();
+    await page.mouse.move(backBox.x+backBox.width/2,backBox.y+backBox.height/2);await page.mouse.down();
+    await page.mouse.move(backBox.x+backBox.width/2+30,backBox.y+backBox.height/2-30,{steps:5});await page.mouse.up();
+    assert.deepEqual((await state()).plans[0].objects.find(object=>object.id==='rear-case-center'),backBefore,'Back cabinets must remain fixed under keyboard and pointer movement');
+    await page.locator('#selected-item').selectOption('A1');
     await page.locator('.room-stage [data-table="rav-seat"][data-seat="0"]').click();
     await page.locator('#seat-name-input').fill('Rav Cohen');await page.locator('#seat-name-input').press('Enter');
     assert.equal((await state()).plans[0].objects.find(object=>object.type==='rav').seats.filter(Boolean).length,1);
@@ -205,6 +220,8 @@ const server = http.createServer((req,res) => {
       });
       assert.ok(printLayout.left<20&&printLayout.right<20,JSON.stringify(printLayout));
       assert.ok(printLayout.distortion<.001,'Print lettering must not stretch');
+      const printedSquare=await page.locator('#seats-print .shtender-surface').boundingBox();
+      assert.ok(Math.abs(printedSquare.width-printedSquare.height)<.1,'The printed Rav shtender should be square: '+JSON.stringify({paper,...printedSquare}));
       const pdf=path.join(output,'seats-'+paper+'.pdf');
       await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:false});
       const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}), text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'});
@@ -212,6 +229,7 @@ const server = http.createServer((req,res) => {
       assert.match(text.replace(/\s+/g,' '),/Yosef Cohen/); assert.match(text.replace(/\s+/g,' '),/Moshe Levi/);
       assert.match(text.replace(/\s+/g,' '),/Shmuel/); assert.match(text,/[א-ת]/);
       assert.doesNotMatch(text,/Upload names|Save plan|Set seats for a column|Saved in this browser/);
+      assert.doesNotMatch(text,/WALKWAY|Open entrance|Door|BACK|Back sefarim|Left sefarim|Right sefarim/);
       for(const label of ['A8','B9','C9','D8']) assert.ok(text.includes(label),label+' missing from '+paper);
       execFileSync('pdftoppm',['-scale-to','1600','-singlefile','-png',pdf,path.join(output,'print-'+paper)]);
       execFileSync('python',['-c', 'from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert("RGB"); data=im.tobytes(); assert all(max(data[i:i+3])-min(data[i:i+3])<=2 for i in range(0,len(data),3)), "Color pixels in black-and-white print"',path.join(output,'print-'+paper+'.png')]);
@@ -242,7 +260,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v4'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v5'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();

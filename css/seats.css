@@ -87,6 +87,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .chair-marker{fill:none;stroke:currentColor;stroke-width:.9;pointer-events:none}
 .pending-seats{font:11px Arial,sans-serif;fill:#777;pointer-events:none}
 .room-item{cursor:pointer}
+.room-item.fixed-fixture{cursor:default}
 .seats-layout-mode .drag-handle{cursor:grab;touch-action:none}
 .seats-layout-mode .drag-handle:active{cursor:grabbing}
 .room-item.selected>.table-surface,.room-item.selected>.object-surface{stroke:#2a67a0;stroke-width:2.5;stroke-dasharray:6 3}
@@ -123,8 +124,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-opening text{fill:currentColor;font:11px Arial,sans-serif}
 .rear-side-walkway text{font-size:10px;letter-spacing:1px}
 .station-frame{fill:none;stroke:none}
-.rav-chair,.amud-top{fill:none;stroke:currentColor;stroke-width:1.4}
-.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2}
+.rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
+.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:non-scaling-stroke}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2;stroke-dasharray:6 3}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
