@@ -36,9 +36,13 @@ const server=http.createServer((request,response)=>{
       await page.getByRole('button',{name:'Close',exact:true}).click();
       const state=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key),created=await state(),next=created.plans.find(plan=>plan.id===created.activeId);
       assert.equal(created.plans.length,2);assert.notEqual(next.id,original.id);assert.equal(next.people.length,0);
-      assert.equal(next.name,'7:30 מנין');assert.equal(next.tables.length,34);assert.equal(next.tables[0].x,25,'A new setup uses the original room layout');
+      assert.match(next.name,/^Seating plan - /);assert.equal(next.tables.length,34);assert.equal(next.tables[0].x,25,'A new setup uses the original room layout');
       assert.ok(next.tables.every(table=>table.seats.every(seat=>seat===null)));
       assert.deepEqual(created.plans.find(plan=>plan.id===original.id),original,'Creating a chart keeps existing saved setups untouched');
+      await page.locator('#chart-name').fill('New seating setup');await page.locator('#chart-name').press('Enter');
+      assert.equal(await page.locator('#chart-name').inputValue(),'New seating setup','A custom chart name is kept until explicitly changed');
+      await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Use today’s date',exact:true}).click();
+      assert.match(await page.locator('#chart-name').inputValue(),/^Seating plan - /);
       await page.locator('#chart-name').fill('New seating setup');await page.locator('#chart-name').press('Enter');
       await page.locator('.room-stage [data-table=A2][data-seat="0"]').click();await page.locator('#seat-name-input').fill('New Assigned Person');
       await page.locator('[data-action=home]').click();

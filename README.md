@@ -29,9 +29,12 @@ Set counts individually or by column, then add people manually or import the fir
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
 The importer finds name headers beneath up to 49 title/note rows, so directory
 files can include house numbers before First name and Last name. Numeric-only
-entries are skipped. The default
-plan is 7:30 מנין;
-old Main shul plan names update without changing custom plan names. Delete beside
+entries are skipped. The room is called 7:30 minyan. New chart titles use the
+current New York date, such as Seating plan - Oct 26, 2026. Additional charts made
+on the same date get a numbered suffix. Exact older room-only chart titles use
+their last-edit date, creation date or today's date when those dates are unknown.
+Custom titles remain unchanged. More > Use today’s date suggests a current date
+name, which can be edited for an occasion or other useful detail. Delete beside
 a name removes one person. Delete names opens checkboxes for selecting
 people, including those already seated. Select all shown follows the search;
 Delete all names clears the current plan's full list. Deletion clears the affected

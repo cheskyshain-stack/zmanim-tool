@@ -47,8 +47,8 @@ const server = http.createServer((req,res) => {
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
     assert.equal(await page.locator('.room-stage .table-item').count(), 34);
     assert.equal(await page.getByRole('button',{name:'Edit layout',exact:true}).count(),0);
-    assert.equal(starting.plans[0].name,'7:30 מנין');
-    assert.equal(await page.title(),'Seats | 7:30 מנין');
+    assert.match(starting.plans[0].name,/^Seating plan - /);
+    assert.equal(await page.title(),'Seats | '+starting.plans[0].name);
     assert.ok(await page.locator('#people-search').isVisible(),'Names should open directly');
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
     assert.equal(await page.locator('.room-stage [data-door]').count(),5);
@@ -400,7 +400,7 @@ const server = http.createServer((req,res) => {
     const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
     const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await openDevice(migrationPage);await migrationPage.locator('.room-stage .table-item').first().waitFor();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
-    assert.equal(upgraded.plans[0].name,'7:30 מנין');
+    assert.match(upgraded.plans[0].name,/^Seating plan - /);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
     assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-front-door-2026-10-26'),storageKey),JSON.stringify(legacy));await migration.close();
     const version11=structuredClone(starting),prior=version11.plans[0];prior.layoutVersion=11;
