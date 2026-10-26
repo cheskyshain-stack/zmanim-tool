@@ -21,7 +21,7 @@ const server=http.createServer((request,response)=>{
     const plans=async page=>(await state(page))?.plans||[];
     const unlock=async page=>{page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();};
     const home=async page=>{const button=page.locator('[data-action=home]');if(await button.count())await button.click();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();};
-    const create=async page=>{await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();await page.locator('#chart-name').waitFor();};
+    const create=async page=>{await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.locator('#chart-name').waitFor();};
     const folder=async page=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();await page.getByRole('heading',{name:'Saved charts',exact:true}).waitFor();};
     const close=page=>page.getByRole('button',{name:'Close',exact:true}).click();
     const addNames=async(page,names)=>{await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});await page.locator('#manual-names').evaluate(node=>{node.open=true;});await page.locator('#new-names').fill(names);await page.locator('[data-action=add-names]').click();};
@@ -40,7 +40,7 @@ const server=http.createServer((request,response)=>{
       assert.equal(saved.plans[0].people.length,1);assert.equal(saved.plans[0].people[0].name,'Synthetic Waiting Person');assert.ok(saved.plans[0].tables.every(table=>table.seats.every(seat=>seat===null)),'Unassigned people are meaningful saved content');
       await home(page);await folder(page);assert.equal(await page.locator('.sharing-local-plan').count(),1);await page.locator('.sharing-local-plan .saved-page-card').click();
       assert.equal((await state(page)).activeId,waitingId);await folder(page);assert.equal(await page.locator('.sharing-local-plan').count(),1,'Opening an existing chart does not append a blank copy');
-      await page.getByRole('button',{name:'New chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();assert.equal((await plans(page)).length,1);
+      await page.getByRole('button',{name:'New chart',exact:true}).click();assert.equal((await plans(page)).length,1);
       await page.locator('.room-stage [data-table=A1][data-seat="0"]').click();await page.locator('#seat-name-input').fill('Synthetic Draft Seat Person');await folder(page);
       saved=await state(page);assert.equal(saved.plans.length,2,'Opening the folder flushes a meaningful seat draft once');const seated=saved.plans.find(plan=>plan.id===saved.activeId);assert.ok(seated.people.some(person=>person.name==='Synthetic Draft Seat Person'));
       assert.equal(await page.locator('.sharing-local-plan').count(),2);await close(page);await home(page);await page.reload();await page.getByRole('button',{name:'View saved charts',exact:true}).waitFor();assert.equal((await plans(page)).length,2);

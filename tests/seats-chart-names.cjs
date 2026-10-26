@@ -53,7 +53,7 @@ const server=http.createServer((request,response)=>{
         assert.match(info,/Pages:\s+1\b/);assert.match(text,/7:30\s+MINYAN/i);assert.ok(!text.includes(today),'The saved chart title stays out of the '+paper+' printout');await page.emulateMedia({media:'screen'});
       }
       const create=async name=>{
-        await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
+        await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();
         await page.locator('.room-stage [data-table=A1][data-seat="0"]').click();await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');
       };
       await create('Synthetic Dated Chart Person Two');assert.equal(await page.locator('#chart-name').inputValue(),today+' (2)');

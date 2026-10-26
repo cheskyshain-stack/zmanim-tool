@@ -91,7 +91,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
         nameUploads = nameUploads.filter(item => item.id !== file.id); persistNameUploads();
       }
       namesRetries = 0;
-      notify(saved ? 'Name file saved on the website. Anyone signed in can choose it from Name files.' : 'Name file removed. Names already added to charts were kept.');
+      notify(saved ? 'Name file saved on the website. Anyone signed in can choose it with Add names.' : 'Name file removed. Names already added to charts were kept.');
     } catch (error) { namesError = error.message; if (!error.status || error.status >= 500) namesRetry = setTimeout(drainNameUploads, Math.min(30000, 3000 * 2 ** namesRetries++)); }
     finally { uploadingNames = false; changed(); if (dialog.open && dialogMode === 'names') refreshNameFiles(); }
   }
@@ -472,7 +472,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },
-    get nameFilesLabel() { return nameUploads.length ? 'Name files (' + nameUploads.length + (uploadingNames ? ' saving)' : ' waiting)') : 'Name files'; },
+    get nameFilesLabel() { return nameUploads.length ? 'Add names (' + nameUploads.length + (uploadingNames ? ' saving)' : ' waiting)') : 'Add names'; },
     get enabled() { return Boolean(endpoint); },
     linked: id => entries.has(id),
     canUndo: () => Boolean(entries.get(current()?.id)?.undo.length), canRedo: () => Boolean(entries.get(current()?.id)?.redo.length),

@@ -242,7 +242,6 @@ function seatsStart(root, auth) {
     zoom = 0; wholeRoom = false; history = []; future = []; notice = '';
     save(); render(); zoomControls.refresh(); sharing?.viewChanged();
     window.scrollTo({ top: 0, behavior: 'instant' });
-    sharing?.open('names');
   }
   function download(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type }));
@@ -359,7 +358,7 @@ function seatsStart(root, auth) {
     const assigned = seatsAssigned(plan());
     return `<div class="people-heading"><h2>People</h2><button type="button" data-action="toggle-delete-names" aria-pressed="${deletingNames}" ${plan().people.length ? '' : 'disabled'}>${deletingNames ? 'Done' : 'Delete names'}</button></div><p class="people-summary">${plan().people.length - assigned.size} waiting for a seat</p><label class="sr-only" for="people-search">Search names</label><input id="people-search" type="search" placeholder="Search names..." value="${attr(search)}"><div class="people-sort"><label for="people-sort">Sort names</label><select id="people-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></div>${deletingNames ? '' : `<label class="check-label"><input id="show-assigned" type="checkbox" ${showAssigned ? 'checked' : ''}> Include seated people</label>`}<div id="people-delete-controls">${deleteControls()}</div><div id="people-list" class="people-list">${peopleList()}</div>
       <p class="field-note">${seatsCanDragNames() ? 'Drag list names to add seats. Drag between seats to move; Ctrl/Option-drag copies. Drag back to the list to unassign. You can also click a name then a seat.' : 'Click any seat and type. Choose an existing name from the suggestions, or enter a new name.'}</p>
-      <button type="button" class="people-upload" data-action="upload-names" ${importing ? 'disabled' : ''}>${importing ? 'Reading names...' : html(sharing?.nameFilesLabel || 'Name files')}</button>`;
+      <button type="button" class="people-upload" data-action="upload-names" ${importing ? 'disabled' : ''}>${importing ? 'Reading names...' : html(sharing?.nameFilesLabel || 'Add names')}</button>`;
   }
   function peopleManualTools() {
     const table = seatsItems(plan()).find(entry => entry.id === selected);
@@ -692,7 +691,7 @@ function seatsStart(root, auth) {
       const links = state.plans.filter(plan => sharing?.linked(plan.id)).map(plan => plan.id).join();
       if (links !== sharingLinks) { history = []; future = []; sharingLinks = links; }
       syncSaveStatus();
-      const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Name files';
+      const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Add names';
       const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
       sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
