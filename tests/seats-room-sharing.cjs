@@ -45,7 +45,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     for (const [id, count] of Object.entries({ C1: 4, A8: 4, B2: 5, C2: 5, B5: 5, C5: 5, D7: 5, D8: 5 })) assert.equal(get(id).count, count, id);
     assert.equal(seatsItems(plan).reduce((sum, entry) => sum + (entry.count || 0), 0), 165);
     assert.ok(Math.abs(get('D1').x - get('C1').x - get('C1').width - 8) < .001, 'C1 and D1 have the requested gap');
-    assert.ok(Math.abs(get('D1').x + get('D1').width - 1175) < .001, 'D1 keeps the same small wall gap as the other front tables');
+    assert.ok(Math.abs(get('D1').x + get('D1').width - 1159) < .001, 'C1 and D1 leave extra clearance for the front-right opening');
     for (const id of ['D7','D8']) assert.ok(Math.abs(get(id).x + get(id).width - 1175) < .001, id + ' sits near the right wall');
     const small = plan.objects.find(object => object.id === 'rear-case-a7');
     assert.deepEqual([small.x,small.y,small.width,small.height],[17,648,24,40]);
