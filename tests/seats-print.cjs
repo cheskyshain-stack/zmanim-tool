@@ -66,12 +66,13 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');
       }
       let letteringRatio,verticalRatio;
-      const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format}))];
+      const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format})),{name:'auto-letter-browser-zoom',paper:'auto',format:'Letter',zoom:1.25},{name:'auto-tabloid-browser-zoom',paper:'auto',format:'Tabloid',zoom:1.5}];
       if(width===1440)cases.push({name:'tabloid-on-letter',paper:'tabloid',nativeLetter:true},{name:'letter-larger-margins',paper:'letter',margin:.75,color:true},{name:'tabloid-larger-margins',paper:'tabloid',margin:.75},{name:'auto-tabloid-larger-margins',paper:'auto',format:'Tabloid',margin:.75});
       for(const testCase of cases){
         await page.locator('#paper-size').selectOption(testCase.paper);await page.locator('#print-color').selectOption(testCase.color?'color':'mono');
         let override=null;
         if(testCase.margin)override=await page.addStyleTag({content:'@page{margin:'+testCase.margin+'in!important}'});
+        const zoomStyle=testCase.zoom?await page.addStyleTag({content:'@media print{html{zoom:'+testCase.zoom+'}}'}):null;
         await page.emulateMedia({media:'print'});
         const label=width+'-'+testCase.name,pdf=path.join(output,label+'.pdf');
         await page.pdf({path:pdf,printBackground:true,preferCSSPageSize:!testCase.nativeLetter,...(testCase.nativeLetter?{format:'Letter',landscape:true}:testCase.format?{format:testCase.format,landscape:true}:{})});
@@ -89,13 +90,13 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         assert.ok(metrics.marginsInches[0]<(testCase.margin?1.25:.65)&&metrics.marginsInches[2]<(testCase.margin?1.25:.65),'The chart should still fill the printable width: '+label+' '+JSON.stringify(metrics));
         if(testCase.name==='letter'){letteringRatio=metrics.frontWordRatio;verticalRatio=metrics.verticalWordRatio;}
         if(testCase.paper==='auto'){
-          assert.ok(metrics.marginsInches.every(margin=>margin<(testCase.margin||.35)+.13),'Auto fit should fill both width and height: '+label+' '+JSON.stringify(metrics));
+          assert.ok(metrics.marginsInches.every(margin=>margin<(testCase.margin||.35)*(testCase.zoom||1)+.13),'Auto fit should fill both width and height: '+label+' '+JSON.stringify(metrics));
           assert.ok(Math.abs(metrics.frontWordRatio-letteringRatio)<.015,'Printed lettering must retain its proportions: '+label+' '+metrics.frontWordRatio);
           assert.ok(Math.abs(metrics.verticalWordRatio-verticalRatio)<.015,'Rotated lettering must retain its proportions: '+label+' '+metrics.verticalWordRatio);
           assert.match(await page.locator('#seats-print .room-landmark .seat-name').first().evaluate(node=>getComputedStyle(node).fontFamily),/Georgia/);
         }
         console.log(JSON.stringify({case:label,...metrics}));
-        await page.emulateMedia({media:'screen'});if(override)await override.evaluate(node=>node.remove());
+        await page.emulateMedia({media:'screen'});if(zoomStyle)await zoomStyle.evaluate(node=>node.remove());if(override)await override.evaluate(node=>node.remove());
       }
       const people=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')).plans[0].people);
       assert.deepEqual(people.map(person=>person.name).sort(),edgeNames.map(entry=>entry[2]).sort());assert.deepEqual(errors,[]);
@@ -106,6 +107,6 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
       }
       await context.close();
     }
-    console.log('PASS: full chart, corner names and bottom cabinets fit safely. Auto fit fills both dimensions on native Letter, Tabloid, Legal, A4 and A5 without stretching lettering. Fixed-size PDFs and larger margins remain supported on phone and desktop.');console.log('Artifacts: '+output);
+    console.log('PASS: full chart, corner names and bottom cabinets stay on one page. Auto fit fills native Letter, Tabloid, Legal, A4 and A5 without stretching lettering, including 125% and 150% browser zoom. Fixed-size PDFs and larger margins remain supported on phone and desktop.');console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

@@ -199,7 +199,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   .no-print,.seats-header,.seats-footer,#seats-app>:not(#seats-print){display:none!important}
   #seats-app{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;min-height:0!important}
   #seats-print{display:flex!important;flex-direction:column;width:min(var(--seats-page-width),100vw);height:min(var(--seats-page-height),calc(100vh - 1px));break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
-  #seats-print.auto-paper{width:100vw;height:calc(100vh - 1px);container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in) / 100cqw)}
+  /* Anchor auto fit to the printable page, which can differ from Android's viewport. */
+  #seats-print.auto-paper{position:fixed;inset:0;width:auto;height:auto;container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in) / 100cqw)}
   #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
   #seats-print .adaptive-print .vertical-lettering{transform:scaleY(var(--seats-print-correction))}
   #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}

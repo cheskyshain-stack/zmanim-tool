@@ -90,7 +90,9 @@ black-and-white or color. Initial setup defaults to Printer paper (auto fit), wh
 fills the printable width and height of the paper chosen in the native print dialog,
 including Letter, 11 x 17, Legal, A4 and A5 landscape. Names keep their normal
 lettering proportions and the Rav’s shtender stays square. Auto fit uses a 0.35 inch
-margin. Explicit Letter and 11 x 17 choices retain fixed-size PDF output with
+margin. Auto fit anchors the sheet to the printable page instead of the browser
+viewport, preventing an oversized sheet from flowing onto a second page.
+Explicit Letter and 11 x 17 choices retain fixed-size PDF output with
 printer-safe margins of 0.35 and 0.5 inch respectively. Existing paper preferences
 are retained; choose Printer paper (auto fit) to fill a different native paper size.
 Older browsers without print container sizing retain a proportional chart.
@@ -136,7 +138,8 @@ seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
 Letter and Tabloid PDFs, Tabloid fitted to Letter, and larger printer margins,
 from both phone and desktop layouts. It also checks automatic Letter, Tabloid,
 Legal, A4 and A5 page filling, normal and rotated lettering proportions, and the
-square Rav shtender in actual PDFs. These print checks require Chromium,
+square Rav shtender in actual PDFs, including 125% and 150% browser zoom.
+These print checks require Chromium,
 Playwright, Poppler, Pillow and PyMuPDF.
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
