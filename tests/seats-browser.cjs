@@ -29,14 +29,23 @@ const server = http.createServer((req,res) => {
     await page.locator('#seats-pin').fill('1111'); await page.getByRole('button', {name:'Open Seats'}).click();
     await page.getByText('That PIN did not match. Try again.').waitFor();
     await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', {name:'Open Seats'}).click();
-    await page.locator('#seat-count').waitFor();
+    await page.locator('.room-stage .table-item').first().waitFor();
+    const openRoom = () => page.evaluate(() => { document.querySelector('#people-extra-tools').open=true; document.querySelector('#room-settings').open=true; });
+    const closeRoom = () => page.evaluate(() => { document.querySelector('#room-settings').open=false; document.querySelector('#people-extra-tools').open=false; });
     const state = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), storageKey);
+    const assertAronCentered = async (selector='.room-stage') => {
+      const offset=await page.locator(selector).evaluate(stage=>{const aron=stage.querySelector('.aron').getBoundingClientRect(),room=stage.querySelector('.room-boundary').getBoundingClientRect();return Math.abs(aron.left+aron.width/2-room.left-room.width/2);});
+      assert.ok(offset<.1,'The Aron must remain centered: '+offset);
+    };
     await page.getByRole('button',{name:'Save plan',exact:true}).click();
     const starting = await state(), originalPlan = starting.activeId;
     assert.equal(starting.plans[0].tables.length, 34);
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
     assert.equal(await page.locator('.room-stage .table-item').count(), 34);
-    assert.equal(await page.locator('#seat-count').inputValue(), '5');
+    assert.equal(await page.getByRole('button',{name:'Edit layout',exact:true}).count(),0);
+    assert.equal(starting.plans[0].name,'7:30 מנין');
+    assert.equal(await page.title(),'Seats | 7:30 מנין');
+    assert.ok(await page.locator('#people-search').isVisible(),'Names should open directly');
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
     assert.equal(await page.locator('.room-stage [data-door]').count(),4);
     assert.equal(await page.locator('.room-stage [data-kind="open"]').count(),2);
@@ -47,6 +56,7 @@ const server = http.createServer((req,res) => {
     for(const id of ['B2','C2','B5','C5','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,192);
+    await assertAronCentered();
     const aisleGaps=await page.locator('.room-stage').evaluate(stage=>{
       const row=['A3','B3','C3','D3'].map(id=>stage.querySelector('[data-item="'+id+'"] .table-surface').getBoundingClientRect());
       return row.slice(1).map((table,index)=>table.left-row[index].right);
@@ -63,7 +73,8 @@ const server = http.createServer((req,res) => {
     const square=await page.locator('.room-stage .shtender-surface').boundingBox();
     assert.ok(Math.abs(square.width-square.height)<.1,'The Rav shtender should be square');
     for(const id of ['A7','B7','C7','D7'])assert.equal(starting.plans[0].tables.find(table=>table.id===id).y,598);
-    await page.locator('#selected-item').selectOption('rear-case-center');
+    await openRoom();
+    await page.locator('#layout-item').selectOption('rear-case-center');
     assert.ok(await page.locator('#item-width').isDisabled());assert.ok(await page.locator('#item-height').isDisabled());
     assert.equal(await page.locator('#item-x,[data-action="remove-item"]').count(),0);
     const backCase=page.locator('.room-stage [data-item="rear-case-center"]'),backBefore=(await state()).plans[0].objects.find(object=>object.id==='rear-case-center');
@@ -72,17 +83,23 @@ const server = http.createServer((req,res) => {
     await page.mouse.move(backBox.x+backBox.width/2,backBox.y+backBox.height/2);await page.mouse.down();
     await page.mouse.move(backBox.x+backBox.width/2+30,backBox.y+backBox.height/2-30,{steps:5});await page.mouse.up();
     assert.deepEqual((await state()).plans[0].objects.find(object=>object.id==='rear-case-center'),backBefore,'Back cabinets must remain fixed under keyboard and pointer movement');
-    await page.locator('#selected-item').selectOption('A1');
+    await page.locator('#layout-item').selectOption('A1');
     await page.locator('.room-stage [data-table="rav-seat"][data-seat="0"]').click();
     await page.locator('#seat-name-input').fill('Rav Cohen');await page.locator('#seat-name-input').press('Enter');
     assert.equal((await state()).plans[0].objects.find(object=>object.type==='rav').seats.filter(Boolean).length,1);
     assert.equal(await page.locator('.room-stage .rav-seat').getAttribute('data-facing'),'south');
-    await page.keyboard.press('Control+z');await page.locator('#selected-item').selectOption('A1');
+    await page.keyboard.press('Control+z');await page.locator('#layout-item').selectOption('A1');
+    await page.locator('#layout-item').selectOption('B1');
+    await page.locator('#seat-count').fill('6');await page.locator('#seat-count').blur();await assertAronCentered();
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    await page.locator('.room-stage [data-item="B1"]').focus();await page.keyboard.press('ArrowLeft');await assertAronCentered();
+    await page.getByRole('button',{name:'Undo',exact:true}).click();await page.locator('#layout-item').selectOption('A1');
     assert.ok(starting.plans[0].tables.find(t=>t.id==='B9').y > starting.plans[0].tables.find(t=>t.id==='A8').y);
     await page.locator('#bulk-settings summary').click();
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
     assert.ok((await state()).plans[0].tables.every(table => table.count === 4));
     const joined=(await state()).plans[0],joinedC=joined.tables.find(t=>t.id==='C1'),joinedD=joined.tables.find(t=>t.id==='D1');assert.equal(joinedC.x+joinedC.width,joinedD.x);
+    await closeRoom();
     const csv = '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\nדוד כהן\r\nRabbi Shmuel Alexander Friedlander\r\nYosef Cohen\r\n';
     await page.locator('#names-file').setInputFiles({name:'names.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
     await page.getByText('4 names added; 1 duplicates skipped.').waitFor();
@@ -102,13 +119,13 @@ const server = http.createServer((req,res) => {
       assert.equal((await page.locator('.room-stage [data-table="A1"][data-seat="'+index+'"] .seat-name tspan').allTextContents()).join(' '),name,'Name wrapping must keep words whole');
     }
 
-    await page.getByRole('button',{name:'Edit layout',exact:true}).click();
-    await page.locator('#selected-item').selectOption('A1');
+    await openRoom();
+    await page.locator('#layout-item').selectOption('A1');
     await page.locator('#auto-size').uncheck();
     await page.locator('#item-width').fill('60');await page.locator('#item-width').blur();
     assert.equal(await page.locator('.fit-warning').count(),1,'Crowded names should trigger a fit warning');
     await page.locator('#auto-size').check();
-    await page.locator('#item-height').fill('48'); await page.locator('#item-height').blur();
+    await page.locator('#item-height').fill('40'); await page.locator('#item-height').blur();
     const boxes = await page.locator('.room-stage .table-item .seat-name').evaluateAll(nodes => nodes.map(node => {
       const a=node.getBoundingClientRect(), b=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect();
       return {name:node.textContent, fits:a.left>=b.left-.5&&a.right<=b.right+.5&&a.top>=b.top-.5&&a.bottom<=b.bottom+.5};
@@ -116,7 +133,8 @@ const server = http.createServer((req,res) => {
     assert.equal(boxes.length,4);
     assert.ok(boxes.every(box=>box.fits), JSON.stringify(boxes));
     assert.equal(await page.locator('.fit-warning').count(), 0);
-    await page.reload(); await page.locator('#seat-count').waitFor();
+    await closeRoom();
+    await page.reload(); await page.locator('.room-stage .table-item').first().waitFor();
     assert.equal((await state()).plans[0].tables.find(t=>t.id==='A2').seats.filter(Boolean).length, 1);
     // Real Excel file through the same upload path, with a quoted Hebrew text name as well.
     const xlsxPath = path.resolve(__dirname,'../vendor/xlsx-0.20.3.min.js');
@@ -128,7 +146,16 @@ const server = http.createServer((req,res) => {
     await page.getByText('1 names added; 0 duplicates skipped.').waitFor();
     await page.locator('#names-file').setInputFiles({name:'names.txt',mimeType:'text/plain',buffer:Buffer.from('רבי משה שליט"א\n')});
     await page.waitForFunction(key => JSON.parse(localStorage.getItem(key)).plans[0].people.length === 6,storageKey);
+    await page.locator('#show-assigned').check();
     const beforeDeletion=await state();
+    page.once('dialog',dialog=>dialog.dismiss());
+    await page.getByRole('button',{name:'Delete Moshe Levi',exact:true}).click();
+    assert.deepEqual(await state(),beforeDeletion,'Cancel single deletion must preserve the plan');
+    page.once('dialog',dialog=>dialog.accept());
+    await page.getByRole('button',{name:'Delete Moshe Levi',exact:true}).click();
+    assert.ok(!(await state()).plans[0].people.some(person=>person.name==='Moshe Levi'));
+    assert.equal((await state()).plans[0].tables.find(table=>table.id==='A1').seats[0],null,'Single deletion must clear the assigned seat');
+    await page.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await state(),beforeDeletion);
     await page.locator('#show-assigned').uncheck();
     await page.getByRole('button',{name:'Delete names',exact:true}).click();
     assert.equal(await page.locator('[data-delete-person]').count(),6,'Deletion includes seated people');
@@ -158,7 +185,7 @@ const server = http.createServer((req,res) => {
     assert.equal((await state()).plans[0].tables.length,34);
     await page.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await state(),beforeDeletion);
     await page.locator('#people-search').fill('');
-    await page.getByRole('button',{name:'Edit layout',exact:true}).click();
+    await openRoom();
     await page.getByRole('button',{name:'+ Pillar',exact:true}).click();
     await page.getByRole('button',{name:'+ Sefarim cabinet',exact:true}).click();
     current = (await state()).plans[0]; assert.deepEqual(current.objects.slice(-2).map(o=>o.type), ['pillar','cabinet']);
@@ -202,12 +229,14 @@ const server = http.createServer((req,res) => {
     await page.mouse.move(box.x+box.width/2+16,box.y+box.height/2+8,{steps:5}); await page.mouse.up();
     assert.ok((await state()).plans[0].tables.find(t=>t.id==='A1').x > 17);
     await page.getByRole('button',{name:'Undo',exact:true}).click();
-    await page.locator('#selected-item').selectOption('A1');
+    await page.locator('#layout-item').selectOption('A1');
     await page.locator('#seat-count').fill('1'); await page.locator('#seat-count').blur();
     assert.equal((await state()).plans[0].tables[0].seats.filter(Boolean).length,1);
     assert.equal((await state()).plans[0].people.length,6);
     await page.getByRole('button',{name:'Undo',exact:true}).click();
     assert.equal((await state()).plans[0].tables[0].seats.filter(Boolean).length,3);
+    await closeRoom();
+    await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
     await page.locator('#plan-files summary').click();
     let downloading=page.waitForEvent('download'); await page.getByRole('button',{name:'Download backup',exact:true}).click();
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
@@ -218,6 +247,8 @@ const server = http.createServer((req,res) => {
     await page.getByText('Backup restored as additional plans. Your existing plans were kept.').waitFor();
     assert.equal((await state()).plans.length,3);
     await page.locator('#plan-select').selectOption(originalPlan);
+    await page.setViewportSize({width:760,height:1000});
+    await openRoom();
     const panel=await page.locator('.seats-panel').boundingBox();
     await page.mouse.move(panel.x+50,Math.min(800,panel.y+180));await page.mouse.wheel(0,450);await page.waitForTimeout(150);
     assert.ok(await page.evaluate(()=>scrollY>100),'Wheel over sidebar should scroll the page');
@@ -228,11 +259,13 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('#seat-count').inputValue(),countBeforeWheel,'Scrolling must not change a focused seat count');
     const labels=await page.locator('.room-stage .table-item .table-label').evaluateAll(nodes=>nodes.map(node=>({label:node.textContent,outside:node.getBoundingClientRect().bottom<=node.closest('.table-item').querySelector('.table-surface').getBoundingClientRect().top+1})));
     assert.ok(labels.every(label=>label.outside),JSON.stringify(labels));
+    await closeRoom();
     const saved=await state();
     for (const width of [1440,760,375]) {
       await page.setViewportSize({width,height:1000});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
       await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      await assertAronCentered();
       const fitWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);
       assert.ok(await page.getByRole('button',{name:'Zoom out',exact:true}).isDisabled());
       await page.getByRole('button',{name:'Show chart at 100 percent',exact:true}).click();
@@ -245,22 +278,23 @@ const server = http.createServer((req,res) => {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Zoom must stay inside the chart');
       await page.screenshot({path:path.join(output,'seats-'+width+'.png'),fullPage:true});
       if(width===375) {
-        await page.getByRole('button',{name:'Assign names',exact:true}).click();
         await page.getByRole('button',{name:'Delete names',exact:true}).click();
         await page.locator('[data-delete-person]').first().check();
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Name deletion must fit a phone');
         await page.screenshot({path:path.join(output,'delete-names-375.png'),fullPage:true});
         await page.getByRole('button',{name:'Done',exact:true}).click();
+        await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
         await page.locator('#seat-list summary').click();
         await page.locator('#selected-item').selectOption('A1');
         assert.equal(await page.locator('.seat-list button').count(),4);
-        await page.getByRole('button',{name:'Edit layout',exact:true}).click();
+        await closeRoom();
       }
     }
     await page.setViewportSize({width:1440,height:1050});
     for (const paper of ['letter','tabloid']) {
       await page.locator('#paper-size').selectOption(paper);
       await page.emulateMedia({media:'print'});
+      await assertAronCentered('#seats-print');
       const printLayout=await page.evaluate(()=>{
         const sheet=document.querySelector('#seats-print').getBoundingClientRect(),room=document.querySelector('#seats-print .room-boundary').getBoundingClientRect();
         const scales=[...document.querySelectorAll('#seats-print text')].map(node=>{const matrix=node.getScreenCTM();return Math.abs(Math.hypot(matrix.a,matrix.b)-Math.hypot(matrix.c,matrix.d));});
@@ -291,30 +325,33 @@ const server = http.createServer((req,res) => {
     await page.goto(origin+'/'); assert.equal(await page.locator('a[href="/seats/"]').count(),0);
     await page.addInitScript(()=>localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()})));
     await page.goto(origin+'/admin/'); await page.locator('a.admin-home-task[href="/seats/"]').waitFor();
-    await page.locator('a.admin-home-task[href="/seats/"]').click(); await page.locator('#seat-count').waitFor();
+    await page.locator('a.admin-home-task[href="/seats/"]').click(); await page.locator('.room-stage .table-item').first().waitFor();
     await page.getByRole('button',{name:'Lock',exact:true}).click(); await page.locator('#seats-pin').waitFor();
     assert.equal(await page.locator('.room-diagram').count(),0);
     const blocked=await browser.newContext();
     await blocked.addInitScript(()=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open'); Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage disabled');}});});
     const blockedPage=await blocked.newPage(); await blockedPage.goto(origin+'/seats/');
     await blockedPage.locator('.storage-warning').waitFor();
+    await blockedPage.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
     await blockedPage.locator('#plan-files summary').click();
     const blockedDownload=blockedPage.waitForEvent('download'); await blockedPage.getByRole('button',{name:'Download backup',exact:true}).click();
     assert.equal((await blockedDownload).suggestedFilename(),'seats-backup.json'); await blocked.close();
     const legacy=JSON.parse(JSON.stringify(starting));delete legacy.plans[0].layoutVersion;legacy.plans[0].objects=[];
+    legacy.plans[0].name='Main shul';
     legacy.plans[0].people=[{id:'legacy-parent',name:'Existing parent'},{id:'legacy-child',name:'Existing child'}];
     for(const table of legacy.plans[0].tables){const row=Number(table.id.slice(1));delete table.autoSize;delete table.anchor;table.x={A:60,B:340,C:645,D:925}[table.column];table.y=130+(row-1)*76;table.width=215;table.count=null;table.seats=[];}
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A1'),{count:5,seats:['legacy-parent',null,null,null,null]});
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A7'),{count:5,seats:[null,null,null,null,'legacy-child']});
     const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
-    const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('#seat-count').waitFor();
+    const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('.room-stage .table-item').first().waitFor();
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
+    assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v8'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v9'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
-    const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
+    const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('.room-stage .table-item').first().waitFor();
     const touchBox=await touchPage.locator('.room-stage [data-table="A4"][data-seat="2"] .seat-area').boundingBox();
     const cdp=await touch.newCDPSession(touchPage);
     const touchX=Math.round(touchBox.x+touchBox.width/2),touchY=Math.round(touchBox.y+touchBox.height/2);

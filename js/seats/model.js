@@ -2,10 +2,13 @@ export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 48;
-export const SEATS_LAYOUT_VERSION = 8;
+export const SEATS_TABLE_HEIGHT = 40;
+export const SEATS_DEFAULT_NAME = '7:30 מנין';
+export const SEATS_LAYOUT_VERSION = 9;
 export const SEATS_BACK_WALKWAY_Y = 828;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
+const SEATS_ROW_GAP = SEATS_TABLE_HEIGHT, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
 const SEATS_COLUMN_GAP = (SEATS_BOUNDS.right - SEATS_BOUNDS.left - SEATS_STANDARD_WIDTH * 4) / 3;
 const SEATS_COLUMN_CENTERS = { A: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH / 2,
   B: SEATS_BOUNDS.left + SEATS_STANDARD_WIDTH * 1.5 + SEATS_COLUMN_GAP,
@@ -26,22 +29,27 @@ export function seatsItems(plan) {
 }
 
 export function seatsFront(plan) {
-  const b1 = plan.tables.find(table => table.id === 'B1');
   const c1 = plan.tables.find(table => table.id === 'C1');
-  const left = b1 ? b1.x + b1.width : SEATS_COLUMN_CENTERS.B + SEATS_STANDARD_WIDTH / 2, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
-  const gap = Math.max(72, right - left);
-  const aronWidth = Math.min(122, Math.max(40, Math.round(gap * 0.52)));
-  const ravWidth = Math.min(56, Math.max(30, Math.round(gap * 0.24)));
-  const spacing = (gap - aronWidth - ravWidth) / 3;
-  return { aron: { x: left + spacing, y: 70, width: aronWidth, height: 48 },
-    rav: { x: left + 2 * spacing + aronWidth, y: 70, width: ravWidth, height: 70 } };
+  const center = SEATS_ROOM.width / 2, aronWidth = 72, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
+  const aronRight = center + aronWidth / 2, gap = right - aronRight;
+  const ravWidth = Math.min(40, Math.max(30, gap - 16));
+  return { aron: { x: center - aronWidth / 2, y: 70, width: aronWidth, height: 48 },
+    rav: { x: aronRight + Math.max(8, (gap - ravWidth) / 2), y: 70, width: ravWidth, height: 70 } };
 }
 
 export function seatsSyncFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
-  if (c1 && d1) { c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y; }
+  if (c1 && d1) {
+    const edge = d1.x + d1.width, available = Math.max(120, edge - (SEATS_ROOM.width / 2 + 36 + 16 + 30));
+    const pair = [c1, d1], fixed = pair.filter(table => table.autoSize === false).reduce((sum, table) => sum + table.width, 0);
+    const automatic = pair.filter(table => table.autoSize !== false), widths = automatic.map(table => Math.max(60, (table.count ?? 5) * SEATS_SEAT_WIDTH));
+    const scale = Math.max(0, Math.min(1, (available - fixed) / (widths.reduce((sum, width) => sum + width, 0) || 1)));
+    automatic.forEach((table, index) => { table.width = Math.max(60, widths[index] * scale); });
+    d1.x = edge - d1.width; c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y;
+  }
   const b1 = plan.tables.find(table => table.id === 'B1');
-  if (b1 && c1 && c1.x - b1.x - b1.width < 80) b1.x = Math.max(SEATS_BOUNDS.left, c1.x - 80 - b1.width);
+  const { aron } = seatsFront(plan);
+  if (b1 && b1.x + b1.width > aron.x - 8) b1.x = Math.max(SEATS_BOUNDS.left, aron.x - 8 - b1.width);
   const rav = plan.objects.find(object => object.type === 'rav');
   if (rav) Object.assign(rav, seatsFront(plan).rav);
 }
@@ -89,8 +97,8 @@ function seatsRearLayout(plan) {
   seatsSyncRear(plan);
   const fixtures = [
     ...SEATS_BACK_CABINETS,
-    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: 676, width: 24, height: 260 },
-    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: 676, width: 24, height: 260 },
+    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: 678, width: 24, height: 258 },
+    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: 678, width: 24, height: 258 },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
     { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 148, width: 64, height: 48 },
   ];
@@ -106,8 +114,28 @@ function seatsDefaultTable(column, row) {
   const center = SEATS_COLUMN_CENTERS[column];
   return { id: column + row, label: column + row, column, anchor, autoSize: true,
     x: anchor === 'left' ? 17 : anchor === 'right' ? 1183 - width : center - width / 2,
-    y: row >= 7 ? 598 + (row - 7) * 78 : 70 + (row - 1) * 78,
-    width, height: 48, count, seats: Array(count).fill(null) };
+    y: row >= 7 ? 598 + (row - 7) * SEATS_ROW_PITCH : 70 + (row - 1) * SEATS_ROW_PITCH,
+    width, height: SEATS_TABLE_HEIGHT, count, seats: Array(count).fill(null) };
+}
+
+function seatsAiryRows(plan, previousVersion) {
+  const before = new Map(plan.tables.map(table => [table.id, { y: table.y, height: table.height }]));
+  for (const table of plan.tables) if (table.height === 48) table.height = SEATS_TABLE_HEIGHT;
+  for (const column of ['A', 'B', 'C', 'D']) {
+    for (const row of [2, 3, 4, 5, 6, 8, 9]) {
+      const table = plan.tables.find(table => table.id === column + row), previous = plan.tables.find(table => table.id === column + (row - 1));
+      if (!table || !previous) continue;
+      const old = before.get(table.id), oldPrevious = before.get(previous.id);
+      if (Math.abs(old.y - oldPrevious.y - oldPrevious.height - 30) < .001 || (previousVersion < 8 && row >= 8)) {
+        table.y = Math.min(SEATS_BOUNDS.bottom - table.height - 14, previous.y + previous.height + SEATS_ROW_GAP);
+      }
+    }
+    const cabinetId = column === 'A' ? 'rear-case-side-left' : column === 'D' ? 'rear-case-side-right' : null;
+    const cabinet = plan.objects.find(object => object.id === cabinetId), row8 = plan.tables.find(table => table.id === column + '8');
+    if (cabinet && row8 && Math.abs(cabinet.y - before.get(row8.id).y) < .001 && Math.abs(cabinet.y + cabinet.height - 936) < .001) {
+      cabinet.y = Math.min(916, row8.y); cabinet.height = 936 - cabinet.y;
+    }
+  }
 }
 
 function seatsSpaceRearRows(plan) {
@@ -182,7 +210,9 @@ export function seatsUpgradePlan(plan) {
     seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   }
   if (previousVersion < 7) seatsBalanceColumns(plan);
-  seatsSpaceRearRows(plan);
+  if (previousVersion < 8) seatsSpaceRearRows(plan);
+  seatsAiryRows(plan, previousVersion);
+  seatsSyncFront(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -191,7 +221,7 @@ export function seatsUid() {
   return crypto.randomUUID();
 }
 
-export function seatsCreatePlan(name = 'Main shul') {
+export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
   const tables = [];
   ['A', 'B', 'C', 'D'].forEach((column, col) => {
     const rows = col === 0 || col === 3 ? 8 : 9;
@@ -357,7 +387,8 @@ export function seatsNormalizeState(input) {
       }
       return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7, 8].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    const name = str(raw.name, 80, 'plan name');
+    return { id, name: /^main shul$/i.test(name) ? SEATS_DEFAULT_NAME : name, layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');
