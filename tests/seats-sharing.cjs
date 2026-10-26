@@ -49,7 +49,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.locator('.sharing-local-plan').filter({hasText:'Earlier seating page'}).locator('.saved-page-card').click();
         assert.match(await page.locator('.room-stage [data-table=A1][data-seat="0"] .seat-name').textContent(),/Earlier/);
         await openSaved(page);
-        await page.locator('.sharing-local-plan').filter({hasText:'7:30'}).locator('.saved-page-card').click();
+        await page.locator('.sharing-local-plan').filter({hasText:/Seating plan - /}).locator('.saved-page-card').click();
         await page.locator('#chart-name').fill('Shared chart test');await page.getByRole('button',{name:'Save',exact:true}).click();
         await page.locator('#sharing-name').waitFor();
         assert.equal(await page.locator('#sharing-pin').count(),0,'The PIN just entered to open Seats is used for the server sign-in');

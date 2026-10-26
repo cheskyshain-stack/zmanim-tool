@@ -12,6 +12,7 @@ import { seatsCreateSharing } from './seats/sharing.js';
 import { seatsCreateRecords } from './seats/records.js';
 import { seatsStartMarkup } from './seats/start.js';
 import { seatsSortPeople } from './seats/name-sort.js';
+import { seatsChartName, seatsDatedChartName } from './seats/chart-names.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 
@@ -83,6 +84,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     : 'Changes save on this device. Save puts this chart in Saved charts on the website.';
   const records = seatsCreateRecords({ getState: () => state, getName: () => sharing?.editorName,
     isShared: id => sharing?.linked(id), notify: message => { storageError = message; }, fresh: false });
+  for (const current of state.plans) current.name = seatsChartName(current.name, records.info(current.id));
 
   const editor = seatsCreateEditor({
     getPlan: plan, commit: change,
@@ -188,7 +190,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     if (editor.flush() === false) return;
     if (hasLocalCharts && state.plans.length >= 30) return alertMessage('You can keep up to 30 charts on this device. Delete an old device copy from saved charts to make room.');
     editor.close();
-    const next = seatsCreatePlan();
+    const next = seatsCreatePlan(seatsDatedChartName(new Date(), hasLocalCharts ? state.plans.map(plan => plan.name) : []));
     if (hasLocalCharts) state.plans.push(next); else state.plans = [next];
     state.activeId = next.id; hasLocalCharts = true;
     screen = 'editor'; returnToEditor = false; selected = 'A1'; selectedPerson = null;
@@ -352,7 +354,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
     if (pageSize.textContent !== css) pageSize.textContent = css;
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(sharing?.label() || 'Saved on this device')}</span></div></div>
-      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
+      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
       <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
@@ -441,6 +443,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     'save-site': () => openPageTools('save'),
     'open-pages': () => navigate('saved'),
     'chart-history': () => openPageTools('history'),
+    'date-name': () => { if (editor.flush() === false) return; change(() => { plan().name = seatsDatedChartName(new Date(), state.plans.filter(current => current.id !== plan().id).map(current => current.name)); }); const input = root.querySelector('#chart-name'); input.focus({ preventScroll: true }); input.select(); },
     fit: () => zoomControls.fit(),
     'fit-whole': () => zoomControls.fitWhole(),
     'zoom-actual': () => zoomControls.actual(),
@@ -537,7 +540,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
         if (control.files[0].size > 8 * 1024 * 1024) throw new Error('Choose a backup smaller than 8 MB.');
         const backup = JSON.parse(await control.files[0].text()), restored = seatsNormalizeState(backup);
         if (restored.plans.length + (hasLocalCharts ? state.plans.length : 0) > 30) throw new Error('Restoring this file would exceed 30 saved plans.');
-        change(() => { if (!hasLocalCharts) state.plans = []; for (const restoredPlan of restored.plans) { const oldId = restoredPlan.id, wasActive = oldId === restored.activeId; seatsUpgradePlan(restoredPlan); restoredPlan.id = seatsUid(); records.restore(restoredPlan.id, backup.chartRecords?.[oldId]); state.plans.push(restoredPlan); if (wasActive) state.activeId = restoredPlan.id; } hasLocalCharts = true; screen = 'editor'; returnToEditor = false; selected = ''; selectedPerson = null; conflict = false; }, 'Backup restored as additional plans. Your existing plans were kept.');
+        change(() => { if (!hasLocalCharts) state.plans = []; for (const restoredPlan of restored.plans) { const oldId = restoredPlan.id, wasActive = oldId === restored.activeId; seatsUpgradePlan(restoredPlan); restoredPlan.name = seatsChartName(restoredPlan.name, backup.chartRecords?.[oldId]); restoredPlan.id = seatsUid(); records.restore(restoredPlan.id, backup.chartRecords?.[oldId]); state.plans.push(restoredPlan); if (wasActive) state.activeId = restoredPlan.id; } hasLocalCharts = true; screen = 'editor'; returnToEditor = false; selected = ''; selectedPerson = null; conflict = false; }, 'Backup restored as additional plans. Your existing plans were kept.');
       } catch (error) { alertMessage(error.message); }
     }
   });
@@ -616,11 +619,12 @@ function seatsStart(root, unlockKey, entryPin = null) {
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
     keepDeletedCopy: (id, metadata) => { const existing = records.info(id); records.restore(id, { ...existing, ...metadata, history: [...existing.history, ...(metadata.history || [])] }); save(); renderInPlace(); },
-    removeLocal: id => { change(() => { state.plans = state.plans.filter(plan => plan.id !== id); if (!state.plans.length) state.plans = seatsCreateState().plans; if (!state.plans.some(plan => plan.id === state.activeId)) state.activeId = state.plans[0].id; selectedPerson = null; selected = ''; }, 'Chart removed from this device.'); },
+    removeLocal: id => { change(() => { state.plans = state.plans.filter(plan => plan.id !== id); if (!state.plans.length) state.plans = [seatsCreatePlan(seatsDatedChartName())]; if (!state.plans.some(plan => plan.id === state.activeId)) state.activeId = state.plans[0].id; selectedPerson = null; selected = ''; }, 'Chart removed from this device.'); },
     updatePlan: (id, incoming, activate = false) => {
       const focused = document.activeElement;
       const draft = root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
       if (activate) { editor.flush(); editor.close(); screen = 'editor'; returnToEditor = false; }
+      incoming.name = seatsChartName(incoming.name, sharing?.metadata(id) || records.info(id));
       if (seatsNeedsUpgrade(incoming)) {
         try { const key = SEATS_STORAGE_KEY + '-before-room-' + SEATS_ROOM_UPDATE + '-shared-' + id; if (!localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify({ version: 1, activeId: incoming.id, plans: [incoming] })); } catch { /* Existing names remain in the chart when a spare copy cannot be written. */ }
         const released = seatsUpgradePlan(incoming);

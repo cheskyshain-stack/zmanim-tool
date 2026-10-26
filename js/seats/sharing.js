@@ -2,6 +2,7 @@ import { escAttr, escText } from '../util.js';
 import { seatsSharedApply, seatsSharedDiff, seatsSharedPlan, seatsSharedReverse } from './shared-model.js';
 import { seatsDescribeChanges, seatsRecordMetadata } from './activity.js';
 import { seatsNormalizeNameFile } from './name-files.js';
+import { seatsChartName } from './chart-names.js';
 
 const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
@@ -301,8 +302,9 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function pageCard(plan, site = false) {
     const metadata = site ? seatsRecordMetadata(plan) : chartMetadata(plan.id);
+    const name = seatsChartName(plan.name, metadata);
     const location = site ? 'On the website' : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
-    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(plan.name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(plan.name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open chart</span></button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div>`;
+    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open chart</span></button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div>`;
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
