@@ -139,6 +139,7 @@ const server=http.createServer((req,res)=>{
    assert.match(await page.locator('#website-preview-note').innerText(),/does not occur/);
    assert.equal(await page.locator('iframe').getAttribute('src'),validBeforeGap,'An invalid local time keeps the last valid preview');
    await page.locator('#website-preview-today').click();assert.equal(await date.inputValue(),'2026-10-25');assert.equal(await time.inputValue(),'08:00');
+   await embedded.waitForURL(url=>url.pathname==='/'&&url.searchParams.get('website-preview')==='2026-10-25T12:00:00.000Z');await ready(embedded,'/');
    await page.locator('#website-preview-screen').selectOption('desktop');assert.equal(await frame.locator('body').evaluate(()=>innerWidth),1200);
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
    await page.goto(origin+'/admin/#home');await page.locator('.admin-home-task[href="#preview"]').click();await page.locator('iframe').waitFor();
