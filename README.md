@@ -16,8 +16,8 @@ for that room. Existing device drafts remain available, and opening Seats again
 returns to home. Direct links to a shared chart still open that chart.
 The standard layout has columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
-seats, except A7, A8, D7, and D8, which have three, and B2, C2, B5, C5, B6, and C6,
-which have four. Width follows seat count, using
+seats, except A7, which has three, and C1, A8, B2, C2, B6 and C6,
+which have four. The room has 163 seats including the Rav's seat. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
 Tables use 48 units per seat, about 12% wider than the original 43. Names wrap
 between whole words, with a smaller font when necessary; exceptionally long names
@@ -36,6 +36,9 @@ a name removes one person. Delete names opens checkboxes for selecting
 people, including those already seated. Select all shown follows the search;
 Delete all names clears the current plan's full list. Deletion clears the affected
 seats, preserves the room, and supports Undo and Redo.
+The Sort names selector orders the list by First name or Last name, ignoring common
+titles and suffixes. The choice is remembered on the device and also orders the
+downloaded seating list. Displayed names and seat assignments stay unchanged.
 Click a seat and type a name, choose a suggested existing person, or copy and paste
 a name into a separate seat for a child. Copying creates a separate person record
 and keeps the original assignment. Choosing an already seated suggestion or list
@@ -55,7 +58,8 @@ Name files stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
-between the Aron Kodesh and C1; C1 touches D1. The Aron Kodesh stays centered on
+between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. D1 leaves room
+for an inward-opening door in the right wall. The Aron Kodesh stays centered on
 the front wall, independently of table movement and resizing. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
 when extra seats are requested. An amud stands between B2 and C2.
@@ -63,15 +67,16 @@ B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right
 leaving more space beside the amud and bimah.
 The middle columns sit closer together so the three main aisle gaps are equal
 beside standard five-seat tables. The shorter tables retain extra clearance around
-the amud and bimah; C1 still touches D1 at the front.
+the amud and bimah. The bimah is slightly farther back, clear of the fifth-row
+tables and chairs, while B5 and C5 keep their standard column alignment.
 Tables near the front and side walls have a small visual gap from the wall.
-The back-right tables also leave a gap beside the side bookcase. A central bimah
+The back-right tables share the same right edge. A central bimah
 is included. The amud has a plain surface without a decorative symbol.
 A walkway separates rows 6 and 7, with row 7 meeting its back edge and an entrance in
 each side wall. These are open passages without door leaves or swings. Two doors
 at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
 the back wall between and outside those doors, and continue along both side walls
-to the front of row 8. Clear walkways run across the entire back and to the left
+to just behind the A8/D8 chairs, with an 8-unit gap. Clear walkways run across the entire back and to the left
 of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
 right edge with a small gap before the bookcase face. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
@@ -79,7 +84,7 @@ Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
 The same gap separates table rows from front to back, with a wider entrance walkway
 between rows 6 and 7. Rows 7, 8 and 9 share the front rows’ spacing. The back walkway
-is 48 units deep. Side bookcases still reach the front of row 8.
+is 48 units deep. Side bookcases stay attached to the walls behind the last outside tables.
 The separate Edit layout tab is removed. Table & room settings remain tucked under
 Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
 labels, and a bimah. Move them by dragging labels or room objects, or with keyboard
@@ -110,6 +115,12 @@ Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
+The current room update keeps the compatible stored layout version 12. Old joined
+C1/D1 tables identify charts that need the new seat counts and front-door clearance.
+Standard side bookcases and the original bimah also receive their revised positions.
+C1's displaced fifth-seat name stays in the waiting list; added seats are empty.
+Updates to a shared chart are emitted as ordinary count/geometry changes after its
+server snapshot is registered, preserving online assignments and edit history.
 Version 11 plans receive an 8-unit inset for wall-side tables. The row grid shifts
 back by the same small amount, retaining names, counts, sizes and the equal row gaps.
 Bookcases stay in their existing positions against the walls. Front table labels
@@ -125,15 +136,15 @@ move rows 8 and 9 forward to match the normal table gaps, retaining
 names, counts, table sizes and horizontal positions. Version 6 plans also
 rebalance the B/C column positions while retaining names, seat
 counts, table sizes, and the outer columns. Plans from version 5 or earlier also
-widen automatic tables and reduce B5/C5 to four seats, retaining
-all names. Anyone in those removed fifth seats returns to the waiting list. Manual
+widen automatic tables while keeping B5/C5's fifth-seat assignments. Manual
 table sizes are retained. Version 4 plans also receive the row 7 and back-cabinet
 updates while retaining names,
 seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v12` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-front-door-2026-10-26` before changes are saved.
+Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Charts save locally as they are edited. The main actions are Save and Saved charts,
@@ -175,6 +186,11 @@ actual one-page Letter and Tabloid PDFs and checks their sizes, names, safe marg
 and lettering proportions, alongside touch zoom and scrolling.
 `node tests/seats-start.cjs` checks the home page, room choices, name chooser,
 existing drafts, canonical new layouts and return navigation on phone and desktop.
+`node --test tests/seats-name-sort.mjs` and `node tests/seats-name-sort.cjs` check
+first/last-name ordering, unchanged assignments, exports, device preference, focus,
+scroll and the undistorted PIN photo. `tests/seats-room-sharing.cjs` uses local
+Workerd and two browser organizers to verify one real legacy-room migration patch
+and no repeat after reload, with the displaced C1 name retained.
 `node tests/seats-desktop.cjs` checks desktop pane fitting, native drag/drop,
 seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
 `node tests/seats-print.cjs` checks all page edges and corner-seat names in native

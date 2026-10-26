@@ -8,7 +8,7 @@ const server=http.createServer((request,response)=>{
   if(!fs.existsSync(file)){response.statusCode=404;return response.end();}
   response.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.woff2':'font/woff2','.png':'image/png'})[path.extname(file)]||'application/octet-stream');response.end(fs.readFileSync(file));
 });
-const edgeNames=[['A1',0,'Front Left'],['D1',4,'Front Right'],['A8',0,'Back Left'],['D8',2,'Back Right'],['B9',4,'Middle Left'],['C9',4,'Middle Right']];
+const edgeNames=[['A1',0,'Front Left'],['D1',4,'Front Right'],['A8',0,'Back Left'],['D8',4,'Back Right'],['B9',4,'Middle Left'],['C9',4,'Middle Right']];
 const inspectPdf=String.raw`
 import json,sys,xml.etree.ElementTree as ET
 import fitz

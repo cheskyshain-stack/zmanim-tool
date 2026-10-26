@@ -5,10 +5,14 @@ export const SEATS_SEAT_WIDTH = 48;
 export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
+// Keep the stored format compatible with the existing shared service.
+export const SEATS_ROOM_UPDATE = 'front-door-2026-10-26';
 export const SEATS_TABLE_WALL_GAP = 8;
+export const SEATS_FRONT_TABLE_GAP = 8;
+export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 64 };
 export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
-export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
+export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B2', 'C2', 'B6', 'C6'];
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_ROW_GAP = 48, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
 const SEATS_TABLE_LEFT = SEATS_BOUNDS.left + SEATS_TABLE_WALL_GAP, SEATS_TABLE_RIGHT = SEATS_BOUNDS.right - SEATS_TABLE_WALL_GAP;
@@ -44,12 +48,13 @@ export function seatsFront(plan) {
 export function seatsSyncFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
   if (c1 && d1) {
-    const edge = d1.x + d1.width, available = Math.max(120, edge - (SEATS_ROOM.width / 2 + 36 + 16 + 30));
+    const edge = Math.min(d1.x + d1.width, SEATS_BOUNDS.right - SEATS_FRONT_RIGHT_DOOR.clearance);
+    const available = Math.max(120, edge - (SEATS_ROOM.width / 2 + 36 + 16 + 30) - SEATS_FRONT_TABLE_GAP);
     const pair = [c1, d1], fixed = pair.filter(table => table.autoSize === false).reduce((sum, table) => sum + table.width, 0);
     const automatic = pair.filter(table => table.autoSize !== false), widths = automatic.map(table => Math.max(60, (table.count ?? 5) * SEATS_SEAT_WIDTH));
     const scale = Math.max(0, Math.min(1, (available - fixed) / (widths.reduce((sum, width) => sum + width, 0) || 1)));
     automatic.forEach((table, index) => { table.width = Math.max(60, widths[index] * scale); });
-    d1.x = edge - d1.width; c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y;
+    d1.x = edge - d1.width; c1.anchor = 'right'; c1.x = Math.max(17, d1.x - SEATS_FRONT_TABLE_GAP - c1.width); c1.y = d1.y;
   }
   const b1 = plan.tables.find(table => table.id === 'B1');
   const { aron } = seatsFront(plan);
@@ -69,12 +74,34 @@ export function seatsSyncRear(plan) {
   }
 }
 
+const seatsSideCases = [['A', 'rear-case-side-left', 17], ['D', 'rear-case-side-right', 1159]];
+function seatsSideCaseTop(plan, column) {
+  const table = plan.tables.find(table => table.id === column + '8');
+  return Math.min(916, (table?.y ?? seatsRowY(8)) + (table?.height ?? SEATS_TABLE_HEIGHT) + 14 + SEATS_TABLE_WALL_GAP);
+}
+function seatsOldSideCases(plan) {
+  return seatsSideCases.map(([column, id, x]) => ({ column, cabinet: plan.objects.find(object => object.id === id && object.type === 'cabinet' && object.x === x && object.width === 24 && Math.abs(object.y + object.height - 936) < .001) }))
+    .filter(({ column, cabinet }) => cabinet && cabinet.y < seatsSideCaseTop(plan, column) - .001);
+}
+function seatsOldBimah(plan) {
+  return plan.objects.find(object => object.type === 'bimah' && object.x === 548 && object.y === 452 && object.width === 104 && object.height === 90);
+}
+function seatsJoinedFront(plan) {
+  const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
+  return Boolean(c1 && d1 && Math.abs(c1.x + c1.width - d1.x) < .001);
+}
+
 export function seatsSyncAisleTables(plan) {
   for (const [id, reference] of [['B2', 'B3'], ['B5', 'B4'], ['B6', 'B4'], ['C2', 'C3'], ['C5', 'C4'], ['C6', 'C4']]) {
     const table = plan.tables.find(entry => entry.id === id), neighbor = plan.tables.find(entry => entry.id === reference);
     if (!table) continue;
     table.anchor = id[0] === 'B' ? 'left' : 'right';
     table.x = table.anchor === 'left' ? neighbor?.x ?? SEATS_COLUMN_CENTERS.B - SEATS_STANDARD_WIDTH / 2 : (neighbor ? neighbor.x + neighbor.width : SEATS_COLUMN_CENTERS.C + SEATS_STANDARD_WIDTH / 2) - table.width;
+    const bimah = plan.objects.find(object => object.type === 'bimah');
+    if (bimah && ['B5', 'C5'].includes(id) && table.y < bimah.y + bimah.height && table.y + table.height > bimah.y) {
+      table.x = id === 'B5' ? Math.min(table.x, bimah.x - SEATS_TABLE_WALL_GAP - table.width)
+        : Math.max(table.x, bimah.x + bimah.width + SEATS_TABLE_WALL_GAP);
+    }
   }
 }
 
@@ -101,8 +128,8 @@ function seatsRearLayout(plan) {
   seatsSyncRear(plan);
   const fixtures = [
     ...SEATS_BACK_CABINETS,
-    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsRowY(8) - SEATS_TABLE_WALL_GAP, width: 24, height: 936 - seatsRowY(8) + SEATS_TABLE_WALL_GAP },
-    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsRowY(8) - SEATS_TABLE_WALL_GAP, width: 24, height: 936 - seatsRowY(8) + SEATS_TABLE_WALL_GAP },
+    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsSideCaseTop(plan, 'A'), width: 24, height: 936 - seatsSideCaseTop(plan, 'A') },
+    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsSideCaseTop(plan, 'D'), width: 24, height: 936 - seatsSideCaseTop(plan, 'D') },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
     { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 164, width: 64, height: 48 },
   ];
@@ -111,7 +138,7 @@ function seatsRearLayout(plan) {
 }
 
 function seatsDefaultTable(column, row) {
-  const count = (column === 'A' || column === 'D') && (row === 7 || row === 8) ? 3
+  const count = column === 'A' && row === 7 ? 3
     : SEATS_FOUR_SEAT_TABLES.includes(column + row) ? 4 : 5;
   const anchor = column === 'A' && row <= 6 ? 'left' : column === 'D' && row <= 6 ? 'right' : 'center';
   const width = count * SEATS_SEAT_WIDTH;
@@ -223,9 +250,16 @@ function seatsSeparateTables(plan) {
   if (bimah) bimah.y = 452;
 }
 
+export function seatsNeedsUpgrade(plan) {
+  if (plan.layoutVersion !== SEATS_LAYOUT_VERSION) return true;
+  // Earlier 7:30 layouts always joined these two tables. The new gap marks the update on every device.
+  return seatsJoinedFront(plan) || seatsOldSideCases(plan).length > 0 || Boolean(seatsOldBimah(plan));
+}
+
 export function seatsUpgradePlan(plan) {
-  if (plan.layoutVersion === SEATS_LAYOUT_VERSION) return 0;
+  if (!seatsNeedsUpgrade(plan)) return 0;
   const previousVersion = plan.layoutVersion ?? 1;
+  const updateCounts = previousVersion !== SEATS_LAYOUT_VERSION || seatsJoinedFront(plan);
   let released = 0;
   if (previousVersion === 3) {
     seatsSyncAisleTables(plan);
@@ -253,7 +287,7 @@ export function seatsUpgradePlan(plan) {
       const table = plan.tables.find(entry => entry.id === id);
       if (table) released += seatsSetCount(table, 4);
     }
-    for (const id of ['A7', 'A8', 'D7', 'D8']) {
+    for (const id of ['A7']) {
       const table = plan.tables.find(entry => entry.id === id);
       if (table) released += seatsSetCount(table, 3);
     }
@@ -268,10 +302,6 @@ export function seatsUpgradePlan(plan) {
     }
   }
   if (previousVersion < 6) {
-    for (const id of ['B5', 'C5']) {
-      const table = plan.tables.find(entry => entry.id === id);
-      if (table) released += seatsSetCount(table, 4);
-    }
     for (const table of plan.tables) if (table.autoSize !== false) seatsSetCount(table, table.count);
     seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   }
@@ -283,7 +313,14 @@ export function seatsUpgradePlan(plan) {
   }
   if (previousVersion < 10) seatsSpreadRearRows(plan);
   if (previousVersion < 11) seatsEvenRows(plan);
-  seatsSeparateTables(plan);
+  if (previousVersion < 12) seatsSeparateTables(plan);
+  for (const [id, count] of updateCounts ? [['C1', 4], ['A8', 4], ['B5', 5], ['C5', 5], ['D7', 5], ['D8', 5]] : []) {
+    const table = plan.tables.find(table => table.id === id);
+    if (table) released += seatsSetCount(table, count);
+  }
+  const bimah = seatsOldBimah(plan); if (bimah) bimah.y = 488;
+  for (const { column, cabinet } of seatsOldSideCases(plan)) { cabinet.y = seatsSideCaseTop(plan, column); cabinet.height = 936 - cabinet.y; }
+  seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -299,7 +336,7 @@ export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
     for (let row = 1; row <= rows; row++) tables.push(seatsDefaultTable(column, row));
   });
   const plan = { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION, tables,
-    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 452, width: 104, height: 90 }],
+    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 488, width: 104, height: 90 }],
     people: [], paper: 'auto', monochrome: true };
   seatsRearLayout(plan);
   seatsSyncAisleTables(plan);
