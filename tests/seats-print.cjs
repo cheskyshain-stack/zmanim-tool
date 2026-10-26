@@ -45,6 +45,14 @@ center=fitz.Point((float(rav.attrib['xMin'])+float(rav.attrib['xMax']))/2,(float
 shtender=[rect for rect in rectangles if rect.contains(center) and 4<rect.width<35 and 4<rect.height<35]
 assert len(shtender)==1, ('The printed shtender is missing',shtender)
 assert abs(shtender[0].width-shtender[0].height)<.15, ('The printed shtender must stay square',shtender)
+amud_text=pdf_page.search_for('Amud')
+assert amud_text, 'The amud label is missing'
+amud_bounds=fitz.Rect(amud_text[0])
+for part in amud_text[1:]: amud_bounds |= part
+amud_center=(amud_bounds.tl+amud_bounds.br)/2
+amud=[rect for rect in rectangles if rect.contains(amud_center) and 4<rect.width<35 and 4<rect.height<35]
+assert len(amud)==1, ('The printed amud is missing',amud)
+assert abs(amud[0].width-shtender[0].width)<.15 and abs(amud[0].height-shtender[0].height)<.15, ('The amud must match the Rav shtender on paper',amud,shtender)
 print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWordRatio':front_ratio,'verticalWordRatio':vertical_ratio,'shtenderSquare':True,'bottomEdgeComplete':True,'textWithinPage':True}))
 `;
 (async()=>{
@@ -53,6 +61,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
   try{
     const {seatsCreateState}=await import('../js/seats/model.js'),sample=seatsCreateState();
+    sample.plans[0].name='Private Chart Title Example';
     sample.plans[0].objects.push({id:'test-case',type:'cabinet',label:'Test Sefarim',x:280,y:320,width:24,height:120});
     for(const width of [375,1440]){
       const context=await browser.newContext({viewport:{width,height:1050},isMobile:width===375,hasTouch:width===375});
@@ -79,6 +88,8 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         await page.pdf({path:pdf,printBackground:true,preferCSSPageSize:!testCase.nativeLetter,...(testCase.nativeLetter?{format:'Letter',landscape:true}:testCase.format?{format:testCase.format,landscape:true}:{})});
         const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
         assert.match(info,/Pages:\s+1\b/,label);
+        assert.match(text,/7:30\s+MINYAN/i,label+' wordmark');
+        assert.ok(!text.includes(sample.plans[0].name),'Chart names are excluded from '+label);
         const format=testCase.format||(testCase.paper==='letter'||testCase.nativeLetter?'Letter':'Tabloid');
         const dimensions=info.match(/Page size:\s+([\d.]+) x ([\d.]+) pts/).slice(1).map(Number),expected=({Letter:[792,612],Tabloid:[1224,792],Legal:[1008,612],A4:[841.89,595.28],A5:[595.28,419.53]})[format];
         assert.ok(dimensions.every((dimension,index)=>Math.abs(dimension-expected[index])<1.1),label+' '+dimensions);

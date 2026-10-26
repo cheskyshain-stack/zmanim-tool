@@ -43,14 +43,14 @@ const server=http.createServer((request,response)=>{
       await page.reload();await openChart(legacy.id);assert.equal(await page.locator('#chart-name').inputValue(),'Custom seating chart');
       assert.equal((await saved()).plans.find(plan=>plan.id===custom.id).name,custom.name,'Unrelated custom chart titles remain intact');
       await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Use today’s date',exact:true}).click();
-      assert.equal(await page.locator('#chart-name').inputValue(),today);assert.equal(await page.locator('#seats-print h1').textContent(),today);
+      assert.equal(await page.locator('#chart-name').inputValue(),today);assert.equal(await page.locator('#seats-print h1').textContent(),'7:30 Minyan');
       const selectedTitle=await page.locator('#chart-name').evaluate(input=>({focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd,length:input.value.length}));
       assert.equal(selectedTitle.focused,true);assert.equal(selectedTitle.start,0);assert.equal(selectedTitle.end,selectedTitle.length,'Using today selects the title for an optional custom edit');
       for(const paper of ['letter','tabloid']){
         await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
         const file=path.join(output,'dated-title-'+width+'-'+paper+'.pdf');await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});
         const info=execFileSync('pdfinfo',[file],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',file,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
-        assert.match(info,/Pages:\s+1\b/);assert.ok(text.includes(today),'The full dated title is retained in the '+paper+' printout');await page.emulateMedia({media:'screen'});
+        assert.match(info,/Pages:\s+1\b/);assert.match(text,/7:30\s+MINYAN/i);assert.ok(!text.includes(today),'The saved chart title stays out of the '+paper+' printout');await page.emulateMedia({media:'screen'});
       }
       const create=async name=>{
         await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
@@ -65,7 +65,7 @@ const server=http.createServer((request,response)=>{
       assert.ok((await page.locator('.sharing-local-plan strong').allTextContents()).includes(today+' (3)'));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
     }
-    console.log('PASS: chart names use New York dates, legacy metadata names stay stable, custom names persist, chart actions open directly, today action and same-day suffixes work, and Letter/Tabloid PDFs retain full titles on phone/desktop.');
+    console.log('PASS: chart names use New York dates, legacy metadata names stay stable, custom names persist, chart actions open directly, today action and same-day suffixes work, and Letter/Tabloid PDFs use the minyan wordmark on phone/desktop.');
     console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

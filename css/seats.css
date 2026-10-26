@@ -284,13 +284,15 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print{display:flex!important;flex-direction:column;width:min(var(--seats-page-width),100vw);height:min(var(--seats-page-height),calc(100vh - 1px));break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
   /* Anchor auto fit to the printable page, which can differ from Android's viewport. */
   #seats-print.auto-paper{position:fixed;inset:0;width:auto;height:auto;container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in) / 100cqw)}
-  #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
+  #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .amud-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
   #seats-print .adaptive-print .vertical-lettering{transform:scaleY(var(--seats-print-correction))}
   #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}
   #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
+  #seats-print .minyan-logo{display:inline-flex;align-items:center;gap:.08in;line-height:1;white-space:nowrap}
+  #seats-print .minyan-logo-name{font-size:9pt;letter-spacing:.12em;text-transform:uppercase;padding-left:.08in;border-left:1pt solid currentColor}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-item{cursor:default}
-  #seats-print .shtender-surface{vector-effect:non-scaling-stroke}
+  #seats-print .shtender-surface,#seats-print .amud-surface{vector-effect:non-scaling-stroke}
   #seats-print .table-seat:hover .seat-area{fill:transparent}
   .seats-print-error #seats-print{display:none!important}
   .seats-print-error #seats-app::after{display:block;content:'Some names do not fit inside their tables. Increase table width or depth before printing.';font:16pt Arial}
