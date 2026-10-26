@@ -15,6 +15,7 @@ import { seatsSortPeople } from './seats/name-sort.js';
 import { seatsChartName, seatsDatedChartName } from './seats/chart-names.js';
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
+import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
@@ -248,30 +249,13 @@ function seatsStart(root, auth) {
     const link = document.createElement('a'); link.href = url; link.download = name; link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
-  function wrapped(text, font, width) {
+  function nameMeasure(text, font) {
     measure.font = font + 'px Arial';
-    const lines = [], words = text.split(/\s+/);
-    let line = '';
-    for (const word of words) {
-      const candidate = line ? line + ' ' + word : word;
-      if (measure.measureText(candidate).width <= width) { line = candidate; continue; }
-      if (line) { lines.push(line); line = ''; }
-      line = word;
-    }
-    if (line) lines.push(line);
-    return lines;
+    return measure.measureText(text).width;
   }
   function nameText(name, x, y, width, height, tableId, maxFont = 13) {
-    let font = maxFont, lines = [], fits = false;
-    for (; font >= 7; font -= 0.5) {
-      lines = wrapped(name, font, width - 6);
-      const wholeWords = name.split(/\s+/).every(word => measure.measureText(word).width <= width - 6);
-      if (wholeWords && lines.length * font * 1.1 <= height - 3) { fits = true; break; }
-    }
-    if (!fits) {
-      font = 7; lines = wrapped(name, font, width - 6);
-      if (lines.length * font * 1.1 > height - 3 || lines.some(line => measure.measureText(line).width > width - 6)) overflowTables.add(tableId);
-    }
+    const { font, lines, fits } = seatsFitName(name, width, height, nameMeasure, maxFont);
+    if (!fits) overflowTables.add(tableId);
     const start = y + height / 2 - (lines.length - 1) * font * 0.55 + font * 0.33;
     const rtl = /[א-ת]/.test(name) && !/[A-Za-z]/.test(name);
     return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
@@ -280,6 +264,13 @@ function seatsStart(root, auth) {
     const current = plan(), geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
+    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(people.get(id), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
+    for (const rav of current.objects.filter(object => object.type === 'rav' && people.has(object.seats[0]))) {
+      const size = Math.min(rav.width - 2, rav.height - 30);
+      nameLayouts.push(seatsFitName(people.get(rav.seats[0]), size, size - 4, nameMeasure, 11));
+    }
+    const commonFont = seatsCommonNameFont(nameLayouts);
+    const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(name, x, y, width, height, id, Math.min(commonFont, maxFont));
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + entry.count + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
@@ -288,7 +279,7 @@ function seatsStart(root, auth) {
         const name = people.get(table.seats[index]);
         return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
           <rect class="seat-area" x="${svgNumber(index * width + 1)}" y="2" width="${svgNumber(Math.max(1, width - 2))}" height="${table.height - 4}"/>
-          ${name ? wideName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="empty-seat" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${index + 1}</text>`}
+          ${name ? seatName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="empty-seat" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${index + 1}</text>`}
           ${seatsChairPillar(current, table.id, index + 1) ? '' : `<path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>`}
         </g>`;
       }).join('');
@@ -302,7 +293,7 @@ function seatsStart(root, auth) {
       const attributes = interactive ? `id="room-item-${attr(object.id)}" data-item="${attr(object.id)}" role="button" tabindex="0" aria-label="${attr(object.label)}"` : '';
       let art;
       if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName);
-      else if (object.type === 'rav') art = seatsRavArt(object, people, wideName, interactive, printScale);
+      else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
       else if (object.type === 'pillar' && seatsIsFixed(object)) art = `<rect width="${object.width}" height="${object.height}" class="object-surface chair-pillar" fill="url(#pillar-${interactive ? 'screen' : 'print'})"/>`;
       else if (object.type === 'amud') {
         const width = object.width / printScale;
