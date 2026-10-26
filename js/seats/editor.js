@@ -42,7 +42,8 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
   function location(person) {
     for (const table of seatsItems(getPlan())) {
       const index = table.seats.indexOf(person.id);
-      if (index >= 0) return table.label + ' · Seat ' + (index + 1) + ' · move here';
+      if (index >= 0) return table.id === active?.tableId && index === active.index
+        ? 'This seat' : table.label + ' · Seat ' + (index + 1) + ' · copy here';
     }
     return 'Not seated';
   }
@@ -62,7 +63,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
     onSelect(tableId);
     active = { tableId, index };
     const name = initial ?? personAt(tableId, index)?.name ?? '';
-    card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Copy and paste keeps the original seat.</small></form>`;
+    card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
     card.hidden = false; position();
     const input = card.querySelector('input'); input.focus({ preventScroll: true });
     if (initial === undefined) input.select();

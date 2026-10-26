@@ -31,11 +31,14 @@ Delete all names clears the current plan's full list. Deletion clears the affect
 seats, preserves the room, and supports Undo and Redo.
 Click a seat and type a name, choose a suggested existing person, or copy and paste
 a name into a separate seat for a child. Copying creates a separate person record
-and keeps the original assignment. Choosing an already seated suggestion moves
-that person. Enter saves; Tab saves and advances. Undo and Redo also support
+and keeps the original assignment. Choosing an already seated suggestion or list
+name adds a separate copy and keeps the original seat. Reopening and saving the
+same seat keeps its existing record. Each copy can be renamed independently.
+Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 On desktop, Seats keeps the list beside the chart within the viewport.
-Drag a list name onto a seat or drag an assigned name to another seat. Ctrl/Option
+Drag a list name onto a seat to add it, keeping any existing assignment. Drag
+an assigned name directly between chart seats to move it. Ctrl/Option
 drag creates a separate copy for another person, and dropping an assigned name back
 in the list frees its seat. An occupied destination returns its former occupant to
 the waiting list. Undo/Redo also covers these changes. Fit shows the whole room;

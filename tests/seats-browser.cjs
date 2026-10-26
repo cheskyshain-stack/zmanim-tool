@@ -110,8 +110,39 @@ const server = http.createServer((req,res) => {
     await page.locator('[data-person]').filter({hasText:'Yosef Cohen'}).click();
     await page.locator('.room-stage [data-table="A2"][data-seat="1"]').click();
     let current = (await state()).plans[0];
-    assert.equal(current.tables.find(t=>t.id==='A1').seats[0], null);
-    assert.equal(current.tables.find(t=>t.id==='A2').seats[1], current.people.find(p=>p.name==='Yosef Cohen').id);
+    const originalYosef=current.people.find(p=>p.name==='Yosef Cohen').id;
+    const copyYosef=current.tables.find(t=>t.id==='A2').seats[1];
+    assert.equal(current.tables.find(t=>t.id==='A1').seats[0],originalYosef,'Clicking an already seated list name must keep the original seat');
+    assert.notEqual(copyYosef,originalYosef);assert.equal(current.people.find(person=>person.id===copyYosef).name,'Yosef Cohen');
+    const copiedState=await state();
+    await page.locator('.room-stage [data-table="A2"][data-seat="1"]').click();
+    await page.locator('.seat-suggestions [data-suggest="'+copyYosef+'"]').click();
+    assert.deepEqual(await state(),copiedState,'Choosing the current seat name must not create another person');
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    assert.equal((await state()).plans[0].tables.find(t=>t.id==='A2').seats[1],null);
+    await page.getByRole('button',{name:'Redo',exact:true}).click();assert.deepEqual(await state(),copiedState);
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    for(const method of ['suggestion click','keyboard suggestion','typed name']){
+      await page.locator('.room-stage [data-table="A2"][data-seat="1"]').click();
+      await page.locator('#seat-name-input').fill(method==='typed name'?'Yosef Cohen':'Yosef');
+      if(method==='suggestion click'){
+        assert.match(await page.locator('.seat-suggestions [data-suggest="'+originalYosef+'"] small').textContent(),/copy here/);
+        await page.locator('.seat-suggestions [data-suggest="'+originalYosef+'"]').click();
+      }else{
+        if(method==='keyboard suggestion')await page.locator('#seat-name-input').press('ArrowDown');
+        await page.locator('#seat-name-input').press('Enter');
+      }
+      const repeated=(await state()).plans[0],id=repeated.tables.find(t=>t.id==='A2').seats[1];
+      assert.equal(repeated.tables.find(t=>t.id==='A1').seats[0],originalYosef,method+' must keep the original assignment');
+      assert.ok(id&&id!==originalYosef);assert.equal(repeated.people.find(person=>person.id===id).name,'Yosef Cohen');
+      await page.getByRole('button',{name:'Undo',exact:true}).click();
+    }
+    // Moving a name directly between chart seats remains an explicit move.
+    const from=await page.locator('.room-stage [data-table="A1"][data-seat="0"] .seat-area').boundingBox(),to=await page.locator('.room-stage [data-table="A2"][data-seat="1"] .seat-area').boundingBox();
+    await page.mouse.move(from.x+from.width/2,from.y+from.height/2);await page.mouse.down();
+    await page.mouse.move(to.x+to.width/2,to.y+to.height/2,{steps:12});await page.mouse.up();
+    current=(await state()).plans[0];assert.equal(current.tables.find(t=>t.id==='A1').seats[0],null);
+    assert.equal(current.tables.find(t=>t.id==='A2').seats[1],originalYosef);
     for (const [index,name] of [[0,'Moshe Levi'],[1,'דוד כהן'],[2,'Rabbi Shmuel Alexander Friedlander']]) {
       await page.locator('.room-stage [data-table="A1"][data-seat="' + index + '"]').click();
       await page.locator('#seat-name-input').fill(name);
