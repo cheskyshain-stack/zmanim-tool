@@ -22,17 +22,20 @@ export function seatsParseDelimited(text) {
 
 export function seatsNamesFromRows(rows) {
   if (!rows.length) return [];
-  const header = rows[0].map(value => String(value).toLowerCase().replace(/[\s_.-]/g, ''));
-  const find = choices => header.findIndex(value => choices.includes(value));
-  const full = find(['name', 'fullname', 'displayname', 'hebrewname', 'שם', 'שםמלא']);
-  const first = find(['first', 'firstname', 'givenname', 'שםפרטי']);
-  const last = find(['last', 'lastname', 'surname', 'familyname', 'שםמשפחה']);
-  const hasHeader = full >= 0 || first >= 0 || last >= 0;
-  return (hasHeader ? rows.slice(1) : rows).map(row => {
+  let full = -1, first = -1, last = -1, headerRow = -1;
+  for (let index = 0; index < Math.min(rows.length, 50); index++) {
+    const header = rows[index].map(value => String(value).toLowerCase().replace(/[\s_.-]/g, ''));
+    const find = choices => header.findIndex(value => choices.includes(value));
+    full = find(['name', 'fullname', 'displayname', 'hebrewname', 'שם', 'שםמלא']);
+    first = find(['first', 'firstname', 'givenname', 'שםפרטי']);
+    last = find(['last', 'lastname', 'surname', 'familyname', 'שםמשפחה']);
+    if (full >= 0 || first >= 0 || last >= 0) { headerRow = index; break; }
+  }
+  return rows.slice(headerRow + 1).map(row => {
     if (full >= 0) return String(row[full] ?? '').trim();
     if (first >= 0 || last >= 0) return [first >= 0 ? row[first] : '', last >= 0 ? row[last] : ''].filter(Boolean).join(' ').trim();
     return String(row[0] ?? '').trim();
-  }).filter(Boolean);
+  }).filter(name => /\p{L}/u.test(name));
 }
 
 export async function seatsReadNames(file) {
@@ -47,7 +50,7 @@ export async function seatsReadNames(file) {
       script.onerror = () => { script.remove(); reject(new Error('Excel import could not load. Try again, or save the spreadsheet as CSV.')); };
       document.head.appendChild(script);
     });
-    const book = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellHTML: false, cellFormula: false, sheetRows: 2002 });
+    const book = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellHTML: false, cellFormula: false, sheetRows: 2052 });
     rows = window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, defval: '', blankrows: false });
   } else if (ext === 'txt') rows = (await file.text()).replace(/^\uFEFF/, '').split(/\r?\n/).map(line => [line]);
   else if (['csv', 'tsv'].includes(ext)) rows = seatsParseDelimited(await file.text());

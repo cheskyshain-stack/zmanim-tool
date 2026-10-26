@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront } from '../js/seats/model.js';
+import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront, seatsRemovePeople } from '../js/seats/model.js';
 import { seatsParseDelimited, seatsNamesFromRows, seatsCsvCell } from '../js/seats/import.js';
 
 test('34-table starting layout has the extra middle tables at the back and the specified four-seat and three-seat tables', () => {
@@ -60,6 +60,32 @@ test('CSV import handles BOM, quoted commas, doubled quotes, multiline cells and
   assert.throws(() => seatsParseDelimited('Name\n"Unclosed'), /unclosed/);
   assert.equal(seatsCsvCell('=1+1'), '"\'=1+1"');
   assert.equal(seatsCsvCell('Normal "name"'), '"Normal ""name"""');
+});
+
+test('directory import finds name headers below title and note rows instead of reading house numbers', () => {
+  const rows=[['Directory'],['Source notes'],['3 entries'],['House number','First name','Last name','Street','Notes'],
+    [1,'Yosef','Cohen','Example Street',''],[2,'Moshe','Levi','Example Street','Check spelling'],[3,'דוד','כהן','Example Street','']];
+  assert.deepEqual(seatsNamesFromRows(rows),['Yosef Cohen','Moshe Levi','דוד כהן']);
+  assert.deepEqual(seatsNamesFromRows([['Directory'],['Number','Name'],[1,'Yosef Cohen'],[2,'Moshe Levi']]),['Yosef Cohen','Moshe Levi']);
+  assert.deepEqual(seatsNamesFromRows([[123],['456'],['Yosef Cohen']]),['Yosef Cohen']);
+});
+
+test('deleting selected or all people clears their table and Rav seats and preserves the room and other plans', () => {
+  const state=seatsCreateState(),plan=state.plans[0],other=seatsCreateState().plans[0];state.plans.push(other);
+  seatsAddNames(plan,['Keep me','Seated person','Waiting person','Rav']);
+  const [keep,seated,waiting,rav]=plan.people.map(person=>person.id);
+  seatsAssign(plan,'A1',0,keep);seatsAssign(plan,'A1',1,seated);seatsAssign(plan,'rav-seat',0,rav);
+  const original=structuredClone(state);
+  assert.equal(seatsRemovePeople(plan,[seated,waiting,rav,'missing',seated]),3);
+  assert.deepEqual(plan.people,[original.plans[0].people[0]]);
+  assert.equal(plan.tables[0].seats[0],keep);assert.equal(plan.tables[0].seats[1],null);
+  assert.deepEqual(plan.objects.find(object=>object.type==='rav').seats,[null]);
+  assert.deepEqual(seatsNormalizeState(state),state);assert.deepEqual(other,original.plans[1]);
+  assert.equal(seatsRemovePeople(plan,plan.people.map(person=>person.id)),1);
+  assert.equal(plan.people.length,0);assert.equal(seatsAssigned(plan).size,0);
+  assert.deepEqual(plan.tables.map(({seats,...table})=>table),original.plans[0].tables.map(({seats,...table})=>table));
+  assert.deepEqual(plan.objects.map(({seats,...object})=>object),original.plans[0].objects.map(({seats,...object})=>object));
+  assert.deepEqual(seatsNormalizeState(state),state);
 });
 
 
