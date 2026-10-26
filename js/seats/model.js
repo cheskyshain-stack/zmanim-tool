@@ -6,10 +6,10 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'chair-pillars-2026-10-26';
+export const SEATS_ROOM_UPDATE = 'front-door-gap-2026-10-26';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
-export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 8 };
+export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 24 };
 export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
 export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B6', 'C6'];
@@ -308,9 +308,14 @@ function seatsFrontClearanceNeeded(plan) {
   const b1 = plan.tables.find(table => table.id === 'B1');
   return Boolean(b1 && b1.x + b1.width > seatsFront(plan).aron.x - SEATS_TABLE_WALL_GAP + .001);
 }
+function seatsDoorClearanceNeeded(plan) {
+  const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
+  return Boolean(c1 && d1 && d1.y < SEATS_FRONT_RIGHT_DOOR.bottom && d1.y + d1.height > SEATS_FRONT_RIGHT_DOOR.top
+    && d1.x + d1.width > SEATS_BOUNDS.right - SEATS_FRONT_RIGHT_DOOR.clearance + .001);
+}
 export function seatsNeedsUpgrade(plan) {
   return plan.layoutVersion !== SEATS_LAYOUT_VERSION || seatsEarlierRoomUpdate(plan) || seatsOldRearInset(plan)
-    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id) || Boolean(seatsOldAmud(plan)) || seatsMissingPillars(plan).length > 0 || seatsFrontClearanceNeeded(plan);
+    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id) || Boolean(seatsOldAmud(plan)) || seatsMissingPillars(plan).length > 0 || seatsFrontClearanceNeeded(plan) || seatsDoorClearanceNeeded(plan);
 }
 
 export function seatsUpgradePlan(plan) {
@@ -322,7 +327,7 @@ export function seatsUpgradePlan(plan) {
     seatsAddA7Cabinet(plan);
     seatsUpdateAmud(plan);
     seatsAddPillars(plan);
-    if (seatsFrontClearanceNeeded(plan)) seatsSyncFront(plan);
+    if (seatsFrontClearanceNeeded(plan) || seatsDoorClearanceNeeded(plan)) seatsSyncFront(plan);
     return 0;
   }
   const previousVersion = plan.layoutVersion ?? 1;

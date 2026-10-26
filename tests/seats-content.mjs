@@ -43,6 +43,12 @@ test('the latest room update keeps older untouched charts empty', () => {
   assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
 });
 
+test('moving the previous front pair away from the doorway does not create a saved empty chart', () => {
+  const plan=seatsCreatePlan();plan.tables.find(table=>table.id==='C1').x=735;plan.tables.find(table=>table.id==='D1').x=935;
+  plan.objects.find(object=>object.type==='rav').x=669.5;
+  assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
+});
+
 test('unassigned people and occupied table or Rav seats preserve content', () => {
   const waiting = seatsCreatePlan(); waiting.people.push({ id: 'waiting-example', name: 'Unassigned Example Person' });
   assert.equal(seatsHasContent(waiting), true);
