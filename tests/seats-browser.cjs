@@ -47,6 +47,11 @@ const server = http.createServer((req,res) => {
     for(const id of ['B2','C2','B5','C5','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,192);
+    const aisleGaps=await page.locator('.room-stage').evaluate(stage=>{
+      const row=['A3','B3','C3','D3'].map(id=>stage.querySelector('[data-item="'+id+'"] .table-surface').getBoundingClientRect());
+      return row.slice(1).map((table,index)=>table.left-row[index].right);
+    });
+    assert.ok(Math.max(...aisleGaps)-Math.min(...aisleGaps)<.1,'The main aisle widths should match on screen');
     await page.screenshot({path:path.join(output,'default-room.png'),fullPage:true});
     assert.equal(await page.locator('.room-stage .walkway text,.room-stage .room-opening text,.room-stage .room-door text,.room-stage [data-item^="rear-case-"] text').count(),0);
     assert.equal(await page.locator('.room-stage #room-item-main-amud path').count(),0);
@@ -301,7 +306,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v6'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v7'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();

@@ -33,6 +33,9 @@ The rav's separate, assignable chair faces the room across its square shtender. 
 between the Aron Kodesh and C1; C1 touches D1. An amud stands between B2 and C2.
 B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
 leaving more space beside the amud and bimah.
+The middle columns sit closer together so the three main aisle gaps are equal
+beside standard five-seat tables. The shorter tables retain extra clearance around
+the amud and bimah; C1 still touches D1 at the front.
 The first row touches the front wall, A1 through A6 touch the left wall, and a
 central bimah is included. The amud has a plain surface without a decorative symbol.
 A walkway separates rows 6 and 7, with row 7 meeting its back edge and an entrance in
@@ -61,7 +64,9 @@ lettering proportions and narrow margins. Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Plans from version 5 or earlier widen automatic tables and reduce B5/C5 to four seats, retaining
+Version 6 plans rebalance the B/C column positions while retaining names, seat
+counts, table sizes, and the outer columns. Plans from version 5 or earlier also
+widen automatic tables and reduce B5/C5 to four seats, retaining
 all names. Anyone in those removed fifth seats returns to the waiting list. Manual
 table sizes are retained. Version 4 plans also receive the row 7 and back-cabinet
 updates while retaining names,
@@ -69,7 +74,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v6` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-v7` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
