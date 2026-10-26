@@ -31,7 +31,7 @@ const server=http.createServer((request,response)=>{
       assert.equal(photoSize.naturalWidth,240);assert.equal(photoSize.naturalHeight,141);
       assert.ok(Math.abs(photoSize.height-54)<1);assert.ok(Math.abs(photoSize.width/photoSize.height-photoSize.naturalWidth/photoSize.naturalHeight)<.02,'The login photo keeps the congregation picture proportions');
       await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
-      const openSaved=async()=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();};
+      const openSaved=async()=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();};
       await openSaved();await page.locator('#people-sort').waitFor();
       const visibleNames=async()=>page.locator('#people-list .person-name bdi').allTextContents();
       const chosenNames=async()=>(await visibleNames()).filter(name=>first.includes(name));

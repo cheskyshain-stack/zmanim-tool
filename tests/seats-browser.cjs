@@ -24,9 +24,9 @@ const server = http.createServer((req,res) => {
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {if(response.status() >= 400) badResponses.push(response.url());});
     page.on('request', request => {if(request.method() !== 'GET') posts.push(request.url());});
-    const openSaved = async target => { await target.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click(); await target.getByRole('button',{name:'7:30 minyan',exact:true}).click(); };
+    const openSaved = async target => { await target.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();  };
     const openDevice = async (target,id) => { await openSaved(target); await target.locator('.sharing-local-plan .saved-page-card'+(id?'[data-id="'+id+'"]':'')).first().click(); };
-    const createChart = async target => { await target.getByRole('button',{name:'Create new chart',exact:true}).click();await target.getByRole('button',{name:'7:30 minyan',exact:true}).click();await target.getByRole('button',{name:'Close',exact:true}).click(); };
+    const createChart = async target => { await target.getByRole('button',{name:'Create new chart',exact:true}).click();await target.getByRole('button',{name:'Close',exact:true}).click(); };
     await page.goto(origin + '/seats/');
     assert.equal(await page.title(), 'Seats | Bais Medrash of Lakewood Commons');
     assert.equal(await page.locator('.room-diagram').count(), 0);
@@ -292,7 +292,7 @@ const server = http.createServer((req,res) => {
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
     const backupData=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.ok(backupData.chartRecords[originalPlan].createdAt);assert.ok(backupData.chartRecords[originalPlan].updatedAt);
     await openSaved(page);await page.getByRole('button',{name:'New chart',exact:true}).click();
-    await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
+    await page.getByRole('button',{name:'Close',exact:true}).click();
     await page.locator('#chart-name').fill('Yomim Noraim');await page.locator('#chart-name').press('Enter');
     assert.equal((await state()).plans.length,2); assert.equal((await state()).plans[1].people.length,0);
     await page.locator('#backup-file').setInputFiles(backupPath);

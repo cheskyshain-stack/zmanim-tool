@@ -8,11 +8,11 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
 Its PIN is separate from the existing admin PIN. After unlocking, the home page
-offers Create new chart and View saved charts. Both lead to a room picker with
-7:30 minyan and a disabled Main BM marked Coming soon. Creating a 7:30 chart
-opens the standard empty layout and the Name files chooser; the chooser can be
-closed to enter names manually. Viewing saved charts opens all existing setups
-for that room. Existing device drafts remain available, and opening Seats again
+offers Create new chart and View saved charts. With 7:30 minyan as the only
+available room, these buttons skip location selection. Create opens the standard
+empty layout and the Name files chooser; the chooser can be closed to enter names
+manually. View saved charts opens all existing setups directly. Existing device
+drafts remain available, and opening Seats again
 returns to home. Direct links to a shared chart still open that chart.
 The standard layout has columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
@@ -155,7 +155,7 @@ beside Print. The chart name is editable inline. Save uploads the current chart 
 the website once; later edits save there automatically. Anyone signed in can open
 the chart from Saved charts and edit it. There is no separate sharing step.
 The folder shows chart names, creation dates, last-edit dates and the last editor.
-New chart inside the folder returns to room selection. Seats home returns to the
+New chart inside the folder opens a fresh layout directly. Seats home returns to the
 start page; history and backup downloads are under More.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
@@ -187,7 +187,7 @@ Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates
 actual one-page Letter and Tabloid PDFs and checks their sizes, names, safe margins,
 and lettering proportions, alongside touch zoom and scrolling.
-`node tests/seats-start.cjs` checks the home page, room choices, name chooser,
+`node tests/seats-start.cjs` checks the home page, direct chart actions, name chooser,
 existing drafts, canonical new layouts and return navigation on phone and desktop.
 `node --test tests/seats-name-sort.mjs` and `node tests/seats-name-sort.cjs` check
 first/last-name ordering, unchanged assignments, exports, device preference, focus,

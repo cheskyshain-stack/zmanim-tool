@@ -71,7 +71,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(patches[0].changes.some(change => change.group === 'plan' && change.key === 'layoutVersion'), false);
     const local = await page.evaluate(() => { const state = JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')); return state.plans.find(plan => plan.id === state.activeId); }); assertUpdated({ plan: local });
     await page.screenshot({ path: path.join(output, 'migrated-shared-room.png'), fullPage: true });
-    await page.reload(); await page.getByRole('button', { name: 'View saved charts', exact: true }).click(); await page.getByRole('button', { name: '7:30 minyan', exact: true }).click();
+    await page.reload(); await page.getByRole('button', { name: 'View saved charts', exact: true }).click();
     await page.locator('.sharing-site-plan .saved-page-card[data-id="' + remoteId + '"]').click(); await page.waitForFunction(() => document.querySelector('.saved-label')?.textContent === 'Saved to website');
     const second = await browser.newContext({ viewport: { width: 375, height: 900 } }); contexts.push(second); const peer = await second.newPage(); observe(peer); await openLink(peer, 'Migration Organizer Two');
     const peerLocal = await peer.evaluate(() => { const state = JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')); return state.plans.find(plan => plan.id === state.activeId); }); assertUpdated({ plan: peerLocal });

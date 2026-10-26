@@ -8,10 +8,9 @@ const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, isViewingChart = () => true, onClose = () => {}, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
-  dialog.addEventListener('close', onClose);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, entryPin = initialPin, pendingPublish = null;
