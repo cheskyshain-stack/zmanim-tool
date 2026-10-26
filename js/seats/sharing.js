@@ -4,16 +4,27 @@ import { seatsSharedApply, seatsSharedDiff, seatsSharedPlan, seatsSharedReverse 
 const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 
-export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, onStatus, isBusy }) {
+export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup }) {
   const clientId = crypto.randomUUID(), entries = new Map();
-  const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; document.body.appendChild(dialog);
+  const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = '', dialogMode = '', lastMessage = 0;
+  let intent = 'pages', listRequest = 0;
+  const requestedPage = new URL(location.href).searchParams.get('page');
+  let pendingPage = /^[A-Za-z0-9_-]{8,100}$/.test(requestedPage || '') ? requestedPage : null;
   const current = () => getState().plans.find(plan => plan.id === getState().activeId);
   const local = id => getState().plans.find(plan => plan.id === id);
   const entryForRemote = id => [...entries.values()].find(entry => entry.remoteId === id);
   const clean = (plan, id = plan.id) => seatsSharedPlan({ ...plan, id });
-  const changed = () => onStatus();
+  const changed = () => {
+    onStatus();
+    const saved = dialog.querySelector('[data-sharing-status]'); if (saved) saved.textContent = label();
+  };
+  function clearPageLink() {
+    pendingPage = null;
+    const url = new URL(location.href);
+    if (url.searchParams.has('page')) { url.searchParams.delete('page'); history.replaceState(history.state, '', url); }
+  }
   function persist() {
     try {
       localStorage.setItem(SEATS_SHARING_KEY, JSON.stringify({ version: 1, profile, entries: [...entries.values()].map(({ localId, remoteId, base, queue }) => ({ localId, remoteId, base, queue })) }));
@@ -86,7 +97,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     } else if (message.type === 'presence') { peers = message.peers || []; changed(); }
     else if (message.type === 'busy') notify(message.name + ' is editing that seat. Choose another seat while they finish.');
     else if (message.type === 'error') notify(message.error || 'That shared update could not be saved.');
-    else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'plans') showPlans();
+    else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'pages') refreshSitePages();
   }
   function connect() {
     if (!endpoint || !session || session.expires <= Date.now() || socket && socket.readyState < WebSocket.CLOSING) return;
@@ -142,7 +153,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   }
   function label() {
     const entry = entries.get(current()?.id);
-    if (!entry) return 'Saved in this browser';
+    if (!entry) return 'Saved on this device';
     if (entry.error) return entry.error;
     if (!session || session.expires <= Date.now()) return 'Local copy saved · Sign in to sync';
     if (!ready || !entry.ready) return 'Local copy saved · Reconnecting';
@@ -168,31 +179,72 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     if (busy) { notify(busy.name + ' is editing that seat. Choose another seat while they finish.'); return false; }
     return true;
   }
+  function showDialog(contents) {
+    dialog.classList.toggle('saved-pages-dialog', dialogMode === 'pages');
+    dialog.innerHTML = contents;
+    if (!dialog.open) dialog.showModal();
+    dialog.scrollTop = 0;
+  }
   function showLogin(error = '') {
     dialogMode = 'login';
-    dialog.innerHTML = `<h2>Work together</h2><p>Both organizers can open the same shared plan. Changes save online and appear for the other person.</p><form id="sharing-login"><label for="sharing-name">Your name</label><input id="sharing-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="given-name" required><label for="sharing-pin">Seats PIN</label><input id="sharing-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions"><button type="button" data-sharing="close">Cancel</button><button class="primary" type="submit">Open shared plans</button></div></form>`;
-    if (!dialog.open) dialog.showModal();
+    const title = pendingPage ? 'Open a shared page' : intent === 'save' ? 'Save this page to the site' : intent === 'share' ? 'Share / work together' : 'Open pages saved on the site';
+    showDialog(`<h2 id="sharing-title">${title}</h2><p>Enter your name and the same Seats PIN you used to open this tool. Your name lets the other organizer see who is editing.</p><form id="sharing-login"><label for="sharing-name">Your name</label><input id="sharing-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="given-name" required><label for="sharing-pin">Seats PIN</label><input id="sharing-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions"><button type="button" data-sharing="pages">Back to saved pages</button><button class="primary" type="submit">Sign in</button></div></form>`);
   }
-  async function showPlans(error = '') {
-    dialogMode = 'plans';
-    const linked = entries.has(current().id);
-    dialog.innerHTML = `<h2>Shared plans</h2><p>Signed in as ${escText(session.name)}. Both organizers should open the same plan below.</p>${linked ? '<p>This plan is shared. Changes save automatically.</p>' : '<button class="primary" type="button" data-sharing="publish">Save this plan to the site</button>'}<p class="sharing-error" role="alert">${escText(error)}</p><div id="sharing-plans">Loading saved plans…</div><div class="dialog-actions"><button type="button" data-sharing="signout">Sign out</button><button type="button" data-sharing="close">Close</button></div>`;
-    if (!dialog.open) dialog.showModal();
+  function pageCard(plan, site = false) {
+    const detail = site ? 'Updated by ' + plan.updatedBy + ' · ' + new Date(plan.updatedAt).toLocaleString()
+      : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
+    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(plan.name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(plan.name)}</bdi></strong><small>${escText(detail)}</small><span class="saved-page-open">Open page</span></button></div>`;
+  }
+  function showPlans(error = '') {
+    dialogMode = 'pages';
+    listRequest++;
+    const devicePages = getState().plans.map(plan => pageCard(plan)).join('');
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved pages</h2><p>Choose a page in this folder to open it. Your other pages stay saved.</p><section class="saved-pages-section"><h3>Saved on the site</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved pages…</p>' : '<p>Sign in to see pages saved on the site.</p><button type="button" class="primary" data-sharing="signin">Sign in to view site pages</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    if (endpoint && session) refreshSitePages();
+  }
+  async function refreshSitePages() {
+    const generation = ++listRequest;
     try {
       const result = await request('/api/plans');
-      if (!dialog.open || dialogMode !== 'plans') return;
-      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => `<div class="sharing-plan"><div><strong><bdi>${escText(plan.name)}</bdi></strong><small>Updated by ${escText(plan.updatedBy)} · ${escText(new Date(plan.updatedAt).toLocaleString())}</small></div><button type="button" data-sharing="open" data-id="${escAttr(plan.id)}">Open</button></div>`).join('') : '<p>No shared plans yet. Save this plan to get started.</p>';
+      if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
+      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<p>No pages saved on the site yet. Close this window and choose Save to site for your current page.</p>';
     } catch (error) {
-      if (!session) showLogin(error.message); else dialog.querySelector('.sharing-error').textContent = error.message;
+      if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
+      dialog.querySelector('#sharing-plans').innerHTML = `<p>${escText(error.message)}</p>${!session ? '<button type="button" data-sharing="signin">Sign in to view site pages</button>' : '<button type="button" data-sharing="refresh">Try again</button>'}`;
     }
+  }
+  function showSave(saved = false) {
+    dialogMode = 'save';
+    const linked = entries.has(current().id);
+    showDialog(`<h2 id="sharing-title">${linked ? saved ? 'Page saved to the site' : 'This page is saved to the site' : 'Save this page to the site'}</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p><p>${linked ? 'Later changes save automatically when connected. You can reopen this page from Saved pages on any device.' : 'Save the layout, names and seat assignments so you can reopen this page on another device or work on it together. Later changes save automatically.'}</p>${linked ? `<p><strong>Save status:</strong> <span data-sharing-status>${escText(label())}</span></p><button class="primary" type="button" data-sharing="share">Share / work together</button><button type="button" data-sharing="pages">Saved pages</button>` : '<button class="primary" type="button" data-sharing="publish">Save this page to the site</button>'}<p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">${linked ? 'Done' : 'Cancel'}</button></div>`);
+  }
+  function showShare() {
+    dialogMode = 'share';
+    const entry = entries.get(current().id), url = new URL(location.pathname, location.origin);
+    if (entry) url.searchParams.set('page', entry.remoteId);
+    showDialog(`<h2 id="sharing-title">Share / work together</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p>${entry ? `<ol class="sharing-steps"><li>Copy this page link and send it to the other organizer.</li><li>They open it and enter their own name and the same Seats PIN.</li><li>Both of you edit this page. Changes save automatically and appear for each other.</li></ol><label for="sharing-link">Link to this seating page</label><input id="sharing-link" type="text" readonly value="${escAttr(url.href)}"><button class="primary" type="button" data-sharing="copy">Copy page link</button><p id="sharing-copy-status" role="status" aria-live="polite"></p><p>They can also use Saved pages, sign in, and choose this page under Saved on the site.</p>` : '<p>Save this page to the site first. Then you’ll get a link so both organizers can open and edit the same page.</p><button class="primary" type="button" data-sharing="publish">Save to site and get a link</button>'}<p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
+  }
+  async function copyLink(button) {
+    const input = dialog.querySelector('#sharing-link');
+    let copied = false;
+    try { await navigator.clipboard.writeText(input.value); copied = true; } catch { /* Select the visible link when clipboard access is refused. */ }
+    if (!dialog.open || dialogMode !== 'share' || !input.isConnected) return;
+    if (!copied) {
+      input.focus({ preventScroll: true }); input.select(); input.setSelectionRange(0, input.value.length);
+      try { copied = document.execCommand('copy'); } catch { /* The selected link can still be copied by hand. */ }
+    }
+    if (!dialog.open || dialogMode !== 'share') return;
+    dialog.querySelector('#sharing-copy-status').textContent = copied ? 'Link copied. Send it to the other organizer and give them the Seats PIN separately.' : 'The link is selected. Copy it and send it to the other organizer.';
+    if (copied) button.focus({ preventScroll: true });
   }
   async function publish() {
     const plan = clean(current()), remoteId = crypto.randomUUID();
     const record = await request('/api/plans', { method: 'POST', body: JSON.stringify({ id: remoteId, plan }) });
     const entry = { localId: plan.id, remoteId, base: record, observed: clean(record.plan), queue: [], undo: [], redo: [], ready: false, error: '' };
     entries.set(plan.id, entry); persist();
-    connect(); watch(); presence(); dialog.close(); changed();
-    notify('Saved to the site. The other organizer can open this plan from Shared plans.');
+    connect(); watch(); presence(); changed();
+    notify('Page saved to the site. Later changes save automatically.');
+    if (intent === 'share') showShare(); else showSave(true);
   }
   async function openPlan(id) {
     const record = await request('/api/plans/' + encodeURIComponent(id));
@@ -203,23 +255,41 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     applySnapshot(entry, { ...record, type: 'snapshot' });
     updatePlan(localId, clean(entry.observed, localId), true); persist();
     dialog.close(); connect(); watch(); presence(); changed();
+    if (pendingPage === id) clearPageLink();
   }
-  async function open() {
-    if (!endpoint) return;
-    if (!session || session.expires <= Date.now()) showLogin(); else { connect(); await showPlans(); }
+  async function continueIntent() {
+    if (pendingPage) {
+      try { await openPlan(pendingPage); }
+      catch (error) { if (!session) showLogin(error.message); else showPlans(error.message); }
+    } else if (intent === 'share') showShare();
+    else if (intent === 'save') showSave();
+    else showPlans();
+  }
+  async function open(mode = 'pages') {
+    intent = mode;
+    if (mode === 'pages') { showPlans(); return; }
+    if (!endpoint) { showPlans(); return; }
+    if (!session || session.expires <= Date.now()) showLogin(); else { connect(); await continueIntent(); }
   }
   dialog.addEventListener('submit', async event => {
     event.preventDefault(); const button = dialog.querySelector('[type=submit]'); if (button) button.disabled = true;
     try {
       profile = dialog.querySelector('#sharing-name').value.trim();
       const result = await request('/api/session', { method: 'POST', body: JSON.stringify({ name: profile, pin: dialog.querySelector('#sharing-pin').value }) });
-      session = { ...result, endpoint }; sessionStorage.setItem(SEATS_SHARING_SESSION, JSON.stringify(session)); persist(); connect(); await showPlans(); changed();
+      session = { ...result, endpoint }; sessionStorage.setItem(SEATS_SHARING_SESSION, JSON.stringify(session)); persist(); connect(); await continueIntent(); changed();
     } catch (error) { showLogin(error.message); }
   });
   dialog.addEventListener('click', async event => {
     const button = event.target.closest('[data-sharing]'); if (!button) return;
     const action = button.dataset.sharing;
-    if (action === 'close') { dialog.close(); return; }
+    if (action === 'close') { clearPageLink(); dialog.close(); return; }
+    if (action === 'pages') { clearPageLink(); intent = 'pages'; showPlans(); return; }
+    if (action === 'signin') { intent = 'pages'; showLogin(); return; }
+    if (action === 'refresh') { refreshSitePages(); return; }
+    if (action === 'share') { intent = 'share'; showShare(); return; }
+    if (action === 'copy') { copyLink(button); return; }
+    if (action === 'local') { if (activatePage(button.dataset.id) !== false) { dialog.close(); presence(); } return; }
+    if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
       if ([...entries.values()].some(entry => entry.queue.length) && !window.confirm('Some changes are waiting to sync. Sign out and keep them on this device?')) return;
       session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); dialog.close(); changed(); return;
@@ -242,6 +312,9 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
         if (changes.length) { entry.observed = desired; queueChanges(entry, changes); }
       }
       changed(); connect();
+      if (pendingPage) {
+        if (!session || session.expires <= Date.now()) showLogin(); else await continueIntent();
+      }
     } catch { /* Local plans keep working when the shared service is unavailable. */ }
   }
   window.addEventListener('online', connect);
