@@ -114,6 +114,7 @@ const server=http.createServer((request,response)=>{
       await page.emulateMedia({media:'screen'});
     }
     await page.setViewportSize({width:375,height:850});
+    await page.waitForFunction(()=>document.querySelectorAll('[data-person][draggable="true"]').length===0);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     assert.equal(await page.locator('.seats-panel').evaluate(node=>getComputedStyle(node).overflowY),'visible','Phone page should keep normal page scrolling');
     assert.equal(await page.locator('[data-person][draggable="true"]').count(),0,'Phone names should retain normal touch scrolling');
