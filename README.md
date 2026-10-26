@@ -15,9 +15,9 @@ five seats as the standard size. Table labels appear above the table surfaces.
 Tables use 48 units per seat, about 12% wider than the original 43. Names wrap
 between whole words, with a smaller font when necessary; exceptionally long names
 still show the fit warning so their table can be enlarged before printing.
-Standard tables are 40 units high with 40 units between ordinary rows. Existing
-48-unit default depths are shortened; custom depths and manually spaced rows stay
-as edited. The main walkway between rows 6 and 7 stays clear.
+Standard tables are 40 units high with 48 units between all ordinary rows. The
+standard A-D rows use the common grid, with names, counts and custom sizes retained.
+Added tables keep their positions. The main walkway between rows 6 and 7 stays clear.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
 The importer finds name headers beneath up to 49 title/note rows, so directory
@@ -68,9 +68,9 @@ right bookcase face as their right edge. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 Built-in cabinet labels and walkway, entrance, and door labels are hidden on screen
 and in print; their shapes remain visible.
-Rows 7, 8 and 9 have equal 70-unit gaps between table surfaces. The back walkway
-is 48 units deep, giving 60 units back to rear row spacing. Front row gaps stay
-40 units. Side bookcases still reach the front of row 8.
+The same gap separates table rows from front to back, with a wider entrance walkway
+between rows 6 and 7. Rows 7, 8 and 9 share the front rows’ spacing. The back walkway
+is 48 units deep. Side bookcases still reach the front of row 8.
 The separate Edit layout tab is removed. Table & room settings remain tucked under
 Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
 labels, and a bimah. Move them by dragging labels or room objects, or with keyboard
@@ -91,7 +91,10 @@ Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Version 9 plans spread standard rear rows into the reduced back walkway, retaining
+Version 10 plans redistribute the standard rows using one common gap, keeping
+names, assignments, sizes and horizontal positions. The main amud and original
+bimah follow their adjacent rows, and side bookcases follow row 8. Version 9 plans
+spread standard rear rows into the reduced back walkway, retaining
 names, assignments, custom sizes, and manually spaced rows. Version 8 plans center
 the Aron, refit its adjacent front tables and Rav's seat,
 and shorten standard tables with matching row gaps, preserving names, assignments,
@@ -108,7 +111,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v10` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-v11` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
