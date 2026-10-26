@@ -4,6 +4,7 @@ import { seatsCreateState, seatsWriteName } from '../js/seats/model.js';
 import { seatsSharedDiff } from '../js/seats/shared-model.js';
 import { seatsDescribeChanges, seatsRecordMetadata } from '../js/seats/activity.js';
 import { seatsCreateRecords } from '../js/seats/records.js';
+import { seatsNormalizeNameFile } from '../js/seats/name-files.js';
 
 function setup(fresh = true) {
   const storage = new Map(); globalThis.localStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) };
@@ -42,4 +43,12 @@ test('change descriptions name seats and renames and summarize bulk name imports
   seatsWriteName(after, 'B9', 0, 'New Test Person');
   const details = seatsDescribeChanges(before, after, seatsSharedDiff(before, after)).join(' ');
   assert.match(details, /Renamed chart/); assert.match(details, /Added 1 name/); assert.match(details, /B9, seat 1: Empty → New Test Person/);
+});
+
+test('shared name files normalize names independently of chart assignments and reject invalid files', () => {
+  const file=seatsNormalizeNameFile({ name:' Family list ', names:['Yosef Cohen','  Yosef   Cohen ','דוד כהן','1234'] });
+  assert.deepEqual(file,{name:'Family list',names:['Yosef Cohen','דוד כהן']});
+  assert.throws(()=>seatsNormalizeNameFile({name:'',names:['Test']}),/Name the file/);
+  assert.throws(()=>seatsNormalizeNameFile({name:'Bad file',names:[{}]}),/2,000 names/);
+  assert.throws(()=>seatsNormalizeNameFile({name:'Empty file',names:['1234']}),/No names/);
 });

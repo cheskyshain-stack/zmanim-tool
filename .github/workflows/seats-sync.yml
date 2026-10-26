@@ -69,7 +69,10 @@ jobs:
           assert.equal(typeof session.token,'string');
           const info=await fetch(process.env.SEATS_API_URL+'/api/info',{headers:{...headers,Authorization:'Bearer '+session.token}});
           assert.equal(info.status,200,'The deployed service must support chart dates and history.');
-          assert.equal((await info.json()).changeHistory,true);
+          const features=await info.json();
+          assert.equal(features.changeHistory,true);
+          assert.equal(features.sharedNameFiles,true);
+          assert.equal(features.deleteFiles,true);
           const plans=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:{...headers,Authorization:'Bearer '+session.token}});
           assert.equal(plans.status,200,'Authenticated plan storage must be available.');
           assert.ok(Array.isArray((await plans.json()).plans));

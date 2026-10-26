@@ -5,7 +5,8 @@ export function seatsCreateZoom(root, { getWidth, setWidth, getWhole, onStart, o
     const { scroll, stage } = elements(); if (!scroll || !stage) return;
     const output = root.querySelector('#seats-zoom-level');
     if (output) output.textContent = getWidth() ? Math.round(stage.clientWidth / 1200 * 100) + '%' : getWhole() ? 'Whole chart' : 'Fit width';
-    const view = root.querySelector('#chart-view'); if (view) view.value = getWhole() ? 'whole' : !getWidth() ? 'width' : getWidth() === 1200 ? 'actual' : 'custom';
+    const view = root.querySelector('#chart-view');
+    if (view) { view.value = getWhole() ? 'whole' : !getWidth() ? 'width' : getWidth() === 1200 ? 'actual' : 'custom'; view.querySelector('[value=custom]').textContent = Math.round(stage.clientWidth / 1200 * 100) + '%'; }
     const minus = root.querySelector('[data-action="zoom-out"]'), plus = root.querySelector('[data-action="zoom-in"]');
     if (minus) minus.disabled = stage.clientWidth <= scroll.clientWidth + 1;
     if (plus) plus.disabled = stage.clientWidth >= Math.max(3600, scroll.clientWidth * 3);

@@ -11,6 +11,11 @@ login. Its GitHub deployment ran but failed because the repository has no
 CLOUDFLARE_API_TOKEN deployment secret. Use your existing Desktop Cloudflare
 login to deploy the prepared Worker. No rebuilding of the feature is needed.
 
+The branch now also includes reusable name-file uploads and file deletion.
+Fetch its latest head before deploying. If an earlier history-only version was
+already deployed, deploy the latest branch again and verify all three feature
+flags below, including sharedNameFiles and deleteFiles.
+
 Read CLAUDE.md first. Preserve existing work and private seating data. Fetch the
 branch and use an unused worktree if the current checkout has other changes:
 
@@ -43,7 +48,13 @@ changing them and does not print any private names or session tokens:
   const auth={...headers,Authorization:'Bearer '+session.token};
   const info=await fetch(api+'/api/info',{headers:auth});
   assert.equal(info.status,200);
-  assert.equal((await info.json()).changeHistory,true);
+  const features=await info.json();
+  assert.equal(features.changeHistory,true);
+  assert.equal(features.sharedNameFiles,true);
+  assert.equal(features.deleteFiles,true);
+  const files=await fetch(api+'/api/name-lists',{headers:auth});
+  assert.equal(files.status,200);
+  assert.ok(Array.isArray((await files.json()).files));
   const response=await fetch(api+'/api/plans',{headers:auth});
   assert.equal(response.status,200);
   const {plans}=await response.json();
@@ -52,7 +63,7 @@ changing them and does not print any private names or session tokens:
     assert.equal(history.status,200);
     assert.ok(Array.isArray((await history.json()).entries));
   }
-  console.log('Shared chart dates and history are deployed. Existing chart storage is readable.');
+  console.log('Chart history, shared name files and file deletion are deployed. Existing storage is readable.');
   JS
 
 Tell the user when the service verification succeeds. Leave PR #203 unmerged so
@@ -63,5 +74,8 @@ Prepared behavior: full-width desktop chart; automatic local saving; Save upload
 once to the website; later edits sync automatically; anyone signed in opens the
 chart through Saved charts; inline chart names; creation and last-edit dates;
 organizer/date/seat history; dated backup restores; matching congregation photos.
-58 unit checks, three-organizer Workerd/browser checks, desktop and browser
+Uploads automatically save reusable name files to the website. Any organizer can
+choose a list for a chart. Shared lists and chart files can be deleted; names
+already used on charts and local offline edits are preserved.
+59 unit checks, multi-organizer Workerd/browser checks, desktop and browser
 suites, 22 actual PDF checks and import/security checks passed before handoff.

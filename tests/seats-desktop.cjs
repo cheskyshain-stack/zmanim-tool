@@ -3,6 +3,7 @@ const {chromium}=require('playwright');
 const {execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-desktop-')),key='lakewood-commons-seats-v1';
 const server=http.createServer((request,response)=>{
+  if(request.url.split('?')[0]==='/data/seats-sync.json'){response.setHeader('Content-Type','application/json');return response.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(request.url.split('?')[0]));
   if(!file.startsWith(root+path.sep)){response.statusCode=403;return response.end();}
   if(fs.existsSync(file)&&fs.statSync(file).isDirectory())file=path.join(file,'index.html');

@@ -137,6 +137,18 @@ The folder shows chart names, creation dates, last-edit dates and the last edito
 New chart is inside the folder; history and backup downloads are under More.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
+Name files opens a shared folder with Upload names and reusable saved lists.
+Uploading Excel, CSV or text adds its names to the current chart and automatically
+saves a named file on the website, even if the chart itself has not been saved
+online. Other organizers can choose the file to add its names to another chart;
+existing names and assignments stay in place. Uploads waiting for connectivity
+are saved locally and retried with the same ID, so a lost response creates no
+duplicate file. Pending uploads can be deleted too.
+Each name file and chart card has a Delete control. Deleting a shared file removes
+it from everyone's website folder. Deleting a name list keeps names already used
+on charts. A deleted chart stays available as a local copy on devices that had it
+open, including unsynced offline edits; reconnecting does not recreate the file.
+Device copies can be deleted separately.
 Each accepted shared edit records the organizer, time and changed names, seats or
 settings in the server history. History is paginated and Undo adds its own entry.
 Older charts whose creation date was never recorded show Not recorded. Local

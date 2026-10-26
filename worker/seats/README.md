@@ -86,3 +86,13 @@ at a time with a nextBefore cursor. Retries do not add duplicate history entries
 Older records retain their last known editor and time; unknown creation dates and
 unrecorded earlier changes are not invented. GET /api/info reports support for dates
 and history after sign-in.
+
+The same PIN-protected service stores reusable name files at /api/name-lists.
+Uploads normalize and deduplicate up to 2,000 names, retain their file ID across
+retries, and record the uploading organizer and date. GET lists active files;
+GET /api/name-lists/:id reads a file; DELETE removes it from the shared folder.
+DELETE /api/plans/:id removes a shared chart. Deletion markers prevent old clients
+and retried uploads from recreating removed files. Watched clients keep the latest
+local chart copy when the shared file is deleted. All mutations require the server
+session and the existing allowed origin. API feature verification now includes
+sharedNameFiles and deleteFiles as well as changeHistory.

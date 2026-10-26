@@ -6,6 +6,7 @@ const root = path.resolve(__dirname, '../dist');
 const output = fs.mkdtempSync(path.join(os.tmpdir(), 'seats-browser-'));
 const storageKey = 'lakewood-commons-seats-v1';
 const server = http.createServer((req,res) => {
+  if(req.url.split('?')[0]==='/data/seats-sync.json'){res.setHeader('Content-Type','application/json');return res.end('{"endpoint":""}');}
   let file = path.resolve(root, '.' + decodeURIComponent(req.url.split('?')[0]));
   if (file !== root && !file.startsWith(root + path.sep)) {res.statusCode = 403; return res.end();}
   if (fs.existsSync(file) && fs.statSync(file).isDirectory()) file = path.join(file, 'index.html');
@@ -282,7 +283,7 @@ const server = http.createServer((req,res) => {
     const restoredId=(await state()).activeId;
     const restoredDates=await page.evaluate(id=>JSON.parse(localStorage.getItem('lakewood-commons-seats-records-v1')).records[id],restoredId);
     assert.equal(restoredDates.createdAt,backupData.chartRecords[originalPlan].createdAt,'Backup restores keep the original chart creation date');
-    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.locator('.sharing-local-plan [data-id="'+originalPlan+'"]').click();
+    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+originalPlan+'"]').click();
     await page.setViewportSize({width:760,height:1000});
     await openRoom();
     const panel=await page.locator('.seats-panel').boundingBox();
