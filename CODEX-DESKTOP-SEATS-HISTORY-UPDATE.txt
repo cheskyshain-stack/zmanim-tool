@@ -1,0 +1,67 @@
+CODEX DESKTOP: FINISH THE SHARED CHART SERVICE UPDATE
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Prepared PR: https://github.com/cheskyshain-stack/zmanim-tool/pull/203
+Branch: feat/seats-chart-workspace-history
+Website: https://baismedrashoflakewoodcommons.org/seats/
+Existing service: https://zmanim-seats.cheskyshain.workers.dev
+
+The code is complete and tested. The web chat cannot use your Desktop Cloudflare
+login. Its GitHub deployment ran but failed because the repository has no
+CLOUDFLARE_API_TOKEN deployment secret. Use your existing Desktop Cloudflare
+login to deploy the prepared Worker. No rebuilding of the feature is needed.
+
+Read CLAUDE.md first. Preserve existing work and private seating data. Fetch the
+branch and use an unused worktree if the current checkout has other changes:
+
+  git fetch origin
+  git worktree add ../seats-history-service-20261026 origin/feat/seats-chart-workspace-history
+  cd ../seats-history-service-20261026
+
+If that worktree already exists, inspect it and update it safely instead of
+deleting or overwriting it. Then use the existing Cloudflare account connection:
+
+  npx wrangler@4.152.0 whoami
+  npx wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+
+This updates the existing zmanim-seats service in account
+04b085d9f19ac1ba6d333e0006fc94c1. The existing SeatsWorkspace Durable Object and
+its migration remain in place. Keep all existing charts, storage and namespaces.
+Do not create a replacement account or deploy to a temporary preview account.
+Do not print credentials or put tokens into chat or repository files.
+
+Verify the deployed service with Node 24. This reads existing charts without
+changing them and does not print any private names or session tokens:
+
+  node --input-type=module <<'JS'
+  import assert from 'node:assert/strict';
+  const api='https://zmanim-seats.cheskyshain.workers.dev';
+  const headers={Origin:'https://baismedrashoflakewoodcommons.org','Content-Type':'application/json'};
+  const login=await fetch(api+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Deployment check',pin:'4444'})});
+  assert.equal(login.status,200);
+  const session=await login.json();
+  const auth={...headers,Authorization:'Bearer '+session.token};
+  const info=await fetch(api+'/api/info',{headers:auth});
+  assert.equal(info.status,200);
+  assert.equal((await info.json()).changeHistory,true);
+  const response=await fetch(api+'/api/plans',{headers:auth});
+  assert.equal(response.status,200);
+  const {plans}=await response.json();
+  if(plans.length){
+    const history=await fetch(api+'/api/plans/'+encodeURIComponent(plans[0].id)+'/history',{headers:auth});
+    assert.equal(history.status,200);
+    assert.ok(Array.isArray((await history.json()).entries));
+  }
+  console.log('Shared chart dates and history are deployed. Existing chart storage is readable.');
+  JS
+
+Tell the user when the service verification succeeds. Leave PR #203 unmerged so
+the web chat can verify the production service, merge the tested website changes
+and check the deployed interface. Do not change the main site hosting.
+
+Prepared behavior: full-width desktop chart; automatic local saving; Save uploads
+once to the website; later edits sync automatically; anyone signed in opens the
+chart through Saved charts; inline chart names; creation and last-edit dates;
+organizer/date/seat history; dated backup restores; matching congregation photos.
+58 unit checks, three-organizer Workerd/browser checks, desktop and browser
+suites, 22 actual PDF checks and import/security checks passed before handoff.
