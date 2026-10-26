@@ -5,6 +5,15 @@ import { seatsParseDelimited, seatsNamesFromRows, seatsCsvCell } from '../js/sea
 
 const rowTop = row => row >= 7 ? 648 + (row - 7) * 88 : 78 + (row - 1) * 88;
 
+test('automatic paper fitting is saved while existing fixed paper preferences are retained', () => {
+  const state=seatsCreateState();
+  assert.equal(state.plans[0].paper,'auto');
+  for(const paper of ['auto','letter','tabloid']){
+    state.plans[0].paper=paper;
+    assert.deepEqual(seatsNormalizeState(state),state);
+  }
+});
+
 test('34-table starting layout has the extra middle tables at the back and the specified four-seat and three-seat tables', () => {
   const state = seatsCreateState(), plan = state.plans[0];
   assert.equal(plan.tables.length, 34);

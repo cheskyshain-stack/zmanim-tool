@@ -11,6 +11,7 @@ const server=http.createServer((request,response)=>{
 const edgeNames=[['A1',0,'Front Left'],['D1',4,'Front Right'],['A8',0,'Back Left'],['D8',2,'Back Right'],['B9',4,'Middle Left'],['C9',4,'Middle Right']];
 const inspectPdf=String.raw`
 import json,sys,xml.etree.ElementTree as ET
+import fitz
 from PIL import Image,ImageChops
 image=Image.open(sys.argv[1]).convert('L')
 width,height=image.size
@@ -32,15 +33,30 @@ text_safe=max(.2,safe-.15)
 for word in words:
     x0,y0,x1,y1=(float(word.attrib[key]) for key in ['xMin','yMin','xMax','yMax'])
     assert min(x0,y0,page_width-x1,page_height-y1)>=text_safe*72-.8, ('A name or label extends outside the printable area',word.text,word.attrib)
-print(json.dumps({'marginsInches':[round(value,3) for value in margins],'bottomEdgeComplete':True,'textWithinPage':True}))
+front=next(word for word in words if word.text=='Front')
+front_ratio=(float(front.attrib['xMax'])-float(front.attrib['xMin']))/(float(front.attrib['yMax'])-float(front.attrib['yMin']))
+vertical=next(word for word in words if word.text=='Sefarim')
+vertical_ratio=(float(vertical.attrib['yMax'])-float(vertical.attrib['yMin']))/(float(vertical.attrib['xMax'])-float(vertical.attrib['xMin']))
+document=fitz.open(sys.argv[6]);pdf_page=document[0]
+rectangles=[item[1] for drawing in pdf_page.get_drawings() if drawing['type'] in ('s','fs') for item in drawing['items'] if item[0]=='re']
+# Locate the actual shtender around its Rav label, including native scaling and margins.
+rav=next(word for word in words if word.text=='Rav')
+center=fitz.Point((float(rav.attrib['xMin'])+float(rav.attrib['xMax']))/2,(float(rav.attrib['yMin'])+float(rav.attrib['yMax']))/2)
+shtender=[rect for rect in rectangles if rect.contains(center) and 4<rect.width<35 and 4<rect.height<35]
+assert len(shtender)==1, ('The printed shtender is missing',shtender)
+assert abs(shtender[0].width-shtender[0].height)<.15, ('The printed shtender must stay square',shtender)
+print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWordRatio':front_ratio,'verticalWordRatio':vertical_ratio,'shtenderSquare':True,'bottomEdgeComplete':True,'textWithinPage':True}))
 `;
 (async()=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   const origin=remote||'http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({headless:true,executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
   try{
+    const {seatsCreateState}=await import('../js/seats/model.js'),sample=seatsCreateState();
+    sample.plans[0].objects.push({id:'test-case',type:'cabinet',label:'Test Sefarim',x:280,y:320,width:24,height:120});
     for(const width of [375,1440]){
       const context=await browser.newContext({viewport:{width,height:1050},isMobile:width===375,hasTouch:width===375});
+      await context.addInitScript(state=>localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(state)),sample);
       if(remote)await context.route('**://static.cloudflareinsights.com/**',route=>route.abort());
       const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
       await page.goto(origin+'/seats/?verify=safe-print-'+Date.now()+'&count=off');
@@ -49,26 +65,35 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'bottomE
         await page.locator('.room-stage [data-table="'+table+'"][data-seat="'+index+'"]').click();
         await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');
       }
-      const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'}];
-      if(width===1440)cases.push({name:'tabloid-on-letter',paper:'tabloid',nativeLetter:true},{name:'letter-larger-margins',paper:'letter',margin:.75,color:true},{name:'tabloid-larger-margins',paper:'tabloid',margin:.75});
+      let letteringRatio,verticalRatio;
+      const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format}))];
+      if(width===1440)cases.push({name:'tabloid-on-letter',paper:'tabloid',nativeLetter:true},{name:'letter-larger-margins',paper:'letter',margin:.75,color:true},{name:'tabloid-larger-margins',paper:'tabloid',margin:.75},{name:'auto-tabloid-larger-margins',paper:'auto',format:'Tabloid',margin:.75});
       for(const testCase of cases){
         await page.locator('#paper-size').selectOption(testCase.paper);await page.locator('#print-color').selectOption(testCase.color?'color':'mono');
         let override=null;
         if(testCase.margin)override=await page.addStyleTag({content:'@page{margin:'+testCase.margin+'in!important}'});
         await page.emulateMedia({media:'print'});
         const label=width+'-'+testCase.name,pdf=path.join(output,label+'.pdf');
-        await page.pdf({path:pdf,printBackground:true,preferCSSPageSize:!testCase.nativeLetter,...(testCase.nativeLetter?{format:'Letter',landscape:true}:{})});
+        await page.pdf({path:pdf,printBackground:true,preferCSSPageSize:!testCase.nativeLetter,...(testCase.nativeLetter?{format:'Letter',landscape:true}:testCase.format?{format:testCase.format,landscape:true}:{})});
         const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
         assert.match(info,/Pages:\s+1\b/,label);
-        const letter=testCase.paper==='letter'||testCase.nativeLetter;
-        assert.match(info,letter?/792 x 612 pts/:/1224 x 792 pts/,label);
+        const format=testCase.format||(testCase.paper==='letter'||testCase.nativeLetter?'Letter':'Tabloid');
+        const dimensions=info.match(/Page size:\s+([\d.]+) x ([\d.]+) pts/).slice(1).map(Number),expected=({Letter:[792,612],Tabloid:[1224,792],Legal:[1008,612],A4:[841.89,595.28],A5:[595.28,419.53]})[format];
+        assert.ok(dimensions.every((dimension,index)=>Math.abs(dimension-expected[index])<1.1),label+' '+dimensions);
         for(const [, ,name] of edgeNames)assert.ok(text.includes(name),name+' is missing in '+label);
         for(const column of ['A','B','C','D'])for(let row=1;row<=(['A','D'].includes(column)?8:9);row++)assert.match(text,new RegExp('\\b'+column+row+'\\b'),label);
         const imageBase=path.join(output,label),bbox=path.join(output,label+'.html');
         execFileSync('pdftoppm',['-scale-to','1600','-singlefile','-png',pdf,imageBase]);execFileSync('pdftotext',['-bbox',pdf,bbox]);
-        const safe=testCase.margin ? .7 : letter ? .3 : .45;
-        const metrics=JSON.parse(execFileSync('python',['-c',inspectPdf,imageBase+'.png',bbox,letter?'11':'17',letter?'8.5':'11',String(safe)],{encoding:'utf8'}));
+        const safe=testCase.margin ? .7 : testCase.paper==='tabloid'&&!testCase.nativeLetter ? .45 : .3;
+        const metrics=JSON.parse(execFileSync('python',['-c',inspectPdf,imageBase+'.png',bbox,...dimensions.map(dimension=>String(dimension/72)),String(safe),pdf],{encoding:'utf8'}));
         assert.ok(metrics.marginsInches[0]<(testCase.margin?1.25:.65)&&metrics.marginsInches[2]<(testCase.margin?1.25:.65),'The chart should still fill the printable width: '+label+' '+JSON.stringify(metrics));
+        if(testCase.name==='letter'){letteringRatio=metrics.frontWordRatio;verticalRatio=metrics.verticalWordRatio;}
+        if(testCase.paper==='auto'){
+          assert.ok(metrics.marginsInches.every(margin=>margin<(testCase.margin||.35)+.13),'Auto fit should fill both width and height: '+label+' '+JSON.stringify(metrics));
+          assert.ok(Math.abs(metrics.frontWordRatio-letteringRatio)<.015,'Printed lettering must retain its proportions: '+label+' '+metrics.frontWordRatio);
+          assert.ok(Math.abs(metrics.verticalWordRatio-verticalRatio)<.015,'Rotated lettering must retain its proportions: '+label+' '+metrics.verticalWordRatio);
+          assert.match(await page.locator('#seats-print .room-landmark .seat-name').first().evaluate(node=>getComputedStyle(node).fontFamily),/Georgia/);
+        }
         console.log(JSON.stringify({case:label,...metrics}));
         await page.emulateMedia({media:'screen'});if(override)await override.evaluate(node=>node.remove());
       }
@@ -76,11 +101,11 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'bottomE
       assert.deepEqual(people.map(person=>person.name).sort(),edgeNames.map(entry=>entry[2]).sort());assert.deepEqual(errors,[]);
       if(remote){
         const html=await(await context.request.get(origin+'/seats/?verify=safe-print-assets-'+Date.now())).text(),map=JSON.parse(html.match(/<script type="importmap">([\s\S]*?)<\/script>/)[1]).imports,css=html.match(/href="(\.\.\/css\/seats\.css\?v=[a-f0-9]+)"/)[1];
-        for(const file of ['/js/seats-app.js','/js/seats/print.js'])assert.ok((await(await context.request.get(origin+map[file])).body()).equals(fs.readFileSync(root+file)),file);
+        for(const file of ['/js/seats-app.js','/js/seats/model.js','/js/seats/print.js'])assert.ok((await(await context.request.get(origin+map[file])).body()).equals(fs.readFileSync(root+file)),file);
         assert.ok((await(await context.request.get(new URL(css,origin+'/seats/').href)).body()).equals(fs.readFileSync(root+'/css/seats.css')));
       }
       await context.close();
     }
-    console.log('PASS: full chart, corner seats, bottom cabinets and text fit printer-safe margins on phone and desktop, Letter and Tabloid, Tabloid fitted to Letter, and larger printer margins.');console.log('Artifacts: '+output);
+    console.log('PASS: full chart, corner names and bottom cabinets fit safely. Auto fit fills both dimensions on native Letter, Tabloid, Legal, A4 and A5 without stretching lettering. Fixed-size PDFs and larger margins remain supported on phone and desktop.');console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
