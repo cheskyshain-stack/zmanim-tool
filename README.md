@@ -15,11 +15,17 @@ five seats as the standard size. Table labels appear above the table surfaces.
 Tables use 48 units per seat, about 12% wider than the original 43. Names wrap
 between whole words, with a smaller font when necessary; exceptionally long names
 still show the fit warning so their table can be enlarged before printing.
+Standard tables are 40 units high with 40 units between ordinary rows. Existing
+48-unit default depths are shortened; custom depths and manually spaced rows stay
+as edited. The main walkway between rows 6 and 7 stays clear.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
 The importer finds name headers beneath up to 49 title/note rows, so directory
 files can include house numbers before First name and Last name. Numeric-only
-entries are skipped. In Assign names, Delete names opens checkboxes for selecting
+entries are skipped. The tool opens directly to the names and chart. The default
+plan is 7:30 מנין;
+old Main shul plan names update without changing custom plan names. Delete beside
+a name removes one person. Delete names opens checkboxes for selecting
 people, including those already seated. Select all shown follows the search;
 Delete all names clears the current plan's full list. Deletion clears the affected
 seats, preserves the room, and supports Undo and Redo.
@@ -28,6 +34,14 @@ a name into a separate seat for a child. Copying creates a separate person recor
 and keeps the original assignment. Choosing an already seated suggestion moves
 that person. Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
+On desktop, Seats keeps the list beside the chart within the viewport.
+Drag a list name onto a seat or drag an assigned name to another seat. Ctrl/Option
+drag creates a separate copy for another person, and dropping an assigned name back
+in the list frees its seat. An occupied destination returns its former occupant to
+the waiting list. Undo/Redo also covers these changes. Fit shows the whole room;
+100% and plus/minus zoom within the chart pane while the names remain visible.
+Upload names stays visible, with manual entry, seat lists and backups under
+Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
 between the Aron Kodesh and C1; C1 touches D1. The Aron Kodesh stays centered on
@@ -51,11 +65,14 @@ right bookcase face as their right edge. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 Built-in cabinet labels and walkway, entrance, and door labels are hidden on screen
 and in print; their shapes remain visible.
-Rows 7, 8 and 9 have the same 30-unit gap between table surfaces as the ordinary
+Rows 7, 8 and 9 have the same 40-unit gap between table surfaces as the ordinary
 front rows. The rear walkway is deeper, and side bookcases still reach the front
 of row 8.
-Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
-dragging a table label or room object, or using keyboard arrows. Width, depth,
+The separate Edit layout tab is removed. Table & room settings remain tucked under
+Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
+labels, and a bimah. Move them by dragging labels or room objects, or with keyboard
+arrows. Close the settings to keep
+room positions fixed while assigning names. Width, depth,
 and position can also be entered. The page scrolls normally over the sidebar
 and tables; touch dragging is limited to labels and room objects. Pinch with two
 fingers to zoom the chart, or use plus/minus, 100%, and Fit. One finger scrolls
@@ -70,8 +87,9 @@ lettering proportions and narrow margins. Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Version 8 plans center the Aron and refit its adjacent front tables and Rav's seat,
-preserving names, assignments, and unrelated layout edits. Version 7 plans also
+Version 8 plans center the Aron, refit its adjacent front tables and Rav's seat,
+and shorten standard tables with matching row gaps, preserving names, assignments,
+and unrelated layout edits. Version 7 plans also
 move rows 8 and 9 forward to match the normal table gaps, retaining
 names, counts, table sizes and horizontal positions. Version 6 plans also
 rebalance the B/C column positions while retaining names, seat
@@ -91,6 +109,8 @@ Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates
 actual one-page Letter and Tabloid PDFs and checks their sizes, names, margins,
 and lettering proportions, alongside touch zoom and scrolling.
+`node tests/seats-desktop.cjs` checks desktop pane fitting, native drag/drop,
+seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
 ported from `Lakewood Commons Zmanim tables.xlsx`.

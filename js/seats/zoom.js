@@ -17,11 +17,14 @@ export function seatsCreateZoom(root, { getWidth, setWidth, onStart, onEnd, onCh
     const fractionY = anchor ? (anchor.clientY - box.top) / box.height : 0;
     const clamped = Math.min(Math.max(3600, scroll.clientWidth * 3), Math.max(scroll.clientWidth, Math.round(width)));
     const next = width && clamped > scroll.clientWidth + 1 ? clamped : 0;
-    setWidth(next); if (next) stage.style.width = next + 'px'; else stage.style.removeProperty('width');
+    setWidth(next); stage.classList.toggle('is-zoomed', Boolean(next));
+    if (next) stage.style.width = next + 'px'; else { stage.style.removeProperty('width'); scroll.scrollTop = 0; }
     scroll.scrollLeft = next ? fractionX * stage.clientWidth - (clientX - viewport.left) : 0;
     if (anchor) {
       const after = stage.getBoundingClientRect();
-      window.scrollBy({ top: after.top + fractionY * after.height - anchor.clientY, behavior: 'instant' });
+      const delta = after.top + fractionY * after.height - anchor.clientY;
+      if (getComputedStyle(scroll).overflowY === 'auto') scroll.scrollTop += delta;
+      else window.scrollBy({ top: delta, behavior: 'instant' });
     }
     refresh(); onChange();
   }
@@ -41,7 +44,9 @@ export function seatsCreateZoom(root, { getWidth, setWidth, onStart, onEnd, onCh
     apply(pinch.width * distance(event.touches) / Math.max(1, pinch.distance), pinch.point);
     // Follow the fingers without scheduling a later scroll after the gesture.
     const { scroll } = elements(); scroll.scrollLeft += pinch.point.clientX - next.clientX;
-    window.scrollBy({ top: pinch.point.clientY - next.clientY, behavior: 'instant' });
+    const deltaY = pinch.point.clientY - next.clientY;
+    if (getComputedStyle(scroll).overflowY === 'auto') scroll.scrollTop += deltaY;
+    else window.scrollBy({ top: deltaY, behavior: 'instant' });
     pinch.point = next;
   }, { passive: false });
   function end(event) {
