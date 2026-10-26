@@ -86,7 +86,9 @@ schedule settings. Nothing uploads to a server. Download a backup to move plans
 between devices. Restore adds plans instead of replacing current ones, and Undo
 can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
 black-and-white or color. The chart fills the available sheet width with normal
-lettering proportions and narrow margins. Only the plan title prints above the chart.
+lettering proportions and printer-safe margins: 0.35 inch on Letter and 0.5 inch
+on 11 x 17. The sheet also shrinks to fit the browser’s available printable area.
+Only the plan title prints above the chart.
 Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
@@ -116,10 +118,13 @@ snapshots are retained when present. Backups and seat-list exports include the r
 
 Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates
-actual one-page Letter and Tabloid PDFs and checks their sizes, names, margins,
+actual one-page Letter and Tabloid PDFs and checks their sizes, names, safe margins,
 and lettering proportions, alongside touch zoom and scrolling.
 `node tests/seats-desktop.cjs` checks desktop pane fitting, native drag/drop,
 seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
+`node tests/seats-print.cjs` checks all page edges and corner-seat names in native
+Letter and Tabloid PDFs, Tabloid fitted to Letter, and larger printer margins,
+from both phone and desktop layouts.
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
 ported from `Lakewood Commons Zmanim tables.xlsx`.
