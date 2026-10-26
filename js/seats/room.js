@@ -42,11 +42,11 @@ export function seatsRavArt(object, people, drawName, interactive, printScale = 
   const top = 30, nameHeight = size - 4;
   const attributes = interactive ? `id="seat-${escAttr(object.id)}-0" data-seat="0" data-table="${escAttr(object.id)}" role="button" tabindex="0" aria-label="${escAttr(object.label + ': ' + (name || 'empty'))}"` : '';
   return `<rect class="station-frame" width="${object.width}" height="${object.height}"/>
-    <g class="drag-handle"><rect x="0" y="-18" width="${object.width}" height="16" fill="transparent"/><text class="table-label" x="${center}" y="-5" text-anchor="middle">${escText(object.label)}</text></g>
+    <g class="drag-handle"><rect x="0" y="-18" width="${object.width}" height="16" fill="transparent"/></g>
     <g class="table-seat rav-seat${name ? ' assigned' : ''}" ${attributes} data-facing="south">
       <path class="rav-chair" d="M${center - 10} 3 h20 M${center - 8} 7 h16 v10 h-16 z M${center - 5} 17 v5 m10 0 v-5"/>
       <rect class="shtender-surface" x="${center - width / 2}" y="${top}" width="${width}" height="${size}"/>
       <rect class="seat-area" x="${center - width / 2 + 2}" y="${top + 2}" width="${Math.max(1, width - 4)}" height="${nameHeight}"/>
-      ${name ? drawName(name, center, top + 2, width - 4, nameHeight, object.label, 11) : `<text class="empty-seat" x="${center}" y="${top + 2 + nameHeight / 2 + 4}" text-anchor="middle">1</text>`}
+      ${name ? drawName(name, center, top + 2, width - 4, nameHeight, object.label, 11) : `<text class="table-label rav-label" x="${center}" y="${top + 2 + nameHeight / 2 + 4}" text-anchor="middle">${escText(object.label)}</text>`}
     </g>`;
 }
