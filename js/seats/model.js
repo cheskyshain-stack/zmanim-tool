@@ -300,7 +300,7 @@ export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
   });
   const plan = { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION, tables,
     objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 452, width: 104, height: 90 }],
-    people: [], paper: 'letter', monochrome: true };
+    people: [], paper: 'auto', monochrome: true };
   seatsRearLayout(plan);
   seatsSyncAisleTables(plan);
   return plan;
@@ -463,7 +463,7 @@ export function seatsNormalizeState(input) {
     });
     const name = str(raw.name, 80, 'plan name');
     return { id, name: /^main shul$/i.test(name) ? SEATS_DEFAULT_NAME : name, layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
-      paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
+      paper: ['auto', 'tabloid'].includes(raw.paper) ? raw.paper : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');
   return { version: 1, activeId: input.activeId, plans };
