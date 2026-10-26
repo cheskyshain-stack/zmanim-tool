@@ -2,6 +2,7 @@ const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),
 const {chromium}=require('playwright'),{execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../dist'),remote=process.env.SEATS_CHECK_ORIGIN,output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-print-'));
 const server=http.createServer((request,response)=>{
+  if(request.url.split('?')[0]==='/data/seats-sync.json'){response.setHeader('Content-Type','application/json');return response.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(request.url.split('?')[0]));
   if(!file.startsWith(root+path.sep)){response.statusCode=403;return response.end();}
   if(fs.existsSync(file)&&fs.statSync(file).isDirectory())file=path.join(file,'index.html');
@@ -69,7 +70,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
       if(remote)await context.route('**://static.cloudflareinsights.com/**',route=>route.abort());
       const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
       await page.goto(origin+'/seats/?verify=safe-print-'+Date.now()+'&count=off');
-      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card').first().click();await page.locator('.room-stage .table-item').first().waitFor();
       for(const [table,index,name] of edgeNames){
         await page.locator('.room-stage [data-table="'+table+'"][data-seat="'+index+'"]').click();

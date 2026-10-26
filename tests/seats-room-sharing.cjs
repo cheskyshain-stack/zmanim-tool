@@ -25,7 +25,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const session = await loginResponse.json(), authenticated = { Authorization: 'Bearer ' + session.token };
   const { seatsCreateState, seatsSetCount, seatsWriteName, seatsAssigned, seatsItems } = await import('../js/seats/model.js');
   const legacy = seatsCreateState().plans[0]; legacy.name = 'Synthetic legacy room';
-  legacy.objects = legacy.objects.filter(object => object.id !== 'rear-case-a7');
+  legacy.objects = legacy.objects.filter(object => object.id !== 'rear-case-a7' && !object.id.startsWith('seat-pillar-'));
   Object.assign(legacy.objects.find(object => object.id === 'main-amud'), { x: 568, y: 164, width: 64, height: 48 });
   const table = id => legacy.tables.find(entry => entry.id === id);
   for (const [id, count] of Object.entries({ C1: 5, A8: 3, B2: 4, C2: 4, B5: 4, C5: 4, D7: 3, D8: 3 })) seatsSetCount(table(id), count);
@@ -51,6 +51,11 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.deepEqual([small.x,small.y,small.width,small.height],[17,648,24,40]);
     assert.equal(plan.objects.find(object => object.type === 'bimah').y, 488);
     const amud = plan.objects.find(object => object.id === 'main-amud'); assert.deepEqual([amud.x,amud.y,amud.width,amud.height],[581,169,38,38]);
+    for(const [id,seat] of [['B7',2],['C7',4]]){
+      const table=get(id),pillar=plan.objects.find(object=>object.id==='seat-pillar-'+id+'-'+seat);
+      assert.deepEqual([pillar.width,pillar.height],[20,20]);assert.ok(Math.abs(pillar.x+10-table.x-table.width*(seat-.5)/table.count)<.001);
+      assert.equal(pillar.y,table.y+table.height+1);
+    }
     for (const id of ['rear-case-side-left', 'rear-case-side-right']) { const cabinet = plan.objects.find(object => object.id === id); assert.equal(cabinet.y, 798); assert.equal(cabinet.height, 138); }
     assert.ok(plan.people.some(person => person.id === displaced), 'The removed fifth seat does not remove its name');
     assert.equal(seatsAssigned(plan).has(displaced), false, 'The removed fifth-seat person returns to the waiting list');
@@ -64,8 +69,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
       page.on('websocket', socket => socket.on('framesent', event => { try { const message = JSON.parse(event.payload); if (message.type === 'patch') patches.push(message); } catch {} }));
     };
     const openLink = async (page, name) => {
-      await page.goto(origin + '/seats/?page=' + remoteId); await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', { name: 'Open Seats', exact: true }).click();
-      await page.locator('#sharing-name').fill(name); if (await page.locator('#sharing-pin').count()) await page.locator('#sharing-pin').fill('4444'); await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+      await page.goto(origin + '/seats/?page=' + remoteId); await page.locator('#seats-name').fill(name); await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', { name: 'Open Seats', exact: true }).click();
       await page.locator('#chart-name').waitFor(); await page.waitForFunction(() => document.querySelector('.saved-label')?.textContent === 'Saved to website');
     };
     const first = await browser.newContext({ viewport: { width: 1440, height: 1050 } }); contexts.push(first); const page = await first.newPage(); observe(page); await openLink(page, 'Migration Organizer One');
@@ -77,7 +81,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(patches[0].changes.some(change => change.group === 'plan' && change.key === 'layoutVersion'), false);
     const local = await page.evaluate(() => { const state = JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')); return state.plans.find(plan => plan.id === state.activeId); }); assertUpdated({ plan: local });
     await page.screenshot({ path: path.join(output, 'migrated-shared-room.png'), fullPage: true });
-    await page.reload(); await page.getByRole('button', { name: 'View saved charts', exact: true }).click();
+    await page.reload(); await page.getByRole('button', { name: 'Saved charts', exact: true }).click();
     await page.locator('.sharing-site-plan .saved-page-card[data-id="' + remoteId + '"]').click(); await page.waitForFunction(() => document.querySelector('.saved-label')?.textContent === 'Saved to website');
     const second = await browser.newContext({ viewport: { width: 375, height: 900 } }); contexts.push(second); const peer = await second.newPage(); observe(peer); await openLink(peer, 'Migration Organizer Two');
     const peerLocal = await peer.evaluate(() => { const state = JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')); return state.plans.find(plan => plan.id === state.activeId); }); assertUpdated({ plan: peerLocal });

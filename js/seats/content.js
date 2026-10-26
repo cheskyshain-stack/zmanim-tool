@@ -8,7 +8,7 @@ let seatsContentBaseline = null;
 export function seatsIsAutomaticChartName(name) {
   if (seatsIsRoomChartName(name)) return true;
   if (typeof name !== 'string') return false;
-  const match = /^Seating plan - (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([1-9]|[12]\d|3[01]), ([1-9]\d{0,5})(?: \((?:[2-9]|[1-9]\d+)\))?$/i.exec(name.trim().replace(/\s+/gu, ' '));
+  const match = /^Seating plan - (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ([1-9]|[12]\d|3[01]), ([1-9]\d{0,5})(?: at (?:[1-9]|1[0-2]):[0-5]\d (?:AM|PM))?(?: \((?:[2-9]|[1-9]\d+)\))?$/i.exec(name.trim().replace(/\s+/gu, ' '));
   if (!match) return false;
   const month = seatsContentMonths.findIndex(value => value.toLowerCase() === match[1].toLowerCase());
   const day = Number(match[2]), year = Number(match[3]), date = new Date(0);

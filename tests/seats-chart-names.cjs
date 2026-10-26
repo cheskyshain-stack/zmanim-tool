@@ -1,7 +1,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-chart-names-')),key='lakewood-commons-seats-v1';
-const recordsKey='lakewood-commons-seats-records-v1',today='Seating plan - Oct 26, 2026',earlier='Seating plan - Jan 2, 2026';
+const recordsKey='lakewood-commons-seats-records-v1',today='Seating plan - Oct 26, 2026 at 10:00 AM',earlier='Seating plan - Jan 2, 2026 at 10:00 PM';
 const server=http.createServer((request,response)=>{
   if(request.url.split('?')[0]==='/data/seats-sync.json'){response.setHeader('Content-Type','application/json');return response.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(request.url.split('?')[0]));
@@ -28,7 +28,7 @@ const server=http.createServer((request,response)=>{
         if(!localStorage.getItem(key)){localStorage.setItem(key,JSON.stringify(sample));localStorage.setItem(recordsKey,JSON.stringify(records));}
       },{key,recordsKey,sample,records});
       page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
-      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       const openFolder=async()=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();};
       const openChart=async id=>{await openFolder();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+id+'"]').click();};
       const saved=async()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key);

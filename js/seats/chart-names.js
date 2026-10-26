@@ -1,4 +1,5 @@
 const seatsChartDateFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', year: 'numeric' });
+const seatsChartTimeFormat = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 const seatsChartNameKey = value => String(value).normalize('NFC').trim().replace(/\s+/gu, ' ').toLocaleLowerCase('en-US');
 
 function seatsChartDate(value) {
@@ -10,7 +11,7 @@ function seatsChartDate(value) {
 
 export function seatsDatedChartName(value = new Date(), usedNames = []) {
   const date = seatsChartDate(value) || new Date();
-  const base = 'Seating plan - ' + seatsChartDateFormat.format(date);
+  const base = 'Seating plan - ' + seatsChartDateFormat.format(date) + ' at ' + seatsChartTimeFormat.format(date);
   const used = new Set(usedNames.map(seatsChartNameKey));
   if (!used.has(seatsChartNameKey(base))) return base;
   let suffix = 2;

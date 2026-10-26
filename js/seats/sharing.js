@@ -8,11 +8,11 @@ export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
-  let peers = [], activeSeat = null, pendingMessages = [], profile = '', dialogMode = '', lastMessage = 0;
+  let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
   try {
@@ -289,6 +289,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     dialog.scrollTop = 0;
   }
   function showLogin(error = '') {
+    if (onSignInRequired) { dialog.close(); onSignInRequired(error); return; }
     dialogMode = 'login';
     const title = pendingPage ? 'Open a saved chart' : intent === 'save' ? 'Save chart to the website' : intent === 'history' ? 'Chart change history' : intent === 'names' ? 'Open name files' : 'Open saved charts';
     const pinField = entryPin ? '' : '<label for="sharing-pin">Seats PIN</label><input id="sharing-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required>';
@@ -429,7 +430,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
       if ([...entries.values()].some(entry => entry.queue.length) && !window.confirm('Some changes are waiting to sync. Sign out and keep them on this device?')) return;
-      session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); dialog.close(); changed(); return;
+      session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); dialog.close(); changed(); onSignOut?.(); return;
     }
     button.disabled = true;
     try {
@@ -448,7 +449,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       if (!config.endpoint) return;
       const url = new URL(config.endpoint);
       if (url.protocol !== 'https:' && !['localhost', '127.0.0.1'].includes(url.hostname)) return;
-      endpoint = url.origin; load();
+      endpoint = url.origin; load(); if (initialName) profile = initialName;
       try { const saved = JSON.parse(sessionStorage.getItem(SEATS_SHARING_SESSION) || 'null'); if (saved?.endpoint === endpoint && saved.expires > Date.now()) session = saved; } catch { /* Ask for the PIN again. */ }
       for (const entry of entries.values()) {
         const plan = local(entry.localId); if (!plan) continue;

@@ -1,6 +1,6 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
@@ -14,36 +14,18 @@ import { seatsStartMarkup } from './seats/start.js';
 import { seatsSortPeople } from './seats/name-sort.js';
 import { seatsChartName, seatsDatedChartName } from './seats/chart-names.js';
 import { seatsHasContent } from './seats/content.js';
+import { seatsOpenSession } from './seats/session.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
+const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
 
-// This is the requested casual-entry gate, independent of the existing admin PIN.
 async function seatsEntry() {
   const root = document.getElementById('seats-app');
-  const unlockKey = 'lakewood-commons-seats-unlock';
-  let unlocked = false;
-  try { unlocked = sessionStorage.getItem(unlockKey) === 'open'; } catch { /* ask again */ }
-  if (unlocked) return seatsStart(root, unlockKey);
-  document.body.classList.add('seats-locked');
-  root.innerHTML = `<section class="seats-lock no-print"><img class="seats-lock-photo" src="/assets/shul-240.jpg" alt="" width="240" height="141"><h1>Seats</h1><p>Enter the four-digit PIN.</p><form id="seats-unlock"><label class="sr-only" for="seats-pin">PIN</label><input id="seats-pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required aria-describedby="pin-message"><button class="primary" type="submit">Open Seats</button><p id="pin-message" role="status" aria-live="polite"></p></form><a href="/admin/">Back to admin</a></section>`;
-  const form = root.querySelector('form'), input = root.querySelector('input');
-  form.addEventListener('submit', async event => {
-    event.preventDefault();
-    if (!crypto.subtle) { root.querySelector('#pin-message').textContent = 'Open this page over HTTPS to check the PIN.'; return; }
-    const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input.value + 'lakewood-commons/seats/v1'));
-    const hash = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
-    if (hash !== 'c5eebef6b017a917b05502fb6016a9dadfd75f31b2e48aa445175a5827a6cc55') {
-      root.querySelector('#pin-message').textContent = 'That PIN did not match. Try again.';
-      input.value = ''; input.focus(); return;
-    }
-    try { sessionStorage.setItem(unlockKey, 'open'); } catch { /* this visit still opens */ }
-    document.body.classList.remove('seats-locked');
-    seatsStart(root, unlockKey, input.value);
-  });
-  input.focus({ preventScroll: true });
+  const auth = await seatsOpenSession(root);
+  seatsStart(root, auth);
 }
 
-function seatsStart(root, unlockKey, entryPin = null) {
+function seatsStart(root, auth) {
   let state = seatsCreateState(), storageError = '', notice = '', selected = 'A1';
   let selectedPerson = null, search = '', showAssigned = false, zoom = 0, wholeRoom = false, history = [], future = [], importing = false;
   let readingNames = 0;
@@ -102,6 +84,20 @@ function seatsStart(root, unlockKey, entryPin = null) {
   const records = seatsCreateRecords({ getState: () => state, isEligible: keepPlan, getName: () => sharing?.editorName,
     isShared: id => sharing?.linked(id), notify: message => { storageError = message; }, fresh: false });
   for (const current of state.plans) current.name = seatsChartName(current.name, records.info(current.id));
+  try {
+    const view = JSON.parse(sessionStorage.getItem(SEATS_VIEW_KEY) || 'null');
+    if (!new URL(location.href).searchParams.has('page') && view?.screen === 'editor') {
+      if (!state.plans.some(current => current.id === view.id) && view.draft) {
+        const draft = seatsNormalizeState({ version: 1, activeId: view.draft.id, plans: [view.draft] }).plans[0];
+        seatsUpgradePlan(draft);
+        if (!seatsHasContent(draft)) state.plans = [...savedPlans(), draft];
+      }
+      if (state.plans.some(current => current.id === view.id)) {
+        state.activeId = view.id; screen = 'editor'; selected = typeof view.selected === 'string' ? view.selected : 'A1';
+        zoom = Number.isFinite(view.zoom) && view.zoom >= 0 ? Math.min(6000, view.zoom) : 0; wholeRoom = view.whole === true;
+      }
+    }
+  } catch { /* Invalid view preferences do not affect saved charts. */ }
 
   const editor = seatsCreateEditor({
     getPlan: plan, commit: change,
@@ -137,6 +133,12 @@ function seatsStart(root, unlockKey, entryPin = null) {
   }
   function savedLabel() { return sharing?.linked(plan().id) ? sharing.label() : keepPlan(plan()) ? 'Saved on this device' : 'Not saved yet'; }
   function canSaveCurrent() { return Boolean(sharing?.linked(plan().id) || seatsHasContent(plan())); }
+  function rememberView() {
+    try {
+      sessionStorage.setItem(SEATS_VIEW_KEY, JSON.stringify({ screen, id: plan().id, selected, zoom, whole: wholeRoom,
+        draft: screen === 'editor' && !keepPlan(plan()) ? plan() : null }));
+    } catch { /* Stored charts still work when view preferences cannot be saved. */ }
+  }
   function syncSaveStatus() {
     const button = root.querySelector('[data-action=save-site]');
     if (button) button.disabled = !sharing?.enabled || sharing?.saving || !canSaveCurrent();
@@ -149,7 +151,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
       const snapshot = storedState();
       if (snapshot) { const json = JSON.stringify(snapshot); localStorage.setItem(SEATS_STORAGE_KEY, json); storedRaw = json; }
       else { localStorage.removeItem(SEATS_STORAGE_KEY); storedRaw = null; }
-      storageError = ''; records.sync(); sharing?.localChanged(); syncSaveStatus(); return !storageError;
+      storageError = ''; records.sync(); sharing?.localChanged(); syncSaveStatus(); rememberView(); return !storageError;
     }
     catch { storageError = 'Changes cannot be saved in this browser. Download a backup before closing this page.'; return false; }
   }
@@ -287,7 +289,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
         return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
           <rect class="seat-area" x="${svgNumber(index * width + 1)}" y="2" width="${svgNumber(Math.max(1, width - 2))}" height="${table.height - 4}"/>
           ${name ? wideName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="empty-seat" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${index + 1}</text>`}
-          <path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>
+          ${seatsChairPillar(current, table.id, index + 1) ? '' : `<path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>`}
         </g>`;
       }).join('');
       return `<g ${controls(table)} transform="translate(${table.x} ${table.y})" class="room-item table-item${interactive && selected === table.id ? ' selected' : ''}">
@@ -301,6 +303,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
       let art;
       if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName);
       else if (object.type === 'rav') art = seatsRavArt(object, people, wideName, interactive, printScale);
+      else if (object.type === 'pillar' && seatsIsFixed(object)) art = `<rect width="${object.width}" height="${object.height}" class="object-surface chair-pillar" fill="url(#pillar-${interactive ? 'screen' : 'print'})"/>`;
       else if (object.type === 'amud') {
         const width = object.width / printScale;
         art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${wideName(object.label, object.width / 2, 0, width, object.height, object.label)}`;
@@ -323,7 +326,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
       ${entry ? `<label for="item-label">Label</label><input id="item-label" value="${attr(entry.label)}" maxlength="80">
         ${isTable ? `<label for="seat-count">Seats at this table</label><input id="seat-count" type="number" min="0" max="16" step="1" placeholder="Not set yet" value="${entry.count ?? ''}"><label class="check-label"><input id="auto-size" type="checkbox" ${entry.autoSize !== false ? 'checked' : ''}> Size table from seat count</label><p class="field-note">Five seats is the standard size. Chairs face the Aron Kodesh.</p>` : ''}
         <div class="field-pair"><div><label for="item-width">Width</label><input id="item-width" type="number" min="${isTable ? 60 : entry.type === 'rav' ? 30 : 20}" max="1100" value="${entry.width}" ${fixed || (isTable && entry.autoSize !== false) ? 'disabled' : ''}></div><div><label for="item-height">Depth</label><input id="item-height" type="number" min="${isTable ? 40 : entry.type === 'rav' ? 70 : 20}" max="600" value="${entry.height}" ${fixed ? 'disabled' : ''}></div></div>
-        ${fixed ? '<p class="field-note">Fixed to the back wall.</p>' : `<details class="position-details"><summary>Position &amp; remove</summary><div class="field-pair"><div><label for="item-x">Left</label><input id="item-x" type="number" value="${entry.x}" min="17" max="${SEATS_BOUNDS.right - entry.width}"></div><div><label for="item-y">Top</label><input id="item-y" type="number" value="${entry.y}" min="70" max="${itemBottom(entry) - entry.height}"></div></div><button type="button" class="danger" data-action="remove-item">Remove ${isTable ? 'table' : 'object'}</button></details>`}` : ''}
+        ${fixed ? '<p class="field-note">Fixed room fixture.</p>' : `<details class="position-details"><summary>Position &amp; remove</summary><div class="field-pair"><div><label for="item-x">Left</label><input id="item-x" type="number" value="${entry.x}" min="17" max="${SEATS_BOUNDS.right - entry.width}"></div><div><label for="item-y">Top</label><input id="item-y" type="number" value="${entry.y}" min="70" max="${itemBottom(entry) - entry.height}"></div></div><button type="button" class="danger" data-action="remove-item">Remove ${isTable ? 'table' : 'object'}</button></details>`}` : ''}
       <details id="bulk-settings"><summary>Set seats for a column or all tables</summary><label for="bulk-target">Apply to</label><select id="bulk-target"><option value="all">All tables</option>${['A', 'B', 'C', 'D'].map(column => `<option>${column}</option>`).join('')}</select><label for="bulk-count">Seats per table</label><input id="bulk-count" type="number" min="0" max="16" step="1" placeholder="Enter a number"><button type="button" data-action="apply-count">Apply seat count</button></details>
       <div class="room-tools"><h3>Add to room</h3><div class="tool-grid"><button type="button" data-add="table">+ Table</button><button type="button" data-add="pillar">+ Pillar</button><button type="button" data-add="cabinet">+ Sefarim cabinet</button><button type="button" data-add="bimah">+ Bimah</button><button type="button" data-add="amud">+ Amud</button><button type="button" data-add="label">+ Label</button></div></div>
       <p class="field-note">Drag a table label or room object to move it. Scroll anywhere on a table. Arrow keys move a focused item.</p>`;
@@ -373,6 +376,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
       <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}">${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || 'Empty')}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
   }
   function render() {
+    rememberView();
     if (screen !== 'editor') {
       document.title = 'Seats | Bais Medrash of Lakewood Commons';
       document.body.classList.remove('seats-people-mode');
@@ -494,7 +498,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
     print: () => { if (editor.flush() === false) return; if (overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
-    lock: () => { editor.flush(); try { sessionStorage.removeItem(unlockKey); } catch { /* reload still locks */ } location.reload(); },
+    lock: () => auth.lock(),
     'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': createChart,
     backup: () => { editor.flush(); const snapshot = storedState(); if (!snapshot) return alertMessage('Add names or change the setup before downloading a chart backup.'); const chartRecords = Object.fromEntries(snapshot.plans.map(plan => [plan.id, { ...records.info(plan.id), ...(sharing?.metadata(plan.id) || {}) }])); download('seats-backup.json', JSON.stringify({ ...snapshot, chartRecords }, null, 2), 'application/json'); },
@@ -662,7 +666,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
   });
   sharing = seatsCreateSharing({
     getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen === 'editor', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
-    activatePage, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialPin: entryPin, getRecord: id => records.info(id),
+    activatePage, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
     keepDeletedCopy: (id, metadata) => { const existing = records.info(id); records.restore(id, { ...existing, ...metadata, history: [...existing.history, ...(metadata.history || [])] }); save(); renderInPlace(); },
@@ -703,6 +707,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
     },
   });
+  auth.onLock(() => { editor.flush(); save(); location.reload(); });
   render(); save(); zoomControls.refresh(); sharing.start();
 }
 

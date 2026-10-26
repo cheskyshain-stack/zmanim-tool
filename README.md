@@ -7,13 +7,16 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 ## Development
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
-Its PIN is separate from the existing admin PIN. After unlocking, the home page
+Sign in once with your name and the Seats PIN to open charts and shared name files.
+After three hours of inactivity the tool asks you to sign in again. Your PIN is never saved.
+The first visit opens the home page, which
 offers Create new chart and View saved charts. With 7:30 minyan as the only
 available room, these buttons skip location selection. Create opens the standard
 empty layout and the Name files chooser; the chooser can be closed to enter names
 manually. View saved charts opens all existing setups directly. Existing device
-drafts remain available, and opening Seats again
-returns to home. Direct links to a shared chart still open that chart.
+drafts remain available. Refreshing Seats
+returns to the same screen and chart. Even an untouched draft resumes
+without becoming a saved file. A fresh tab starts at home. Direct links to a shared chart still open that chart.
 The standard layout has columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
 seats, except A7, which has three, and C1, A8, B6 and C6,
@@ -30,8 +33,8 @@ worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
 The importer finds name headers beneath up to 49 title/note rows, so directory
 files can include house numbers before First name and Last name. Numeric-only
 entries are skipped. The room is called 7:30 minyan. New chart titles use the
-current New York date, such as Seating plan - Oct 26, 2026. Additional charts made
-on the same date get a numbered suffix. Exact older room-only chart titles use
+current New York date and time, such as Seating plan - Oct 26, 2026 at 4:30 PM.
+Charts created in the same minute get a numbered suffix. Exact older room-only chart titles use
 their last-edit date, creation date or today's date when those dates are unknown.
 Custom titles remain unchanged. More > Use today’s date suggests a current date
 name, which can be edited for an occasion or other useful detail. Delete beside
@@ -64,7 +67,8 @@ The rav's separate, assignable chair faces the room across its square shtender. 
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. D1 keeps the
 same small gap from the right wall as the other front tables. A plain opening
 beside it has no door leaf or swing. The Aron Kodesh stays centered on
-the front wall, independently of table movement and resizing. Front tables leave
+the front wall, independently of table movement and resizing. Its wider 88-unit
+front leaves B1 slightly farther left, with an 8-unit gap. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
 when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between the five-seat B2 and C2 tables.
 B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
@@ -86,6 +90,9 @@ right edge with the same small gap from the right wall as the front tables.
 Their chairs stay in front of the shortened side bookcase. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 A very small fixed bookcase sits against the left wall beside A7, clear of its table and chairs.
+Two fixed pillars occupy the chair positions at B7 seat 2 and C7 seat 4. Existing names
+are retained, and covered chair symbols are hidden. The remaining two pillar locations
+have not yet been specified.
 Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
 The same gap separates table rows from front to back, with a wider entrance walkway
@@ -117,6 +124,9 @@ are retained; choose Printer paper (auto fit) to fill a different native paper s
 Older browsers without print container sizing retain a proportional chart.
 The sheet also shrinks to fit the browser’s available printable area.
 Only the fixed 7:30 Minyan wordmark prints above the chart.
+Congregation seasonal and weekday charts retain the original building picture.
+Special schedule handouts use the current design and fill the screen preview without
+an unused half; printing retains the real half-sheet size, including mixed print runs.
 Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
@@ -151,7 +161,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-small-amud-2026-10-26` before changes are saved.
+`lakewood-commons-seats-v1-before-room-chair-pillars-2026-10-26` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 

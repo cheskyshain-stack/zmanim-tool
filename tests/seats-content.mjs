@@ -10,7 +10,7 @@ function frozen(value) {
 }
 
 test('automatic names include room titles and valid generated dates, while custom titles count as content', () => {
-  const automatic = ['7:30', '7:30 מנין', '7:30 מניין', ' 7 : 30 MINYAN ', 'Main shul', 'Seating plan - Oct 26, 2026', 'Seating plan - Oct 26, 2026 (2)', 'Seating plan - Feb 29, 2028'];
+  const automatic = ['7:30', '7:30 מנין', '7:30 מניין', ' 7 : 30 MINYAN ', 'Main shul', 'Seating plan - Oct 26, 2026', 'Seating plan - Oct 26, 2026 (2)', 'Seating plan - Feb 29, 2028', 'Seating plan - Oct 26, 2026 at 10:00 AM', 'Seating plan - Oct 26, 2026 at 10:00 PM (2)'];
   for (const name of automatic) {
     assert.equal(seatsIsAutomaticChartName(name), true, name);
     const plan = seatsCreatePlan(); plan.name = name;
@@ -39,6 +39,7 @@ test('the latest room update keeps older untouched charts empty', () => {
   for(const table of plan.tables.filter(table=>['D7','D8'].includes(table.id)))table.x=1151-table.width;
   for(const table of plan.tables.filter(table=>['B2','C2'].includes(table.id))){table.count=4;table.seats=[null,null,null,null];table.width=192;if(table.id==='C2')table.x+=48;}
   Object.assign(plan.objects.find(object=>object.id==='main-amud'),{x:568,y:164,width:64,height:48});
+  plan.tables.find(table=>table.id==='B1').x=316;plan.objects.find(object=>object.type==='rav').x=665.5;
   assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
 });
 

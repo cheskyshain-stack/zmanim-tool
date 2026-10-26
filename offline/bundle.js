@@ -1789,9 +1789,9 @@ function sanitizeRichText(value) {
 }
 
 /** The cropper saves raster data URLs. No remote URLs or SVG from a backup. */
-function safeHeaderImage(value) {
+function safeHeaderImage(value, originalChartPicture = false) {
   return typeof value === 'string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(value)
-    ? value : 'assets/shul-240.jpg';
+    ? value : originalChartPicture ? 'assets/logo-building-icon.png' : 'assets/shul-240.jpg';
 }
 
 function backupObject(value) {
@@ -10403,7 +10403,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.innerHTML = `
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage)}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage, true)}" alt="">
         <div class="header-center">
           <img class="header-logo" src="assets/logo-text.png" alt="${escAttr(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
           ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}
@@ -16458,7 +16458,8 @@ function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS, tables = null } = {}) {
+  if (tables) posterTables = tables;
   const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
@@ -16477,13 +16478,15 @@ function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), sett
       if (!built?.span) continue;
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
+      const handout = Boolean(posterTables && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key));
       out.push({
         key: `onepage-${year}-${name}`,
         year,
         label: name,
         span: built.span,
         when: when(from, to),
-        html: renderOnePagePoster(built, settings),
+        handout,
+        html: handout ? `<div class="poster-half-sheet">${renderHalfSchedulePoster(built.items[0].poster, built.items[0].key, settings, { standalone: true })}</div>` : renderOnePagePoster(built, settings),
       });
     }
     let vasikin = null;
@@ -18381,7 +18384,7 @@ function fitPoster(container) {
       const cs = getComputedStyle(box);
       const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const wide = el.getBoundingClientRect().width;
-      if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+      if (avail > 0 && (wide > avail || box.matches('.luach-sheet-page.is-handout'))) el.style.zoom = Math.max(0.15, avail / wide);
     }
     // The one-page sheet's type is set against the zoom just chosen, so the two are decided
     // together and a resize cannot leave one of them behind. See fitOnePage for why it has

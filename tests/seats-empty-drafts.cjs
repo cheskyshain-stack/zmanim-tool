@@ -19,7 +19,7 @@ const server=http.createServer((request,response)=>{
     const errors=[];
     const state=page=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)||'null'),key);
     const plans=async page=>(await state(page))?.plans||[];
-    const unlock=async page=>{page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();};
+    const unlock=async page=>{page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();};
     const home=async page=>{const button=page.locator('[data-action=home]');if(await button.count())await button.click();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();};
     const create=async page=>{await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();await page.locator('#chart-name').waitFor();};
     const folder=async page=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();await page.getByRole('heading',{name:'Saved charts',exact:true}).waitFor();};
