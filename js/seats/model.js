@@ -2,7 +2,8 @@ export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 48;
-export const SEATS_LAYOUT_VERSION = 7;
+export const SEATS_LAYOUT_VERSION = 8;
+export const SEATS_BACK_WALKWAY_Y = 828;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_COLUMN_GAP = (SEATS_BOUNDS.right - SEATS_BOUNDS.left - SEATS_STANDARD_WIDTH * 4) / 3;
@@ -88,8 +89,8 @@ function seatsRearLayout(plan) {
   seatsSyncRear(plan);
   const fixtures = [
     ...SEATS_BACK_CABINETS,
-    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: 706, width: 24, height: 230 },
-    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: 706, width: 24, height: 230 },
+    { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: 676, width: 24, height: 260 },
+    { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: 676, width: 24, height: 260 },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
     { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 148, width: 64, height: 48 },
   ];
@@ -105,8 +106,27 @@ function seatsDefaultTable(column, row) {
   const center = SEATS_COLUMN_CENTERS[column];
   return { id: column + row, label: column + row, column, anchor, autoSize: true,
     x: anchor === 'left' ? 17 : anchor === 'right' ? 1183 - width : center - width / 2,
-    y: row === 7 ? 598 : 70 + (row - 1) * 78 + (row > 6 ? 90 : 0),
+    y: row >= 7 ? 598 + (row - 7) * 78 : 70 + (row - 1) * 78,
     width, height: 48, count, seats: Array(count).fill(null) };
+}
+
+function seatsSpaceRearRows(plan) {
+  for (const column of ['A', 'B', 'C', 'D']) {
+    const previous8 = plan.tables.find(table => table.id === column + '8')?.y;
+    for (const row of [8, 9]) {
+      const table = plan.tables.find(table => table.id === column + row);
+      if (!table) continue;
+      const previous = plan.tables.find(table => table.id === column + (row - 1));
+      const top = previous ? previous.y + previous.height + 30 : 598 + (row - 7) * 78;
+      table.y = Math.min(SEATS_BOUNDS.bottom - table.height - 14, top);
+    }
+    const cabinetId = column === 'A' ? 'rear-case-side-left' : column === 'D' ? 'rear-case-side-right' : null;
+    const cabinet = plan.objects.find(object => object.id === cabinetId);
+    const row8 = plan.tables.find(table => table.id === column + '8');
+    if (cabinet && row8 && Math.abs(cabinet.y - previous8) < .001 && Math.abs(cabinet.y + cabinet.height - 936) < .001) {
+      cabinet.y = Math.min(916, row8.y); cabinet.height = 936 - cabinet.y;
+    }
+  }
 }
 
 export function seatsUpgradePlan(plan) {
@@ -161,7 +181,8 @@ export function seatsUpgradePlan(plan) {
     for (const table of plan.tables) if (table.autoSize !== false) seatsSetCount(table, table.count);
     seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   }
-  seatsBalanceColumns(plan);
+  if (previousVersion < 7) seatsBalanceColumns(plan);
+  seatsSpaceRearRows(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -336,7 +357,7 @@ export function seatsNormalizeState(input) {
       }
       return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7, 8].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');

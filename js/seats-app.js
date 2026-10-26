@@ -1,6 +1,6 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, SEATS_SEAT_WIDTH, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, SEATS_SEAT_WIDTH, SEATS_BACK_WALKWAY_Y, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
@@ -287,8 +287,8 @@ function seatsStart(root, unlockKey) {
         const defaults = { pillar: ['Pillar', 36, 36], cabinet: ['Sefarim cabinet', 65, 160], bimah: ['Bimah', 110, 100], amud: ['Amud', 64, 48], label: ['Label', 150, 40] }[type];
         const object = { id, type, label: defaults[0], x: 550, y: 400, width: defaults[1], height: defaults[2] };
         const occupied = [...plan().tables.map(table => ({ ...table, height: table.height + 14 })), ...plan().objects,
-          { x: 17, y: 536, width: 1166, height: 62 }, { x: 41, y: 858, width: 1118, height: 78 },
-          { x: 41, y: 598, width: 62, height: 260 }, { x: 968, y: 598, width: 62, height: 260 },
+          { x: 17, y: 536, width: 1166, height: 62 }, { x: 41, y: SEATS_BACK_WALKWAY_Y, width: 1118, height: 936 - SEATS_BACK_WALKWAY_Y },
+          { x: 41, y: 598, width: 62, height: SEATS_BACK_WALKWAY_Y - 598 }, { x: 968, y: 598, width: 62, height: SEATS_BACK_WALKWAY_Y - 598 },
           { ...seatsFront(plan()).aron }];
         let found = false;
         for (let y = 130; y <= SEATS_BOUNDS.bottom - object.height && !found; y += 10) {
