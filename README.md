@@ -16,8 +16,8 @@ drafts remain available, and opening Seats again
 returns to home. Direct links to a shared chart still open that chart.
 The standard layout has columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
-seats, except A7, which has three, and C1, A8, B2, C2, B6 and C6,
-which have four. The room has 163 seats including the Rav's seat. Width follows seat count, using
+seats, except A7, which has three, and C1, A8, B6 and C6,
+which have four. The room has 165 seats including the Rav's seat. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
 Tables use 48 units per seat, about 12% wider than the original 43. Names wrap
 between whole words, with a smaller font when necessary; exceptionally long names
@@ -66,7 +66,7 @@ same small gap from the right wall as the other front tables. A plain opening
 beside it has no door leaf or swing. The Aron Kodesh stays centered on
 the front wall, independently of table movement and resizing. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
-when extra seats are requested. An amud stands between B2 and C2.
+when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between the five-seat B2 and C2 tables.
 B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
 leaving more space beside the amud and bimah.
 The middle columns sit closer together so the three main aisle gaps are equal
@@ -116,7 +116,7 @@ printer-safe margins of 0.35 and 0.5 inch respectively. Existing paper preferenc
 are retained; choose Printer paper (auto fit) to fill a different native paper size.
 Older browsers without print container sizing retain a proportional chart.
 The sheet also shrinks to fit the browser’s available printable area.
-Only the plan title prints above the chart.
+Only the fixed 7:30 Minyan wordmark prints above the chart.
 Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
@@ -151,7 +151,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-rear-right-2026-10-26` before changes are saved.
+`lakewood-commons-seats-v1-before-room-small-amud-2026-10-26` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 

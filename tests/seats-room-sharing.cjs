@@ -26,8 +26,9 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   const { seatsCreateState, seatsSetCount, seatsWriteName, seatsAssigned, seatsItems } = await import('../js/seats/model.js');
   const legacy = seatsCreateState().plans[0]; legacy.name = 'Synthetic legacy room';
   legacy.objects = legacy.objects.filter(object => object.id !== 'rear-case-a7');
+  Object.assign(legacy.objects.find(object => object.id === 'main-amud'), { x: 568, y: 164, width: 64, height: 48 });
   const table = id => legacy.tables.find(entry => entry.id === id);
-  for (const [id, count] of Object.entries({ C1: 5, A8: 3, B5: 4, C5: 4, D7: 3, D8: 3 })) seatsSetCount(table(id), count);
+  for (const [id, count] of Object.entries({ C1: 5, A8: 3, B2: 4, C2: 4, B5: 4, C5: 4, D7: 3, D8: 3 })) seatsSetCount(table(id), count);
   Object.assign(table('C1'), { x: 695, y: 78, width: 240 }); Object.assign(table('D1'), { x: 935, y: 78, width: 240 });
   legacy.objects.find(object => object.type === 'bimah').y = 452;
   for (const id of ['rear-case-side-left', 'rear-case-side-right']) Object.assign(legacy.objects.find(object => object.id === id), { y: 728, height: 208 });
@@ -41,14 +42,15 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   function assertUpdated(record) {
     const plan = record.plan, get = id => plan.tables.find(entry => entry.id === id);
     assert.equal(plan.layoutVersion, 12, 'The migrated chart retains the deployed wire format');
-    for (const [id, count] of Object.entries({ C1: 4, A8: 4, B5: 5, C5: 5, D7: 5, D8: 5 })) assert.equal(get(id).count, count, id);
-    assert.equal(seatsItems(plan).reduce((sum, entry) => sum + (entry.count || 0), 0), 163);
+    for (const [id, count] of Object.entries({ C1: 4, A8: 4, B2: 5, C2: 5, B5: 5, C5: 5, D7: 5, D8: 5 })) assert.equal(get(id).count, count, id);
+    assert.equal(seatsItems(plan).reduce((sum, entry) => sum + (entry.count || 0), 0), 165);
     assert.ok(Math.abs(get('D1').x - get('C1').x - get('C1').width - 8) < .001, 'C1 and D1 have the requested gap');
     assert.ok(Math.abs(get('D1').x + get('D1').width - 1175) < .001, 'D1 keeps the same small wall gap as the other front tables');
     for (const id of ['D7','D8']) assert.ok(Math.abs(get(id).x + get(id).width - 1175) < .001, id + ' sits near the right wall');
     const small = plan.objects.find(object => object.id === 'rear-case-a7');
     assert.deepEqual([small.x,small.y,small.width,small.height],[17,648,24,40]);
     assert.equal(plan.objects.find(object => object.type === 'bimah').y, 488);
+    const amud = plan.objects.find(object => object.id === 'main-amud'); assert.deepEqual([amud.x,amud.y,amud.width,amud.height],[581,169,38,38]);
     for (const id of ['rear-case-side-left', 'rear-case-side-right']) { const cabinet = plan.objects.find(object => object.id === id); assert.equal(cabinet.y, 798); assert.equal(cabinet.height, 138); }
     assert.ok(plan.people.some(person => person.id === displaced), 'The removed fifth seat does not remove its name');
     assert.equal(seatsAssigned(plan).has(displaced), false, 'The removed fifth-seat person returns to the waiting list');

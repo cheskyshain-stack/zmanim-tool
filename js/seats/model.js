@@ -6,13 +6,14 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'rear-right-2026-10-26';
+export const SEATS_ROOM_UPDATE = 'small-amud-2026-10-26';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
 export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 8 };
 export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
-export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B2', 'C2', 'B6', 'C6'];
+export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B6', 'C6'];
+const SEATS_AMUD_SIZE = 38;
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_ROW_GAP = 48, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
 const SEATS_TABLE_LEFT = SEATS_BOUNDS.left + SEATS_TABLE_WALL_GAP, SEATS_TABLE_RIGHT = SEATS_BOUNDS.right - SEATS_TABLE_WALL_GAP;
@@ -138,7 +139,7 @@ function seatsRearLayout(plan) {
     { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsSideCaseTop(plan, 'A'), width: 24, height: 936 - seatsSideCaseTop(plan, 'A') },
     { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsSideCaseTop(plan, 'D'), width: 24, height: 936 - seatsSideCaseTop(plan, 'D') },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
-    { id: 'main-amud', type: 'amud', label: 'Amud', x: 568, y: 164, width: 64, height: 48 },
+    { id: 'main-amud', type: 'amud', label: 'Amud', x: 600 - SEATS_AMUD_SIZE / 2, y: 188 - SEATS_AMUD_SIZE / 2, width: SEATS_AMUD_SIZE, height: SEATS_AMUD_SIZE },
   ];
   for (const fixture of fixtures) if (!plan.objects.some(object => object.id === fixture.id)) plan.objects.push({ ...fixture });
   seatsSyncFront(plan);
@@ -267,9 +268,22 @@ function seatsOldRearInset(plan) {
 function seatsAddA7Cabinet(plan) {
   if (!plan.objects.some(object => object.id === SEATS_A7_CABINET.id)) plan.objects.push({ ...SEATS_A7_CABINET });
 }
+function seatsOldAmud(plan) {
+  return plan.objects.find(object => object.id === 'main-amud' && object.type === 'amud' && object.width === 64 && object.height === 48);
+}
+function seatsUpdateAmud(plan) {
+  const amud = seatsOldAmud(plan);
+  if (!amud) return;
+  amud.x += (amud.width - SEATS_AMUD_SIZE) / 2; amud.y += (amud.height - SEATS_AMUD_SIZE) / 2;
+  amud.width = amud.height = SEATS_AMUD_SIZE;
+  for (const id of ['B2', 'C2']) {
+    const table = plan.tables.find(table => table.id === id);
+    if (table?.count === 4) seatsSetCount(table, 5);
+  }
+}
 export function seatsNeedsUpgrade(plan) {
   return plan.layoutVersion !== SEATS_LAYOUT_VERSION || seatsEarlierRoomUpdate(plan) || seatsOldRearInset(plan)
-    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id);
+    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id) || Boolean(seatsOldAmud(plan));
 }
 
 export function seatsUpgradePlan(plan) {
@@ -279,6 +293,7 @@ export function seatsUpgradePlan(plan) {
       table.anchor = 'right'; table.x = Math.max(SEATS_BOUNDS.left, SEATS_TABLE_RIGHT - table.width);
     }
     seatsAddA7Cabinet(plan);
+    seatsUpdateAmud(plan);
     return 0;
   }
   const previousVersion = plan.layoutVersion ?? 1;
@@ -338,7 +353,7 @@ export function seatsUpgradePlan(plan) {
   if (previousVersion < 10) seatsSpreadRearRows(plan);
   if (previousVersion < 11) seatsEvenRows(plan);
   if (previousVersion < 12) seatsSeparateTables(plan);
-  for (const [id, count] of updateCounts ? [['C1', 4], ['A8', 4], ['B5', 5], ['C5', 5], ['D7', 5], ['D8', 5]] : []) {
+  for (const [id, count] of updateCounts ? [['C1', 4], ['A8', 4], ['B2', 5], ['C2', 5], ['B5', 5], ['C5', 5], ['D7', 5], ['D8', 5]] : []) {
     const table = plan.tables.find(table => table.id === id);
     if (table) released += seatsSetCount(table, count);
   }
@@ -347,6 +362,7 @@ export function seatsUpgradePlan(plan) {
   if (inset) inset.x = SEATS_BOUNDS.right - SEATS_FRONT_RIGHT_DOOR.clearance - inset.width;
   seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   seatsAddA7Cabinet(plan);
+  seatsUpdateAmud(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
