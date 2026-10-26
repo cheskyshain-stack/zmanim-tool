@@ -12,8 +12,8 @@ After three hours of inactivity the tool asks you to sign in again. Your PIN is 
 The first visit opens the home page, which
 offers Create new chart and View saved charts. With 7:30 minyan as the only
 available room, these buttons skip location selection. Create opens the standard
-empty layout and the Name files chooser; the chooser can be closed to enter names
-manually. View saved charts opens all existing setups directly. Existing device
+empty layout without a pop-up. Add names opens the name files chooser when needed;
+names can also be entered directly on seats. View saved charts opens all existing setups directly. Existing device
 drafts remain available. Refreshing Seats
 returns to the same screen and chart. Even an untouched draft resumes
 without becoming a saved file. A fresh tab starts at home. Direct links to a shared chart still open that chart.
@@ -61,7 +61,7 @@ drag creates a separate copy for another person, and dropping an assigned name b
 in the list frees its seat. An occupied destination returns its former occupant to
 the waiting list. Undo/Redo also covers these changes. The view selector offers
 Full width, Whole chart, and 100%; plus/minus zoom within the chart pane.
-Name files stays visible, with manual entry, seat lists and backups under
+Add names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
@@ -183,7 +183,7 @@ New chart inside the folder opens a fresh layout directly. Seats home returns to
 start page; history and backup downloads are under More.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
-Name files opens a shared folder with Upload names and reusable saved lists.
+Add names opens a shared folder with Upload names and reusable saved lists.
 Uploading Excel, CSV or text adds its names to the current chart and automatically
 saves a named file on the website, even if the chart itself has not been saved
 online. Other organizers can choose the file to add its names to another chart;

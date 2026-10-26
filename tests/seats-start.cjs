@@ -35,6 +35,11 @@ const server=http.createServer((request,response)=>{
       await page.locator('.sharing-dialog').waitFor({state:'hidden'});
       assert.ok(await page.getByRole('button',{name:'Create new chart',exact:true}).isVisible(),'Escape from the home folder returns to home');
       await page.getByRole('button',{name:'Create new chart',exact:true}).click();
+      await page.locator('#chart-name').waitFor();
+      assert.equal(await page.locator('dialog[open]').count(),0,'A new chart opens directly without a name-file pop-up');
+      assert.ok(await page.getByRole('button',{name:'Add names',exact:true}).isVisible());
+      await page.screenshot({path:path.join(output,'new-chart-'+width+'.png'),fullPage:true});
+      await page.getByRole('button',{name:'Add names',exact:true}).click();
       await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();
       assert.equal(await page.getByRole('button',{name:/^(7:30 minyan|Main BM)$/}).count(),0);
       assert.ok(await page.getByRole('button',{name:'Upload names',exact:true}).isVisible());
@@ -88,7 +93,6 @@ const server=http.createServer((request,response)=>{
     await page.getByRole('button',{name:'View saved charts',exact:true}).click();
     assert.equal(await page.locator('.sharing-local-plan').count(),0,'A first visit does not create a phantom saved setup');await page.getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Create new chart',exact:true}).click();
-    await page.getByRole('button',{name:'Close',exact:true}).click();
     assert.equal(await page.evaluate(key=>localStorage.getItem(key),key),null,'An untouched new draft is not stored as a chart');assert.ok(await page.locator('#people-search').isVisible());await fresh.close();
     const linked=await browser.newContext(),linkedPage=await linked.newPage(),linkedErrors=[];
     linkedPage.on('pageerror',error=>linkedErrors.push(error.message));
@@ -99,7 +103,6 @@ const server=http.createServer((request,response)=>{
     assert.equal(await linkedPage.evaluate(key=>localStorage.getItem(key),key),null,'An unavailable shared link does not create a saved chart');
     await linkedPage.getByRole('button',{name:'Create new chart',exact:true}).click();
     assert.equal(new URL(linkedPage.url()).searchParams.has('page'),false,'Explicit navigation leaves the unavailable shared link');
-    await linkedPage.getByRole('button',{name:'Close',exact:true}).click();
     await linkedPage.locator('#chart-name').fill('Created after unavailable link');await linkedPage.locator('#chart-name').press('Enter');
     await linkedPage.locator('.room-stage [data-table=A2][data-seat="0"]').click();await linkedPage.locator('#seat-name-input').fill('Persisted New Person');
     await linkedPage.locator('#seat-name-input').press('Enter');
@@ -109,7 +112,7 @@ const server=http.createServer((request,response)=>{
     assert.equal(linkedState.plans.length,1);assert.equal(linkedState.plans[0].name,'Created after unavailable link');
     assert.ok(linkedState.plans[0].people.some(person=>person.name==='Persisted New Person'),'A chart explicitly created after an unavailable link keeps its edits on reload');
     assert.deepEqual(linkedErrors,[]);await linked.close();
-    console.log('PASS: Create/View open directly without room choices, new dated layouts open name files, saved charts and drafts are preserved, Close/Escape return to the previous screen, unavailable shared links expose no unsaved editor, and phone/desktop screens fit.');
+    console.log('PASS: Create/View open directly without room choices, new dated layouts have no pop-up and Add names opens name files on request, saved charts and drafts are preserved, Close/Escape return to the previous screen, unavailable shared links expose no unsaved editor, and phone/desktop screens fit.');
     console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

@@ -17,7 +17,7 @@ const server=http.createServer((request,response)=>{
     const context=await browser.newContext({viewport:{width:1366,height:768}}),page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
     await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
-    await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();await page.locator('.room-stage .table-item').first().waitFor();
+    await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.locator('.room-stage .table-item').first().waitFor();
     await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.getByRole('button',{name:'Edit layout',exact:true}).count(),0);
     assert.ok(await page.locator('#people-search').isVisible(),'Names should be the initial view');

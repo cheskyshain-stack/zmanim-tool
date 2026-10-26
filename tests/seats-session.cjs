@@ -31,7 +31,7 @@ const server=http.createServer(async(req,res)=>{
     await page.clock.install({time:new Date()});await page.goto(origin+'/seats/');
     await page.locator('#seats-name').fill('Synthetic Session Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
     await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();assert.equal(signIns,1);
-    await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();
+    await page.getByRole('button',{name:'Create new chart',exact:true}).click();assert.equal(await page.locator('dialog[open]').count(),0);await page.getByRole('button',{name:'Add names',exact:true}).click();await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();
     assert.equal(await page.locator('#sharing-name,#sharing-pin').count(),0);await page.getByRole('button',{name:'Close',exact:true}).click();
     const title=await page.locator('#chart-name').inputValue();assert.match(title,/ at \d{1,2}:\d{2} [AP]M/);
     await page.reload();await page.locator('#chart-name').waitFor();assert.equal(await page.locator('#chart-name').inputValue(),title);
@@ -49,7 +49,7 @@ const server=http.createServer(async(req,res)=>{
       },{table,index});assert.ok(geometry.center<.01);assert.ok(geometry.gap>0);
     }
     await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
-    await page.getByRole('button',{name:'Name files',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();assert.equal(signIns,1);
+    await page.getByRole('button',{name:'Add names',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();assert.equal(signIns,1);
     await page.clock.fastForward(2*60*60*1000);await page.locator('#people-search').click();
     await page.clock.fastForward(2*60*60*1000);await page.locator('#people-search').click();assert.equal(await page.locator('#seats-unlock').count(),0,'Active editing survives more than three total hours');
     await page.clock.fastForward(3*60*60*1000+1);await page.locator('#seats-unlock').waitFor();
