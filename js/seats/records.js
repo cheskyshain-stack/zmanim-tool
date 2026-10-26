@@ -9,8 +9,8 @@ function normalize(record = {}) {
     history: Array.isArray(record?.history) ? record.history.slice(-200).filter(entry => date(entry?.at)).map(entry => ({ id: text(entry.id, 100), at: date(entry.at), by: text(entry.by, 60) || 'This device', details: Array.isArray(entry.details) ? entry.details.slice(0, 31).map(detail => String(detail).slice(0, 400)) : [] })) : [] };
 }
 
-export function seatsCreateRecords({ getState, getName, isShared, notify, fresh }) {
-  const records = new Map(), observed = new Map(getState().plans.map(plan => [plan.id, seatsSharedPlan(plan)]));
+export function seatsCreateRecords({ getState, getName, isShared, isEligible = () => true, notify, fresh }) {
+  const records = new Map(), observed = new Map(getState().plans.filter(isEligible).map(plan => [plan.id, seatsSharedPlan(plan)]));
   try {
     const saved = JSON.parse(localStorage.getItem(SEATS_RECORDS_KEY) || 'null');
     if (saved?.version === 1 && saved.records && typeof saved.records === 'object') {
@@ -28,11 +28,13 @@ export function seatsCreateRecords({ getState, getName, isShared, notify, fresh 
     record.history.push({ id: crypto.randomUUID(), at: now, by, details }); record.history = record.history.slice(-200);
     records.set(id, record);
   }
-  if (fresh) { for (const plan of getState().plans) append(plan.id, ['Created chart'], true); persist(); }
+  if (fresh) { for (const plan of getState().plans.filter(isEligible)) append(plan.id, ['Created chart'], true); persist(); }
   function sync() {
     let changed = false;
     for (const plan of getState().plans) {
-      const previous = observed.get(plan.id), next = seatsSharedPlan(plan); observed.set(plan.id, next);
+      const previous = observed.get(plan.id);
+      if (!previous && !isEligible(plan)) continue;
+      const next = seatsSharedPlan(plan); observed.set(plan.id, next);
       if (isShared(plan.id)) continue;
       if (!previous) { append(plan.id, [records.has(plan.id) ? 'Restored chart from a backup' : 'Created chart'], !records.has(plan.id)); changed = true; }
       else {

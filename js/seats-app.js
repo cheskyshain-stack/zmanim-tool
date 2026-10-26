@@ -99,7 +99,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     ? 'This chart is on the website. Changes save automatically for everyone signed in.'
     : seatsHasContent(plan()) ? 'Changes save on this device. Save puts this chart in Saved charts on the website.'
       : 'Add names or change the setup to start saving. Empty charts stay out of Saved charts.';
-  const records = seatsCreateRecords({ getState: () => ({ ...state, plans: savedPlans() }), getName: () => sharing?.editorName,
+  const records = seatsCreateRecords({ getState: () => state, isEligible: keepPlan, getName: () => sharing?.editorName,
     isShared: id => sharing?.linked(id), notify: message => { storageError = message; }, fresh: false });
   for (const current of state.plans) current.name = seatsChartName(current.name, records.info(current.id));
 

@@ -5,6 +5,7 @@ import { seatsSharedDiff } from '../js/seats/shared-model.js';
 import { seatsDescribeChanges, seatsRecordMetadata } from '../js/seats/activity.js';
 import { seatsCreateRecords } from '../js/seats/records.js';
 import { seatsNormalizeNameFile } from '../js/seats/name-files.js';
+import { seatsHasContent } from '../js/seats/content.js';
 
 function setup(fresh = true) {
   const storage = new Map(); globalThis.localStorage = { getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value) };
@@ -36,6 +37,23 @@ test('older charts retain unknown creation dates, and backup restores retain kno
   assert.equal(records.info(restored.id).createdAt, '2026-01-02T10:00:00.000Z');
   assert.match(records.info(restored.id).history.at(-1).details[0], /Restored/);
   assert.deepEqual(seatsRecordMetadata({ revision: 4, updatedAt: '2026-03-04T12:00:00Z', updatedBy: 'Earlier organizer' }), { createdAt: null, createdBy: null, updatedAt: '2026-03-04T12:00:00Z', updatedBy: 'Earlier organizer' });
+});
+
+test('untouched drafts have no dates while undo and redo of real work retain accurate edit history', t => {
+  t.mock.timers.enable({ apis: ['Date'], now: Date.parse('2026-10-26T12:00:00Z') });
+  const { state, options } = setup(false), plan = state.plans[0], empty = structuredClone(plan);
+  const records = seatsCreateRecords({ ...options, isEligible: seatsHasContent });
+  records.sync(); assert.equal(records.info(plan.id).createdAt, null); assert.equal(records.info(plan.id).history.length, 0);
+  t.mock.timers.tick(1000); seatsWriteName(plan, 'A1', 0, 'History Test Person'); records.sync();
+  const filled = structuredClone(plan), created = records.info(plan.id).createdAt;
+  assert.equal(created, '2026-10-26T12:00:01.000Z');
+  t.mock.timers.tick(1000); state.plans[0] = empty; records.sync();
+  assert.equal(records.info(plan.id).updatedAt, '2026-10-26T12:00:02.000Z');
+  assert.match(records.info(plan.id).history.at(-1).details.join(' '), /History Test Person → Empty/);
+  t.mock.timers.tick(1000); state.plans[0] = filled; records.sync();
+  assert.equal(records.info(plan.id).createdAt, created); assert.equal(records.info(plan.id).updatedAt, '2026-10-26T12:00:03.000Z');
+  assert.match(records.info(plan.id).history.at(-1).details.join(' '), /Empty → History Test Person/);
+  assert.equal(records.info(plan.id).history.filter(entry => entry.details.includes('Created chart')).length, 1);
 });
 
 test('change descriptions name seats and renames and summarize bulk name imports', () => {
