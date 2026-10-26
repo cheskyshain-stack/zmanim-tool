@@ -210,6 +210,13 @@ export function seatsAssigned(plan) {
   return new Set(seatsItems(plan).flatMap(table => table.seats).filter(Boolean));
 }
 
+export function seatsRemovePeople(plan, ids) {
+  const removed = new Set(ids), before = plan.people.length;
+  plan.people = plan.people.filter(person => !removed.has(person.id));
+  for (const table of seatsItems(plan)) table.seats = table.seats.map(id => removed.has(id) ? null : id);
+  return before - plan.people.length;
+}
+
 export function seatsAddNames(plan, names) {
   const key = name => name.normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
   const existing = new Set(plan.people.map(person => key(person.name)));

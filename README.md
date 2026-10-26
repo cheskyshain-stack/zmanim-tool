@@ -14,6 +14,12 @@ which have four. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
+The importer finds name headers beneath up to 49 title/note rows, so directory
+files can include house numbers before First name and Last name. Numeric-only
+entries are skipped. In Assign names, Delete names opens checkboxes for selecting
+people, including those already seated. Select all shown follows the search;
+Delete all names clears the current plan's full list. Deletion clears the affected
+seats, preserves the room, and supports Undo and Redo.
 Click a seat and type a name, choose a suggested existing person, or copy and paste
 a name into a separate seat for a child. Copying creates a separate person record
 and keeps the original assignment. Choosing an already seated suggestion moves

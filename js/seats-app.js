@@ -1,6 +1,6 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
@@ -36,6 +36,7 @@ async function seatsEntry() {
 function seatsStart(root, unlockKey) {
   let state = seatsCreateState(), storageError = '', notice = '', mode = 'layout', selected = 'A1';
   let selectedPerson = null, search = '', showAssigned = false, zoom = 0, history = [], future = [], importing = false;
+  let deletingNames = false, deleteSelection = new Set();
   let overflowTables = new Set(), drag = null, suppressClick = false, conflict = false;
   let storedRaw = null, pinching = false;
   const measure = document.createElement('canvas').getContext('2d');
@@ -201,14 +202,35 @@ function seatsStart(root, unlockKey) {
     }
     return 'Needs a seat';
   }
-  function peopleList() {
+  function visiblePeople() {
     const assigned = seatsAssigned(plan());
-    const people = plan().people.filter(person => (showAssigned || !assigned.has(person.id)) && person.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
-    return people.length ? people.map(person => `<div class="person-row${selectedPerson === person.id ? ' active' : ''}"><button type="button" class="person-name" data-person="${attr(person.id)}" aria-pressed="${selectedPerson === person.id}"><bdi>${html(person.name)}</bdi><small>${html(locationOf(person.id))}</small></button><button type="button" class="person-edit" data-edit-person="${attr(person.id)}" aria-label="${attr('Edit ' + person.name)}">✎</button></div>`).join('') : `<p class="empty-list">${plan().people.length ? 'No matching people.' : 'Add names below or upload a list.'}</p>`;
+    return plan().people.filter(person => (deletingNames || showAssigned || !assigned.has(person.id)) && person.name.toLocaleLowerCase().includes(search.toLocaleLowerCase())).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  function peopleList() {
+    const people = visiblePeople();
+    return people.length ? people.map(person => deletingNames
+      ? `<label class="person-row name-delete-row${deleteSelection.has(person.id) ? ' active' : ''}"><input id="delete-person-${attr(person.id)}" type="checkbox" data-delete-person="${attr(person.id)}" aria-label="${attr('Select ' + person.name)}" ${deleteSelection.has(person.id) ? 'checked' : ''}><span class="person-name"><bdi>${html(person.name)}</bdi><small>${html(locationOf(person.id))}</small></span></label>`
+      : `<div class="person-row${selectedPerson === person.id ? ' active' : ''}"><button type="button" class="person-name" data-person="${attr(person.id)}" aria-pressed="${selectedPerson === person.id}"><bdi>${html(person.name)}</bdi><small>${html(locationOf(person.id))}</small></button><button type="button" class="person-edit" data-edit-person="${attr(person.id)}" aria-label="${attr('Edit ' + person.name)}">✎</button></div>`).join('') : `<p class="empty-list">${plan().people.length ? 'No matching people.' : 'Add names below or upload a list.'}</p>`;
+  }
+  function deleteControls() {
+    if (!deletingNames) return '';
+    const visible = visiblePeople(), allSelected = visible.length && visible.every(person => deleteSelection.has(person.id));
+    return `<p class="field-note">Select names to delete. Seated people are included. Undo can restore deleted names and seats.</p><div class="people-delete-actions"><button type="button" data-action="select-delete-shown" ${visible.length ? '' : 'disabled'}>${allSelected ? 'Clear shown' : 'Select all shown'}</button><button type="button" class="danger" data-action="delete-selected-names" ${deleteSelection.size ? '' : 'disabled'}>Delete selected (${deleteSelection.size})</button><button type="button" class="danger" data-action="delete-all-names">Delete all names (${plan().people.length})</button></div>`;
+  }
+  function deleteNames(all = false) {
+    editor.flush(); editor.close();
+    const ids = all ? plan().people.map(person => person.id) : plan().people.filter(person => deleteSelection.has(person.id)).map(person => person.id);
+    if (!ids.length) return;
+    if (!window.confirm('Delete ' + (all ? 'all ' : '') + ids.length + (ids.length === 1 ? ' name' : ' names') + ' from this plan? Their seats will be cleared. Undo can restore them.')) return;
+    change(() => {
+      const count = seatsRemovePeople(plan(), ids);
+      deleteSelection.clear(); selectedPerson = null;
+      notice = count + (count === 1 ? ' name deleted.' : ' names deleted.') + ' Undo restores names and seats.';
+    });
   }
   function peoplePanel() {
     const assigned = seatsAssigned(plan()), table = seatsItems(plan()).find(entry => entry.id === selected);
-    return `<h2>People</h2><p class="people-summary">${plan().people.length - assigned.size} waiting for a seat</p><label class="sr-only" for="people-search">Search names</label><input id="people-search" type="search" placeholder="Search names..." value="${attr(search)}"><label class="check-label"><input id="show-assigned" type="checkbox" ${showAssigned ? 'checked' : ''}> Include seated people</label><div id="people-list" class="people-list">${peopleList()}</div>
+    return `<div class="people-heading"><h2>People</h2><button type="button" data-action="toggle-delete-names" aria-pressed="${deletingNames}" ${plan().people.length ? '' : 'disabled'}>${deletingNames ? 'Done' : 'Delete names'}</button></div><p class="people-summary">${plan().people.length - assigned.size} waiting for a seat</p><label class="sr-only" for="people-search">Search names</label><input id="people-search" type="search" placeholder="Search names..." value="${attr(search)}">${deletingNames ? '' : `<label class="check-label"><input id="show-assigned" type="checkbox" ${showAssigned ? 'checked' : ''}> Include seated people</label>`}<div id="people-delete-controls">${deleteControls()}</div><div id="people-list" class="people-list">${peopleList()}</div>
       <p class="field-note">Click any seat and type. Choose an existing name from the suggestions, or enter a new name.</p>
       <details id="manual-names"><summary>Add names</summary><label for="new-names">One name per line</label><textarea id="new-names" rows="4" placeholder="English or Hebrew names"></textarea><button type="button" data-action="add-names">Add names</button></details>
       <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}">${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || 'Empty')}</bdi></button>`).join('')}</div>` : '<p class="field-note">Set the table’s seat count in Edit layout first.</p>'}</details>`;
@@ -216,6 +238,8 @@ function seatsStart(root, unlockKey) {
   function render() {
     if (!item()) selected = plan().tables[0]?.id || plan().objects[0]?.id || '';
     if (!plan().people.some(person => person.id === selectedPerson)) selectedPerson = null;
+    deleteSelection = new Set([...deleteSelection].filter(id => plan().people.some(person => person.id === id)));
+    if (!plan().people.length) deletingNames = false;
     overflowTables = new Set();
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + (table.count ?? 0), 0);
@@ -312,6 +336,10 @@ function seatsStart(root, unlockKey) {
       download('seats-list.csv', '\uFEFF' + rows.map(row => row.map(seatsCsvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
     },
     'add-names': () => { const names = root.querySelector('#new-names').value.split(/\r?\n/); change(() => { const result = seatsAddNames(plan(), names); notice = result.added + ' names added; ' + result.duplicates + ' duplicates skipped.'; }); },
+    'toggle-delete-names': () => { editor.flush(); editor.close(); deletingNames = !deletingNames; deleteSelection.clear(); selectedPerson = null; renderInPlace(); },
+    'select-delete-shown': () => { const visible = visiblePeople(), clear = visible.every(person => deleteSelection.has(person.id)); visible.forEach(person => { if (clear) deleteSelection.delete(person.id); else deleteSelection.add(person.id); }); renderInPlace(); },
+    'delete-selected-names': () => deleteNames(),
+    'delete-all-names': () => deleteNames(true),
     'apply-count': () => {
       const value = root.querySelector('#bulk-count').value, target = root.querySelector('#bulk-target').value;
       if (value === '') return alertMessage('Enter a seat count first.');
@@ -325,7 +353,7 @@ function seatsStart(root, unlockKey) {
     if (suppressClick) return;
     const button = event.target.closest('[data-action],[data-mode],[data-add],[data-person],[data-edit-person],[data-open-seat]');
     if (button?.dataset.action) return actions[button.dataset.action]?.();
-    if (button?.dataset.mode) { editor.flush(); selectedPerson = null; mode = button.dataset.mode; notice = ''; renderInPlace(); return; }
+    if (button?.dataset.mode) { editor.flush(); selectedPerson = null; deletingNames = false; deleteSelection.clear(); mode = button.dataset.mode; notice = ''; renderInPlace(); return; }
     if (button?.dataset.add) return addObject(button.dataset.add);
     if (button?.dataset.person) { selectedPerson = selectedPerson === button.dataset.person ? null : button.dataset.person; notice = selectedPerson ? 'Now choose a seat inside a table.' : ''; renderInPlace(); return; }
     if (button?.dataset.editPerson) {
@@ -341,15 +369,16 @@ function seatsStart(root, unlockKey) {
     if (object) { selected = object.dataset.item; renderInPlace(); }
   });
   root.addEventListener('input', event => {
-    if (event.target.id === 'people-search') { search = event.target.value; root.querySelector('#people-list').innerHTML = peopleList(); }
+    if (event.target.id === 'people-search') { search = event.target.value; root.querySelector('#people-list').innerHTML = peopleList(); root.querySelector('#people-delete-controls').innerHTML = deleteControls(); }
   });
   root.addEventListener('wheel', () => {
     if (document.activeElement?.matches('input[type="number"]')) document.activeElement.blur();
   }, { passive: true, capture: true });
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
+    if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }
     if (id === 'selected-item') { selected = control.value; renderInPlace(); return; }
-    if (id === 'plan-select') { editor.flush(); state.activeId = control.value; selected = ''; selectedPerson = null; notice = ''; save(); renderInPlace(); return; }
+    if (id === 'plan-select') { editor.flush(); state.activeId = control.value; selected = ''; selectedPerson = null; deletingNames = false; deleteSelection.clear(); notice = ''; save(); renderInPlace(); return; }
     if (id === 'paper-size' || id === 'print-color') return change(() => { if (id === 'paper-size') plan().paper = control.value; else plan().monochrome = control.value === 'mono'; });
     if (id === 'show-assigned') { showAssigned = control.checked; renderInPlace(); return; }
     if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count, plan()); });

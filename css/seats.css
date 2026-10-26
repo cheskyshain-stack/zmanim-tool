@@ -49,7 +49,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-panel details{border-top:1px solid var(--seats-border);margin-top:14px;padding-top:12px;font-size:12px}
 .seats-panel summary{cursor:pointer;font-weight:600;line-height:1.4;min-height:29px}
 .seats-panel details button{font-size:12px;margin-top:8px;width:100%}
-.position-details .danger{color:#a3362e;border-color:#ddbdb9}
+.seats-app .danger{color:#a3362e;border-color:#ddbdb9}
 .room-tools{margin-top:18px;padding-top:15px;border-top:1px solid var(--seats-border)}
 .tool-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .tool-grid button{font-size:11px;padding:7px 6px;text-align:left}
@@ -133,10 +133,17 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .storage-warning button{margin-left:10px;font-size:11px}
 .fit-warning{margin:6px 16px}
 .people-summary{font-size:12px;color:#86691f;background:#f8f1e3;padding:8px 10px;border-radius:4px}
+.people-heading{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.people-heading h2{margin:0}
+.people-heading button{font-size:11px;padding:6px 8px;min-height:44px}
+.people-delete-actions{display:grid;gap:6px;margin:10px 0}
+.people-delete-actions button{font-size:12px;min-height:44px}
 .seats-panel .check-label{display:flex;align-items:center;gap:7px;font-size:11px;font-weight:400;margin:10px 0}
 .people-list{max-height:300px;overflow:auto;scrollbar-width:thin}
 .person-row{display:flex;border:1px solid #e0e5e9;border-radius:5px;margin:6px 0;overflow:hidden}
 .person-row.active{border-color:#326b9e;background:#eaf2fa}
+.seats-panel .name-delete-row{display:flex;align-items:center;min-height:44px;margin:6px 0;cursor:pointer;font-weight:400}
+.name-delete-row input{flex-shrink:0;margin-left:10px}
 .person-name{flex:1;text-align:left;min-width:0;overflow-wrap:anywhere}
 .seats-app .person-name{border:0;background:transparent;border-radius:0;font-size:12px;padding:8px;font-weight:500}
 .person-name small{display:block;font-size:10px;margin-top:3px;color:var(--seats-muted)}
