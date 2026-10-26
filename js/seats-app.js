@@ -1,6 +1,6 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_LAYOUT_VERSION, SEATS_SEAT_WIDTH, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsUid, seatsCreateState, seatsNormalizeState, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
@@ -123,23 +123,20 @@ function seatsStart(root, unlockKey) {
       const candidate = line ? line + ' ' + word : word;
       if (measure.measureText(candidate).width <= width) { line = candidate; continue; }
       if (line) { lines.push(line); line = ''; }
-      for (const char of word) {
-        if (line && measure.measureText(line + char).width > width) { lines.push(line); line = ''; }
-        line += char;
-      }
+      line = word;
     }
     if (line) lines.push(line);
     return lines;
   }
   function nameText(name, x, y, width, height, tableId, maxFont = 13) {
     let font = maxFont, lines = [], fits = false;
-    for (; font >= 8; font -= 0.5) {
+    for (; font >= 7; font -= 0.5) {
       lines = wrapped(name, font, width - 6);
       const wholeWords = name.split(/\s+/).every(word => measure.measureText(word).width <= width - 6);
       if (wholeWords && lines.length * font * 1.1 <= height - 3) { fits = true; break; }
     }
     if (!fits) {
-      font = 8; lines = wrapped(name, font, width - 6);
+      font = 7; lines = wrapped(name, font, width - 6);
       if (lines.length * font * 1.1 > height - 3 || lines.some(line => measure.measureText(line).width > width - 6)) overflowTables.add(tableId);
     }
     const start = y + height / 2 - (lines.length - 1) * font * 0.55 + font * 0.33;
@@ -257,7 +254,7 @@ function seatsStart(root, unlockKey) {
       <section class="seats-controls no-print"><div class="mode-tabs" role="group" aria-label="Planner mode"><button type="button" data-mode="layout" aria-pressed="${mode === 'layout'}">Edit layout</button><button type="button" data-mode="people" aria-pressed="${mode === 'people'}">Assign names</button></div><div class="print-settings"><label>Print size <select id="paper-size"><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>.</p>
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
-      <div class="seats-workspace no-print"><aside class="seats-panel">${mode === 'layout' ? layoutPanel() : peoplePanel()}<div class="upload-area"><button type="button" data-action="upload-names" ${importing ? 'disabled' : ''}>↑ ${importing ? 'Reading names...' : 'Upload names'}</button><p class="field-note">Excel, CSV, or text. Names stay in this browser.</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="new-plan">New plan from this layout</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. B2, C2, B6, and C6 have 4 seats. Other tables start with 5 seats. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Suggestions show existing people. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Plans save on this device. Download a backup to move them to another computer or keep a spare copy.</p><p>Print uses the selected paper size. Choose the same size in your printer settings, use Landscape, turn off browser headers and footers, or select Save as PDF. On Android, the paper size must also be chosen in the printer dialog.</p></details></aside>
+      <div class="seats-workspace no-print"><aside class="seats-panel">${mode === 'layout' ? layoutPanel() : peoplePanel()}<div class="upload-area"><button type="button" data-action="upload-names" ${importing ? 'disabled' : ''}>↑ ${importing ? 'Reading names...' : 'Upload names'}</button><p class="field-note">Excel, CSV, or text. Names stay in this browser.</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="new-plan">New plan from this layout</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. B2, C2, B5, C5, B6, and C6 have 4 seats. Other tables start with 5 seats. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Suggestions show existing people. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Plans save on this device. Download a backup to move them to another computer or keep a spare copy.</p><p>Print uses the selected paper size. Choose the same size in your printer settings, use Landscape, turn off browser headers and footers, or select Save as PDF. On Android, the paper size must also be chosen in the printer dialog.</p></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p><div class="canvas-buttons"><button type="button" data-action="undo" ${history.length ? '' : 'disabled'}>Undo</button><button type="button" data-action="redo" ${future.length ? '' : 'disabled'}>Redo</button><button type="button" data-action="fit" aria-label="Fit room on screen">Fit</button><button type="button" data-action="zoom-actual" aria-label="Show chart at 100 percent">100%</button><output id="seats-zoom-level" aria-label="Chart zoom">${zoom ? Math.round(zoom / 1200 * 100) + '%' : 'Fit'}</output><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
@@ -285,7 +282,7 @@ function seatsStart(root, unlockKey) {
     if (type !== 'table' && plan().objects.length >= 200) return alertMessage('A plan can contain up to 200 room objects.');
     change(() => {
       const id = seatsUid(); selected = id;
-      if (type === 'table') plan().tables.push({ id, label: 'T' + (plan().tables.length + 1), column: '', x: 490, y: 400, width: 215, height: 48, count: 5, seats: Array(5).fill(null), autoSize: true, anchor: 'center' });
+      if (type === 'table') plan().tables.push({ id, label: 'T' + (plan().tables.length + 1), column: '', x: 490, y: 400, width: SEATS_SEAT_WIDTH * 5, height: 48, count: 5, seats: Array(5).fill(null), autoSize: true, anchor: 'center' });
       else {
         const defaults = { pillar: ['Pillar', 36, 36], cabinet: ['Sefarim cabinet', 65, 160], bimah: ['Bimah', 110, 100], amud: ['Amud', 64, 48], label: ['Label', 150, 40] }[type];
         const object = { id, type, label: defaults[0], x: 550, y: 400, width: defaults[1], height: defaults[2] };

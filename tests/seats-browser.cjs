@@ -44,7 +44,9 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('.room-stage [data-walkway]').count(),4);
     assert.equal(starting.plans[0].objects.filter(object=>object.type==='cabinet').length,5);
     const c1=starting.plans[0].tables.find(t=>t.id==='C1'),d1=starting.plans[0].tables.find(t=>t.id==='D1');assert.equal(c1.x+c1.width,d1.x);
-    for(const id of ['B2','C2','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
+    for(const id of ['B2','C2','B5','C5','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
+    assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
+    assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,192);
     await page.screenshot({path:path.join(output,'default-room.png'),fullPage:true});
     assert.equal(await page.locator('.room-stage .walkway text,.room-stage .room-opening text,.room-stage .room-door text,.room-stage [data-item^="rear-case-"] text').count(),0);
     assert.equal(await page.locator('.room-stage #room-item-main-amud path').count(),0);
@@ -71,7 +73,7 @@ const server = http.createServer((req,res) => {
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
     assert.ok((await state()).plans[0].tables.every(table => table.count === 4));
     const joined=(await state()).plans[0],joinedC=joined.tables.find(t=>t.id==='C1'),joinedD=joined.tables.find(t=>t.id==='D1');assert.equal(joinedC.x+joinedC.width,joinedD.x);
-    const csv = '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\nדוד כהן\r\nRabbi Shmuel Alexander Friedman\r\nYosef Cohen\r\n';
+    const csv = '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\nדוד כהן\r\nRabbi Shmuel Alexander Friedlander\r\nYosef Cohen\r\n';
     await page.locator('#names-file').setInputFiles({name:'names.csv',mimeType:'text/csv',buffer:Buffer.from(csv)});
     await page.getByText('4 names added; 1 duplicates skipped.').waitFor();
     assert.equal((await state()).plans[0].people.length, 4);
@@ -83,10 +85,11 @@ const server = http.createServer((req,res) => {
     let current = (await state()).plans[0];
     assert.equal(current.tables.find(t=>t.id==='A1').seats[0], null);
     assert.equal(current.tables.find(t=>t.id==='A2').seats[1], current.people.find(p=>p.name==='Yosef Cohen').id);
-    for (const [index,name] of [[0,'Moshe Levi'],[1,'דוד כהן'],[2,'Rabbi Shmuel Alexander Friedman']]) {
+    for (const [index,name] of [[0,'Moshe Levi'],[1,'דוד כהן'],[2,'Rabbi Shmuel Alexander Friedlander']]) {
       await page.locator('.room-stage [data-table="A1"][data-seat="' + index + '"]').click();
       await page.locator('#seat-name-input').fill(name);
       await page.locator('#seat-name-input').press('Enter');
+      assert.equal((await page.locator('.room-stage [data-table="A1"][data-seat="'+index+'"] .seat-name tspan').allTextContents()).join(' '),name,'Name wrapping must keep words whole');
     }
 
     await page.getByRole('button',{name:'Edit layout',exact:true}).click();
@@ -255,6 +258,9 @@ const server = http.createServer((req,res) => {
       });
       assert.ok(printLayout.left<20&&printLayout.right<20,JSON.stringify(printLayout));
       assert.ok(printLayout.distortion<.001,'Print lettering must not stretch');
+      const printedNames=await page.locator('#seats-print .table-seat .seat-name').evaluateAll(nodes=>nodes.map(node=>[...node.querySelectorAll('tspan')].map(span=>span.textContent).join(' ')));
+      const savedPeople=(await state()).plans[0].people.map(person=>person.name);
+      assert.ok(printedNames.every(name=>savedPeople.includes(name)),'Printed names must retain whole words');
       const printedSquare=await page.locator('#seats-print .shtender-surface').boundingBox();
       assert.ok(Math.abs(printedSquare.width-printedSquare.height)<.1,'The printed Rav shtender should be square: '+JSON.stringify({paper,...printedSquare}));
       const pdf=path.join(output,'seats-'+paper+'.pdf');
@@ -295,7 +301,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v5'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v6'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
