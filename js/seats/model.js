@@ -2,7 +2,7 @@ export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 48;
-export const SEATS_LAYOUT_VERSION = 8;
+export const SEATS_LAYOUT_VERSION = 9;
 export const SEATS_BACK_WALKWAY_Y = 828;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B5', 'C5', 'B6', 'C6'];
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
@@ -26,22 +26,27 @@ export function seatsItems(plan) {
 }
 
 export function seatsFront(plan) {
-  const b1 = plan.tables.find(table => table.id === 'B1');
   const c1 = plan.tables.find(table => table.id === 'C1');
-  const left = b1 ? b1.x + b1.width : SEATS_COLUMN_CENTERS.B + SEATS_STANDARD_WIDTH / 2, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
-  const gap = Math.max(72, right - left);
-  const aronWidth = Math.min(122, Math.max(40, Math.round(gap * 0.52)));
-  const ravWidth = Math.min(56, Math.max(30, Math.round(gap * 0.24)));
-  const spacing = (gap - aronWidth - ravWidth) / 3;
-  return { aron: { x: left + spacing, y: 70, width: aronWidth, height: 48 },
-    rav: { x: left + 2 * spacing + aronWidth, y: 70, width: ravWidth, height: 70 } };
+  const center = SEATS_ROOM.width / 2, aronWidth = 72, right = c1?.x ?? SEATS_BOUNDS.right - SEATS_STANDARD_WIDTH * 2;
+  const aronRight = center + aronWidth / 2, gap = right - aronRight;
+  const ravWidth = Math.min(40, Math.max(30, gap - 16));
+  return { aron: { x: center - aronWidth / 2, y: 70, width: aronWidth, height: 48 },
+    rav: { x: aronRight + Math.max(8, (gap - ravWidth) / 2), y: 70, width: ravWidth, height: 70 } };
 }
 
 export function seatsSyncFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
-  if (c1 && d1) { c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y; }
+  if (c1 && d1) {
+    const edge = d1.x + d1.width, available = Math.max(120, edge - (SEATS_ROOM.width / 2 + 36 + 16 + 30));
+    const pair = [c1, d1], fixed = pair.filter(table => table.autoSize === false).reduce((sum, table) => sum + table.width, 0);
+    const automatic = pair.filter(table => table.autoSize !== false), widths = automatic.map(table => Math.max(60, (table.count ?? 5) * SEATS_SEAT_WIDTH));
+    const scale = Math.max(0, Math.min(1, (available - fixed) / (widths.reduce((sum, width) => sum + width, 0) || 1)));
+    automatic.forEach((table, index) => { table.width = Math.max(60, widths[index] * scale); });
+    d1.x = edge - d1.width; c1.anchor = 'right'; c1.x = Math.max(17, d1.x - c1.width); c1.y = d1.y;
+  }
   const b1 = plan.tables.find(table => table.id === 'B1');
-  if (b1 && c1 && c1.x - b1.x - b1.width < 80) b1.x = Math.max(SEATS_BOUNDS.left, c1.x - 80 - b1.width);
+  const { aron } = seatsFront(plan);
+  if (b1 && b1.x + b1.width > aron.x - 8) b1.x = Math.max(SEATS_BOUNDS.left, aron.x - 8 - b1.width);
   const rav = plan.objects.find(object => object.type === 'rav');
   if (rav) Object.assign(rav, seatsFront(plan).rav);
 }
@@ -182,7 +187,8 @@ export function seatsUpgradePlan(plan) {
     seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
   }
   if (previousVersion < 7) seatsBalanceColumns(plan);
-  seatsSpaceRearRows(plan);
+  if (previousVersion < 8) seatsSpaceRearRows(plan);
+  seatsSyncFront(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -357,7 +363,7 @@ export function seatsNormalizeState(input) {
       }
       return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7, 8].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');

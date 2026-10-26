@@ -421,7 +421,7 @@ function seatsStart(root, unlockKey) {
     if (seatsIsFixed(plan().objects.find(object => object.id === entryNode.dataset.item))) return;
     event.preventDefault(); selected = entryNode.dataset.item;
     const delta = event.shiftKey ? 1 : 8;
-    change(() => { const entry = item(); entry.x = number(entry.x + (event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0), SEATS_BOUNDS.left, SEATS_BOUNDS.right - entry.width); entry.y = number(entry.y + (event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0), SEATS_BOUNDS.top, itemBottom(entry) - entry.height); });
+    change(() => { const entry = item(); entry.x = number(entry.x + (event.key === 'ArrowLeft' ? -delta : event.key === 'ArrowRight' ? delta : 0), SEATS_BOUNDS.left, SEATS_BOUNDS.right - entry.width); entry.y = number(entry.y + (event.key === 'ArrowUp' ? -delta : event.key === 'ArrowDown' ? delta : 0), SEATS_BOUNDS.top, itemBottom(entry) - entry.height); if (['B1','C1','D1'].includes(entry.id)) seatsSyncFront(plan()); });
   });
   root.addEventListener('pointerdown', event => {
     const handle = event.target.closest('.drag-handle'), node = handle?.closest('[data-item]');
@@ -448,6 +448,7 @@ function seatsStart(root, unlockKey) {
     if (!drag || drag.pointer !== event.pointerId) return;
     if (event.type === 'pointercancel') { state = drag.before; renderInPlace(); }
     else if (drag.moved) {
+      if (['B1','C1','D1'].includes(drag.entry.id)) seatsSyncFront(plan());
       history.push(drag.before); future = []; if (history.length > 25) history.shift();
       save(); notice = 'Position saved.'; suppressClick = true; renderInPlace(); setTimeout(() => { suppressClick = false; }, 0);
     }

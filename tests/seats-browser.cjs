@@ -31,6 +31,10 @@ const server = http.createServer((req,res) => {
     await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', {name:'Open Seats'}).click();
     await page.locator('#seat-count').waitFor();
     const state = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), storageKey);
+    const assertAronCentered = async (selector='.room-stage') => {
+      const offset=await page.locator(selector).evaluate(stage=>{const aron=stage.querySelector('.aron').getBoundingClientRect(),room=stage.querySelector('.room-boundary').getBoundingClientRect();return Math.abs(aron.left+aron.width/2-room.left-room.width/2);});
+      assert.ok(offset<.1,'The Aron must remain centered: '+offset);
+    };
     await page.getByRole('button',{name:'Save plan',exact:true}).click();
     const starting = await state(), originalPlan = starting.activeId;
     assert.equal(starting.plans[0].tables.length, 34);
@@ -47,6 +51,7 @@ const server = http.createServer((req,res) => {
     for(const id of ['B2','C2','B5','C5','B6','C6'])assert.equal(starting.plans[0].tables.find(t=>t.id===id).count,4);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B8').width,240);
     assert.equal(starting.plans[0].tables.find(table=>table.id==='B5').width,192);
+    await assertAronCentered();
     const aisleGaps=await page.locator('.room-stage').evaluate(stage=>{
       const row=['A3','B3','C3','D3'].map(id=>stage.querySelector('[data-item="'+id+'"] .table-surface').getBoundingClientRect());
       return row.slice(1).map((table,index)=>table.left-row[index].right);
@@ -78,6 +83,11 @@ const server = http.createServer((req,res) => {
     assert.equal((await state()).plans[0].objects.find(object=>object.type==='rav').seats.filter(Boolean).length,1);
     assert.equal(await page.locator('.room-stage .rav-seat').getAttribute('data-facing'),'south');
     await page.keyboard.press('Control+z');await page.locator('#selected-item').selectOption('A1');
+    await page.locator('#selected-item').selectOption('B1');
+    await page.locator('#seat-count').fill('6');await page.locator('#seat-count').blur();await assertAronCentered();
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    await page.locator('.room-stage [data-item="B1"]').focus();await page.keyboard.press('ArrowLeft');await assertAronCentered();
+    await page.getByRole('button',{name:'Undo',exact:true}).click();await page.locator('#selected-item').selectOption('A1');
     assert.ok(starting.plans[0].tables.find(t=>t.id==='B9').y > starting.plans[0].tables.find(t=>t.id==='A8').y);
     await page.locator('#bulk-settings summary').click();
     await page.locator('#bulk-count').fill('4'); await page.getByRole('button',{name:'Apply seat count',exact:true}).click();
@@ -233,6 +243,7 @@ const server = http.createServer((req,res) => {
       await page.setViewportSize({width,height:1000});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
       await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      await assertAronCentered();
       const fitWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);
       assert.ok(await page.getByRole('button',{name:'Zoom out',exact:true}).isDisabled());
       await page.getByRole('button',{name:'Show chart at 100 percent',exact:true}).click();
@@ -261,6 +272,7 @@ const server = http.createServer((req,res) => {
     for (const paper of ['letter','tabloid']) {
       await page.locator('#paper-size').selectOption(paper);
       await page.emulateMedia({media:'print'});
+      await assertAronCentered('#seats-print');
       const printLayout=await page.evaluate(()=>{
         const sheet=document.querySelector('#seats-print').getBoundingClientRect(),room=document.querySelector('#seats-print .room-boundary').getBoundingClientRect();
         const scales=[...document.querySelectorAll('#seats-print text')].map(node=>{const matrix=node.getScreenCTM();return Math.abs(Math.hypot(matrix.a,matrix.b)-Math.hypot(matrix.c,matrix.d));});
@@ -311,7 +323,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v8'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v9'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
