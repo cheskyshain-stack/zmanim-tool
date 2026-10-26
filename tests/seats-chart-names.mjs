@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsDatedChartName, seatsIsRoomChartName, seatsChartName } from '../js/seats/chart-names.js';
+import { seatsDatedChartName, seatsIsRoomChartName, seatsChartName, seatsCopiedChartName } from '../js/seats/chart-names.js';
+
+test('copy titles remain distinct and keep their suffix within the chart-name limit', () => {
+  assert.equal(seatsCopiedChartName('Family seating', [' FAMILY   SEATING (COPY) ', 'Family seating (copy 3)']), 'Family seating (copy 2)');
+  const name = 'מ'.repeat(80), first = seatsCopiedChartName(name), next = seatsCopiedChartName(name, [first]);
+  assert.equal(first.length, 80); assert.ok(first.endsWith(' (copy)'));
+  assert.equal(next.length, 80); assert.ok(next.endsWith(' (copy 2)'));
+});
 
 test('dated chart titles use the New York calendar day across midnight and daylight saving', () => {
   assert.equal(seatsDatedChartName(new Date('2026-10-26T02:00:00Z')), 'Seating plan - Oct 25, 2026 at 10:00 PM');

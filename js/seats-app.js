@@ -12,7 +12,7 @@ import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
 import { seatsCreateRecords } from './seats/records.js';
 import { seatsStartMarkup } from './seats/start.js';
 import { seatsSortPeople } from './seats/name-sort.js';
-import { seatsChartName, seatsDatedChartName } from './seats/chart-names.js';
+import { seatsChartName, seatsDatedChartName, seatsCopiedChartName } from './seats/chart-names.js';
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
@@ -242,6 +242,24 @@ function seatsStart(root, auth) {
     zoom = 0; wholeRoom = false; history = []; future = []; notice = '';
     save(); render(); zoomControls.refresh(); sharing?.viewChanged();
     window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function copyChart(source, usedNames = []) {
+    if (readingNames) { alertMessage('Reading names. Please wait before changing charts.'); return false; }
+    if (conflict || editor.flush() === false) return false;
+    const plans = savedPlans();
+    if (plans.length >= 30) { alertMessage('You can keep up to 30 charts on this device. Delete an old device copy from saved charts to make room.'); return false; }
+    const next = copy(source); next.id = seatsUid();
+    next.name = seatsCopiedChartName(next.name, [...plans.map(plan => plan.name), ...usedNames]);
+    seatsUpgradePlan(next);
+    editor.close(); sharing?.leavePageLink();
+    state.plans = [...plans, next]; state.activeId = next.id;
+    screen = 'editor'; selected = 'A1'; selectedPerson = null;
+    deletingNames = false; deleteSelection.clear(); search = ''; showAssigned = false;
+    zoom = 0; wholeRoom = false; history = []; future = [];
+    notice = 'Copy created. Changes here will not change the original chart.';
+    save(); render(); zoomControls.refresh(); sharing?.viewChanged();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    return next.id;
   }
   function download(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type }));
@@ -656,7 +674,7 @@ function seatsStart(root, auth) {
   });
   sharing = seatsCreateSharing({
     getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen === 'editor', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
-    activatePage, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
+    activatePage, copyChart, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
     keepDeletedCopy: (id, metadata) => { const existing = records.info(id); records.restore(id, { ...existing, ...metadata, history: [...existing.history, ...(metadata.history || [])] }); save(); renderInPlace(); },

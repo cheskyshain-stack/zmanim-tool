@@ -8,12 +8,12 @@ export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
-  let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, entryPin = initialPin, pendingPublish = null;
+  let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
   try {
     const saved = JSON.parse(localStorage.getItem(SEATS_NAME_UPLOADS) || '[]');
@@ -304,13 +304,13 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     const metadata = site ? seatsRecordMetadata(plan) : chartMetadata(plan.id);
     const name = seatsChartName(plan.name, metadata);
     const location = site ? 'On the website' : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
-    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open chart</span></button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div>`;
+    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open chart</span></button><div class="saved-chart-actions"><button type="button" data-sharing="${site ? 'copy-chart' : 'copy-local'}" data-id="${escAttr(plan.id)}">Copy chart</button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div></div>`;
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
     listRequest++;
     const devicePages = getLocalPlans().map(plan => pageCard(plan)).join('') || '<p>No charts saved on this device yet.</p>';
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup for this room. Everyone signed in can edit charts on the website, and changes save automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved charts…</p>' : '<p>Sign in to see charts saved on the website.</p><button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved charts…</p>' : '<p>Sign in to see charts saved on the website.</p><button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
@@ -366,6 +366,33 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     entries.set(plan.id, entry); pendingPublish = null; persist(); localChanged();
     connect(); watch(); presence(); changed();
     dialog.close(); notify('Chart saved in Saved charts on the website. Later changes save automatically.');
+  }
+  async function copyChartFile(id, site) {
+    if (copyingChart) return;
+    if (publishing) throw new Error('Wait for the current chart to finish saving before making a copy.');
+    copyingChart = true;
+    const panel = dialog.querySelector('#sharing-plans');
+    const buttons = dialog.querySelectorAll('[data-sharing=copy-chart],[data-sharing=copy-local]');
+    for (const button of buttons) button.disabled = true;
+    try {
+      let source = local(id);
+      if (site) {
+        const record = await request('/api/plans/' + encodeURIComponent(id)), entry = entryForRemote(id);
+        source = entry?.queue.length ? local(entry.localId) : record.plan;
+        source = { ...source, name: seatsChartName(source.name, seatsRecordMetadata(record)) };
+      }
+      if (!dialog.open || dialogMode !== 'pages' || panel !== dialog.querySelector('#sharing-plans')) return;
+      if (!source) throw new Error('This chart is no longer available. Refresh Saved charts and try again.');
+      if (!copyChart(source, sitePlans.map(plan => seatsChartName(plan.name, seatsRecordMetadata(plan))))) return;
+      dialog.close(); presence();
+      if (site) {
+        try { await publish(); }
+        catch (error) { notify('Your copy is saved on this device. Press Save to put it on the website. ' + error.message); }
+      }
+    } finally {
+      copyingChart = false;
+      for (const button of buttons) if (button.isConnected) button.disabled = false;
+    }
   }
   async function openPlan(id) {
     const record = await request('/api/plans/' + encodeURIComponent(id));
@@ -436,6 +463,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     try {
       if (action === 'publish') await publish();
       else if (action === 'open') await openPlan(button.dataset.id);
+      else if (action === 'copy-chart' || action === 'copy-local') await copyChartFile(button.dataset.id, action === 'copy-chart');
       else if (action === 'use-names') await chooseNameFile(button.dataset.id);
       else if (action === 'delete-names') await deleteNameFile(button.dataset.id);
       else if (action === 'delete-chart' || action === 'delete-local') await deleteChartFile(button.dataset.id, action === 'delete-local');
