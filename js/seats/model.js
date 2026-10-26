@@ -6,7 +6,7 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'right-opening-2026-10-26';
+export const SEATS_ROOM_UPDATE = 'rear-right-2026-10-26';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
 export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 8 };
@@ -27,9 +27,10 @@ const SEATS_BACK_CABINETS = [
   { id: 'rear-case-center', type: 'cabinet', label: 'Back sefarim (center)', x: 311, y: 936, width: 578, height: 24 },
   { id: 'rear-case-right', type: 'cabinet', label: 'Back sefarim (right)', x: 979, y: 936, width: 204, height: 24 },
 ];
+const SEATS_A7_CABINET = { id: 'rear-case-a7', type: 'cabinet', label: 'Small sefarim by A7', x: 17, y: seatsRowY(7), width: 24, height: 40 };
 
 export function seatsIsFixed(entry) {
-  return entry?.type === 'cabinet' && SEATS_BACK_CABINETS.some(cabinet => cabinet.id === entry.id);
+  return entry?.type === 'cabinet' && [SEATS_A7_CABINET, ...SEATS_BACK_CABINETS].some(cabinet => cabinet.id === entry.id);
 }
 
 export function seatsItems(plan) {
@@ -69,7 +70,7 @@ export function seatsSyncRear(plan) {
     const table = plan.tables.find(entry => entry.id === id);
     if (!table) continue;
     table.anchor = 'right';
-    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : SEATS_TABLE_LEFT + SEATS_SEAT_WIDTH * 5) : 1159 - SEATS_TABLE_WALL_GAP;
+    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : SEATS_TABLE_LEFT + SEATS_SEAT_WIDTH * 5) : SEATS_TABLE_RIGHT;
     table.x = edge - table.width;
   }
 }
@@ -133,6 +134,7 @@ function seatsRearLayout(plan) {
   seatsSyncRear(plan);
   const fixtures = [
     ...SEATS_BACK_CABINETS,
+    SEATS_A7_CABINET,
     { id: 'rear-case-side-left', type: 'cabinet', label: 'Left sefarim', x: 17, y: seatsSideCaseTop(plan, 'A'), width: 24, height: 936 - seatsSideCaseTop(plan, 'A') },
     { id: 'rear-case-side-right', type: 'cabinet', label: 'Right sefarim', x: 1159, y: seatsSideCaseTop(plan, 'D'), width: 24, height: 936 - seatsSideCaseTop(plan, 'D') },
     { id: 'rav-seat', type: 'rav', label: 'Rav', count: 1, seats: [null], ...seatsFront(plan).rav },
@@ -255,14 +257,30 @@ function seatsSeparateTables(plan) {
   if (bimah) bimah.y = 452;
 }
 
-export function seatsNeedsUpgrade(plan) {
-  if (plan.layoutVersion !== SEATS_LAYOUT_VERSION) return true;
+function seatsEarlierRoomUpdate(plan) {
   // Earlier 7:30 layouts always joined these two tables. The new gap marks the update on every device.
   return seatsJoinedFront(plan) || seatsOldSideCases(plan).length > 0 || Boolean(seatsOldBimah(plan)) || Boolean(seatsOldFrontInset(plan));
+}
+function seatsOldRearInset(plan) {
+  return plan.tables.some(table => ['D7', 'D8'].includes(table.id) && Math.abs(table.x + table.width - 1151) < .001);
+}
+function seatsAddA7Cabinet(plan) {
+  if (!plan.objects.some(object => object.id === SEATS_A7_CABINET.id)) plan.objects.push({ ...SEATS_A7_CABINET });
+}
+export function seatsNeedsUpgrade(plan) {
+  return plan.layoutVersion !== SEATS_LAYOUT_VERSION || seatsEarlierRoomUpdate(plan) || seatsOldRearInset(plan)
+    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id);
 }
 
 export function seatsUpgradePlan(plan) {
   if (!seatsNeedsUpgrade(plan)) return 0;
+  if (plan.layoutVersion === SEATS_LAYOUT_VERSION && !seatsEarlierRoomUpdate(plan)) {
+    for (const table of seatsOldRearInset(plan) ? plan.tables.filter(table => ['D7', 'D8'].includes(table.id)) : []) {
+      table.anchor = 'right'; table.x = Math.max(SEATS_BOUNDS.left, SEATS_TABLE_RIGHT - table.width);
+    }
+    seatsAddA7Cabinet(plan);
+    return 0;
+  }
   const previousVersion = plan.layoutVersion ?? 1;
   const updateCounts = previousVersion !== SEATS_LAYOUT_VERSION || seatsJoinedFront(plan);
   const inset = seatsOldFrontInset(plan);
@@ -328,6 +346,7 @@ export function seatsUpgradePlan(plan) {
   for (const { column, cabinet } of seatsOldSideCases(plan)) { cabinet.y = seatsSideCaseTop(plan, column); cabinet.height = 936 - cabinet.y; }
   if (inset) inset.x = SEATS_BOUNDS.right - SEATS_FRONT_RIGHT_DOOR.clearance - inset.width;
   seatsSyncFront(plan); seatsSyncRear(plan); seatsSyncAisleTables(plan);
+  seatsAddA7Cabinet(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }

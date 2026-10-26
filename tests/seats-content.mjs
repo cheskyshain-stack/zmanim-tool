@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreatePlan } from '../js/seats/model.js';
+import { seatsCreatePlan, seatsUpgradePlan } from '../js/seats/model.js';
 import { seatsHasContent, seatsIsAutomaticChartName } from '../js/seats/content.js';
 
 const copy = value => structuredClone(value);
@@ -31,6 +31,13 @@ test('fresh canonical layouts stay empty despite factory IDs, ordering and print
   assert.equal(seatsHasContent(first), false); assert.equal(seatsHasContent(second), false);
   second.tables.reverse(); second.objects.reverse(); second.paper = 'tabloid'; second.monochrome = false; second.layoutVersion = 1;
   assert.equal(seatsHasContent(second), false);
+});
+
+test('the latest room update keeps older untouched charts empty', () => {
+  const plan=seatsCreatePlan();
+  plan.objects=plan.objects.filter(object=>object.id!=='rear-case-a7');
+  for(const table of plan.tables.filter(table=>['D7','D8'].includes(table.id)))table.x=1151-table.width;
+  assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
 });
 
 test('unassigned people and occupied table or Rav seats preserve content', () => {

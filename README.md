@@ -82,8 +82,10 @@ at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
 the back wall between and outside those doors, and continue along both side walls
 to just behind the A8/D8 chairs, with an 8-unit gap. Clear walkways run across the entire back and to the left
 of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
-right edge with a small gap before the bookcase face. The three back-wall cabinets are fixed
+right edge with the same small gap from the right wall as the front tables.
+Their chairs stay in front of the shortened side bookcase. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
+A very small fixed bookcase sits against the left wall beside A7, clear of its table and chairs.
 Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
 The same gap separates table rows from front to back, with a wider entrance walkway
@@ -149,7 +151,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-right-opening-2026-10-26` before changes are saved.
+`lakewood-commons-seats-v1-before-room-rear-right-2026-10-26` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
