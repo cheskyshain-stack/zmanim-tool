@@ -2,7 +2,7 @@ export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
 export const SEATS_SEAT_WIDTH = 43;
-export const SEATS_LAYOUT_VERSION = 3;
+export const SEATS_LAYOUT_VERSION = 4;
 export const SEATS_FOUR_SEAT_TABLES = ['B2', 'C2', 'B6', 'C6'];
 
 export function seatsItems(plan) {
@@ -34,8 +34,17 @@ export function seatsSyncRear(plan) {
     const table = plan.tables.find(entry => entry.id === id);
     if (!table) continue;
     table.anchor = 'right';
-    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : 232) : id === 'D8' ? 1159 : 1183;
+    const edge = id[0] === 'A' ? (a6 ? a6.x + a6.width : 232) : 1159;
     table.x = edge - table.width;
+  }
+}
+
+export function seatsSyncAisleTables(plan) {
+  for (const [id, reference] of [['B2', 'B3'], ['B6', 'B5'], ['C2', 'C3'], ['C6', 'C5']]) {
+    const table = plan.tables.find(entry => entry.id === id), neighbor = plan.tables.find(entry => entry.id === reference);
+    if (!table) continue;
+    table.anchor = id[0] === 'B' ? 'left' : 'right';
+    table.x = table.anchor === 'left' ? neighbor?.x ?? 300 : (neighbor ? neighbor.x + neighbor.width : 900) - table.width;
   }
 }
 
@@ -68,6 +77,13 @@ function seatsDefaultTable(column, row) {
 
 export function seatsUpgradePlan(plan) {
   if (plan.layoutVersion === SEATS_LAYOUT_VERSION) return 0;
+  if (plan.layoutVersion === 3) {
+    seatsSyncAisleTables(plan);
+    const d7 = plan.tables.find(table => table.id === 'D7'), d8 = plan.tables.find(table => table.id === 'D8');
+    if (d7 && d8) { d7.anchor = 'right'; d7.x = d8.x + d8.width - d7.width; }
+    plan.layoutVersion = SEATS_LAYOUT_VERSION;
+    return 0;
+  }
   let released = 0;
   if ((plan.layoutVersion ?? 1) < 2) {
     for (const table of plan.tables) {
@@ -94,6 +110,7 @@ export function seatsUpgradePlan(plan) {
     if (table) released += seatsSetCount(table, 3);
   }
   seatsRearLayout(plan);
+  seatsSyncAisleTables(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -112,6 +129,7 @@ export function seatsCreatePlan(name = 'Main shul') {
     objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 420, width: 104, height: 90 }],
     people: [], paper: 'letter', monochrome: true };
   seatsRearLayout(plan);
+  seatsSyncAisleTables(plan);
   return plan;
 }
 
@@ -137,6 +155,7 @@ export function seatsSetCount(table, value, plan = null) {
   }
   if (plan?.layoutVersion === SEATS_LAYOUT_VERSION && ['B1', 'C1', 'D1'].includes(table.id)) seatsSyncFront(plan);
   if (plan?.layoutVersion === SEATS_LAYOUT_VERSION && ['A6', 'A7', 'A8', 'D7', 'D8'].includes(table.id)) seatsSyncRear(plan);
+  if (plan?.layoutVersion === SEATS_LAYOUT_VERSION && ['B2', 'B3', 'B5', 'B6', 'C2', 'C3', 'C5', 'C6'].includes(table.id)) seatsSyncAisleTables(plan);
   return removed;
 }
 
@@ -259,7 +278,7 @@ export function seatsNormalizeState(input) {
       }
       return { ...base, count: 1, seats: [...seats] };
     });
-    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
+    return { id, name: str(raw.name, 80, 'plan name'), layoutVersion: [2, 3, 4].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
       paper: raw.paper === 'tabloid' ? 'tabloid' : 'letter', monochrome: raw.monochrome !== false };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');

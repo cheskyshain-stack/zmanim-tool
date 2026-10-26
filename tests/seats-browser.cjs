@@ -174,6 +174,17 @@ const server = http.createServer((req,res) => {
     for (const width of [1440,760,375]) {
       await page.setViewportSize({width,height:1000});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
+      await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      const fitWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);
+      assert.ok(await page.getByRole('button',{name:'Zoom out',exact:true}).isDisabled());
+      await page.getByRole('button',{name:'Show chart at 100 percent',exact:true}).click();
+      const actualWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);assert.ok(actualWidth>=Math.max(1200,fitWidth));
+      await page.getByRole('button',{name:'Zoom in',exact:true}).click();
+      assert.ok(await page.locator('.room-stage').evaluate(node=>node.clientWidth)>actualWidth);
+      await page.getByRole('button',{name:'Zoom out',exact:true}).click();
+      await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      assert.equal(await page.locator('.room-stage').evaluate(node=>node.clientWidth),fitWidth);
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Zoom must stay inside the chart');
       await page.screenshot({path:path.join(output,'seats-'+width+'.png'),fullPage:true});
       if(width===375) {
         await page.getByRole('button',{name:'Assign names',exact:true}).click();
@@ -186,6 +197,14 @@ const server = http.createServer((req,res) => {
     await page.setViewportSize({width:1440,height:1050});
     for (const paper of ['letter','tabloid']) {
       await page.locator('#paper-size').selectOption(paper);
+      await page.emulateMedia({media:'print'});
+      const printLayout=await page.evaluate(()=>{
+        const sheet=document.querySelector('#seats-print').getBoundingClientRect(),room=document.querySelector('#seats-print .room-boundary').getBoundingClientRect();
+        const scales=[...document.querySelectorAll('#seats-print text')].map(node=>{const matrix=node.getScreenCTM();return Math.abs(Math.hypot(matrix.a,matrix.b)-Math.hypot(matrix.c,matrix.d));});
+        return {left:room.left-sheet.left,right:sheet.right-room.right,distortion:Math.max(...scales)};
+      });
+      assert.ok(printLayout.left<20&&printLayout.right<20,JSON.stringify(printLayout));
+      assert.ok(printLayout.distortion<.001,'Print lettering must not stretch');
       const pdf=path.join(output,'seats-'+paper+'.pdf');
       await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:false});
       const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}), text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'});
@@ -196,6 +215,8 @@ const server = http.createServer((req,res) => {
       for(const label of ['A8','B9','C9','D8']) assert.ok(text.includes(label),label+' missing from '+paper);
       execFileSync('pdftoppm',['-scale-to','1600','-singlefile','-png',pdf,path.join(output,'print-'+paper)]);
       execFileSync('python',['-c', 'from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert("RGB"); data=im.tobytes(); assert all(max(data[i:i+3])-min(data[i:i+3])<=2 for i in range(0,len(data),3)), "Color pixels in black-and-white print"',path.join(output,'print-'+paper+'.png')]);
+      execFileSync('python',['-c', 'from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert("L"); w,h=im.size; points=[x for x in range(w) if sum(im.getpixel((x,y))<100 for y in range(h//8,h*15//16))>h/4]; assert points, "Room frame missing"; inches=float(sys.argv[2]); left=min(points)*inches/w; right=(w-1-max(points))*inches/w; assert left<.35 and right<.35, (left,right); print("Room frame margins in inches:",round(left,3),round(right,3))',path.join(output,'print-'+paper+'.png'),paper==='letter'?'11':'17'],{stdio:'inherit'});
+      await page.emulateMedia({media:'screen'});
     }
     // The organizer link exists in admin, and is absent from the public homepage.
     await page.goto(origin+'/'); assert.equal(await page.locator('a[href="/seats/"]').count(),0);
@@ -221,7 +242,7 @@ const server = http.createServer((req,res) => {
     await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
-    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v3'),storageKey),JSON.stringify(legacy));await migration.close();
+    assert.equal(await migrationPage.evaluate(key=>localStorage.getItem(key+'-before-room-v4'),storageKey),JSON.stringify(legacy));await migration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('#seat-count').waitFor();
@@ -233,9 +254,21 @@ const server = http.createServer((req,res) => {
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touchPage.waitForTimeout(150);
     assert.ok(await touchPage.evaluate(()=>scrollY>100),'Touch swipe over a table should scroll the page');
     assert.equal(await touchPage.locator('.room-stage [data-item="A1"]').getAttribute('transform'),'translate(17 70)');
-    assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);await touch.close();
+    assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);
+    await touchPage.evaluate(()=>scrollTo(0,0));await touchPage.waitForTimeout(100);
+    const pinchBox=await touchPage.locator('.room-scroll').boundingBox(),pinchWidth=await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth);
+    const centerX=Math.round(pinchBox.x+pinchBox.width/2),centerY=Math.round(Math.min(650,pinchBox.y+100));
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:centerX-60,y:centerY},{x:centerX+60,y:centerY}]});
+    for(let step=1;step<=10;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:centerX-60-step*5,y:centerY},{x:centerX+60+step*5,y:centerY}]});await touchPage.waitForTimeout(20);}
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touchPage.waitForTimeout(150);
+    assert.ok(await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth)>pinchWidth*1.5,'Two fingers must zoom the chart');
+    assert.equal(await touchPage.evaluate(()=>visualViewport.scale),1,'Pinching should zoom the chart rather than the entire page');
+    assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);
+    await touchPage.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+    assert.equal(await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth),pinchWidth);
+    await touch.close();
     assert.deepEqual(posts,[]); assert.deepEqual(errors,[]); assert.deepEqual(badResponses,[]);
-    console.log('PASS: PIN, exact 34-table layout, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, direct typing, suggestions, copy/paste, undo/redo, migration, wheel/touch scrolling, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
+    console.log('PASS: PIN, exact 34-table layout, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, direct typing, suggestions, copy/paste, undo/redo, migration, wheel/touch scrolling, button/pinch zoom, print margins, undistorted text, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
     console.log('Artifacts: '+output);
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
