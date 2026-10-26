@@ -69,6 +69,9 @@ function seatsStart(root, unlockKey) {
   const html = value => escText(value);
   const attr = value => escAttr(value);
   const svgNumber = value => Math.round(value * 100) / 100;
+  const pageHelp = () => sharing?.linked(plan().id)
+    ? 'Changes save to the site automatically when connected. Share / work together gives the other organizer a link to this page.'
+    : 'This page saves on this device. Save to site lets you open it on other devices or work together.';
 
   const editor = seatsCreateEditor({
     getPlan: plan, commit: change,
@@ -140,6 +143,16 @@ function seatsStart(root, unlockKey) {
     state = snapshot;
   }
   function alertMessage(message) { notice = message; renderInPlace(); }
+  function activatePage(id) {
+    if (!state.plans.some(plan => plan.id === id) || editor.flush() === false) return false;
+    editor.close(); state.activeId = id; selected = ''; selectedPerson = null;
+    deletingNames = false; deleteSelection.clear(); notice = ''; save(); renderInPlace();
+    return true;
+  }
+  function openPageTools(intent) {
+    if (editor.flush() === false) return;
+    editor.close(); sharing?.open(intent);
+  }
   function download(name, data, type) {
     const url = URL.createObjectURL(new Blob([data], { type }));
     const link = document.createElement('a'); link.href = url; link.download = name; link.click();
@@ -285,13 +298,14 @@ function seatsStart(root, unlockKey) {
     if (!pageSize) { pageSize = document.createElement('style'); pageSize.id = 'seats-page-size'; document.head.appendChild(pageSize); }
     const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
     if (pageSize.textContent !== css) pageSize.textContent = css;
-    root.innerHTML = `<section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label class="sr-only" for="plan-select">Saved plan</label><select id="plan-select">${state.plans.map(entry => `<option value="${attr(entry.id)}" ${entry.id === current.id ? 'selected' : ''}>${html(entry.name)}</option>`).join('')}</select><button type="button" class="text-button" data-action="rename-plan">Rename</button><span class="saved-label">${storageError ? 'Backup needed' : html(sharing?.label() || 'Saved in this browser')}</span></div></div>
-      <div class="top-actions">${sharing?.enabled ? `<button type="button" data-action="shared">${sharing.linked(current.id) ? 'Shared plans' : 'Save to site'}</button>` : ''}<button type="button" data-action="save">Save plan</button><button type="button" class="primary" data-action="print">Print / PDF</button><button type="button" class="text-button" data-action="lock">Lock</button></div></section>
+    root.innerHTML = `<section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="plan-select">Current page</label><select id="plan-select">${state.plans.map(entry => `<option value="${attr(entry.id)}" ${entry.id === current.id ? 'selected' : ''}>${html(entry.name)}</option>`).join('')}</select><button type="button" class="text-button" data-action="rename-plan">Rename</button><span class="saved-label">${storageError ? 'Backup needed' : html(sharing?.label() || 'Saved on this device')}</span></div></div>
+      <div class="top-actions"><button type="button" class="primary" data-action="print">Print / PDF</button><button type="button" class="text-button" data-action="lock">Lock</button></div></section>
+      <section class="seats-page-tools no-print" aria-label="Save, share and open pages"><div class="page-actions"><button type="button" data-action="new-plan">+ New page</button>${sharing?.enabled ? '<button type="button" class="primary" data-action="save-site">Save to site</button>' : ''}<button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved pages</button>${sharing?.enabled ? '<button type="button" data-action="share-page">Share / work together</button>' : ''}</div><p id="seats-page-help">${sharing?.enabled ? pageHelp() : 'Pages save automatically on this device. Open the Saved pages folder to return to an earlier page.'}</p></section>
       <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
       <div id="seats-sharing-status" class="sharing-status no-print" role="status" aria-live="polite">${sharing?.markup() || ''}</div>
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
-      <div class="seats-workspace no-print"><aside class="seats-panel">${peoplePanel()}<details id="people-extra-tools"><summary>Add names &amp; other tools</summary>${peopleManualTools()}<details id="room-settings"><summary>Table &amp; room settings</summary>${layoutPanel()}</details><div class="upload-area"><p class="field-note">Excel, CSV, or text. ${sharing?.linked(current.id) ? 'Names are shared with the other organizers.' : 'Names stay in this browser until you save this plan to the site.'}</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="new-plan">New plan from this layout</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. B2, C2, B5, C5, B6, and C6 have 4 seats. Other tables start with 5 seats. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Choosing an existing name adds it to this seat and keeps its other seats. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Use Delete beside a name to remove one person. Delete names lets you select several people or delete the whole list, including seated people. Undo restores deleted names and seats.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Local plans save on this device. Download a backup to move them to another computer or keep a spare copy.</p>${sharing?.enabled ? '<p>Save to site makes an online plan. Both organizers open the same plan from Shared plans. Changes save automatically, and the chart shows who is editing each seat. Undo keeps the other organizer’s work.</p>' : ''}<p>Printer paper (auto fit) fills the printable width and height of the paper selected in your printer dialog. Use Landscape and turn off browser headers and footers. For a fixed-size PDF, choose Letter or 11 × 17 and select Save as PDF. Match that size in the printer dialog, including Android’s paper-size picker.</p></details></details></aside>
+      <div class="seats-workspace no-print"><aside class="seats-panel">${peoplePanel()}<details id="people-extra-tools"><summary>Add names &amp; other tools</summary>${peopleManualTools()}<details id="room-settings"><summary>Table &amp; room settings</summary>${layoutPanel()}</details><div class="upload-area"><p class="field-note">Excel, CSV, or text. ${sharing?.linked(current.id) ? 'Names are shared with the other organizers.' : 'Names stay on this device until you save this page to the site.'}</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="save">Save on this device</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7, A8, D7, and D8 have 3 seats. B2, C2, B5, C5, B6, and C6 have 4 seats. Other tables start with 5 seats. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Choosing an existing name adds it to this seat and keeps its other seats. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Use Delete beside a name to remove one person. Delete names lets you select several people or delete the whole list, including seated people. Undo restores deleted names and seats.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Saved pages at the top lists earlier pages saved on this device and on the site. Download a backup to keep a spare copy.</p>${sharing?.enabled ? '<p>Save to site saves the current page online. Later changes save automatically. Share / work together gives you a link for the other organizer. They open it with their name and the same Seats PIN. Both people edit the same page and see each other’s changes. Undo keeps the other organizer’s work.</p>' : ''}<p>Printer paper (auto fit) fills the printable width and height of the paper selected in your printer dialog. Use Landscape and turn off browser headers and footers. For a fixed-size PDF, choose Letter or 11 × 17 and select Save as PDF. Match that size in the printer dialog, including Android’s paper-size picker.</p></details></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p><div class="canvas-buttons"><button type="button" data-action="undo" ${(sharing?.linked(current.id) ? sharing.canUndo() : history.length) ? '' : 'disabled'}>Undo</button><button type="button" data-action="redo" ${(sharing?.linked(current.id) ? sharing.canRedo() : future.length) ? '' : 'disabled'}>Redo</button><button type="button" data-action="fit" aria-label="Fit room on screen">Fit</button><button type="button" data-action="zoom-actual" aria-label="Show chart at 100 percent">100%</button><output id="seats-zoom-level" aria-label="Chart zoom">${zoom ? Math.round(zoom / 1200 * 100) + '%' : 'Fit'}</output><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
@@ -367,18 +381,20 @@ function seatsStart(root, unlockKey) {
     save: () => { if (editor.flush() === false) return; const ok = save(); notice = ok ? (sharing?.linked(plan().id) ? 'Changes are saved to the shared plan automatically.' : 'Plan saved in this browser.') : 'Download a backup to keep this plan.'; renderInPlace(); },
     undo: () => { editor.close(); if (sharing?.linked(plan().id)) return sharing.undo(); if (history.length) { future.push(copy(state)); restoreLocalHistory(history.pop()); save(); notice = 'Last change undone.'; renderInPlace(); } },
     redo: () => { editor.close(); if (sharing?.linked(plan().id)) return sharing.redo(); if (future.length) { history.push(copy(state)); restoreLocalHistory(future.pop()); save(); notice = 'Last change restored.'; renderInPlace(); } },
-    shared: () => { if (editor.flush() === false) return; editor.close(); sharing?.open(); },
+    'save-site': () => openPageTools('save'),
+    'open-pages': () => openPageTools('pages'),
+    'share-page': () => openPageTools('share'),
     fit: () => zoomControls.fit(),
     'zoom-actual': () => zoomControls.actual(),
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
     print: () => { if (editor.flush() === false) return; if (overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
     lock: () => { editor.flush(); try { sessionStorage.removeItem(unlockKey); } catch { /* reload still locks */ } location.reload(); },
-    'rename-plan': () => { const name = window.prompt('Plan name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Plan renamed.'); },
+    'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': () => {
       editor.flush();
       if (state.plans.length >= 30) return alertMessage('You can keep up to 30 plans in this browser.');
-      const name = window.prompt('Name for the new plan'); if (!name?.trim()) return;
+      const name = window.prompt('Name for the new page'); if (!name?.trim()) return;
       change(() => { const next = copy(plan()); next.id = seatsUid(); next.name = name.trim().slice(0, 80); next.people = []; seatsItems(next).forEach(table => { table.seats = table.seats.map(() => null); }); state.plans.push(next); state.activeId = next.id; selectedPerson = null; }, 'New plan created with this layout and empty seats.');
     },
     backup: () => { editor.flush(); download('seats-backup.json', JSON.stringify(state, null, 2), 'application/json'); },
@@ -437,7 +453,7 @@ function seatsStart(root, unlockKey) {
     const control = event.target, id = control.id;
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }
     if (id === 'selected-item' || id === 'layout-item') { selected = control.value; renderInPlace(); return; }
-    if (id === 'plan-select') { editor.flush(); state.activeId = control.value; selected = ''; selectedPerson = null; deletingNames = false; deleteSelection.clear(); notice = ''; save(); renderInPlace(); return; }
+    if (id === 'plan-select') return activatePage(control.value);
     if (id === 'paper-size' || id === 'print-color') return change(() => { if (id === 'paper-size') plan().paper = control.value; else plan().monochrome = control.value === 'mono'; });
     if (id === 'show-assigned') { showAssigned = control.checked; renderInPlace(); return; }
     if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count, plan()); });
@@ -533,6 +549,7 @@ function seatsStart(root, unlockKey) {
   window.addEventListener('afterprint', () => { printing = false; document.body.classList.remove('seats-print-error'); sharing?.flush(); });
   sharing = seatsCreateSharing({
     getState: () => state, isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
+    activatePage, restoreBackup: () => actions.restore(),
     updatePlan: (id, incoming, activate = false) => {
       const focused = document.activeElement;
       const draft = root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
@@ -555,10 +572,10 @@ function seatsStart(root, unlockKey) {
     onStatus: () => {
       const links = state.plans.filter(plan => sharing?.linked(plan.id)).map(plan => plan.id).join();
       if (links !== sharingLinks) { history = []; future = []; sharingLinks = links; }
-      const button = root.querySelector('[data-action=shared]');
+      const button = root.querySelector('[data-action=save-site]');
       if (sharing?.enabled && !button) { renderInPlace(); return; }
-      if (button) button.textContent = sharing.linked(plan().id) ? 'Shared plans' : 'Save to site';
-      const saved = root.querySelector('.saved-label'); if (saved && !storageError) saved.textContent = sharing?.label() || 'Saved in this browser';
+      const saved = root.querySelector('.saved-label'); if (saved && !storageError) saved.textContent = sharing?.label() || 'Saved on this device';
+      const help = root.querySelector('#seats-page-help'); if (help && sharing?.enabled) help.textContent = pageHelp();
       const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
       sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();

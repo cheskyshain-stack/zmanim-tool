@@ -128,8 +128,16 @@ the waiting list. The browser keeps the original pre-update JSON in
 `lakewood-commons-seats-v1-before-room-v12` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
-Optional shared plans let two organizers work on the same online plan. Save to site
-uploads an existing local plan; Shared plans opens it on another device. Committed
+The page toolbar offers New page, Save to site, a Saved pages folder, and
+Share / work together. The current page and its saved location are labeled.
+The folder shows named page cards with document icons, grouped by site and device.
+Click a page card to reopen it. Device
+pages remain available before signing in. Save to site identifies the current page
+and confirms its first upload. Later changes save automatically.
+Share / work together provides a link to that exact page and explains how the
+other organizer opens it with their own name and the same Seats PIN. Shared
+links contain only a page ID; they require the existing PIN-protected session.
+Clipboard refusal leaves the visible link selected for manual copying. Committed
 edits appear live, with the other organizer's name and active seat. Independent
 seat changes merge, Undo affects only that organizer's edits, and conflicting
 offline changes are kept as a separate local copy. Restoring a backup creates

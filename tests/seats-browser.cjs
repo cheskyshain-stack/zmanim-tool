@@ -37,7 +37,13 @@ const server = http.createServer((req,res) => {
       const offset=await page.locator(selector).evaluate(stage=>{const aron=stage.querySelector('.aron').getBoundingClientRect(),room=stage.querySelector('.room-boundary').getBoundingClientRect();return Math.abs(aron.left+aron.width/2-room.left-room.width/2);});
       assert.ok(offset<.1,'The Aron must remain centered: '+offset);
     };
-    await page.getByRole('button',{name:'Save plan',exact:true}).click();
+    const saveOnDevice=async target=>{
+      await target.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
+      await target.locator('#plan-files').evaluate(node=>{node.open=true;});
+      await target.getByRole('button',{name:'Save on this device',exact:true}).click();
+      await target.locator('#people-extra-tools').evaluate(node=>{node.open=false;});
+    };
+    await saveOnDevice(page);
     const starting = await state(), originalPlan = starting.activeId;
     assert.equal(starting.plans[0].tables.length, 34);
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
@@ -274,7 +280,7 @@ const server = http.createServer((req,res) => {
     let downloading=page.waitForEvent('download'); await page.getByRole('button',{name:'Download backup',exact:true}).click();
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
     page.once('dialog',dialog=>dialog.accept('Yomim Noraim'));
-    await page.getByRole('button',{name:'New plan from this layout',exact:true}).click();
+    await page.getByRole('button',{name:'+ New page',exact:true}).click();
     assert.equal((await state()).plans.length,2); assert.equal((await state()).plans[1].people.length,0);
     await page.locator('#backup-file').setInputFiles(backupPath);
     await page.getByText('Backup restored as additional plans. Your existing plans were kept.').waitFor();
@@ -377,7 +383,7 @@ const server = http.createServer((req,res) => {
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A7'),{count:5,seats:[null,null,null,null,'legacy-child']});
     const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
     const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('.room-stage .table-item').first().waitFor();
-    await migrationPage.getByRole('button',{name:'Save plan',exact:true}).click();
+    await saveOnDevice(migrationPage);
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
@@ -390,7 +396,7 @@ const server = http.createServer((req,res) => {
     prior.tables.find(table=>table.id==='A3').height=48;
     const savedMigration=await browser.newContext();await savedMigration.addInitScript(({key,state})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(state));},{key:storageKey,state:version11});
     const savedPage=await savedMigration.newPage();await savedPage.goto(origin+'/seats/');await savedPage.locator('.room-stage .table-item').first().waitFor();
-    await savedPage.getByRole('button',{name:'Save plan',exact:true}).click();
+    await saveOnDevice(savedPage);
     const latest=await savedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),byId=id=>latest.plans[0].tables.find(table=>table.id===id);
     assert.equal(latest.plans[0].layoutVersion,12);assert.deepEqual(latest.plans[0].people,prior.people);
     assert.equal(byId('A8').seats[0],'parent');assert.equal(byId('B9').seats[0],'child');
