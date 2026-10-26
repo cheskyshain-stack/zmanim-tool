@@ -14,7 +14,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ inputs.service_only && 'seats-service' || 'pages' }}
   cancel-in-progress: false
 
 jobs:
