@@ -36,13 +36,14 @@ name adds a separate copy and keeps the original seat. Reopening and saving the
 same seat keeps its existing record. Each copy can be renamed independently.
 Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
-On desktop, Seats keeps the list beside the chart within the viewport.
+On desktop, Seats opens the chart at the full available width and keeps the list
+beside it. Scroll vertically inside the chart to reach the back of the room.
 Drag a list name onto a seat to add it, keeping any existing assignment. Drag
 an assigned name directly between chart seats to move it. Ctrl/Option
 drag creates a separate copy for another person, and dropping an assigned name back
 in the list frees its seat. An occupied destination returns its former occupant to
-the waiting list. Undo/Redo also covers these changes. Fit shows the whole room;
-100% and plus/minus zoom within the chart pane while the names remain visible.
+the waiting list. Undo/Redo also covers these changes. The view selector offers
+Full width, Whole chart, and 100%; plus/minus zoom within the chart pane.
 Upload names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
@@ -128,17 +129,20 @@ the waiting list. The browser keeps the original pre-update JSON in
 `lakewood-commons-seats-v1-before-room-v12` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
-The page toolbar offers New page, Save to site, a Saved pages folder, and
-Share / work together. The current page and its saved location are labeled.
-The folder shows named page cards with document icons, grouped by site and device.
-Click a page card to reopen it. Device
-pages remain available before signing in. Save to site identifies the current page
-and confirms its first upload. Later changes save automatically.
-Share / work together provides a link to that exact page and explains how the
-other organizer opens it with their own name and the same Seats PIN. Shared
-links contain only a page ID; they require the existing PIN-protected session.
-Clipboard refusal leaves the visible link selected for manual copying. Committed
-edits appear live, with the other organizer's name and active seat. Independent
+Charts save locally as they are edited. The main actions are Save and Saved charts,
+beside Print. The chart name is editable inline. Save uploads the current chart to
+the website once; later edits save there automatically. Anyone signed in can open
+the chart from Saved charts and edit it. There is no separate sharing step.
+The folder shows chart names, creation dates, last-edit dates and the last editor.
+New chart is inside the folder; history and backup downloads are under More.
+The PIN just entered to open Seats is reused in memory for the first server sign-in;
+the organizer supplies their name for history. The PIN is not saved to browser storage.
+Each accepted shared edit records the organizer, time and changed names, seats or
+settings in the server history. History is paginated and Undo adds its own entry.
+Older charts whose creation date was never recorded show Not recorded. Local
+dates and the 200 most recent local changes use a separate browser record; backup
+downloads include those records and restores retain known creation dates.
+Committed edits appear live, with the other organizer's name and active seat. Independent
 seat changes merge, Undo affects only that organizer's edits, and conflicting
 offline changes are kept as a separate local copy. Restoring a backup creates
 independent local plans. Shared editing stays disabled until its Cloudflare service

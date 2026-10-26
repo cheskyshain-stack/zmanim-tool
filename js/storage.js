@@ -53,7 +53,7 @@ function applySeeds(state) {
   // colon so no dash of that kind is left anywhere in the app, including names already
   // saved in a browser.
   for (const rule of state.rules) {
-    if (rule.name?.includes('—')) rule.name = rule.name.replace(/\s*—\s*/g, ': ');
+    if (rule.name?.includes('\u2014')) rule.name = rule.name.replace(/\s*\u2014\s*/g, ': ');
   }
   state.seeded = seeded;
   return state;

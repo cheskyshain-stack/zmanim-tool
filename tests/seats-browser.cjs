@@ -37,13 +37,6 @@ const server = http.createServer((req,res) => {
       const offset=await page.locator(selector).evaluate(stage=>{const aron=stage.querySelector('.aron').getBoundingClientRect(),room=stage.querySelector('.room-boundary').getBoundingClientRect();return Math.abs(aron.left+aron.width/2-room.left-room.width/2);});
       assert.ok(offset<.1,'The Aron must remain centered: '+offset);
     };
-    const saveOnDevice=async target=>{
-      await target.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
-      await target.locator('#plan-files').evaluate(node=>{node.open=true;});
-      await target.getByRole('button',{name:'Save on this device',exact:true}).click();
-      await target.locator('#people-extra-tools').evaluate(node=>{node.open=false;});
-    };
-    await saveOnDevice(page);
     const starting = await state(), originalPlan = starting.activeId;
     assert.equal(starting.plans[0].tables.length, 34);
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
@@ -279,13 +272,17 @@ const server = http.createServer((req,res) => {
     await page.locator('#plan-files summary').click();
     let downloading=page.waitForEvent('download'); await page.getByRole('button',{name:'Download backup',exact:true}).click();
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
+    const backupData=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.ok(backupData.chartRecords[originalPlan].createdAt);assert.ok(backupData.chartRecords[originalPlan].updatedAt);
     page.once('dialog',dialog=>dialog.accept('Yomim Noraim'));
-    await page.getByRole('button',{name:'+ New page',exact:true}).click();
+    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.getByRole('button',{name:'New chart',exact:true}).click();
     assert.equal((await state()).plans.length,2); assert.equal((await state()).plans[1].people.length,0);
     await page.locator('#backup-file').setInputFiles(backupPath);
     await page.getByText('Backup restored as additional plans. Your existing plans were kept.').waitFor();
     assert.equal((await state()).plans.length,3);
-    await page.locator('#plan-select').selectOption(originalPlan);
+    const restoredId=(await state()).activeId;
+    const restoredDates=await page.evaluate(id=>JSON.parse(localStorage.getItem('lakewood-commons-seats-records-v1')).records[id],restoredId);
+    assert.equal(restoredDates.createdAt,backupData.chartRecords[originalPlan].createdAt,'Backup restores keep the original chart creation date');
+    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.locator('.sharing-local-plan [data-id="'+originalPlan+'"]').click();
     await page.setViewportSize({width:760,height:1000});
     await openRoom();
     const panel=await page.locator('.seats-panel').boundingBox();
@@ -303,16 +300,16 @@ const server = http.createServer((req,res) => {
     for (const width of [1440,760,375]) {
       await page.setViewportSize({width,height:1000});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
-      await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      await page.locator('#chart-view').selectOption('width');
       await assertAronCentered();
       const fitWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);
       assert.ok(await page.getByRole('button',{name:'Zoom out',exact:true}).isDisabled());
-      await page.getByRole('button',{name:'Show chart at 100 percent',exact:true}).click();
+      await page.locator('#chart-view').selectOption('actual');
       const actualWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);assert.ok(actualWidth>=Math.max(1200,fitWidth));
       await page.getByRole('button',{name:'Zoom in',exact:true}).click();
       assert.ok(await page.locator('.room-stage').evaluate(node=>node.clientWidth)>actualWidth);
       await page.getByRole('button',{name:'Zoom out',exact:true}).click();
-      await page.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+      await page.locator('#chart-view').selectOption('width');
       assert.equal(await page.locator('.room-stage').evaluate(node=>node.clientWidth),fitWidth);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Zoom must stay inside the chart');
       await page.screenshot({path:path.join(output,'seats-'+width+'.png'),fullPage:true});
@@ -365,7 +362,7 @@ const server = http.createServer((req,res) => {
     await page.addInitScript(()=>localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()})));
     await page.goto(origin+'/admin/'); await page.locator('a.admin-home-task[href="/seats/"]').waitFor();
     await page.locator('a.admin-home-task[href="/seats/"]').click(); await page.locator('.room-stage .table-item').first().waitFor();
-    await page.getByRole('button',{name:'Lock',exact:true}).click(); await page.locator('#seats-pin').waitFor();
+    await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Lock',exact:true}).click(); await page.locator('#seats-pin').waitFor();
     assert.equal(await page.locator('.room-diagram').count(),0);
     const blocked=await browser.newContext();
     await blocked.addInitScript(()=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open'); Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage disabled');}});});
@@ -383,7 +380,6 @@ const server = http.createServer((req,res) => {
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A7'),{count:5,seats:[null,null,null,null,'legacy-child']});
     const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
     const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('.room-stage .table-item').first().waitFor();
-    await saveOnDevice(migrationPage);
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
@@ -396,7 +392,6 @@ const server = http.createServer((req,res) => {
     prior.tables.find(table=>table.id==='A3').height=48;
     const savedMigration=await browser.newContext();await savedMigration.addInitScript(({key,state})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(state));},{key:storageKey,state:version11});
     const savedPage=await savedMigration.newPage();await savedPage.goto(origin+'/seats/');await savedPage.locator('.room-stage .table-item').first().waitFor();
-    await saveOnDevice(savedPage);
     const latest=await savedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),byId=id=>latest.plans[0].tables.find(table=>table.id===id);
     assert.equal(latest.plans[0].layoutVersion,12);assert.deepEqual(latest.plans[0].people,prior.people);
     assert.equal(byId('A8').seats[0],'parent');assert.equal(byId('B9').seats[0],'child');
@@ -426,7 +421,7 @@ const server = http.createServer((req,res) => {
     assert.ok(await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth)>pinchWidth*1.5,'Two fingers must zoom the chart');
     assert.equal(await touchPage.evaluate(()=>visualViewport.scale),1,'Pinching should zoom the chart rather than the entire page');
     assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);
-    await touchPage.getByRole('button',{name:'Fit room on screen',exact:true}).click();
+    await touchPage.locator('#chart-view').selectOption('width');
     assert.equal(await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth),pinchWidth);
     await touch.close();
     assert.deepEqual(posts,[]); assert.deepEqual(errors,[]); assert.deepEqual(badResponses,[]);

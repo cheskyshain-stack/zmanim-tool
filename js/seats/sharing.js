@@ -1,15 +1,16 @@
 import { escAttr, escText } from '../util.js';
 import { seatsSharedApply, seatsSharedDiff, seatsSharedPlan, seatsSharedReverse } from './shared-model.js';
+import { seatsRecordMetadata } from './activity.js';
 
 const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 
-export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup }) {
+export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = '', dialogMode = '', lastMessage = 0;
-  let intent = 'pages', listRequest = 0;
+  let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, entryPin = initialPin, pendingPublish = null;
   const requestedPage = new URL(location.href).searchParams.get('page');
   let pendingPage = /^[A-Za-z0-9_-]{8,100}$/.test(requestedPage || '') ? requestedPage : null;
   const current = () => getState().plans.find(plan => plan.id === getState().activeId);
@@ -49,7 +50,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     const response = await fetch(endpoint + path, { ...options, headers: { 'Content-Type': 'application/json', ...(session ? { Authorization: 'Bearer ' + session.token } : {}), ...options.headers }, cache: 'no-store' });
     const result = await response.json();
     if (!response.ok) {
-      if (response.status === 401) { session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); }
+      if (response.status === 401) { session = null; entryPin = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); }
       throw new Error(result.error || 'The shared plan could not be opened.');
     }
     return result;
@@ -68,7 +69,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     if (message.revision < entry.base.revision) return;
     const oldLocal = local(entry.localId), accepted = entry.queue.findIndex(operation => operation.id === message.operationId);
     if (accepted >= 0) entry.queue.splice(accepted, 1);
-    const base = { plan: clean(message.plan, entry.remoteId), revision: message.revision, updatedAt: message.updatedAt, updatedBy: message.updatedBy };
+    const base = { plan: clean(message.plan, entry.remoteId), revision: message.revision, ...seatsRecordMetadata(message) };
     let visible = base.plan;
     try {
       if (message.type === 'conflict') throw new Error(message.error || 'Another organizer updated the same seat.');
@@ -156,14 +157,14 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     if (!entry) return 'Saved on this device';
     if (entry.error) return entry.error;
     if (!session || session.expires <= Date.now()) return 'Local copy saved · Sign in to sync';
-    if (!ready || !entry.ready) return 'Local copy saved · Reconnecting';
-    return entry.queue.length ? 'Saving online…' : 'Saved online';
+    if (!ready || !entry.ready) return 'Saved on this device · Reconnecting';
+    return entry.queue.length ? 'Saving to website…' : 'Saved to website';
   }
   function peersHere() { const id = entries.get(current()?.id)?.remoteId; return id ? peers.filter(peer => peer.clientId !== clientId && peer.planId === id) : []; }
   function markup() {
     const entry = entries.get(current()?.id); if (!entry) return '';
     const others = peersHere(), text = others.map(peer => peer.name + (peer.seat ? ' editing ' + peer.seat.replace(':', ' · Seat ').replace(/Seat (\d+)$/, (_, index) => 'Seat ' + (Number(index) + 1)) : ' is viewing this plan')).join(' · ');
-    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${text ? `<span class="sharing-peers">${escText(text)}</span>` : ''}`;
+    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${entry.base.updatedBy ? `<span class="sharing-audit">Last edited by ${escText(entry.base.updatedBy)} · ${escText(formatDate(entry.base.updatedAt))}</span>` : ''}${text ? `<span class="sharing-peers">${escText(text)}</span>` : ''}`;
   }
   function decorate(root) {
     root.querySelectorAll('.is-remote').forEach(node => { node.classList.remove('is-remote'); node.removeAttribute('data-organizer'); });
@@ -187,19 +188,25 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   }
   function showLogin(error = '') {
     dialogMode = 'login';
-    const title = pendingPage ? 'Open a shared page' : intent === 'save' ? 'Save this page to the site' : intent === 'share' ? 'Share / work together' : 'Open pages saved on the site';
-    showDialog(`<h2 id="sharing-title">${title}</h2><p>Enter your name and the same Seats PIN you used to open this tool. Your name lets the other organizer see who is editing.</p><form id="sharing-login"><label for="sharing-name">Your name</label><input id="sharing-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="given-name" required><label for="sharing-pin">Seats PIN</label><input id="sharing-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions"><button type="button" data-sharing="pages">Back to saved pages</button><button class="primary" type="submit">Sign in</button></div></form>`);
+    const title = pendingPage ? 'Open a saved chart' : intent === 'save' ? 'Save chart to the website' : intent === 'history' ? 'Chart change history' : 'Open saved charts';
+    const pinField = entryPin ? '' : '<label for="sharing-pin">Seats PIN</label><input id="sharing-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required>';
+    showDialog(`<h2 id="sharing-title">${title}</h2><p>Enter your name so the chart history can show who made each change.${entryPin ? '' : ' Use the same Seats PIN.'}</p><form id="sharing-login"><label for="sharing-name">Your name</label><input id="sharing-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="given-name" required>${pinField}<p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions"><button type="button" data-sharing="close">Cancel</button><button class="primary" type="submit">${intent === 'save' ? 'Save chart' : 'Sign in'}</button></div></form>`);
+  }
+  function formatDate(value) { return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded'; }
+  function chartMetadata(id) { const entry = entries.get(id); return entry ? seatsRecordMetadata(entry.base) : getRecord(id); }
+  function dateDetails(record) {
+    return `<span>Created: ${escText(formatDate(record.createdAt))}</span><span>Last edited: ${escText(formatDate(record.updatedAt))}</span>${record.updatedBy ? `<span>Edited by: ${escText(record.updatedBy)}</span>` : ''}`;
   }
   function pageCard(plan, site = false) {
-    const detail = site ? 'Updated by ' + plan.updatedBy + ' · ' + new Date(plan.updatedAt).toLocaleString()
-      : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
-    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(plan.name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(plan.name)}</bdi></strong><small>${escText(detail)}</small><span class="saved-page-open">Open page</span></button></div>`;
+    const metadata = site ? seatsRecordMetadata(plan) : chartMetadata(plan.id);
+    const location = site ? 'On the website' : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
+    return `<div class="sharing-plan ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(plan.name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke="currentColor" stroke-width="1.5"/><path d="M42 3v13h13M17 24h30" stroke="currentColor" stroke-width="1.5"/><g fill="#eaf0f5" stroke="currentColor" stroke-width=".8"><path d="M17 31h11v5H17zM36 31h11v5H36zM17 42h11v5H17zM36 42h11v5H36zM17 53h11v5H17zM36 53h11v5H36z"/></g></svg><strong><bdi>${escText(plan.name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open page</span></button></div>`;
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
     listRequest++;
     const devicePages = getState().plans.map(plan => pageCard(plan)).join('');
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved pages</h2><p>Choose a page in this folder to open it. Your other pages stay saved.</p><section class="saved-pages-section"><h3>Saved on the site</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved pages…</p>' : '<p>Sign in to see pages saved on the site.</p><button type="button" class="primary" data-sharing="signin">Sign in to view site pages</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><button type="button" data-sharing="new">New chart</button><p>Open any chart saved on the website. Everyone signed in can edit it, and changes save automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved charts…</p>' : '<p>Sign in to see charts saved on the website.</p><button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
@@ -207,44 +214,52 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     try {
       const result = await request('/api/plans');
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
-      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<p>No pages saved on the site yet. Close this window and choose Save to site for your current page.</p>';
+      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<p>No charts saved on the website yet. Close this folder and press Save for your current chart.</p>';
     } catch (error) {
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
-      dialog.querySelector('#sharing-plans').innerHTML = `<p>${escText(error.message)}</p>${!session ? '<button type="button" data-sharing="signin">Sign in to view site pages</button>' : '<button type="button" data-sharing="refresh">Try again</button>'}`;
+      dialog.querySelector('#sharing-plans').innerHTML = `<p>${escText(error.message)}</p>${!session ? '<button type="button" data-sharing="signin">Sign in to open saved charts</button>' : '<button type="button" data-sharing="refresh">Try again</button>'}`;
     }
   }
-  function showSave(saved = false) {
-    dialogMode = 'save';
-    const linked = entries.has(current().id);
-    showDialog(`<h2 id="sharing-title">${linked ? saved ? 'Page saved to the site' : 'This page is saved to the site' : 'Save this page to the site'}</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p><p>${linked ? 'Later changes save automatically when connected. You can reopen this page from Saved pages on any device.' : 'Save the layout, names and seat assignments so you can reopen this page on another device or work on it together. Later changes save automatically.'}</p>${linked ? `<p><strong>Save status:</strong> <span data-sharing-status>${escText(label())}</span></p><button class="primary" type="button" data-sharing="share">Share / work together</button><button type="button" data-sharing="pages">Saved pages</button>` : '<button class="primary" type="button" data-sharing="publish">Save this page to the site</button>'}<p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">${linked ? 'Done' : 'Cancel'}</button></div>`);
+  function historyRows(rows) {
+    return rows.map(row => `<li><div class="change-history-heading"><strong>${escText(row.by || 'Organizer')}</strong><time datetime="${escAttr(row.at || '')}">${escText(formatDate(row.at))}</time></div><ul>${(row.details || []).map(detail => `<li>${escText(detail)}</li>`).join('')}</ul></li>`).join('');
   }
-  function showShare() {
-    dialogMode = 'share';
-    const entry = entries.get(current().id), url = new URL(location.pathname, location.origin);
-    if (entry) url.searchParams.set('page', entry.remoteId);
-    showDialog(`<h2 id="sharing-title">Share / work together</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p>${entry ? `<ol class="sharing-steps"><li>Copy this page link and send it to the other organizer.</li><li>They open it and enter their own name and the same Seats PIN.</li><li>Both of you edit this page. Changes save automatically and appear for each other.</li></ol><label for="sharing-link">Link to this seating page</label><input id="sharing-link" type="text" readonly value="${escAttr(url.href)}"><button class="primary" type="button" data-sharing="copy">Copy page link</button><p id="sharing-copy-status" role="status" aria-live="polite"></p><p>They can also use Saved pages, sign in, and choose this page under Saved on the site.</p>` : '<p>Save this page to the site first. Then you’ll get a link so both organizers can open and edit the same page.</p><button class="primary" type="button" data-sharing="publish">Save to site and get a link</button>'}<p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
+  function showHistory() {
+    dialogMode = 'history';
+    showDialog(`<h2 id="sharing-title">Chart change history</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p><div class="chart-date-details">${dateDetails(chartMetadata(current().id))}</div><p>See who changed this chart, when, and what they changed.</p><p class="sharing-error" role="alert"></p><ol id="chart-history-list" class="change-history"></ol><p id="chart-history-message" role="status">Loading changes…</p><button type="button" data-sharing="history-load" hidden>Load earlier changes</button><div class="dialog-actions"><button type="button" data-sharing="history-refresh">Refresh history</button><button type="button" data-sharing="close">Close</button></div>`);
+    loadHistory();
   }
-  async function copyLink(button) {
-    const input = dialog.querySelector('#sharing-link');
-    let copied = false;
-    try { await navigator.clipboard.writeText(input.value); copied = true; } catch { /* Select the visible link when clipboard access is refused. */ }
-    if (!dialog.open || dialogMode !== 'share' || !input.isConnected) return;
-    if (!copied) {
-      input.focus({ preventScroll: true }); input.select(); input.setSelectionRange(0, input.value.length);
-      try { copied = document.execCommand('copy'); } catch { /* The selected link can still be copied by hand. */ }
+  async function loadHistory(before = null) {
+    const generation = ++historyRequest, id = current().id, entry = entries.get(id), load = dialog.querySelector('[data-sharing=history-load]');
+    const top = load.getBoundingClientRect().top; load.disabled = true;
+    try {
+      const result = entry ? await request('/api/plans/' + encodeURIComponent(entry.remoteId) + '/history' + (before ? '?before=' + before : ''))
+        : { entries: [...getRecord(id).history].reverse(), nextBefore: null };
+      if (!dialog.open || dialogMode !== 'history' || id !== current().id || generation !== historyRequest) return;
+      const list = dialog.querySelector('#chart-history-list');
+      if (before) list.insertAdjacentHTML('beforeend', historyRows(result.entries)); else list.innerHTML = historyRows(result.entries);
+      dialog.querySelector('#chart-history-message').textContent = !result.entries.length && !before ? 'No changes have been recorded for this chart yet.' : entry ? '' : 'Local history keeps the 200 most recent changes on this device.';
+      load.hidden = !result.nextBefore; load.dataset.before = result.nextBefore || ''; load.disabled = false;
+      if (before && !load.hidden) { dialog.scrollTop += load.getBoundingClientRect().top - top; load.focus({ preventScroll: true }); }
+    } catch (error) {
+      if (!dialog.open || dialogMode !== 'history' || generation !== historyRequest) return;
+      if (!session && entry) { showLogin(error.message); return; }
+      dialog.querySelector('#chart-history-message').textContent = '';
+      dialog.querySelector('.sharing-error').textContent = error.message; load.hidden = true;
     }
-    if (!dialog.open || dialogMode !== 'share') return;
-    dialog.querySelector('#sharing-copy-status').textContent = copied ? 'Link copied. Send it to the other organizer and give them the Seats PIN separately.' : 'The link is selected. Copy it and send it to the other organizer.';
-    if (copied) button.focus({ preventScroll: true });
   }
   async function publish() {
-    const plan = clean(current()), remoteId = crypto.randomUUID();
-    const record = await request('/api/plans', { method: 'POST', body: JSON.stringify({ id: remoteId, plan }) });
+    if (publishing) return;
+    publishing = true; changed();
+    let plan, remoteId, record;
+    try {
+      plan = clean(current()); remoteId = pendingPublish?.localId === plan.id ? pendingPublish.remoteId : crypto.randomUUID();
+      pendingPublish = { localId: plan.id, remoteId };
+      record = await request('/api/plans', { method: 'POST', body: JSON.stringify({ id: remoteId, plan }) });
+    } finally { publishing = false; changed(); }
     const entry = { localId: plan.id, remoteId, base: record, observed: clean(record.plan), queue: [], undo: [], redo: [], ready: false, error: '' };
-    entries.set(plan.id, entry); persist();
+    entries.set(plan.id, entry); pendingPublish = null; persist(); localChanged();
     connect(); watch(); presence(); changed();
-    notify('Page saved to the site. Later changes save automatically.');
-    if (intent === 'share') showShare(); else showSave(true);
+    dialog.close(); notify('Chart saved in Saved charts on the website. Later changes save automatically.');
   }
   async function openPlan(id) {
     const record = await request('/api/plans/' + encodeURIComponent(id));
@@ -261,23 +276,30 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     if (pendingPage) {
       try { await openPlan(pendingPage); }
       catch (error) { if (!session) showLogin(error.message); else showPlans(error.message); }
-    } else if (intent === 'share') showShare();
-    else if (intent === 'save') showSave();
+    } else if (intent === 'save') {
+      if (entries.has(current().id)) { dialog.close(); notify(label() + '. Changes save to the website automatically when connected.'); }
+      else await publish();
+    }
+    else if (intent === 'history') showHistory();
     else showPlans();
   }
   async function open(mode = 'pages') {
     intent = mode;
+    if (mode === 'history' && !entries.has(current().id)) { showHistory(); return; }
     if (mode === 'pages') { showPlans(); return; }
     if (!endpoint) { showPlans(); return; }
-    if (!session || session.expires <= Date.now()) showLogin(); else { connect(); await continueIntent(); }
+    if (!session || session.expires <= Date.now()) showLogin(); else {
+      connect();
+      try { await continueIntent(); } catch (error) { if (!session) showLogin(error.message); else notify(error.message); }
+    }
   }
   dialog.addEventListener('submit', async event => {
     event.preventDefault(); const button = dialog.querySelector('[type=submit]'); if (button) button.disabled = true;
     try {
       profile = dialog.querySelector('#sharing-name').value.trim();
-      const result = await request('/api/session', { method: 'POST', body: JSON.stringify({ name: profile, pin: dialog.querySelector('#sharing-pin').value }) });
-      session = { ...result, endpoint }; sessionStorage.setItem(SEATS_SHARING_SESSION, JSON.stringify(session)); persist(); connect(); await continueIntent(); changed();
-    } catch (error) { showLogin(error.message); }
+      const result = await request('/api/session', { method: 'POST', body: JSON.stringify({ name: profile, pin: entryPin || dialog.querySelector('#sharing-pin').value }) });
+      entryPin = null; session = { ...result, endpoint }; sessionStorage.setItem(SEATS_SHARING_SESSION, JSON.stringify(session)); persist(); connect(); await continueIntent(); changed();
+    } catch (error) { if (session) { dialog.close(); notify(error.message); } else showLogin(error.message); }
   });
   dialog.addEventListener('click', async event => {
     const button = event.target.closest('[data-sharing]'); if (!button) return;
@@ -286,8 +308,9 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
     if (action === 'pages') { clearPageLink(); intent = 'pages'; showPlans(); return; }
     if (action === 'signin') { intent = 'pages'; showLogin(); return; }
     if (action === 'refresh') { refreshSitePages(); return; }
-    if (action === 'share') { intent = 'share'; showShare(); return; }
-    if (action === 'copy') { copyLink(button); return; }
+    if (action === 'new') { dialog.close(); newChart(); return; }
+    if (action === 'history-load') { loadHistory(button.dataset.before); return; }
+    if (action === 'history-refresh') { showHistory(); return; }
     if (action === 'local') { if (activatePage(button.dataset.id) !== false) { dialog.close(); presence(); } return; }
     if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
@@ -322,6 +345,9 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   document.addEventListener('visibilitychange', () => { if (!document.hidden) connect(); });
   return {
     start, open, localChanged, label, markup, decorate, canEdit,
+    metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
+    get editorName() { return session?.name || profile; },
+    get saving() { return publishing; },
     get enabled() { return Boolean(endpoint); },
     linked: id => entries.has(id),
     canUndo: () => Boolean(entries.get(current()?.id)?.undo.length), canRedo: () => Boolean(entries.get(current()?.id)?.redo.length),

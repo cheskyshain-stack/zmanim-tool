@@ -1,15 +1,16 @@
-export function seatsCreateZoom(root, { getWidth, setWidth, onStart, onEnd, onChange }) {
+export function seatsCreateZoom(root, { getWidth, setWidth, getWhole, onStart, onEnd, onChange }) {
   let pinch = null;
   const elements = () => ({ scroll: root.querySelector('.room-scroll'), stage: root.querySelector('.room-stage') });
   function refresh() {
     const { scroll, stage } = elements(); if (!scroll || !stage) return;
     const output = root.querySelector('#seats-zoom-level');
-    if (output) output.textContent = getWidth() ? Math.round(stage.clientWidth / 1200 * 100) + '%' : 'Fit';
+    if (output) output.textContent = getWidth() ? Math.round(stage.clientWidth / 1200 * 100) + '%' : getWhole() ? 'Whole chart' : 'Fit width';
+    const view = root.querySelector('#chart-view'); if (view) view.value = getWhole() ? 'whole' : !getWidth() ? 'width' : getWidth() === 1200 ? 'actual' : 'custom';
     const minus = root.querySelector('[data-action="zoom-out"]'), plus = root.querySelector('[data-action="zoom-in"]');
     if (minus) minus.disabled = stage.clientWidth <= scroll.clientWidth + 1;
     if (plus) plus.disabled = stage.clientWidth >= Math.max(3600, scroll.clientWidth * 3);
   }
-  function apply(width, anchor = null) {
+  function apply(width, anchor = null, whole = false) {
     const { scroll, stage } = elements(); if (!scroll || !stage) return;
     const box = stage.getBoundingClientRect(), viewport = scroll.getBoundingClientRect();
     const clientX = anchor?.clientX ?? viewport.left + scroll.clientWidth / 2;
@@ -17,7 +18,7 @@ export function seatsCreateZoom(root, { getWidth, setWidth, onStart, onEnd, onCh
     const fractionY = anchor ? (anchor.clientY - box.top) / box.height : 0;
     const clamped = Math.min(Math.max(3600, scroll.clientWidth * 3), Math.max(scroll.clientWidth, Math.round(width)));
     const next = width && clamped > scroll.clientWidth + 1 ? clamped : 0;
-    setWidth(next); stage.classList.toggle('is-zoomed', Boolean(next));
+    setWidth(next, whole); stage.classList.toggle('is-zoomed', Boolean(next)); stage.classList.toggle('fits-room', whole);
     if (next) stage.style.width = next + 'px'; else { stage.style.removeProperty('width'); scroll.scrollTop = 0; }
     scroll.scrollLeft = next ? fractionX * stage.clientWidth - (clientX - viewport.left) : 0;
     if (anchor) {
@@ -57,7 +58,7 @@ export function seatsCreateZoom(root, { getWidth, setWidth, onStart, onEnd, onCh
   root.addEventListener('touchend', end, { passive: false });
   root.addEventListener('touchcancel', end, { passive: false });
   window.addEventListener('resize', refresh);
-  return { refresh, fit: () => apply(0), actual: () => apply(1200),
+  return { refresh, fit: () => apply(0), fitWhole: () => apply(0, null, true), actual: () => apply(1200),
     increase: () => apply(elements().stage.clientWidth * 1.3),
     decrease: () => apply(elements().stage.clientWidth / 1.3) };
 }
