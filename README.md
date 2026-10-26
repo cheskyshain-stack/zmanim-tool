@@ -22,8 +22,9 @@ The standard layout has columns of 8, 9,
 seats, except A7, which has three, and C1, A8, B6 and C6,
 which have four. The room has 165 seats including the Rav's seat. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
-Tables use 48 units per seat, about 12% wider than the original 43. Names wrap
-between whole words, with a smaller font when necessary; exceptionally long names
+Tables use 48 units per seat, about 12% wider than the original 43. Names use a
+shared font size chosen to fit most assigned seats, with only the longest names
+shrinking further. Names wrap between whole words; exceptionally long names
 still show the fit warning so their table can be enlarged before printing.
 Standard tables are 40 units high with 48 units between all ordinary rows. The
 standard A-D rows use the common grid, with names, counts and custom sizes retained.
