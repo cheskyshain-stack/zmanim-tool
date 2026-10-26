@@ -168,6 +168,19 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-dialog::backdrop{background:rgb(15 30 45 / 40%)}
 .seats-dialog label{display:block;font-size:13px;margin-bottom:6px}
 .dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:22px}
+.sharing-status:empty{display:none}
+.sharing-status{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px;padding:8px 11px;border:1px solid #d9dde1;border-radius:5px;background:#fff;font-size:12px}
+.sharing-state{font-weight:600;color:#88641b}
+.sharing-state.connected{color:#28664c}
+.sharing-peers{color:var(--seats-muted)}
+.table-seat.is-remote .seat-area{stroke:#347b60;stroke-width:2;fill:#e9f4ec}
+.sharing-dialog{max-width:580px;max-height:85vh;overflow:auto}
+.sharing-dialog p{font-size:13px;line-height:1.5}
+.sharing-dialog label{margin:12px 0 5px}
+.sharing-error,.seat-editor-conflict{color:#a3362e;font-weight:600}
+.sharing-plan{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:12px 0;border-bottom:1px solid var(--seats-border)}
+.sharing-plan div{min-width:0;overflow-wrap:anywhere}
+.sharing-plan small{display:block;color:var(--seats-muted);font-size:11px;margin-top:4px}
 .seats-print{display:none}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 @media(max-width:1050px){.seats-controls{align-items:start;flex-wrap:wrap}.print-settings{margin-left:auto}.seats-workspace{grid-template-columns:240px minmax(0,1fr)}.seats-panel{padding:14px}.canvas-heading p{flex-basis:100%;order:3}.seats-header{padding:7px 18px}.seats-brand{font-size:16px}}
