@@ -284,7 +284,7 @@ function seatsStart(root, unlockKey) {
       <p id="seats-notice" class="seats-notice no-print" role="status" aria-live="polite">${html(notice)}</p>
       <input id="names-file" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden><input id="backup-file" type="file" accept=".json" hidden>
 
-      <section id="seats-print" class="seats-print"><header><h1>${html(current.name)}</h1><p>Bais Medrash of Lakewood Commons<br>${capacity} seats · ${assigned.size} assigned</p></header>${printRoom}</section>`;
+      <section id="seats-print" class="seats-print"><header><h1>${html(current.name)}</h1></header>${printRoom}</section>`;
     seatsPreparePrint(root.querySelector('#seats-print .room-diagram'), printGeometry);
     workspaceControls.refresh(); assignmentControls.refresh();
   }

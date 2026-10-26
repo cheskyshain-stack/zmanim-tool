@@ -68,9 +68,9 @@ right bookcase face as their right edge. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 Built-in cabinet labels and walkway, entrance, and door labels are hidden on screen
 and in print; their shapes remain visible.
-Rows 7, 8 and 9 have the same 40-unit gap between table surfaces as the ordinary
-front rows. The rear walkway is deeper, and side bookcases still reach the front
-of row 8.
+Rows 7, 8 and 9 have equal 70-unit gaps between table surfaces. The back walkway
+is 48 units deep, giving 60 units back to rear row spacing. Front row gaps stay
+40 units. Side bookcases still reach the front of row 8.
 The separate Edit layout tab is removed. Table & room settings remain tucked under
 Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
 labels, and a bimah. Move them by dragging labels or room objects, or with keyboard
@@ -86,11 +86,14 @@ schedule settings. Nothing uploads to a server. Download a backup to move plans
 between devices. Restore adds plans instead of replacing current ones, and Undo
 can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
 black-and-white or color. The chart fills the available sheet width with normal
-lettering proportions and narrow margins. Match both paper size and Landscape in
+lettering proportions and narrow margins. Only the plan title prints above the chart.
+Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Version 8 plans center the Aron, refit its adjacent front tables and Rav's seat,
+Version 9 plans spread standard rear rows into the reduced back walkway, retaining
+names, assignments, custom sizes, and manually spaced rows. Version 8 plans center
+the Aron, refit its adjacent front tables and Rav's seat,
 and shorten standard tables with matching row gaps, preserving names, assignments,
 and unrelated layout edits. Version 7 plans also
 move rows 8 and 9 forward to match the normal table gaps, retaining
@@ -105,7 +108,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v9` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-v10` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
