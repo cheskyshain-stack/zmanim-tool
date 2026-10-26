@@ -35,6 +35,8 @@ const server = http.createServer((req,res) => {
     await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', {name:'Open Seats'}).click();
     await createChart(page);
     await page.locator('.room-stage .table-item').first().waitFor();
+    assert.match(await page.locator('#chart-name').inputValue(),/^Seating plan - /);
+    await page.locator('#chart-name').fill('Browser seating chart');await page.locator('#chart-name').press('Enter');
     const openRoom = () => page.evaluate(() => { document.querySelector('#people-extra-tools').open=true; document.querySelector('#room-settings').open=true; });
     const closeRoom = () => page.evaluate(() => { document.querySelector('#room-settings').open=false; document.querySelector('#people-extra-tools').open=false; });
     const state = () => page.evaluate(key => JSON.parse(localStorage.getItem(key)), storageKey);
@@ -47,7 +49,7 @@ const server = http.createServer((req,res) => {
     assert.deepEqual(['A','B','C','D'].map(col => starting.plans[0].tables.filter(table => table.column === col).length), [8,9,9,8]);
     assert.equal(await page.locator('.room-stage .table-item').count(), 34);
     assert.equal(await page.getByRole('button',{name:'Edit layout',exact:true}).count(),0);
-    assert.match(starting.plans[0].name,/^Seating plan - /);
+    assert.equal(starting.plans[0].name,'Browser seating chart');
     assert.equal(await page.title(),'Seats | '+starting.plans[0].name);
     assert.ok(await page.locator('#people-search').isVisible(),'Names should open directly');
     assert.equal(starting.plans[0].tables.find(t=>t.id==='A7').count,3);
@@ -390,6 +392,7 @@ const server = http.createServer((req,res) => {
     await blocked.addInitScript(()=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open'); Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage disabled');}});});
     const blockedPage=await blocked.newPage(); await blockedPage.goto(origin+'/seats/');
     await createChart(blockedPage);await blockedPage.locator('.storage-warning').waitFor();
+    await blockedPage.locator('#chart-name').fill('Synthetic storage-disabled chart');await blockedPage.locator('#chart-name').press('Enter');
     await blockedPage.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
     await blockedPage.locator('#plan-files summary').click();
     const blockedDownload=blockedPage.waitForEvent('download'); await blockedPage.getByRole('button',{name:'Download backup',exact:true}).click();

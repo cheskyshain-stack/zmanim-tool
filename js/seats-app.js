@@ -8,11 +8,12 @@ import { seatsCreateWorkspace } from './seats/workspace.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
 import { seatsCreateEditor } from './seats/editor.js';
 import { seatsReadNames, seatsCsvCell } from './seats/import.js';
-import { seatsCreateSharing } from './seats/sharing.js';
+import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
 import { seatsCreateRecords } from './seats/records.js';
 import { seatsStartMarkup } from './seats/start.js';
 import { seatsSortPeople } from './seats/name-sort.js';
 import { seatsChartName, seatsDatedChartName } from './seats/chart-names.js';
+import { seatsHasContent } from './seats/content.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 
@@ -45,6 +46,7 @@ async function seatsEntry() {
 function seatsStart(root, unlockKey, entryPin = null) {
   let state = seatsCreateState(), storageError = '', notice = '', selected = 'A1';
   let selectedPerson = null, search = '', showAssigned = false, zoom = 0, wholeRoom = false, history = [], future = [], importing = false;
+  let readingNames = 0;
   let deletingNames = false, deleteSelection = new Set();
   let overflowTables = new Set(), drag = null, suppressClick = false, conflict = false;
   let storedRaw = null, pinching = false;
@@ -70,7 +72,21 @@ function seatsStart(root, unlockKey, entryPin = null) {
       conflict = true;
     } else storageError = 'Changes cannot be saved in this browser. Download a backup before closing this page.';
   }
-  let hasLocalCharts = Boolean(storedRaw);
+  const rememberedShared = new Set();
+  let sharedRaw = null;
+  try {
+    sharedRaw = localStorage.getItem(SEATS_SHARING_KEY);
+    const saved = JSON.parse(sharedRaw || 'null');
+    if (saved?.version === 1 && Array.isArray(saved.entries)) for (const entry of saved.entries) if (typeof entry.localId === 'string') rememberedShared.add(entry.localId);
+  } catch { if (sharedRaw) for (const current of state.plans) rememberedShared.add(current.id); }
+  const retained = savedPlans();
+  if (!conflict && storedRaw && retained.length < state.plans.length) {
+    try { const key = SEATS_STORAGE_KEY + '-before-empty-drafts-2026-10-26'; if (!localStorage.getItem(key)) localStorage.setItem(key, storedRaw); } catch { /* Only unchanged automatic drafts are omitted. */ }
+  }
+  if (!conflict) {
+    state.plans = retained.length ? retained : seatsCreateState().plans;
+    if (!state.plans.some(current => current.id === state.activeId)) state.activeId = state.plans[0].id;
+  }
   const plan = () => state.plans.find(item => item.id === state.activeId);
   const item = () => [...plan().tables, ...plan().objects].find(entry => entry.id === selected);
   const itemBottom = entry => SEATS_BOUNDS.bottom - (entry.type ? 0 : 14);
@@ -81,8 +97,9 @@ function seatsStart(root, unlockKey, entryPin = null) {
   const svgNumber = value => Math.round(value * 100) / 100;
   const pageHelp = () => sharing?.linked(plan().id)
     ? 'This chart is on the website. Changes save automatically for everyone signed in.'
-    : 'Changes save on this device. Save puts this chart in Saved charts on the website.';
-  const records = seatsCreateRecords({ getState: () => state, getName: () => sharing?.editorName,
+    : seatsHasContent(plan()) ? 'Changes save on this device. Save puts this chart in Saved charts on the website.'
+      : 'Add names or change the setup to start saving. Empty charts stay out of Saved charts.';
+  const records = seatsCreateRecords({ getState: () => ({ ...state, plans: savedPlans() }), getName: () => sharing?.editorName,
     isShared: id => sharing?.linked(id), notify: message => { storageError = message; }, fresh: false });
   for (const current of state.plans) current.name = seatsChartName(current.name, records.info(current.id));
 
@@ -112,10 +129,28 @@ function seatsStart(root, unlockKey, entryPin = null) {
     getMode: () => 'people', onResize: () => { assignmentControls.refresh(); zoomControls.refresh(); editor.sync(); },
   });
 
+  function keepPlan(current) { return seatsHasContent(current) || rememberedShared.has(current.id) || sharing?.linked(current.id); }
+  function savedPlans() { return state.plans.filter(keepPlan); }
+  function storedState() {
+    const plans = savedPlans();
+    return plans.length ? { ...state, plans, activeId: plans.some(current => current.id === state.activeId) ? state.activeId : plans[0].id } : null;
+  }
+  function savedLabel() { return sharing?.linked(plan().id) ? sharing.label() : keepPlan(plan()) ? 'Saved on this device' : 'Not saved yet'; }
+  function canSaveCurrent() { return Boolean(sharing?.linked(plan().id) || seatsHasContent(plan())); }
+  function syncSaveStatus() {
+    const button = root.querySelector('[data-action=save-site]');
+    if (button) button.disabled = !sharing?.enabled || sharing?.saving || !canSaveCurrent();
+    const saved = root.querySelector('.saved-label'); if (saved && !storageError) saved.textContent = savedLabel();
+    const help = root.querySelector('#seats-page-help'); if (help) help.textContent = pageHelp();
+  }
   function save() {
     if (conflict) return false;
-    if (!hasLocalCharts) return true;
-    try { const json = JSON.stringify(state); localStorage.setItem(SEATS_STORAGE_KEY, json); storedRaw = json; storageError = ''; records.sync(); sharing?.localChanged(); return !storageError; }
+    try {
+      const snapshot = storedState();
+      if (snapshot) { const json = JSON.stringify(snapshot); localStorage.setItem(SEATS_STORAGE_KEY, json); storedRaw = json; }
+      else { localStorage.removeItem(SEATS_STORAGE_KEY); storedRaw = null; }
+      storageError = ''; records.sync(); sharing?.localChanged(); syncSaveStatus(); return !storageError;
+    }
     catch { storageError = 'Changes cannot be saved in this browser. Download a backup before closing this page.'; return false; }
   }
   function renderInPlace() {
@@ -166,18 +201,22 @@ function seatsStart(root, unlockKey, entryPin = null) {
   }
   function alertMessage(message) { notice = message; renderInPlace(); }
   function activatePage(id) {
+    if (readingNames) { alertMessage('Reading names. Please wait before changing charts.'); return false; }
     if (!state.plans.some(plan => plan.id === id) || editor.flush() === false) return false;
-    editor.close(); screen = 'editor'; state.activeId = id; selected = ''; selectedPerson = null;
+    editor.close(); state.plans = state.plans.filter(current => current.id === id || keepPlan(current));
+    screen = 'editor'; state.activeId = id; selected = ''; selectedPerson = null;
     deletingNames = false; deleteSelection.clear(); notice = ''; save(); renderInPlace();
     return true;
   }
   function openPageTools(intent) {
+    if (intent === 'pages' && readingNames) return alertMessage('Reading names. Please wait before changing charts.');
     if (editor.flush() === false) return;
     editor.close();
     if (intent === 'pages') sharing?.leavePageLink();
     sharing?.open(intent);
   }
   function showHome() {
+    if (readingNames) return alertMessage('Reading names. Please wait before changing charts.');
     if (editor.flush() === false) return false;
     editor.close();
     sharing?.leavePageLink();
@@ -188,13 +227,14 @@ function seatsStart(root, unlockKey, entryPin = null) {
     return true;
   }
   function createChart() {
+    if (readingNames) return alertMessage('Reading names. Please wait before changing charts.');
     if (editor.flush() === false) return;
-    if (hasLocalCharts && state.plans.length >= 30) return alertMessage('You can keep up to 30 charts on this device. Delete an old device copy from saved charts to make room.');
+    const plans = savedPlans();
+    if (plans.length >= 30) return alertMessage('You can keep up to 30 charts on this device. Delete an old device copy from saved charts to make room.');
     editor.close();
     sharing?.leavePageLink();
-    const next = seatsCreatePlan(seatsDatedChartName(new Date(), hasLocalCharts ? state.plans.map(plan => plan.name) : []));
-    if (hasLocalCharts) state.plans.push(next); else state.plans = [next];
-    state.activeId = next.id; hasLocalCharts = true;
+    const next = seatsCreatePlan(seatsDatedChartName(new Date(), plans.map(plan => plan.name)));
+    state.plans = [...plans, next]; state.activeId = next.id;
     screen = 'editor'; selected = 'A1'; selectedPerson = null;
     deletingNames = false; deleteSelection.clear(); search = ''; showAssigned = false;
     zoom = 0; wholeRoom = false; history = []; future = []; notice = '';
@@ -355,8 +395,8 @@ function seatsStart(root, unlockKey, entryPin = null) {
     if (!pageSize) { pageSize = document.createElement('style'); pageSize.id = 'seats-page-size'; document.head.appendChild(pageSize); }
     const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
     if (pageSize.textContent !== css) pageSize.textContent = css;
-    root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(sharing?.label() || 'Saved on this device')}</span></div></div>
-      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
+    root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(savedLabel())}</span></div></div>
+      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
       <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
@@ -438,7 +478,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     home: showHome,
     'start-create': createChart,
     'start-saved': () => openPageTools('pages'),
-    save: () => { if (editor.flush() === false) return; const ok = save(); notice = ok ? (sharing?.linked(plan().id) ? 'Changes are saved to the shared plan automatically.' : 'Plan saved in this browser.') : 'Download a backup to keep this plan.'; renderInPlace(); },
+    save: () => { if (editor.flush() === false) return; const ok = save(); notice = ok ? (sharing?.linked(plan().id) ? 'Changes are saved to the shared plan automatically.' : keepPlan(plan()) ? 'Plan saved in this browser.' : 'Empty charts are not saved.') : 'Download a backup to keep this plan.'; renderInPlace(); },
     undo: () => { editor.close(); if (sharing?.linked(plan().id)) return sharing.undo(); if (history.length) { future.push(copy(state)); restoreLocalHistory(history.pop()); save(); notice = 'Last change undone.'; renderInPlace(); } },
     redo: () => { editor.close(); if (sharing?.linked(plan().id)) return sharing.redo(); if (future.length) { history.push(copy(state)); restoreLocalHistory(future.pop()); save(); notice = 'Last change restored.'; renderInPlace(); } },
     'save-site': () => openPageTools('save'),
@@ -454,7 +494,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     lock: () => { editor.flush(); try { sessionStorage.removeItem(unlockKey); } catch { /* reload still locks */ } location.reload(); },
     'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': createChart,
-    backup: () => { editor.flush(); const chartRecords = Object.fromEntries(state.plans.map(plan => [plan.id, { ...records.info(plan.id), ...(sharing?.metadata(plan.id) || {}) }])); download('seats-backup.json', JSON.stringify({ ...state, chartRecords }, null, 2), 'application/json'); },
+    backup: () => { editor.flush(); const snapshot = storedState(); if (!snapshot) return alertMessage('Add names or change the setup before downloading a chart backup.'); const chartRecords = Object.fromEntries(snapshot.plans.map(plan => [plan.id, { ...records.info(plan.id), ...(sharing?.metadata(plan.id) || {}) }])); download('seats-backup.json', JSON.stringify({ ...snapshot, chartRecords }, null, 2), 'application/json'); },
     restore: () => { editor.flush(); root.querySelector('#backup-file').click(); },
     'upload-names': () => openPageTools('names'),
     template: () => download('seats-names-example.csv', '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\n', 'text/csv;charset=utf-8'),
@@ -528,20 +568,24 @@ function seatsStart(root, unlockKey, entryPin = null) {
       if (['B1','C1','D1'].includes(entry.id)) seatsSyncFront(plan());
     });
     if (id === 'names-file' && control.files[0]) {
-      const targetId = plan().id; importing = true; renderInPlace();
+      const targetId = plan().id; let reading = true; readingNames++; importing = true; renderInPlace();
       try {
         const file = control.files[0], names = await seatsReadNames(file);
+        readingNames--; reading = false;
         change(() => { const target = state.plans.find(entry => entry.id === targetId); if (!target) throw new Error('The selected plan is no longer open.'); const result = seatsAddNames(target, names); notice = result.added + ' names added; ' + result.duplicates + ' duplicates skipped.'; });
         await sharing.uploadNameFile(file.name.replace(/\.[^.]+$/, '').slice(0, 80) || 'Names', names);
       } catch (error) { notice = error.message; }
+      finally { if (reading) readingNames--; }
       importing = false; renderInPlace();
     }
     if (id === 'backup-file' && control.files[0]) {
       try {
         if (control.files[0].size > 8 * 1024 * 1024) throw new Error('Choose a backup smaller than 8 MB.');
         const backup = JSON.parse(await control.files[0].text()), restored = seatsNormalizeState(backup);
-        if (restored.plans.length + (hasLocalCharts ? state.plans.length : 0) > 30) throw new Error('Restoring this file would exceed 30 saved plans.');
-        change(() => { if (!hasLocalCharts) state.plans = []; for (const restoredPlan of restored.plans) { const oldId = restoredPlan.id, wasActive = oldId === restored.activeId; seatsUpgradePlan(restoredPlan); restoredPlan.name = seatsChartName(restoredPlan.name, backup.chartRecords?.[oldId]); restoredPlan.id = seatsUid(); records.restore(restoredPlan.id, backup.chartRecords?.[oldId]); state.plans.push(restoredPlan); if (wasActive) state.activeId = restoredPlan.id; } hasLocalCharts = true; screen = 'editor'; selected = ''; selectedPerson = null; conflict = false; }, 'Backup restored as additional plans. Your existing plans were kept.');
+        const additions = restored.plans.filter(restoredPlan => { seatsUpgradePlan(restoredPlan); restoredPlan.name = seatsChartName(restoredPlan.name, backup.chartRecords?.[restoredPlan.id]); return seatsHasContent(restoredPlan); });
+        if (!additions.length) throw new Error('That backup contains no names or customized charts.');
+        if (additions.length + savedPlans().length > 30) throw new Error('Restoring this file would exceed 30 saved plans.');
+        change(() => { state.plans = savedPlans(); for (const restoredPlan of additions) { const oldId = restoredPlan.id, wasActive = oldId === restored.activeId; restoredPlan.id = seatsUid(); records.restore(restoredPlan.id, backup.chartRecords?.[oldId]); state.plans.push(restoredPlan); if (wasActive) state.activeId = restoredPlan.id; } if (!state.plans.some(current => current.id === state.activeId)) state.activeId = state.plans[0].id; screen = 'editor'; selected = ''; selectedPerson = null; conflict = false; }, 'Backup restored as additional plans. Your existing plans were kept.');
       } catch (error) { alertMessage(error.message); }
     }
   });
@@ -614,12 +658,12 @@ function seatsStart(root, unlockKey, entryPin = null) {
     editor.flush(); save();
   });
   sharing = seatsCreateSharing({
-    getState: () => state, getLocalPlans: () => hasLocalCharts ? state.plans : [], isViewingChart: () => screen === 'editor', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
+    getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen === 'editor', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
     activatePage, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialPin: entryPin, getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
     keepDeletedCopy: (id, metadata) => { const existing = records.info(id); records.restore(id, { ...existing, ...metadata, history: [...existing.history, ...(metadata.history || [])] }); save(); renderInPlace(); },
-    removeLocal: id => { change(() => { state.plans = state.plans.filter(plan => plan.id !== id); if (!state.plans.length) state.plans = [seatsCreatePlan(seatsDatedChartName())]; if (!state.plans.some(plan => plan.id === state.activeId)) state.activeId = state.plans[0].id; selectedPerson = null; selected = ''; }, 'Chart removed from this device.'); },
+    removeLocal: id => { rememberedShared.delete(id); change(() => { state.plans = state.plans.filter(plan => plan.id !== id); if (!state.plans.length) state.plans = [seatsCreatePlan(seatsDatedChartName())]; if (!state.plans.some(plan => plan.id === state.activeId)) state.activeId = state.plans[0].id; selectedPerson = null; selected = ''; }, 'Chart removed from this device.'); },
     updatePlan: (id, incoming, activate = false) => {
       const focused = document.activeElement;
       const draft = root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
@@ -630,7 +674,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
         const released = seatsUpgradePlan(incoming);
         notice = 'Room layout updated. Existing names were kept.' + (released ? ' ' + released + ' people returned to the waiting list after the updated seat counts.' : '');
       }
-      if (!hasLocalCharts) { state.plans = []; hasLocalCharts = true; }
+      state.plans = state.plans.filter(current => current.id === id || (!activate && current.id === state.activeId) || keepPlan(current));
       const index = state.plans.findIndex(plan => plan.id === id);
       if (index < 0) state.plans.push(incoming); else state.plans[index] = incoming;
       if (activate) { state.activeId = id; selected = ''; selectedPerson = null; }
@@ -649,10 +693,7 @@ function seatsStart(root, unlockKey, entryPin = null) {
     onStatus: () => {
       const links = state.plans.filter(plan => sharing?.linked(plan.id)).map(plan => plan.id).join();
       if (links !== sharingLinks) { history = []; future = []; sharingLinks = links; }
-      const button = root.querySelector('[data-action=save-site]');
-      if (button) button.disabled = !sharing?.enabled || sharing?.saving;
-      const saved = root.querySelector('.saved-label'); if (saved && !storageError) saved.textContent = sharing?.label() || 'Saved on this device';
-      const help = root.querySelector('#seats-page-help'); if (help && sharing?.enabled) help.textContent = pageHelp();
+      syncSaveStatus();
       const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Name files';
       const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
       sharing?.decorate(root);

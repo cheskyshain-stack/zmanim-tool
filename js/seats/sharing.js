@@ -4,11 +4,11 @@ import { seatsDescribeChanges, seatsRecordMetadata } from './activity.js';
 import { seatsNormalizeNameFile } from './name-files.js';
 import { seatsChartName } from './chart-names.js';
 
-const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
+export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
@@ -318,7 +318,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       const result = await request('/api/plans');
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
       sitePlans = result.plans;
-      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<p>No charts saved on the website yet. Close this folder and press Save for your current chart.</p>';
+      dialog.querySelector('#sharing-plans').innerHTML = result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<p>No charts saved on the website yet. Add names or customize a chart, then press Save to put it here.</p>';
     } catch (error) {
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
       dialog.querySelector('#sharing-plans').innerHTML = `<p>${escText(error.message)}</p>${!session ? '<button type="button" data-sharing="signin">Sign in to open saved charts</button>' : '<button type="button" data-sharing="refresh">Try again</button>'}`;
@@ -353,6 +353,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   async function publish() {
     if (publishing) return;
+    if (!canPublish()) { dialog.close(); notify('Add names or change the setup before saving this chart to the website.'); return; }
     publishing = true; changed();
     let plan, remoteId, record;
     try {
@@ -368,7 +369,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   async function openPlan(id) {
     const record = await request('/api/plans/' + encodeURIComponent(id));
     const existing = entryForRemote(id), localId = existing?.localId || crypto.randomUUID();
-    if (!existing && getState().plans.length >= 30) throw new Error('There are already 30 plans on this device.');
+    if (!existing && getLocalPlans().length >= 30) throw new Error('There are already 30 plans on this device.');
     const entry = existing || { localId, remoteId: id, base: record, observed: clean(record.plan), queue: [], undo: [], redo: [], ready: false, error: '' };
     entries.set(localId, entry);
     applySnapshot(entry, { ...record, type: 'snapshot' });
@@ -392,6 +393,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   async function open(mode = 'pages') {
     intent = mode;
+    if (mode === 'save' && !entries.has(current().id) && !canPublish()) { notify('Add names or change the setup before saving this chart to the website.'); return; }
     if (mode === 'history' && !entries.has(current().id)) { showHistory(); return; }
     if (mode === 'names' && !endpoint) { showNameFiles(); return; }
     if (mode === 'pages') { showPlans(); return; }

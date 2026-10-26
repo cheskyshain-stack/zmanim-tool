@@ -153,7 +153,15 @@ the waiting list. The browser keeps the original pre-update JSON in
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
-Charts save locally as they are edited. The main actions are Save and Saved charts,
+Untouched automatic charts stay in memory and do not create saved files, dates or
+history entries. Names, custom titles and room-layout changes start local saving;
+changing only print size or color does not. Abandoned empty drafts are replaced
+when another chart opens. Existing automatic empty device copies are omitted
+after preserving their original JSON in
+`lakewood-commons-seats-v1-before-empty-drafts-2026-10-26`.
+Previously shared files are retained even if their names have been cleared.
+The Save button and website-save path both prevent publishing a new empty chart.
+Charts with information save locally as they are edited. The main actions are Save and Saved charts,
 beside Print. The chart name is editable inline. Save uploads the current chart to
 the website once; later edits save there automatically. Anyone signed in can open
 the chart from Saved charts and edit it. There is no separate sharing step.

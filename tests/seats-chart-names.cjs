@@ -14,9 +14,10 @@ const server=http.createServer((request,response)=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
   try{
-    const {seatsCreateState,seatsCreatePlan}=await import('../js/seats/model.js'),sample=seatsCreateState(),legacy=sample.plans[0];
+    const {seatsCreateState,seatsCreatePlan,seatsAddNames}=await import('../js/seats/model.js'),sample=seatsCreateState(),legacy=sample.plans[0];
     legacy.name='7:30 מנין';
     const sameDay=seatsCreatePlan('7:30 minyan'),custom=seatsCreatePlan('Yomim Noraim Family Section');sample.plans.push(sameDay,custom);
+    seatsAddNames(legacy,['Synthetic Legacy Title Person']);seatsAddNames(sameDay,['Synthetic Same Day Title Person']);
     const metadata={createdAt:'2025-12-01T17:00:00Z',createdBy:'Example organizer',updatedAt:'2026-01-03T03:00:00Z',updatedBy:'Example organizer',history:[]};
     const records={version:1,records:Object.fromEntries(sample.plans.map(plan=>[plan.id,{...metadata}]))};
     for(const width of [1440,375]){
@@ -51,9 +52,12 @@ const server=http.createServer((request,response)=>{
         const info=execFileSync('pdfinfo',[file],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',file,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
         assert.match(info,/Pages:\s+1\b/);assert.ok(text.includes(today),'The full dated title is retained in the '+paper+' printout');await page.emulateMedia({media:'screen'});
       }
-      const create=async()=>{await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();};
-      await create();assert.equal(await page.locator('#chart-name').inputValue(),today+' (2)');
-      await create();assert.equal(await page.locator('#chart-name').inputValue(),today+' (3)');
+      const create=async name=>{
+        await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
+        await page.locator('.room-stage [data-table=A1][data-seat="0"]').click();await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');
+      };
+      await create('Synthetic Dated Chart Person Two');assert.equal(await page.locator('#chart-name').inputValue(),today+' (2)');
+      await create('Synthetic Dated Chart Person Three');assert.equal(await page.locator('#chart-name').inputValue(),today+' (3)');
       const titleFit=await page.locator('#chart-name').evaluate(input=>{const style=getComputedStyle(input),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;return {text:context.measureText(input.value).width,available:input.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)};});
       assert.ok(titleFit.text<=titleFit.available+1,'The full dated title and suffix fit the chart-name field: '+JSON.stringify({width,...titleFit}));
       const titles=(await saved()).plans.map(plan=>plan.name);assert.ok(titles.includes(today));assert.ok(titles.includes(today+' (2)'));assert.ok(titles.includes(today+' (3)'));
