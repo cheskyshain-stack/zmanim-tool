@@ -16,7 +16,8 @@ const server=http.createServer((request,response)=>{
   try{
     const context=await browser.newContext({viewport:{width:1366,height:768}}),page=await context.newPage(),errors=[];
     page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
-    await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.locator('.room-stage .table-item').first().waitFor();
+    await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();await page.locator('.room-stage .table-item').first().waitFor();
     await page.evaluate(()=>document.fonts.ready);
     assert.equal(await page.getByRole('button',{name:'Edit layout',exact:true}).count(),0);
     assert.ok(await page.locator('#people-search').isVisible(),'Names should be the initial view');
@@ -55,6 +56,7 @@ const server=http.createServer((request,response)=>{
     const yosef=await person('Yosef Cohen'),moshe=await person('Moshe Levi');
     await seat('A3').click();await page.locator('#seat-name-input').fill('Draft person');
     // Start the native drag before crossing the open editor, which sits above A3 at full width.
+    await page.locator('[data-person="'+yosef.id+'"]').scrollIntoViewIfNeeded();
     const dragSource=await page.locator('[data-person="'+yosef.id+'"]').boundingBox();
     await page.mouse.move(dragSource.x+dragSource.width/2,dragSource.y+dragSource.height/2);await page.mouse.down();
     await page.mouse.move(dragSource.x+dragSource.width/2+12,dragSource.y+dragSource.height/2,{steps:4});
@@ -114,6 +116,7 @@ const server=http.createServer((request,response)=>{
       await page.emulateMedia({media:'screen'});
     }
     await page.setViewportSize({width:375,height:850});
+    await page.waitForFunction(()=>document.querySelectorAll('[data-person][draggable="true"]').length===0);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
     assert.equal(await page.locator('.seats-panel').evaluate(node=>getComputedStyle(node).overflowY),'visible','Phone page should keep normal page scrolling');
     assert.equal(await page.locator('[data-person][draggable="true"]').count(),0,'Phone names should retain normal touch scrolling');

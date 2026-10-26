@@ -7,9 +7,10 @@ const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, isViewingChart = () => true, onClose = () => {}, updatePlan, recoverPlan, notify, onStatus, isBusy, activatePage, restoreBackup, getRecord, newChart, initialPin, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
+  dialog.addEventListener('close', onClose);
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, publishing = false, entryPin = initialPin, pendingPublish = null;
@@ -153,7 +154,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   }
   function send(message) { if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
   function watch() { send({ type: 'watch', ids: [...new Set([...entries.values()].map(entry => entry.remoteId))] }); }
-  function presence() { send({ type: 'presence', planId: entries.get(current()?.id)?.remoteId || null, seat: activeSeat }); }
+  function presence() { send({ type: 'presence', planId: isViewingChart() ? entries.get(current()?.id)?.remoteId || null : null, seat: activeSeat }); }
   function transmit(entry) {
     if (!entry.ready || !entry.queue.length || !ready) return;
     const first = entry.queue[0];
@@ -306,8 +307,8 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   function showPlans(error = '') {
     dialogMode = 'pages';
     listRequest++;
-    const devicePages = getState().plans.map(plan => pageCard(plan)).join('');
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><button type="button" data-sharing="new">New chart</button><p>Open any chart saved on the website. Everyone signed in can edit it, and changes save automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved charts…</p>' : '<p>Sign in to see charts saved on the website.</p><button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    const devicePages = getLocalPlans().map(plan => pageCard(plan)).join('') || '<p>No charts saved on this device yet.</p>';
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup for this room. Everyone signed in can edit charts on the website, and changes save automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><div id="sharing-plans" class="saved-pages-grid" aria-live="polite">${endpoint ? session ? '<p>Loading saved charts…</p>' : '<p>Sign in to see charts saved on the website.</p><button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button>' : '<p>Connect to the site to see pages saved online. You can open device pages below.</p>'}</div></section><section class="saved-pages-section"><h3>On this device</h3><div class="saved-pages-grid">${devicePages}</div><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Sign out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
@@ -463,7 +464,7 @@ export function seatsCreateSharing({ getState, updatePlan, recoverPlan, notify, 
   window.addEventListener('offline', () => socket?.close());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (!endpoint) { start(); return; } connect(); drainNameUploads(); } });
   return {
-    start, open, localChanged, label, markup, decorate, canEdit, uploadNameFile,
+    start, open, localChanged, label, markup, decorate, canEdit, uploadNameFile, viewChanged: presence, leavePageLink: clearPageLink,
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },

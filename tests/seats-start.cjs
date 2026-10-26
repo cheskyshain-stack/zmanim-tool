@@ -1,0 +1,91 @@
+const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
+const {chromium}=require('playwright');
+const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-start-')),key='lakewood-commons-seats-v1';
+const server=http.createServer((request,response)=>{
+  if(request.url.split('?')[0]==='/data/seats-sync.json'){response.setHeader('Content-Type','application/json');return response.end('{"endpoint":""}');}
+  let file=path.resolve(root,'.'+decodeURIComponent(request.url.split('?')[0]));
+  if(!file.startsWith(root+path.sep)){response.statusCode=403;return response.end();}
+  if(fs.existsSync(file)&&fs.statSync(file).isDirectory())file=path.join(file,'index.html');
+  if(!fs.existsSync(file)){response.statusCode=404;return response.end();}
+  response.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.png':'image/png','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');response.end(fs.readFileSync(file));
+});
+(async()=>{
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
+  const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
+  try{
+    const {seatsCreateState,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState(),original=sample.plans[0];
+    original.name='Existing saved setup';original.tables[0].x=80;seatsWriteName(original,'A1',0,'Existing Assigned Person');
+    for(const width of [1440,375]){
+      const context=await browser.newContext({viewport:{width,height:900},isMobile:width===375,hasTouch:width===375}),page=await context.newPage(),errors=[];
+      await context.addInitScript(({key,sample})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(sample));},{key,sample});
+      page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
+      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
+      assert.ok(await page.getByRole('button',{name:'View saved charts',exact:true}).isVisible());
+      assert.equal(await page.locator('.room-stage,#chart-name').count(),0,'No chart opens until a room/setup is chosen');
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+      await page.screenshot({path:path.join(output,'home-'+width+'.png'),fullPage:true});
+      await page.getByRole('button',{name:'Create new chart',exact:true}).click();
+      assert.ok(await page.getByRole('button',{name:'7:30 minyan',exact:true}).isEnabled());
+      assert.ok(await page.getByRole('button',{name:'Main BM',exact:true}).isDisabled());
+      assert.ok(await page.getByText('Coming soon',{exact:true}).isVisible());
+      await page.screenshot({path:path.join(output,'create-room-'+width+'.png'),fullPage:true});
+      await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();
+      await page.getByRole('heading',{name:'Name files',exact:true}).waitFor();
+      assert.ok(await page.getByRole('button',{name:'Upload names',exact:true}).isVisible());
+      await page.getByRole('button',{name:'Close',exact:true}).click();
+      const state=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key),created=await state(),next=created.plans.find(plan=>plan.id===created.activeId);
+      assert.equal(created.plans.length,2);assert.notEqual(next.id,original.id);assert.equal(next.people.length,0);
+      assert.equal(next.name,'7:30 מנין');assert.equal(next.tables.length,34);assert.equal(next.tables[0].x,25,'A new setup uses the original room layout');
+      assert.ok(next.tables.every(table=>table.seats.every(seat=>seat===null)));
+      assert.deepEqual(created.plans.find(plan=>plan.id===original.id),original,'Creating a chart keeps existing saved setups untouched');
+      await page.locator('#chart-name').fill('New seating setup');await page.locator('#chart-name').press('Enter');
+      await page.locator('.room-stage [data-table=A2][data-seat="0"]').click();await page.locator('#seat-name-input').fill('New Assigned Person');
+      await page.locator('[data-action=home]').click();
+      await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
+      const afterHome=await state(),newer=afterHome.plans.find(plan=>plan.id===next.id);
+      assert.equal(newer.name,'New seating setup');assert.ok(newer.people.some(person=>person.name==='New Assigned Person'),'Returning home saves an unfinished seat name');
+      await page.reload();await page.getByRole('button',{name:'View saved charts',exact:true}).waitFor();
+      assert.equal(await page.locator('.room-stage').count(),0,'Reload returns to the start page even after a chart was active');
+      await page.getByRole('button',{name:'View saved charts',exact:true}).click();
+      assert.ok(await page.getByRole('button',{name:'Main BM',exact:true}).isDisabled());
+      await page.screenshot({path:path.join(output,'saved-room-'+width+'.png'),fullPage:true});
+      await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();
+      assert.equal(await page.locator('.sharing-local-plan').count(),2);
+      await page.locator('.sharing-local-plan .saved-page-card[data-id="'+original.id+'"]').click();
+      assert.equal(await page.locator('#chart-name').inputValue(),'Existing saved setup');
+      assert.match(await page.locator('.room-stage [data-table=A1][data-seat="0"] .seat-name').textContent(),/Existing/);
+      const reopened=await state();assert.deepEqual(reopened.plans.find(plan=>plan.id===original.id),original);
+      await page.screenshot({path:path.join(output,'existing-chart-'+width+'.png'),fullPage:true});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
+    }
+    const fresh=await browser.newContext(),page=await fresh.newPage();await page.goto(origin+'/seats/');
+    await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();
+    assert.equal(await page.locator('.sharing-local-plan').count(),0,'A first visit does not create a phantom saved setup');await page.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();
+    await page.getByRole('button',{name:'Close',exact:true}).click();
+    assert.equal(await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).plans.length,key),1);assert.ok(await page.locator('#people-search').isVisible());await fresh.close();
+    const linked=await browser.newContext(),linkedPage=await linked.newPage(),linkedErrors=[];
+    linkedPage.on('pageerror',error=>linkedErrors.push(error.message));
+    await linkedPage.goto(origin+'/seats/?page=missing123');
+    await linkedPage.locator('#seats-pin').fill('4444');await linkedPage.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await linkedPage.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
+    assert.equal(await linkedPage.locator('.room-stage,#chart-name').count(),0,'An unavailable shared link does not expose an unsaved editable placeholder');
+    assert.equal(await linkedPage.evaluate(key=>localStorage.getItem(key),key),null,'An unavailable shared link does not create a saved chart');
+    await linkedPage.getByRole('button',{name:'Create new chart',exact:true}).click();
+    assert.equal(new URL(linkedPage.url()).searchParams.has('page'),false,'Explicit navigation leaves the unavailable shared link');
+    await linkedPage.getByRole('button',{name:'7:30 minyan',exact:true}).click();
+    await linkedPage.getByRole('button',{name:'Close',exact:true}).click();
+    await linkedPage.locator('#chart-name').fill('Created after unavailable link');await linkedPage.locator('#chart-name').press('Enter');
+    await linkedPage.locator('.room-stage [data-table=A2][data-seat="0"]').click();await linkedPage.locator('#seat-name-input').fill('Persisted New Person');
+    await linkedPage.locator('#seat-name-input').press('Enter');
+    await linkedPage.reload();await linkedPage.getByRole('button',{name:'View saved charts',exact:true}).waitFor();
+    const linkedState=await linkedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),key);
+    assert.equal(linkedState.plans.length,1);assert.equal(linkedState.plans[0].name,'Created after unavailable link');
+    assert.ok(linkedState.plans[0].people.some(person=>person.name==='Persisted New Person'),'A chart explicitly created after an unavailable link keeps its edits on reload');
+    assert.deepEqual(linkedErrors,[]);await linked.close();
+    console.log('PASS: Seats starts at Create/View, both room pickers keep Main BM disabled, fresh canonical layouts open the name-file chooser, existing charts and drafts stay saved, unavailable shared links expose no unsaved editor, reload returns home, and phone/desktop screens fit.');
+    console.log('Artifacts: '+output);
+  }finally{await browser.close();server.close();}
+})().catch(error=>{console.error(error);server.close();process.exitCode=1;});

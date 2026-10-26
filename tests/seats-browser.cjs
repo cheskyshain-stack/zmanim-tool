@@ -24,12 +24,16 @@ const server = http.createServer((req,res) => {
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {if(response.status() >= 400) badResponses.push(response.url());});
     page.on('request', request => {if(request.method() !== 'GET') posts.push(request.url());});
+    const openSaved = async target => { await target.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click(); await target.getByRole('button',{name:'7:30 minyan',exact:true}).click(); };
+    const openDevice = async (target,id) => { await openSaved(target); await target.locator('.sharing-local-plan .saved-page-card'+(id?'[data-id="'+id+'"]':'')).first().click(); };
+    const createChart = async target => { await target.getByRole('button',{name:'Create new chart',exact:true}).click();await target.getByRole('button',{name:'7:30 minyan',exact:true}).click();await target.getByRole('button',{name:'Close',exact:true}).click(); };
     await page.goto(origin + '/seats/');
     assert.equal(await page.title(), 'Seats | Bais Medrash of Lakewood Commons');
     assert.equal(await page.locator('.room-diagram').count(), 0);
     await page.locator('#seats-pin').fill('1111'); await page.getByRole('button', {name:'Open Seats'}).click();
     await page.getByText('That PIN did not match. Try again.').waitFor();
     await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', {name:'Open Seats'}).click();
+    await createChart(page);
     await page.locator('.room-stage .table-item').first().waitFor();
     const openRoom = () => page.evaluate(() => { document.querySelector('#people-extra-tools').open=true; document.querySelector('#room-settings').open=true; });
     const closeRoom = () => page.evaluate(() => { document.querySelector('#room-settings').open=false; document.querySelector('#people-extra-tools').open=false; });
@@ -167,7 +171,7 @@ const server = http.createServer((req,res) => {
     assert.ok(boxes.every(box=>box.fits), JSON.stringify(boxes));
     assert.equal(await page.locator('.fit-warning').count(), 0);
     await closeRoom();
-    await page.reload(); await page.locator('.room-stage .table-item').first().waitFor();
+    await page.reload(); await openDevice(page,originalPlan); await page.locator('.room-stage .table-item').first().waitFor();
     assert.equal((await state()).plans[0].tables.find(t=>t.id==='A2').seats.filter(Boolean).length, 1);
     // Real Excel file through the same upload path, with a quoted Hebrew text name as well.
     const xlsxPath = path.resolve(__dirname,'../vendor/xlsx-0.20.3.min.js');
@@ -274,8 +278,9 @@ const server = http.createServer((req,res) => {
     let downloading=page.waitForEvent('download'); await page.getByRole('button',{name:'Download backup',exact:true}).click();
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
     const backupData=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.ok(backupData.chartRecords[originalPlan].createdAt);assert.ok(backupData.chartRecords[originalPlan].updatedAt);
-    page.once('dialog',dialog=>dialog.accept('Yomim Noraim'));
-    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.getByRole('button',{name:'New chart',exact:true}).click();
+    await openSaved(page);await page.getByRole('button',{name:'New chart',exact:true}).click();
+    await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();
+    await page.locator('#chart-name').fill('Yomim Noraim');await page.locator('#chart-name').press('Enter');
     assert.equal((await state()).plans.length,2); assert.equal((await state()).plans[1].people.length,0);
     await page.locator('#backup-file').setInputFiles(backupPath);
     await page.getByText('Backup restored as additional plans. Your existing plans were kept.').waitFor();
@@ -283,7 +288,7 @@ const server = http.createServer((req,res) => {
     const restoredId=(await state()).activeId;
     const restoredDates=await page.evaluate(id=>JSON.parse(localStorage.getItem('lakewood-commons-seats-records-v1')).records[id],restoredId);
     assert.equal(restoredDates.createdAt,backupData.chartRecords[originalPlan].createdAt,'Backup restores keep the original chart creation date');
-    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+originalPlan+'"]').click();
+    await openSaved(page);await page.locator('.sharing-local-plan .saved-page-card[data-id="'+originalPlan+'"]').click();
     await page.setViewportSize({width:760,height:1000});
     await openRoom();
     const panel=await page.locator('.seats-panel').boundingBox();
@@ -362,13 +367,13 @@ const server = http.createServer((req,res) => {
     await page.goto(origin+'/'); assert.equal(await page.locator('a[href="/seats/"]').count(),0);
     await page.addInitScript(()=>localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()})));
     await page.goto(origin+'/admin/'); await page.locator('a.admin-home-task[href="/seats/"]').waitFor();
-    await page.locator('a.admin-home-task[href="/seats/"]').click(); await page.locator('.room-stage .table-item').first().waitFor();
+    await page.locator('a.admin-home-task[href="/seats/"]').click(); await openDevice(page,originalPlan); await page.locator('.room-stage .table-item').first().waitFor();
     await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Lock',exact:true}).click(); await page.locator('#seats-pin').waitFor();
     assert.equal(await page.locator('.room-diagram').count(),0);
     const blocked=await browser.newContext();
     await blocked.addInitScript(()=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open'); Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage disabled');}});});
     const blockedPage=await blocked.newPage(); await blockedPage.goto(origin+'/seats/');
-    await blockedPage.locator('.storage-warning').waitFor();
+    await createChart(blockedPage);await blockedPage.locator('.storage-warning').waitFor();
     await blockedPage.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
     await blockedPage.locator('#plan-files summary').click();
     const blockedDownload=blockedPage.waitForEvent('download'); await blockedPage.getByRole('button',{name:'Download backup',exact:true}).click();
@@ -380,7 +385,7 @@ const server = http.createServer((req,res) => {
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A1'),{count:5,seats:['legacy-parent',null,null,null,null]});
     Object.assign(legacy.plans[0].tables.find(t=>t.id==='A7'),{count:5,seats:[null,null,null,null,'legacy-child']});
     const migration=await browser.newContext();await migration.addInitScript(({key,legacy})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(legacy));},{key:storageKey,legacy});
-    const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await migrationPage.locator('.room-stage .table-item').first().waitFor();
+    const migrationPage=await migration.newPage();await migrationPage.goto(origin+'/seats/');await openDevice(migrationPage);await migrationPage.locator('.room-stage .table-item').first().waitFor();
     const upgraded=await migrationPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey);
     assert.equal(upgraded.plans[0].name,'7:30 מנין');
     assert.equal(upgraded.plans[0].tables[0].seats[0],'legacy-parent');assert.equal(upgraded.plans[0].tables.find(t=>t.id==='A7').count,3);assert.equal(upgraded.plans[0].people.length,2);
@@ -392,7 +397,7 @@ const server = http.createServer((req,res) => {
     prior.tables.find(table=>table.id==='A8').seats[0]='parent';prior.tables.find(table=>table.id==='B9').seats[0]='child';
     prior.tables.find(table=>table.id==='A3').height=48;
     const savedMigration=await browser.newContext();await savedMigration.addInitScript(({key,state})=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open');localStorage.setItem(key,JSON.stringify(state));},{key:storageKey,state:version11});
-    const savedPage=await savedMigration.newPage();await savedPage.goto(origin+'/seats/');await savedPage.locator('.room-stage .table-item').first().waitFor();
+    const savedPage=await savedMigration.newPage();await savedPage.goto(origin+'/seats/');await openDevice(savedPage);await savedPage.locator('.room-stage .table-item').first().waitFor();
     const latest=await savedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),storageKey),byId=id=>latest.plans[0].tables.find(table=>table.id===id);
     assert.equal(latest.plans[0].layoutVersion,12);assert.deepEqual(latest.plans[0].people,prior.people);
     assert.equal(byId('A8').seats[0],'parent');assert.equal(byId('B9').seats[0],'child');
@@ -403,7 +408,7 @@ const server = http.createServer((req,res) => {
     await savedMigration.close();
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
-    const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await touchPage.locator('.room-stage .table-item').first().waitFor();
+    const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await createChart(touchPage);await touchPage.locator('.room-stage .table-item').first().waitFor();
     const touchBox=await touchPage.locator('.room-stage [data-table="A4"][data-seat="2"] .seat-area').boundingBox();
     const cdp=await touch.newCDPSession(touchPage);
     const touchX=Math.round(touchBox.x+touchBox.width/2),touchY=Math.round(touchBox.y+touchBox.height/2);
