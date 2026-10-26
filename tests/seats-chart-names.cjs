@@ -28,7 +28,7 @@ const server=http.createServer((request,response)=>{
       },{key,recordsKey,sample,records});
       page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
       await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
-      const openFolder=async()=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();assert.ok(await page.getByRole('button',{name:'7:30 minyan',exact:true}).isEnabled());await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();};
+      const openFolder=async()=>{await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click();};
       const openChart=async id=>{await openFolder();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+id+'"]').click();};
       const saved=async()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key);
       await openFolder();
@@ -51,7 +51,7 @@ const server=http.createServer((request,response)=>{
         const info=execFileSync('pdfinfo',[file],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',file,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
         assert.match(info,/Pages:\s+1\b/);assert.ok(text.includes(today),'The full dated title is retained in the '+paper+' printout');await page.emulateMedia({media:'screen'});
       }
-      const create=async()=>{await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();};
+      const create=async()=>{await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();await page.getByRole('button',{name:'Close',exact:true}).click();};
       await create();assert.equal(await page.locator('#chart-name').inputValue(),today+' (2)');
       await create();assert.equal(await page.locator('#chart-name').inputValue(),today+' (3)');
       const titleFit=await page.locator('#chart-name').evaluate(input=>{const style=getComputedStyle(input),canvas=document.createElement('canvas'),context=canvas.getContext('2d');context.font=style.font;return {text:context.measureText(input.value).width,available:input.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)};});
@@ -61,7 +61,7 @@ const server=http.createServer((request,response)=>{
       assert.ok((await page.locator('.sharing-local-plan strong').allTextContents()).includes(today+' (3)'));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
     }
-    console.log('PASS: chart names use New York dates, legacy metadata names stay stable, custom names persist, room choices stay unchanged, today action and same-day suffixes work, and Letter/Tabloid PDFs retain full titles on phone/desktop.');
+    console.log('PASS: chart names use New York dates, legacy metadata names stay stable, custom names persist, chart actions open directly, today action and same-day suffixes work, and Letter/Tabloid PDFs retain full titles on phone/desktop.');
     console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
