@@ -56,15 +56,16 @@ leaving more space beside the amud and bimah.
 The middle columns sit closer together so the three main aisle gaps are equal
 beside standard five-seat tables. The shorter tables retain extra clearance around
 the amud and bimah; C1 still touches D1 at the front.
-The first row touches the front wall, A1 through A6 touch the left wall, and a
-central bimah is included. The amud has a plain surface without a decorative symbol.
+Tables near the front and side walls have a small visual gap from the wall.
+The back-right tables also leave a gap beside the side bookcase. A central bimah
+is included. The amud has a plain surface without a decorative symbol.
 A walkway separates rows 6 and 7, with row 7 meeting its back edge and an entrance in
 each side wall. These are open passages without door leaves or swings. Two doors
 at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
 the back wall between and outside those doors, and continue along both side walls
 to the front of row 8. Clear walkways run across the entire back and to the left
 of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
-right bookcase face as their right edge. The three back-wall cabinets are fixed
+right edge with a small gap before the bookcase face. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
@@ -93,7 +94,10 @@ Match both paper size and Landscape in
 the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Version 10 plans redistribute the standard rows using one common gap, keeping
+Version 11 plans receive an 8-unit inset for wall-side tables. The row grid shifts
+back by the same small amount, retaining names, counts, sizes and the equal row gaps.
+Bookcases stay in their existing positions against the walls. Front table labels
+stay above the wall line. Version 10 plans redistribute the standard rows using one common gap, keeping
 names, assignments, sizes and horizontal positions. The main amud and original
 bimah follow their adjacent rows, and side bookcases follow row 8. Version 9 plans
 spread standard rear rows into the reduced back walkway, retaining
@@ -113,7 +117,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v11` before changes are saved. Earlier room
+`lakewood-commons-seats-v1-before-room-v12` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
