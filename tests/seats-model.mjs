@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront, seatsRemovePeople, seatsNeedsUpgrade } from '../js/seats/model.js';
+import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront, seatsRemovePeople, seatsNeedsUpgrade, seatsIsFixed } from '../js/seats/model.js';
 import { seatsParseDelimited, seatsNamesFromRows, seatsCsvCell } from '../js/seats/import.js';
 
 const rowTop = row => row >= 7 ? 648 + (row - 7) * 88 : 78 + (row - 1) * 88;
@@ -174,12 +174,15 @@ test('front tables keep a small gap, wall clearance and the opposite-facing rav 
   assert.equal(seatsFront(plan).aron.x+seatsFront(plan).aron.width/2,600,'Moving tables must not move the Aron');
 });
 
-test('rear tables align with the front or the bookcase face and leave continuous walkways', () => {
+test('rear tables align with the front or the right wall and leave continuous walkways', () => {
   const plan=seatsCreateState().plans[0],byId=id=>plan.tables.find(table=>table.id===id);
   for(const id of ['A7','A8'])assert.equal(byId(id).x+byId(id).width,byId('A6').x+byId('A6').width);
-  assert.equal(byId('D7').x+byId('D7').width,1151);
-  assert.equal(byId('D8').x+byId('D8').width,1151);
-  const cases=plan.objects.filter(object=>object.type==='cabinet');assert.equal(cases.length,5);
+  assert.equal(byId('D7').x+byId('D7').width,1175);
+  assert.equal(byId('D8').x+byId('D8').width,1175);
+  const cases=plan.objects.filter(object=>object.type==='cabinet');assert.equal(cases.length,6);
+  const small=cases.find(object=>object.id==='rear-case-a7');
+  assert.deepEqual([small.x,small.y,small.width,small.height],[17,byId('A7').y,24,40]);
+  assert.ok(small.x+small.width+8<byId('A7').x);assert.equal(seatsIsFixed(small),true);
   for(const [id,tableId] of [['rear-case-side-left','A8'],['rear-case-side-right','D8']]){
     const cabinet=cases.find(object=>object.id===id),table=byId(tableId);
     assert.equal(cabinet.y,table.y+table.height+14+8);assert.equal(cabinet.y+cabinet.height,936);
@@ -445,7 +448,7 @@ test('version 11 wall tables gain clear space while names, sizes and manual row 
   for(const table of plan.tables){const old=before.tables.find(old=>old.id===table.id);assert.deepEqual({...table,x:old.x,y:old.y},old);assert.equal(table.y,table.id==='B8'?750:rowTop(Number(table.id.slice(1))));}
   for(const column of ['A','D'])for(let row=1;row<=6;row++){const table=byId(column+row);assert.ok(Math.abs((column==='A'?table.x-17:1183-table.x-table.width)-8)<.0001);}
   for(const id of ['A1','B1','C1','D1'])assert.equal(byId(id).y-70,8);
-  for(const id of ['D7','D8'])assert.equal(1159-byId(id).x-byId(id).width,8);
+  for(const id of ['D7','D8'])assert.equal(1183-byId(id).x-byId(id).width,8);
   for(const id of ['A7','A8'])assert.equal(byId(id).x+byId(id).width,byId('A6').x+byId('A6').width);
   assert.ok(Math.abs(byId('D1').x-byId('C1').x-byId('C1').width-8)<.0001);
     assert.ok(byId('D1').x+byId('D1').width<=1175.0001);assert.equal(seatsFront(plan).aron.x+seatsFront(plan).aron.width/2,600);
@@ -521,4 +524,37 @@ test('the former 64-unit front inset moves D1 toward the opening while keeping c
   assert.ok(aron.x+aron.width<rav.x&&rav.x+rav.width<byId('C1').x);
   assert.equal(seatsNeedsUpgrade(plan),false);assert.deepEqual(seatsNormalizeState(state),state);
   const updated=JSON.stringify(plan);assert.equal(seatsUpgradePlan(plan),0);assert.equal(JSON.stringify(plan),updated);
+});
+
+test('the old D7/D8 inset moves to the right wall without changing names, custom sizes or unrelated layout', () => {
+  const state=seatsCreateState(),plan=state.plans[0],byId=id=>plan.tables.find(table=>table.id===id);
+  seatsSetCount(byId('D7'),4);Object.assign(byId('D8'),{autoSize:false,width:216});
+  for(const id of ['D7','D8'])byId(id).x=1151-byId(id).width;
+  byId('A7').x-=12;Object.assign(byId('B8'),{autoSize:false,width:225,x:304});
+  seatsWriteName(plan,'D7',3,'Synthetic Right Rear Person');seatsWriteName(plan,'D8',4,'Synthetic Back Right Person');
+  const before=structuredClone(plan);
+  assert.equal(seatsNeedsUpgrade(plan),true);assert.equal(seatsUpgradePlan(plan),0);
+  assert.deepEqual(plan.people,before.people);assert.deepEqual(plan.objects,before.objects);
+  for(const table of plan.tables){
+    const previous=before.tables.find(item=>item.id===table.id);
+    if(['D7','D8'].includes(table.id))assert.deepEqual(table,{...previous,x:1175-previous.width,anchor:'right'});
+    else assert.deepEqual(table,previous);
+  }
+  assert.equal(seatsNeedsUpgrade(plan),false);assert.deepEqual(seatsNormalizeState(state),state);
+  const after=JSON.stringify(plan);assert.equal(seatsUpgradePlan(plan),0);assert.equal(JSON.stringify(plan),after);
+  seatsSetCount(byId('D7'),5,plan);assert.equal(byId('D7').x+byId('D7').width,1175);
+});
+
+test('adding the small A7 bookcase preserves existing tables, assignments and custom fixtures', () => {
+  const state=seatsCreateState(),plan=state.plans[0];
+  plan.objects=plan.objects.filter(object=>object.id!=='rear-case-a7');
+  plan.tables.find(table=>table.id==='D7').x-=12;
+  seatsWriteName(plan,'A7',0,'Synthetic A7 Person');
+  const before=structuredClone(plan);
+  assert.equal(seatsNeedsUpgrade(plan),true);assert.equal(seatsUpgradePlan(plan),0);
+  assert.deepEqual(plan.tables,before.tables);assert.deepEqual(plan.people,before.people);
+  assert.deepEqual(plan.objects.filter(object=>object.id!=='rear-case-a7'),before.objects);
+  assert.equal(plan.objects.filter(object=>object.id==='rear-case-a7').length,1);
+  assert.equal(seatsNeedsUpgrade(plan),false);assert.deepEqual(seatsNormalizeState(state),state);
+  const after=JSON.stringify(plan);seatsUpgradePlan(plan);assert.equal(JSON.stringify(plan),after);
 });
