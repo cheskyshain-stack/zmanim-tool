@@ -1,4 +1,4 @@
-export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 940 };
+export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 916 };
 
 export function seatsPrintGeometry(paper) {
   const tabloid = paper === 'tabloid', width = tabloid ? 17 : 11, height = tabloid ? 11 : 8.5;
