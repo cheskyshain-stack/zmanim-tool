@@ -125,7 +125,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .rear-side-walkway text{font-size:10px;letter-spacing:1px}
 .station-frame{fill:none;stroke:none}
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
-.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:non-scaling-stroke}
+.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2;stroke-dasharray:6 3}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
@@ -179,6 +179,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print p{font:8pt/1.4 Arial,sans-serif;text-align:right;margin:0;color:#000}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-item{cursor:default}
+  #seats-print .shtender-surface{vector-effect:non-scaling-stroke}
   #seats-print .table-seat:hover .seat-area{fill:transparent}
   .seats-print-error #seats-print{display:none!important}
   .seats-print-error #seats-app::after{display:block;content:'Some names do not fit inside their tables. Increase table width or depth before printing.';font:16pt Arial}
