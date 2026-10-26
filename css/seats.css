@@ -87,15 +87,15 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-item.fixed-fixture{cursor:default}
 .seats-app:has(#room-settings[open]) .drag-handle{cursor:grab;touch-action:none}
 .seats-app:has(#room-settings[open]) .drag-handle:active{cursor:grabbing}
-.room-item.selected>.table-surface,.room-item.selected>.object-surface{stroke:#2a67a0;stroke-width:2.5;stroke-dasharray:6 3}
+.room-item.selected>.table-surface,.room-item.selected>.object-surface{stroke:#2a67a0;stroke-width:2.5}
 .room-item:focus-visible,.table-seat:focus-visible{outline:0}
 .room-item:focus-visible>.table-surface,.room-item:focus-visible>.object-surface,.table-seat:focus-visible .seat-area{stroke:#2a67a0;stroke-width:3}
 .table-seat:hover .seat-area{fill:#e7edf3}
 .table-seat.is-active .seat-area{stroke:#2a67a0;stroke-width:2;fill:#eef4fa}
-.walkway path{fill:none;stroke:#aaa;stroke-width:.8;stroke-dasharray:6 6}
+.walkway path{fill:none;stroke:none}
 .walkway text{fill:#666;font:11px Arial,sans-serif;letter-spacing:2px}
 .room-door path{fill:none;stroke:currentColor;stroke-width:1.2}
-.room-door .door-swing{stroke-dasharray:3 3;stroke-width:.7}
+.room-door .door-swing{stroke-width:.7}
 .room-door .door-gap{stroke:#fff;stroke-width:7}
 .room-door text{fill:currentColor;font:11px Arial,sans-serif}
 .seat-editor{position:fixed;z-index:1000;width:340px;max-width:calc(100vw - 16px);max-height:calc(100dvh - 16px);overflow:auto;background:#fff;border:1px solid #8296a9;border-top:3px solid var(--seats-gold);border-radius:7px;padding:15px;box-shadow:0 5px 22px rgb(20 43 70 / 18%)}
@@ -123,7 +123,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .station-frame{fill:none;stroke:none}
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
 .shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
-.rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2;stroke-dasharray:6 3}
+.rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
 .storage-warning,.fit-warning{padding:12px 15px;border:1px solid #d7b881;border-radius:5px;background:#fff8e9;font-size:12px;margin-bottom:12px;color:#6f4c17}

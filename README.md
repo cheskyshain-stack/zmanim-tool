@@ -66,8 +66,8 @@ to the front of row 8. Clear walkways run across the entire back and to the left
 of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
 right bookcase face as their right edge. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
-Built-in cabinet labels and walkway, entrance, and door labels are hidden on screen
-and in print; their shapes remain visible.
+Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
+print. Walkway guide lines are hidden too, and selection outlines are solid.
 The same gap separates table rows from front to back, with a wider entrance walkway
 between rows 6 and 7. Rows 7, 8 and 9 share the front rows’ spacing. The back walkway
 is 48 units deep. Side bookcases still reach the front of row 8.
