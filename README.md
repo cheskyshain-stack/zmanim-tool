@@ -83,7 +83,7 @@ fingers to zoom the chart, or use plus/minus, 100%, and Fit. One finger scrolls
 the page or pans across an enlarged chart.
 
 Seats saves its own versioned plans in `lakewood-commons-seats-v1`, separately from
-schedule settings. Nothing uploads to a server. Download a backup to move plans
+schedule settings. Local plans stay on the device. Download a backup to move plans
 between devices. Restore adds plans instead of replacing current ones, and Undo
 can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
 black-and-white or color. Initial setup defaults to Printer paper (auto fit), which
@@ -125,6 +125,15 @@ layout and explicitly three-seat and four-seat tables; any excess names return t
 the waiting list. The browser keeps the original pre-update JSON in
 `lakewood-commons-seats-v1-before-room-v12` before changes are saved. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
+
+Optional shared plans let two organizers work on the same online plan. Save to site
+uploads an existing local plan; Shared plans opens it on another device. Committed
+edits appear live, with the other organizer's name and active seat. Independent
+seat changes merge, Undo affects only that organizer's edits, and conflicting
+offline changes are kept as a separate local copy. Restoring a backup creates
+independent local plans. Shared editing stays disabled until its Cloudflare service
+is deployed and `data/seats-sync.json` points to the verified service. See
+`worker/seats/README.md` for deployment and the activation workflow.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates

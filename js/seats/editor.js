@@ -1,7 +1,7 @@
 import { escAttr, escText } from '../util.js';
 import { seatsWriteName, seatsItems } from './model.js';
 
-export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify }) {
+export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true, onActivity = () => {} }) {
   const card = document.createElement('section');
   card.className = 'seat-editor no-print'; card.hidden = true;
   card.setAttribute('aria-label', 'Edit seat'); document.body.appendChild(card);
@@ -24,14 +24,23 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
   }
   function close() {
     active = null; card.hidden = true;
+    onActivity(null);
     document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
   }
   function save({ personId = null, duplicate = false, next = 0 } = {}) {
     if (!active) return;
     const target = { ...active }, name = card.querySelector('input').value;
+    const now = personAt(target.tableId, target.index), original = JSON.stringify(now ? { id: now.id, name: now.name } : null);
+    if (original !== active.original && name.trim() !== (now?.name || '')) {
+      active.original = original;
+      let warning = card.querySelector('.seat-editor-conflict');
+      if (!warning) { warning = document.createElement('p'); warning.className = 'seat-editor-conflict'; warning.setAttribute('role', 'alert'); card.querySelector('form').appendChild(warning); }
+      warning.textContent = 'This seat changed while you were typing. Your text is kept here. Check the chart, then save again if you want to replace its name.';
+      return false;
+    }
     close();
     const ok = commit(() => seatsWriteName(getPlan(), target.tableId, target.index, name, { personId, duplicate }), 'Seat saved.');
-    if (!ok) return;
+    if (!ok) return false;
     if (next) {
       const seats = seatsItems(getPlan()).flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
       const index = seats.findIndex(seat => seat.tableId === target.tableId && seat.index === target.index);
@@ -57,11 +66,14 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
     position();
   }
   function open(tableId, index, initial) {
-    if (active) save();
+    if (!canEdit(tableId, index)) return;
+    if (active && save() === false) return;
     const table = seatsItems(getPlan()).find(entry => entry.id === tableId);
     if (!table || index < 0 || index >= (table.count ?? 0)) return;
     onSelect(tableId);
-    active = { tableId, index };
+    const person = personAt(tableId, index);
+    active = { tableId, index, original: JSON.stringify(person ? { id: person.id, name: person.name } : null) };
+    onActivity({ tableId, index });
     const name = initial ?? personAt(tableId, index)?.name ?? '';
     card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
     card.hidden = false; position();
@@ -83,6 +95,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify 
   }
   function pasteName(tableId = active?.tableId, index = active?.index) {
     if (!copied || tableId === undefined) return;
+    if (!canEdit(tableId, index)) return;
     close();
     commit(() => seatsWriteName(getPlan(), tableId, index, copied, { duplicate: true }), 'Copied name to a separate seat.');
     seatNode(tableId, index)?.focus({ preventScroll: true });

@@ -1,0 +1,13 @@
+{
+  "name": "zmanim-seats",
+  "main": "worker.js",
+  "account_id": "04b085d9f19ac1ba6d333e0006fc94c1",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "vars": { "ALLOWED_ORIGIN": "https://baismedrashoflakewoodcommons.org" },
+  "durable_objects": {
+    "bindings": [{ "name": "SEATS_WORKSPACE", "class_name": "SeatsWorkspace" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SeatsWorkspace"] }],
+  "observability": { "enabled": false }
+}
