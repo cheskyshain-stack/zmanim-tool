@@ -22,35 +22,43 @@ Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its shtender. It sits
 between the Aron Kodesh and C1; C1 touches D1. An amud stands between B2 and C2.
+B2/B6 align with the left edges of their columns, and C2/C6 with the right edges,
+leaving more space beside the amud and bimah.
 The first row touches the front wall, A1 through A6 touch the left wall, and a
 central bimah is included. A walkway separates rows 6 and 7, with an entrance in
 each side wall. These are open passages without door leaves or swings. Two doors
 at the back, between A/B and C/D, are marked usually closed. Sefarim bookcases line
 the back wall between and outside those doors, and continue along both side walls
 to the front of row 8. Clear walkways run across the entire back and to the left
-of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 meets the right wall
-and D8 meets the right bookcase face.
+of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
+right bookcase face as their right edge.
 Tables, pillars, sefarim cabinets, labels, and a bimah can be added and moved with
 dragging a table label or room object, or using keyboard arrows. Width, depth,
 and position can also be entered. The page scrolls normally over the sidebar
-and tables; touch dragging is limited to labels and room objects.
+and tables; touch dragging is limited to labels and room objects. Pinch with two
+fingers to zoom the chart, or use plus/minus, 100%, and Fit. One finger scrolls
+the page or pans across an enlarged chart.
 
 Seats saves its own versioned plans in `lakewood-commons-seats-v1`, separately from
 schedule settings. Nothing uploads to a server. Download a backup to move plans
 between devices. Restore adds plans instead of replacing current ones, and Undo
 can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
-black-and-white or color; match the selected paper size in the browser print dialog.
+black-and-white or color. The chart fills the available sheet width with normal
+lettering proportions and narrow margins. Match both paper size and Landscape in
+the browser print dialog, including Android's separate native paper-size picker.
 The build stamps `seats/index.html` and includes it in `dist/`, outside public
 routing and the sitemap, with `noindex` and a robots exclusion.
-Older plans migrate to the revised room layout while retaining names and existing
-seat counts, except the explicitly three-seat and four-seat tables. Any excess names
-return to the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-v3` before changes are saved. The earlier v2
-snapshot is retained when present. Backups and seat-list exports include the rav's seat.
+Version 3 plans receive the alignment changes while retaining names, seat counts,
+fixtures, and other custom positions. Older plans also receive the revised room
+layout and explicitly three-seat and four-seat tables; any excess names return to
+the waiting list. The browser keeps the original pre-update JSON in
+`lakewood-commons-seats-v1-before-room-v4` before changes are saved. Earlier v2 and
+v3 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
 Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates
-actual one-page Letter and Tabloid PDFs and checks their sizes and names.
+actual one-page Letter and Tabloid PDFs and checks their sizes, names, margins,
+and lettering proportions, alongside touch zoom and scrolling.
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
 ported from `Lakewood Commons Zmanim tables.xlsx`.

@@ -62,9 +62,11 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .canvas-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 17px 10px}
 .canvas-heading h2{margin:0;font-size:20px}
 .canvas-heading p{font-size:11px;color:var(--seats-muted);margin:0;flex:1}
-.canvas-buttons{display:flex;gap:4px;align-items:center}
+.canvas-buttons{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .canvas-buttons button{font-size:11px;padding:4px 8px;min-height:29px}
 .canvas-buttons [data-action=zoom-in],.canvas-buttons [data-action=zoom-out]{font-size:19px;width:29px;padding:0}
+.canvas-buttons output{font-size:10px;min-width:30px;text-align:center;color:var(--seats-muted)}
+.print-paper-hint{font-size:11px;color:var(--seats-muted);margin:-5px 0 12px;text-align:right}
 .setup-hint{font-size:11px;margin:0 17px 7px;color:var(--seats-muted)}
 .room-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;overscroll-behavior-y:auto;min-width:0;background:#fff;touch-action:pan-x pan-y}
 .room-stage{min-width:100%;max-width:none}
@@ -158,13 +160,14 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 @media(max-width:1050px){.seats-controls{align-items:start;flex-wrap:wrap}.print-settings{margin-left:auto}.seats-workspace{grid-template-columns:240px minmax(0,1fr)}.seats-panel{padding:14px}.canvas-heading p{flex-basis:100%;order:3}.seats-header{padding:7px 18px}.seats-brand{font-size:16px}}
 @media(max-width:700px){#seats-app{padding:16px 12px 0}.seats-header{padding:7px 12px;min-height:54px}.seats-brand{font-size:13px;gap:8px}.seats-brand img{width:32px;height:32px}.seats-header-label{display:none}.seats-top{align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:12px}.seats-app h1{font-size:34px}.tool-badge{font-size:8px;padding:3px 5px;letter-spacing:.8px}.plan-line select{max-width:190px;font-size:13px}.saved-label{flex-basis:100%}.top-actions{gap:5px;justify-content:flex-end;flex:1}.top-actions button{font-size:11px;padding:7px 9px}.top-actions [data-action=save]{display:none}.seats-controls{gap:10px;margin-bottom:12px}.mode-tabs button{padding:9px 12px;font-size:12px}.print-settings{gap:8px;width:100%;justify-content:space-between}.print-settings label{display:block;font-size:10px;min-width:0;flex:1}.print-settings select{font-size:11px;margin-top:3px;width:100%;padding-right:15px}.seats-workspace{display:flex;flex-direction:column}.seats-panel{position:static;max-height:none;width:100%;order:2;padding:16px}.seats-canvas{width:100%;order:1}.canvas-heading{padding:12px;gap:8px}.canvas-heading h2{font-size:18px}.canvas-buttons{margin-left:auto}.canvas-heading p{font-size:10px}.setup-hint{margin:0 12px 8px;font-size:10px}.canvas-foot{padding:8px 12px;font-size:9px;gap:5px}.seats-panel h2{font-size:20px}.seats-panel input,.seats-panel select,.seats-panel textarea{font-size:16px}.seats-panel button{min-height:40px}.tool-grid{grid-template-columns:1fr 1fr}.tool-grid button{font-size:12px}.seats-panel label{font-size:12px}.seats-lock{margin-top:6vh}.people-list{max-height:360px}.person-name bdi{font-size:14px}.seats-notice{font-size:12px}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+@media(max-width:700px){.canvas-heading .canvas-buttons{flex-basis:100%;margin-left:0;justify-content:flex-end}.canvas-buttons button{min-height:44px;min-width:42px}.canvas-buttons [data-action=zoom-in],.canvas-buttons [data-action=zoom-out]{width:42px}.print-paper-hint{text-align:left;font-size:10px}}
 @media print{
   html,body.seats-app{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;width:auto!important;min-width:0!important;height:auto!important}
   .no-print,.seats-header,.seats-footer,#seats-app>:not(#seats-print){display:none!important}
   #seats-app{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;min-height:0!important}
   #seats-print{display:flex!important;flex-direction:column;width:var(--seats-page-width);height:var(--seats-page-height);break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
-  #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .4in;padding:0 .08in;min-height:0}
-  #seats-print h1{font:600 19pt Georgia,'David Libre',serif;margin:0;color:#000}
+  #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}
+  #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
   #seats-print p{font:8pt/1.4 Arial,sans-serif;text-align:right;margin:0;color:#000}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-item{cursor:default}
