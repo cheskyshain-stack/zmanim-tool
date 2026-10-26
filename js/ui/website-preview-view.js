@@ -2,6 +2,7 @@ import { loadPublished } from '../publish.js';
 import { resolveSettings } from '../settings.js';
 import { WEBSITE_PREVIEW_PARAM, websiteLocalFields, websitePreviewInstant, websitePreviewURL } from '../website-clock.js';
 import { escAttr } from '../util.js';
+import { keepPosition } from './keep-position.js';
 
 const WEBSITE_PREVIEW_SELECTION = 'zmanim-website-preview-selection';
 const WEBSITE_PREVIEW_PAGES = [['/', 'Home'], ['/week/', 'Zmanim'], ['/chart/', 'Charts'], ['/schedules/', 'Special schedules'], ['/donate/', 'Donate']];
@@ -31,13 +32,21 @@ export function renderWebsitePreview(container) {
           <label>Page<select id="website-preview-page">${WEBSITE_PREVIEW_PAGES.map(([path, name]) => `<option value="${path}">${name}</option>`).join('')}</select></label>
           <label>Screen<select id="website-preview-screen"><option value="auto">Fit available width</option><option value="phone">Phone</option><option value="desktop">Desktop</option></select></label>
           <div class="website-preview-actions"><button type="submit" class="btn-primary">Show preview</button><button type="button" id="website-preview-today">Today</button><a id="website-preview-open" target="_blank" rel="noopener">Open in new tab</a></div>
-          <p class="hint" id="website-preview-note" role="status" hidden></p>
         </form>
+        <div class="website-preview-date-nav" role="group" aria-label="Change preview date">
+          <button type="button" id="website-preview-previous" aria-label="Previous day" title="Previous day">−</button>
+          <span id="website-preview-day" aria-live="polite" aria-atomic="true"></span>
+          <button type="button" id="website-preview-next" aria-label="Next day" title="Next day">+</button>
+        </div>
+        <p class="hint" id="website-preview-note" role="status" hidden></p>
         <div class="website-preview-canvas"><div class="website-preview-device"><iframe id="website-preview-frame" title="Congregation website preview"></iframe></div></div>
       </div>`;
       const form = container.querySelector('form'), date = form.querySelector('#website-preview-date'), time = form.querySelector('#website-preview-time');
       const page = form.querySelector('#website-preview-page'), screen = form.querySelector('#website-preview-screen');
-      const note = form.querySelector('#website-preview-note'), open = form.querySelector('#website-preview-open');
+      const note = container.querySelector('#website-preview-note'), open = form.querySelector('#website-preview-open');
+      const previous = container.querySelector('#website-preview-previous'), next = container.querySelector('#website-preview-next');
+      const day = container.querySelector('#website-preview-day');
+      const dayFormat = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
       const canvas = container.querySelector('.website-preview-canvas'), device = container.querySelector('.website-preview-device'), frame = container.querySelector('iframe');
       date.value = selected.date; time.value = selected.time; page.value = selected.page; screen.value = selected.screen;
       const size = () => {
@@ -48,16 +57,23 @@ export function renderWebsitePreview(container) {
         frame.style.width = width + 'px'; frame.style.height = height + 'px'; frame.style.transform = `scale(${scale})`;
         device.style.width = width * scale + 'px'; device.style.height = height * scale + 'px';
       };
-      const show = () => {
+      const show = ({ retainPage = false } = {}) => {
         if (!form.reportValidity()) return;
         try {
           const at = websitePreviewInstant(date.value, time.value, zone);
-          const url = websitePreviewURL(new URL(page.value, location.origin), at.instant).href;
-          open.href = url;
-          expectedInstant = at.instant.toISOString();
           let currentURL = frame.getAttribute('src');
           try { currentURL = frame.contentWindow.location.href; } catch { /* A failed frame can be opened again. */ }
+          let target = new URL(page.value, location.origin);
+          if (retainPage && currentURL) {
+            const current = new URL(currentURL, location.origin);
+            if (current.origin === location.origin && current.pathname === page.value) target = current;
+          }
+          const url = websitePreviewURL(target, at.instant).href;
+          open.href = url;
+          expectedInstant = at.instant.toISOString();
           if (currentURL !== url) frame.src = url;
+          day.textContent = dayFormat.format(at.instant);
+          previous.disabled = date.value <= date.min; next.disabled = date.value >= date.max;
           selected = { date: date.value, time: time.value, page: page.value, screen: screen.value };
           try { sessionStorage.setItem(WEBSITE_PREVIEW_SELECTION, JSON.stringify(selected)); } catch { /* Preview still works without storage. */ }
           note.textContent = at.repeated ? 'This time occurs twice when the clocks change. The preview uses its first occurrence.' : '';
@@ -71,6 +87,10 @@ export function renderWebsitePreview(container) {
       form.querySelector('#website-preview-today').addEventListener('click', () => {
         const now = websiteLocalFields(new Date(), zone); date.value = now.date; time.value = now.time; show();
       });
+      [[previous, -1], [next, 1]].forEach(([button, amount]) => button.addEventListener('click', () => keepPosition(container, () => {
+        if (!date.reportValidity()) return;
+        date.stepUp(amount); show({ retainPage: true });
+      })));
       previewMessageListener = event => {
         if (disposed || event.origin !== location.origin || event.source !== frame.contentWindow
           || event.data?.type !== 'zmanim-website-preview-location' || typeof event.data.url !== 'string') return;

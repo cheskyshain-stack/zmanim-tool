@@ -932,6 +932,9 @@ omit preview visits from analytics and avoid marking chart announcements as seen
 Automatic charts must be generated around the chosen year. Real visitors and the
 parent admin retain real time. The admin screen's own remembered form selection is
 session-only; dispose its frame observer/message listener when leaving the tab.
+Keep previous/next-day buttons directly above the embedded screen, with the chosen
+date between them. Step calendar days while retaining the local time and current
+public page, including its query/hash. Keep the parent scroll and button focus steady.
 Reject nonexistent DST times and identify repeated times. `tests/website-clock.mjs`
 checks date/time conversion; browser checks must compare preview pages to ordinary
 pages running at the same date/time, including year boundaries and public route changes.
