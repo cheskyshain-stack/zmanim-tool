@@ -903,7 +903,8 @@ export function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS } = {}) {
+export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS, tables = null } = {}) {
+  if (tables) posterTables = tables;
   const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
@@ -922,13 +923,15 @@ export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(
       if (!built?.span) continue;
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
+      const handout = Boolean(posterTables && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key));
       out.push({
         key: `onepage-${year}-${name}`,
         year,
         label: name,
         span: built.span,
         when: when(from, to),
-        html: renderOnePagePoster(built, settings),
+        handout,
+        html: handout ? `<div class="poster-half-sheet">${renderHalfSchedulePoster(built.items[0].poster, built.items[0].key, settings, { standalone: true })}</div>` : renderOnePagePoster(built, settings),
       });
     }
     let vasikin = null;
@@ -2826,7 +2829,7 @@ export function fitPoster(container) {
       const cs = getComputedStyle(box);
       const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const wide = el.getBoundingClientRect().width;
-      if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+      if (avail > 0 && (wide > avail || box.matches('.luach-sheet-page.is-handout'))) el.style.zoom = Math.max(0.15, avail / wide);
     }
     // The one-page sheet's type is set against the zoom just chosen, so the two are decided
     // together and a resize cannot leave one of them behind. See fitOnePage for why it has

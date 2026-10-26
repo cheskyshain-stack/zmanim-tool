@@ -44,7 +44,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .tool-badge{font-size:9px;letter-spacing:1.2px;border:1px solid var(--seats-gold);color:#86691f;padding:4px 7px;border-radius:3px;font-weight:700}
 .plan-line{display:flex;align-items:center;gap:7px;margin-top:6px;flex-wrap:wrap}
 .plan-line>label{font-size:11px;color:var(--seats-muted)}
-.plan-line #chart-name{width:230px;max-width:100%;min-height:34px;padding:4px 8px;font-size:15px;background:#fff}
+.plan-line #chart-name{width:360px;max-width:100%;min-height:34px;padding:4px 8px;font-size:15px;background:#fff}
 .seats-page-help{font-size:11px;color:var(--seats-muted);margin:-8px 0 12px}
 .chart-more{position:relative;font-size:12px}
 .chart-more summary{cursor:pointer;padding:8px;min-height:36px;display:flex;align-items:center;text-decoration:underline;text-underline-offset:3px}
@@ -193,7 +193,9 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-lock-photo{display:block;width:auto;max-width:100%;height:54px;object-fit:contain;margin:0 auto}
 .seats-lock h1{font-size:36px;margin-top:12px}
 .seats-lock p{font-size:13px;color:var(--seats-muted)}
+.seats-lock label{display:block;text-align:left;font-size:13px;font-weight:600}
 .seats-lock input{font-size:27px;letter-spacing:9px;text-align:center;margin:4px 0 14px}
+.seats-lock #seats-name{font-size:17px;letter-spacing:normal;text-align:left}
 .seats-lock button{width:100%}
 .seats-lock a{font-size:12px}
 #pin-message{min-height:23px;color:#a2382c}

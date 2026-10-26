@@ -1350,7 +1350,7 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
   page.innerHTML = `
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage)}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage, true)}" alt="">
         <div class="header-center">
           <img class="header-logo" src="/assets/logo-text.png" alt="${escAttr(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
           ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}

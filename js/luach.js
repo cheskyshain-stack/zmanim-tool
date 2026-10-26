@@ -21,6 +21,7 @@ import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
 import { shulNow, dateFromSerial } from './zmanim/solar.js';
 import { loadTables } from './data-loader.js';
+let congregationScheduleTables = null;
 import { hasParsha } from './hebrew-calendar.js';
 import { wireInstalledSystemBars } from './ui/system-bars.js';
 import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
@@ -851,7 +852,7 @@ function renderWeekPage(published) {
 function schedulesNow(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   try {
-    return currentOnePageSheets(state, resolveSettings(published.settings));
+    return currentOnePageSheets(state, resolveSettings(published.settings), { tables: congregationScheduleTables });
   } catch (err) {
     // A sheet that will not build must not take the whole site down with it. The menu then
     // has one fewer thing on it, which is the same as there being nothing up.
@@ -879,18 +880,18 @@ function schedulesNow(published) {
 function renderSchedulesPage(published) {
   stopNextUp();
   const sheets = schedulesNow(published);
-  // Every sheet here is portrait: a one-page sheet is 8.5in by 11in whatever occasion it
-  // holds. See setPrintPage for why the page size comes from the view.
-  setPrintPage('letter portrait');
+  const allHandouts = sheets.length > 0 && sheets.every(sheet => sheet.handout);
+  const mixedHandouts = !allHandouts && sheets.some(sheet => sheet.handout);
+  setPrintPage(allHandouts ? 'letter landscape' : 'letter portrait');
   main.className = '';
-  main.innerHTML = backBar('schedules') + `<div class="luach-sheets">
+  main.innerHTML = backBar('schedules') + `<div class="luach-sheets${allHandouts ? ' is-half-letter-print' : mixedHandouts ? ' has-mixed-handouts' : ''}">
     ${sheets.length ? `<div class="luach-sheet-print no-print">${printButtonHtml('sheet-print')}</div>` : ''}
     ${sheets.length
       ? sheets.map((sh) => `<section class="luach-sheet">
           <h2 class="luach-sheet-name no-print"${hebrewLang(sh.label)}>${escAttr(sh.label)}</h2>
           <p class="luach-sheet-when-he no-print" lang="he" dir="rtl">${escAttr(sh.when.he)}</p>
           <p class="luach-sheet-when no-print">${escAttr(sh.when.en)}</p>
-          <div class="luach-sheet-page">${sh.html}</div>
+          <div class="luach-sheet-page${sh.handout ? ' is-handout' : ''}">${sh.html}</div>
         </section>`).join('')
         + `<p class="luach-sheet-caveat no-print">Times are subject to change.</p>`
       : `<p class="luach-sheet-none">Nothing extra is up at the moment. The week's times are on
@@ -1316,6 +1317,7 @@ function wireNav(published) {
     home.append(retry);
     return;
   }
+  try { congregationScheduleTables = await loadTables(); } catch { /* Existing full-page schedules remain available without the calendar tables. */ }
   installWebsitePreviewBanner(resolveSettings(published.settings).timezone.id, ROUTES);
   wireNav(published);
   // Consumed once, before the first render: the other end of a stale-tab reload (see

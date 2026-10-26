@@ -160,6 +160,7 @@ test('front tables keep a small gap, wall clearance and the opposite-facing rav 
     seatsSetCount(byId('D1'),count,plan);seatsSetCount(byId('C1'),count,plan);
     const front=seatsFront(plan),rav=plan.objects.find(object=>object.type==='rav');
     assert.equal(front.aron.x+front.aron.width/2,600,'The Aron must stay centered when front tables change size');
+    assert.equal(front.aron.width,88);
     assert.ok(Math.abs(byId('D1').x-byId('C1').x-byId('C1').width-8)<.0001);
     assert.ok(byId('D1').x+byId('D1').width<=1175.0001);
     assert.ok(byId('B1').x+byId('B1').width<front.aron.x);
@@ -577,4 +578,15 @@ test('the smaller amud adds the fifth B2/C2 seats while keeping names, outer edg
   assert.deepEqual(plan.objects.filter(object=>object.id!=='main-amud'),before.objects.filter(object=>object.id!=='main-amud'));
   assert.equal(seatsNeedsUpgrade(plan),false);assert.deepEqual(seatsNormalizeState(state),state);
   const after=JSON.stringify(plan);seatsUpgradePlan(plan);assert.equal(JSON.stringify(plan),after);
+});
+
+test('a wider centered Aron moves the old B1 slightly left without changing its names or capacity', () => {
+  const plan=seatsCreateState().plans[0],b1=plan.tables.find(table=>table.id==='B1');
+  b1.x=316;plan.objects.find(object=>object.type==='rav').x=665.5;
+  seatsWriteName(plan,'B1',0,'Synthetic Front Person');const before=structuredClone(plan);
+  assert.equal(seatsNeedsUpgrade(plan),true);assert.equal(seatsUpgradePlan(plan),0);
+  assert.equal(b1.x,308);assert.equal(b1.width,240);assert.equal(b1.count,5);assert.deepEqual(b1.seats,before.tables.find(table=>table.id==='B1').seats);
+  assert.deepEqual(plan.people,before.people);const aron=seatsFront(plan).aron;
+  assert.equal(aron.width,88);assert.equal(aron.x+aron.width/2,600);assert.equal(aron.x-b1.x-b1.width,8);
+  assert.equal(seatsNeedsUpgrade(plan),false);const after=JSON.stringify(plan);seatsUpgradePlan(plan);assert.equal(JSON.stringify(plan),after);
 });

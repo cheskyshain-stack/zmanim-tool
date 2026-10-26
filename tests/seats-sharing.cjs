@@ -31,34 +31,24 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     const earlier=structuredClone(seed.plans[0]);earlier.id=crypto.randomUUID();earlier.name='Earlier seating page';
     seatsWriteName(earlier,'A1',0,'Earlier Assigned Person');seed.plans.push(earlier);
     const openSaved=async page=>{ await page.getByRole('button',{name:/^(View saved charts|Saved charts)$/}).click(); };
-    const signIn=async(page,name,save=false)=>{
-      await page.locator('#sharing-name').fill(name);
-      if(await page.locator('#sharing-pin').count())await page.locator('#sharing-pin').fill('4444');
-      await page.getByRole('button',{name:save?'Save chart':'Sign in',exact:true}).click();
-    };
     for(const name of ['Organizer One','Organizer Two']){
       const context=await browser.newContext({viewport:{width:1440,height:1050}});contexts.push(context);
       if(name==='Organizer One')await context.addInitScript(seed=>{if(!localStorage.getItem('lakewood-commons-seats-v1'))localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(seed))},seed);
       const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));pages.push(page);
-      await page.goto(origin+'/seats/');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.goto(origin+'/seats/');await page.locator('#seats-name').fill(name);await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
       assert.equal(await page.locator('.room-stage').count(),0,'Unlock opens the Seats start page');
       if(name==='Organizer One'){
         await openSaved(page);
-        assert.ok(await page.getByRole('button',{name:'Sign in to open saved charts',exact:true}).isVisible());
+        assert.equal(await page.getByRole('button',{name:'Sign in to open saved charts',exact:true}).count(),0);
         assert.equal(await page.locator('.sharing-local-plan').count(),2);
         await page.locator('.sharing-local-plan').filter({hasText:'Earlier seating page'}).locator('.saved-page-card').click();
         assert.match(await page.locator('.room-stage [data-table=A1][data-seat="0"] .seat-name').textContent(),/Earlier/);
         await openSaved(page);
         await page.locator('.sharing-local-plan').filter({hasText:/Seating plan - /}).locator('.saved-page-card').click();
         await page.locator('#chart-name').fill('Shared chart test');await page.getByRole('button',{name:'Save',exact:true}).click();
-        await page.locator('#sharing-name').waitFor();
-        assert.equal(await page.locator('#sharing-pin').count(),0,'The PIN just entered to open Seats is used for the server sign-in');
-        await signIn(page,name,true);
       }else{
         await openSaved(page);
-        await page.getByRole('button',{name:'Sign in to open saved charts',exact:true}).click();
-        await signIn(page,name);
         await page.locator('.sharing-site-plan button').first().click();
       }
       await page.waitForFunction(()=>document.querySelector('.saved-label')?.textContent==='Saved to website');
@@ -73,8 +63,8 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.match(await siteCard.textContent(),/Organizer One/);
     const remoteId=await siteCard.locator('.saved-page-card').getAttribute('data-id'),sharedLink=origin+'/seats/?page='+remoteId;
     const linkedContext=await browser.newContext(),linked=await linkedContext.newPage();linked.on('pageerror',error=>errors.push(error.message));
-    await linked.goto(sharedLink);await linked.locator('#seats-pin').fill('4444');await linked.getByRole('button',{name:'Open Seats',exact:true}).click();
-    await signIn(linked,'Link organizer');await linked.waitForFunction(()=>document.querySelector('.saved-label')?.textContent==='Saved to website');
+    await linked.goto(sharedLink);await linked.locator('#seats-name').fill('Link organizer');await linked.locator('#seats-pin').fill('4444');await linked.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await linked.waitForFunction(()=>document.querySelector('.saved-label')?.textContent==='Saved to website');
     assert.equal(await linked.locator('#chart-name').inputValue(),'Shared chart test');assert.equal(await linked.getByRole('button',{name:'Create new chart',exact:true}).count(),0,'An explicit chart link opens that chart directly');await linkedContext.close();
     await a.screenshot({path:path.join(output,'saved-charts-folder-desktop.png'),fullPage:true});
     await a.getByRole('button',{name:'Close',exact:true}).click();
@@ -203,8 +193,8 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     await a.getByRole('button',{name:'Close',exact:true}).click();
     const fresh=await browser.newContext({viewport:{width:375,height:900}}),invited=await fresh.newPage();
     invited.on('pageerror',error=>errors.push(error.message));
-    await invited.goto(origin+'/seats/');await invited.locator('#seats-pin').fill('4444');await invited.getByRole('button',{name:'Open Seats',exact:true}).click();
-    await invited.getByRole('button',{name:'Create new chart',exact:true}).click();await signIn(invited,'Third organizer');
+    await invited.goto(origin+'/seats/');await invited.locator('#seats-name').fill('Third organizer');await invited.locator('#seats-pin').fill('4444');await invited.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await invited.getByRole('button',{name:'Create new chart',exact:true}).click();
     await invited.getByRole('heading',{name:'Name files',exact:true}).waitFor();
     await invited.getByRole('button',{name:'Close',exact:true}).click();
     assert.equal(await invited.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1')),null,'Signing in from a pristine draft does not create a device chart');

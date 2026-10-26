@@ -19,7 +19,7 @@ const server=http.createServer((request,response)=>{
       const context=await browser.newContext({viewport:{width,height:900},isMobile:width===375,hasTouch:width===375}),page=await context.newPage(),errors=[];
       await context.addInitScript(({key,sample})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify(sample));},{key,sample});
       page.on('pageerror',error=>errors.push(error.message));await page.goto(origin+'/seats/');
-      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
       assert.ok(await page.getByRole('button',{name:'View saved charts',exact:true}).isVisible());
       assert.equal(await page.getByRole('button',{name:/^(7:30 minyan|Main BM)$/}).count(),0,'There is no room-selection step while only one room exists');
@@ -84,7 +84,7 @@ const server=http.createServer((request,response)=>{
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
     }
     const fresh=await browser.newContext(),page=await fresh.newPage();await page.goto(origin+'/seats/');
-    await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
     await page.getByRole('button',{name:'View saved charts',exact:true}).click();
     assert.equal(await page.locator('.sharing-local-plan').count(),0,'A first visit does not create a phantom saved setup');await page.getByRole('button',{name:'Close',exact:true}).click();
     await page.getByRole('button',{name:'Create new chart',exact:true}).click();
@@ -93,7 +93,7 @@ const server=http.createServer((request,response)=>{
     const linked=await browser.newContext(),linkedPage=await linked.newPage(),linkedErrors=[];
     linkedPage.on('pageerror',error=>linkedErrors.push(error.message));
     await linkedPage.goto(origin+'/seats/?page=missing123');
-    await linkedPage.locator('#seats-pin').fill('4444');await linkedPage.getByRole('button',{name:'Open Seats',exact:true}).click();
+    await linkedPage.locator('#seats-name').fill('Synthetic Organizer');await linkedPage.locator('#seats-pin').fill('4444');await linkedPage.getByRole('button',{name:'Open Seats',exact:true}).click();
     await linkedPage.getByRole('button',{name:'Create new chart',exact:true}).waitFor();
     assert.equal(await linkedPage.locator('.room-stage,#chart-name').count(),0,'An unavailable shared link does not expose an unsaved editable placeholder');
     assert.equal(await linkedPage.evaluate(key=>localStorage.getItem(key),key),null,'An unavailable shared link does not create a saved chart');
@@ -103,7 +103,8 @@ const server=http.createServer((request,response)=>{
     await linkedPage.locator('#chart-name').fill('Created after unavailable link');await linkedPage.locator('#chart-name').press('Enter');
     await linkedPage.locator('.room-stage [data-table=A2][data-seat="0"]').click();await linkedPage.locator('#seat-name-input').fill('Persisted New Person');
     await linkedPage.locator('#seat-name-input').press('Enter');
-    await linkedPage.reload();await linkedPage.getByRole('button',{name:'View saved charts',exact:true}).waitFor();
+    await linkedPage.reload();await linkedPage.locator('#chart-name').waitFor();
+    assert.equal(await linkedPage.locator('#chart-name').inputValue(),'Created after unavailable link','Refresh keeps the open chart');
     const linkedState=await linkedPage.evaluate(key=>JSON.parse(localStorage.getItem(key)),key);
     assert.equal(linkedState.plans.length,1);assert.equal(linkedState.plans[0].name,'Created after unavailable link');
     assert.ok(linkedState.plans[0].people.some(person=>person.name==='Persisted New Person'),'A chart explicitly created after an unavailable link keeps its edits on reload');
