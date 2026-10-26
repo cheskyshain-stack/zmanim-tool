@@ -17,11 +17,12 @@ const server=http.createServer((req,res)=>{
       const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
       if(remote)await context.route('**://static.cloudflareinsights.com/**',route=>route.abort());
       await page.goto(origin+'/chart/?count=off');await page.locator('#chart-host .page').first().waitFor();await page.evaluate(()=>document.fonts.ready);
+      await page.locator('#chart-host .header-icon').evaluateAll(images=>Promise.all(images.map(image=>image.decode())));
       const photos=await page.locator('#chart-host .header-icon').evaluateAll(images=>images.map(image=>({source:new URL(image.src).pathname,loaded:image.naturalWidth>0})));assert.ok(photos.length>=2);
       assert.ok(photos.every(photo=>photo.source==='/assets/logo-building-icon.png'&&photo.loaded),'Seasonal and weekday charts keep the original building picture');
       await page.screenshot({path:path.join(output,'charts-'+width+'.png'),fullPage:true});
       let fullHtml;
-      for(const [name,date,half] of [['noraim','2026-09-14T15:00:00Z',false],['chanukah','2026-12-06T15:00:00Z',true],['asara','2026-12-20T15:00:00Z',true]]){
+      for(const [name,date,half] of [['noraim','2026-09-14T15:00:00Z',false],['chanukah','2026-12-06T15:00:00Z',true],['two-handouts','2026-12-10T15:00:00Z',true],['asara','2026-12-20T15:00:00Z',true]]){
         await page.goto(origin+'/schedules/?count=off&website-preview='+encodeURIComponent(date));
         try { await page.locator('.luach-sheets .poster').first().waitFor({timeout:5000}); }
         catch(error){console.error(name,await page.evaluate(async()=>{const {currentOnePageSheets}=await import('/js/ui/posters-view.js'),{resolveSettings}=await import('/js/settings.js'),published=await(await fetch('/data/published.json')).json();try{return {sheets:currentOnePageSheets(published,resolveSettings(published.settings)).length,body:document.querySelector('.luach-sheets')?.textContent};}catch(error){return {error:error.stack};}}));throw error;}
