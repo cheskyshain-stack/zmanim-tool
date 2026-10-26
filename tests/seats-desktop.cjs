@@ -55,6 +55,16 @@ const server=http.createServer((request,response)=>{
       await page.mouse.move(b.x+b.width/2,b.y+b.height/2,{steps:15});await page.mouse.up();
       if(copy)await page.keyboard.up('Control');
     }
+    await page.locator('#show-assigned').check();
+    const beforeListCopy=await state();
+    await page.locator('[data-person="'+yosef.id+'"]').dragTo(seat('A2'));
+    const listCopy=await assigned('A2');
+    assert.equal(await assigned('A1'),yosef.id,'Dragging an already seated name from the list must keep its original seat');
+    assert.ok(listCopy&&listCopy!==yosef.id);assert.equal((await plan()).people.find(person=>person.id===listCopy).name,'Yosef Cohen');
+    await page.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await state(),beforeListCopy);
+    await page.getByRole('button',{name:'Redo',exact:true}).click();assert.equal(await assigned('A2'),listCopy);
+    await page.getByRole('button',{name:'Undo',exact:true}).click();
+    await page.locator('#show-assigned').uncheck();
     await moveSeat(seat('A1'),seat('B1'));
     assert.equal(await assigned('A1'),null);assert.equal(await assigned('B1'),yosef.id,'Drag from one seat to another should move the person');
     await moveSeat(seat('B1'),seat('A2'),true);

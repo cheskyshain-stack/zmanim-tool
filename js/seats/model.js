@@ -264,12 +264,15 @@ export function seatsSetCount(table, value, plan = null) {
 export function seatsWriteName(plan, tableId, index, text, { duplicate = false, personId = null } = {}) {
   const table = seatsItems(plan).find(entry => entry.id === tableId);
   if (!table || index < 0 || index >= (table.count ?? 0)) throw new Error('Choose a seat first.');
-  const name = String(text).replace(/\s+/g, ' ').trim();
+  let name = String(text).replace(/\s+/g, ' ').trim();
   if (!name) { seatsAssign(plan, tableId, index, null); return null; }
   if (name.length > 160) throw new Error('Names must be 160 characters or shorter.');
   const key = value => value.normalize('NFC').toLocaleLowerCase();
   const assigned = seatsAssigned(plan);
   let person = personId ? plan.people.find(entry => entry.id === personId) : null;
+  if (person && (duplicate || (assigned.has(person.id) && table.seats[index] !== person.id))) {
+    name = person.name; person = null; duplicate = true;
+  }
   if (!person && !duplicate) {
     const current = plan.people.find(entry => entry.id === table.seats[index]);
     person = (current && key(current.name) === key(name) ? current : null)

@@ -113,15 +113,18 @@ test('table width follows seat count and preserves the wall or center anchor', (
   middle.autoSize=false;middle.width=250;seatsSetCount(middle,3);assert.equal(middle.width,250);
 });
 
-test('typing reuses an unseated name, suggestions move a person, and copying keeps separate seats', () => {
+test('typing and suggestions keep existing seats and create independently editable names', () => {
   const plan=seatsCreateState().plans[0];seatsAddNames(plan,['Yosef Cohen']);
   const dad=seatsWriteName(plan,'A1',0,'Yosef Cohen');assert.equal(plan.people.length,1);
   const child=seatsWriteName(plan,'A1',1,'Yosef Cohen',{duplicate:true});
   assert.notEqual(dad.id,child.id);assert.equal(plan.tables[0].seats[0],dad.id);assert.equal(plan.tables[0].seats[1],child.id);
   seatsWriteName(plan,'A1',1,'Child Cohen');assert.equal(plan.tables[0].seats[1],child.id);assert.equal(plan.people.length,2);assert.equal(plan.people.find(p=>p.id===child.id).name,'Child Cohen');
-  seatsWriteName(plan,'A2',0,'Yosef',{personId:dad.id});assert.equal(plan.tables[0].seats[0],null);
-  assert.equal(plan.tables[1].seats[0],dad.id);assert.equal(plan.tables[0].seats[1],child.id);
-  seatsWriteName(plan,'A2',1,'New Person');assert.equal(plan.people.length,3);
+  const suggested=seatsWriteName(plan,'A2',0,'Yosef',{personId:dad.id});
+  assert.notEqual(suggested.id,dad.id);assert.equal(suggested.name,'Yosef Cohen');
+  assert.equal(plan.tables[0].seats[0],dad.id);assert.equal(plan.tables[1].seats[0],suggested.id);assert.equal(plan.tables[0].seats[1],child.id);
+  assert.equal(seatsWriteName(plan,'A2',0,'Yosef',{personId:suggested.id}).id,suggested.id);assert.equal(plan.people.length,3);
+  seatsWriteName(plan,'A2',0,'Another Cohen');assert.equal(plan.people.find(person=>person.id===dad.id).name,'Yosef Cohen');
+  seatsWriteName(plan,'A2',1,'New Person');assert.equal(plan.people.length,4);
   assert.deepEqual(seatsNormalizeState({version:1,plans:[plan],activeId:plan.id}).plans[0],plan);
 });
 
