@@ -60,7 +60,8 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
       if(remote)await context.route('**://static.cloudflareinsights.com/**',route=>route.abort());
       const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
       await page.goto(origin+'/seats/?verify=safe-print-'+Date.now()+'&count=off');
-      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.locator('.room-stage .table-item').first().waitFor();
+      await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
+      await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.getByRole('button',{name:'7:30 minyan',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card').first().click();await page.locator('.room-stage .table-item').first().waitFor();
       for(const [table,index,name] of edgeNames){
         await page.locator('.room-stage [data-table="'+table+'"][data-seat="'+index+'"]').click();
         await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');

@@ -7,7 +7,14 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 ## Development
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
-Its PIN is separate from the existing admin PIN. It starts with columns of 8, 9,
+Its PIN is separate from the existing admin PIN. After unlocking, the home page
+offers Create new chart and View saved charts. Both lead to a room picker with
+7:30 minyan and a disabled Main BM marked Coming soon. Creating a 7:30 chart
+opens the standard empty layout and the Name files chooser; the chooser can be
+closed to enter names manually. Viewing saved charts opens all existing setups
+for that room. Existing device drafts remain available, and opening Seats again
+returns to home. Direct links to a shared chart still open that chart.
+The standard layout has columns of 8, 9,
 9, and 8 tables, with the extra middle tables at the back. Tables start with five
 seats, except A7, A8, D7, and D8, which have three, and B2, C2, B5, C5, B6, and C6,
 which have four. Width follows seat count, using
@@ -22,7 +29,7 @@ Set counts individually or by column, then add people manually or import the fir
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
 The importer finds name headers beneath up to 49 title/note rows, so directory
 files can include house numbers before First name and Last name. Numeric-only
-entries are skipped. The tool opens directly to the names and chart. The default
+entries are skipped. The default
 plan is 7:30 מנין;
 old Main shul plan names update without changing custom plan names. Delete beside
 a name removes one person. Delete names opens checkboxes for selecting
@@ -44,7 +51,7 @@ drag creates a separate copy for another person, and dropping an assigned name b
 in the list frees its seat. An occupied destination returns its former occupant to
 the waiting list. Undo/Redo also covers these changes. The view selector offers
 Full width, Whole chart, and 100%; plus/minus zoom within the chart pane.
-Upload names stays visible, with manual entry, seat lists and backups under
+Name files stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
@@ -134,7 +141,8 @@ beside Print. The chart name is editable inline. Save uploads the current chart 
 the website once; later edits save there automatically. Anyone signed in can open
 the chart from Saved charts and edit it. There is no separate sharing step.
 The folder shows chart names, creation dates, last-edit dates and the last editor.
-New chart is inside the folder; history and backup downloads are under More.
+New chart inside the folder returns to room selection. Seats home returns to the
+start page; history and backup downloads are under More.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
 Name files opens a shared folder with Upload names and reusable saved lists.
@@ -165,6 +173,8 @@ Verify the tool with `node --test tests/seats-model.mjs` and
 `node tests/seats-browser.cjs` after building `dist/`. The browser check generates
 actual one-page Letter and Tabloid PDFs and checks their sizes, names, safe margins,
 and lettering proportions, alongside touch zoom and scrolling.
+`node tests/seats-start.cjs` checks the home page, room choices, name chooser,
+existing drafts, canonical new layouts and return navigation on phone and desktop.
 `node tests/seats-desktop.cjs` checks desktop pane fitting, native drag/drop,
 seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
 `node tests/seats-print.cjs` checks all page edges and corner-seat names in native
