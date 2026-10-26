@@ -86,6 +86,25 @@ const server=http.createServer((request,response)=>{
       assert.match(await page.locator('.room-stage [data-table=A1][data-seat="0"] .seat-name').textContent(),/Existing/);
       const reopened=await state();assert.deepEqual(reopened.plans.find(plan=>plan.id===original.id),original);
       await page.screenshot({path:path.join(output,'existing-chart-'+width+'.png'),fullPage:true});
+      await page.getByRole('button',{name:'Saved charts',exact:true}).click();
+      const originalCard=page.locator('.sharing-local-plan').filter({has:page.locator('.saved-page-card[data-id="'+original.id+'"]')});
+      await originalCard.getByRole('button',{name:'Copy chart',exact:true}).click();
+      assert.equal(await page.locator('dialog[open]').count(),0);
+      let copied=await state(),copiedPlan=copied.plans.find(plan=>plan.id===copied.activeId),copyId=copiedPlan.id;
+      assert.notEqual(copyId,original.id);assert.equal(copiedPlan.name,original.name+' (copy)');
+      assert.deepEqual({...copiedPlan,id:original.id,name:original.name},original,'The copy retains every layout setting, person and assignment');
+      assert.deepEqual(copied.plans.find(plan=>plan.id===original.id),original);
+      const record=await page.evaluate(id=>JSON.parse(localStorage.getItem('lakewood-commons-seats-records-v1')).records[id],copyId);
+      assert.equal(record.createdBy,'Synthetic Organizer');assert.equal(record.history.length,1);assert.deepEqual(record.history[0].details,['Created chart']);
+      await page.locator('.room-stage [data-table=A1][data-seat="0"]').click();await page.locator('#seat-name-input').fill('Edited Copy Person');await page.locator('#seat-name-input').press('Enter');
+      copied=await state();assert.deepEqual(copied.plans.find(plan=>plan.id===original.id),original,'Editing a copied seat keeps the original intact');
+      await page.reload();await page.locator('#chart-name').waitFor();assert.equal((await state()).activeId,copyId);assert.equal(await page.locator('#chart-name').inputValue(),original.name+' (copy)');
+      await page.getByRole('button',{name:'Saved charts',exact:true}).click();
+      await page.screenshot({path:path.join(output,'copy-chart-folder-'+width+'.png'),fullPage:true});
+      assert.ok(await page.locator('.saved-chart-actions button').evaluateAll(buttons=>buttons.every(button=>{const r=button.getBoundingClientRect(),card=button.closest('.sharing-plan').getBoundingClientRect();return r.height>=44&&r.left>=card.left-1&&r.right<=card.right+1;})),'Copy/Delete buttons fit their cards and have 44px tap targets');
+      await page.locator('.sharing-local-plan').filter({has:page.locator('.saved-page-card[data-id="'+original.id+'"]')}).getByRole('button',{name:'Copy chart',exact:true}).click();
+      assert.equal(await page.locator('#chart-name').inputValue(),original.name+' (copy 2)');
+      assert.deepEqual((await state()).plans.find(plan=>plan.id===original.id),original);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);await context.close();
     }
     const fresh=await browser.newContext(),page=await fresh.newPage();await page.goto(origin+'/seats/');

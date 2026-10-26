@@ -19,6 +19,15 @@ export function seatsDatedChartName(value = new Date(), usedNames = []) {
   return base + ' (' + suffix + ')';
 }
 
+export function seatsCopiedChartName(name, usedNames = []) {
+  const base = String(name || 'Seating plan').trim(), used = new Set(usedNames.map(seatsChartNameKey));
+  for (let number = 1; ; number++) {
+    const suffix = number === 1 ? ' (copy)' : ' (copy ' + number + ')';
+    const candidate = base.slice(0, 80 - suffix.length).trimEnd() + suffix;
+    if (!used.has(seatsChartNameKey(candidate))) return candidate;
+  }
+}
+
 export function seatsIsRoomChartName(value) {
   return typeof value === 'string' && /^(?:7\s*:\s*30(?:\s+(?:מנין|מניין|minyan))?|main\s+shul)$/iu.test(value.trim());
 }
