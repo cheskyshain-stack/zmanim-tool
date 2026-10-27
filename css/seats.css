@@ -196,7 +196,6 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-lock input{font-size:27px;letter-spacing:9px;text-align:center;margin:4px 0 14px}
 .seats-lock #seats-name{font-size:17px;letter-spacing:normal;text-align:left}
 .seats-lock button{width:100%}
-.seats-lock a{font-size:12px}
 #pin-message{min-height:23px;color:#a2382c}
 .seats-dialog{color:var(--seats-navy);border:1px solid var(--seats-border);border-radius:9px;padding:25px;max-width:440px;width:calc(100% - 32px)}
 .seats-dialog::backdrop{background:rgb(15 30 45 / 40%)}
