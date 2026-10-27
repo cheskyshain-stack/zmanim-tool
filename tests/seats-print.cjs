@@ -54,7 +54,16 @@ amud_center=(amud_bounds.tl+amud_bounds.br)/2
 amud=[rect for rect in rectangles if rect.contains(amud_center) and 4<rect.width<35 and 4<rect.height<35]
 assert len(amud)==1, ('The printed amud is missing',amud)
 assert abs(amud[0].width-shtender[0].width)<.15 and abs(amud[0].height-shtender[0].height)<.15, ('The amud must match the Rav shtender on paper',amud,shtender)
-print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWordRatio':front_ratio,'verticalWordRatio':vertical_ratio,'shtenderSquare':True,'bottomEdgeComplete':True,'textWithinPage':True}))
+for label in ['Bimah','Square Pillar']:
+    label_parts=pdf_page.search_for(label)
+    assert label_parts, ('Square fixture label missing',label)
+    label_bounds=fitz.Rect(label_parts[0])
+    for part in label_parts[1:]: label_bounds |= part
+    fixture_center=(label_bounds.tl+label_bounds.br)/2
+    surfaces=[rect for rect in rectangles if rect.contains(fixture_center) and 4<rect.width<70 and 4<rect.height<70]
+    assert len(surfaces)==1, ('Square fixture surface missing',label,surfaces)
+    assert abs(surfaces[0].width-surfaces[0].height)<.15, ('Fixture must stay square on this paper',label,surfaces)
+print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWordRatio':front_ratio,'verticalWordRatio':vertical_ratio,'shtenderSquare':True,'bimahSquare':True,'pillarSquare':True,'bottomEdgeComplete':True,'textWithinPage':True}))
 `;
 (async()=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
@@ -64,6 +73,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
     const {seatsCreateState}=await import('../js/seats/model.js'),sample=seatsCreateState();
     sample.plans[0].name='Private Chart Title Example';
     sample.plans[0].objects.push({id:'test-case',type:'cabinet',label:'Test Sefarim',x:280,y:320,width:24,height:120});
+    sample.plans[0].objects.push({id:'test-pillar',type:'pillar',label:'Square Pillar',x:550,y:330,width:40,height:50});
     for(const width of [375,1440]){
       const context=await browser.newContext({viewport:{width,height:1050},isMobile:width===375,hasTouch:width===375});
       await context.addInitScript(state=>localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(state)),sample);
@@ -120,6 +130,6 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
       }
       await context.close();
     }
-    console.log('PASS: full chart, corner names and bottom cabinets stay on one page. Auto fit fills native Letter, Tabloid, Legal, A4 and A5 without stretching lettering, including 125% and 150% browser zoom. Fixed-size PDFs and larger margins remain supported on phone and desktop.');console.log('Artifacts: '+output);
+    console.log('PASS: full chart, corner names and bottom cabinets stay on one page. Bimah, pillars, amud and shtender stay square on native Letter, Tabloid, Legal, A4 and A5, including browser zoom and larger margins. Lettering proportions are retained on phone and desktop.');console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

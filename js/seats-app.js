@@ -21,6 +21,7 @@ import { seatsCreateNavigation } from './seats/navigation.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
+const SEATS_RESERVED_PRINT_KEY = 'lakewood-commons-seats-print-reserved';
 const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
 
 async function seatsEntry() {
@@ -40,8 +41,10 @@ function seatsStart(root, auth) {
   let screen = 'home';
   let nameOrder = 'first';
   let shortNames = false;
+  let reservedPrint = false;
   try { if (localStorage.getItem(SEATS_NAME_SORT_KEY) === 'last') nameOrder = 'last'; } catch { /* Keep the default when preferences cannot be saved. */ }
   try { shortNames = localStorage.getItem(SEATS_SHORT_NAMES_KEY) === '1'; } catch { /* Full names are the default. */ }
+  try { reservedPrint = localStorage.getItem(SEATS_RESERVED_PRINT_KEY) === '1'; } catch { /* Print names unless this device chose otherwise. */ }
   const measure = document.createElement('canvas').getContext('2d');
   try {
     storedRaw = localStorage.getItem(SEATS_STORAGE_KEY);
@@ -313,7 +316,7 @@ function seatsStart(root, auth) {
     const current = plan(), geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
-    const displayName = name => shortNames ? seatsInitialsName(name) : name;
+    const displayName = name => !interactive && reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
     const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
     for (const rav of current.objects.filter(object => object.type === 'rav' && people.has(object.seats[0]))) {
       const size = Math.min(rav.width - 2, rav.height - 30);
@@ -344,7 +347,10 @@ function seatsStart(root, auth) {
       let art;
       if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName);
       else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
-      else if (object.type === 'pillar' && seatsIsFixed(object)) art = `<rect width="${object.width}" height="${object.height}" class="object-surface chair-pillar" fill="url(#pillar-${interactive ? 'screen' : 'print'})"/>`;
+      else if (['pillar', 'bimah'].includes(object.type)) {
+        const side = Math.min(object.width, object.height), width = side / printScale, top = (object.height - side) / 2;
+        art = `<rect x="${svgNumber((object.width - width) / 2)}" y="${svgNumber(top)}" width="${svgNumber(width)}" height="${svgNumber(side)}" class="object-surface square-surface${seatsIsFixed(object) ? ' chair-pillar' : ''}" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>${seatsIsFixed(object) ? '' : wideName(object.label, object.width / 2, top, width, side, object.label)}`;
+      }
       else if (object.type === 'amud') {
         const width = object.width / printScale;
         art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${wideName(object.label, object.width / 2, 0, width, object.height, object.label)}`;
@@ -436,7 +442,9 @@ function seatsStart(root, auth) {
     overflowTables = new Set();
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + (table.count ?? 0), 0);
-    const room = diagram(), printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
+    const room = diagram();
+    if (reservedPrint) overflowTables.clear();
+    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
     document.title = 'Seats | ' + current.name;
     document.body.classList.add('seats-people-mode');
     document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');
@@ -447,7 +455,7 @@ function seatsStart(root, auth) {
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(savedLabel())}</span></div></div>
       <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="logout">Log out</button></div></details></div></section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
-      <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
+      <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label><label class="chart-name-switch reserved-print-toggle"><input id="reserved-print" type="checkbox" role="switch" ${reservedPrint ? 'checked' : ''}><span>Print Reserved instead of names</span></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
       <div id="seats-sharing-status" class="sharing-status no-print" role="status" aria-live="polite">${sharing?.markup() || ''}</div>
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
@@ -596,6 +604,7 @@ function seatsStart(root, auth) {
   }, { passive: true, capture: true });
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
+    if (id === 'reserved-print') { reservedPrint = control.checked; try { localStorage.setItem(SEATS_RESERVED_PRINT_KEY, reservedPrint ? '1' : '0'); } catch { /* Keep the print choice for this visit. */ } renderInPlace(); return; }
     if (id === 'short-names') { shortNames = control.checked; try { localStorage.setItem(SEATS_SHORT_NAMES_KEY, shortNames ? '1' : '0'); } catch { /* Keep the choice for this visit when storage is unavailable. */ } renderInPlace(); return; }
     if (id === 'people-sort' || id === 'roster-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }

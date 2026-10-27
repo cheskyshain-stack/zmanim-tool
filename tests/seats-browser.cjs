@@ -113,6 +113,8 @@ const server = http.createServer((req,res) => {
     assert.equal(await page.locator('.room-stage #room-item-main-amud path').count(),0);
     const square=await page.locator('.room-stage .shtender-surface').boundingBox();
     assert.ok(Math.abs(square.width-square.height)<.1,'The Rav shtender should be square');
+    const fixtureSquares=await page.locator('.room-stage .square-surface').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return {width:box.width,height:box.height};}));
+    assert.ok(fixtureSquares.length>=3&&fixtureSquares.every(box=>Math.abs(box.width-box.height)<.1),'The bimah and fixed pillars should be square');
     for(const id of ['A7','B7','C7','D7'])assert.equal(starting.plans[0].tables.find(table=>table.id===id).y,648);
     await openRoom();
     await page.locator('#layout-item').selectOption('rear-case-a7');
@@ -345,6 +347,7 @@ const server = http.createServer((req,res) => {
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Page overflow at '+width);
       await page.locator('#chart-view').selectOption('width');
       await assertAronCentered();
+      assert.ok(await page.locator('.room-stage .square-surface').evaluateAll(nodes=>nodes.every(node=>{const box=node.getBoundingClientRect();return Math.abs(box.width-box.height)<.1;})),'Bimah and pillars stay square at '+width);
       const fitWidth=await page.locator('.room-stage').evaluate(node=>node.clientWidth);
       assert.ok(await page.getByRole('button',{name:'Zoom out',exact:true}).isDisabled());
       await page.locator('#chart-view').selectOption('actual');
@@ -400,6 +403,31 @@ const server = http.createServer((req,res) => {
       execFileSync('python',['-c', 'from PIL import Image; import sys; im=Image.open(sys.argv[1]).convert("L"); w,h=im.size; points=[x for x in range(w) if sum(im.getpixel((x,y))<100 for y in range(h//8,h*15//16))>h/4]; assert points, "Room frame missing"; inches=float(sys.argv[2]); left=min(points)*inches/w; right=(w-1-max(points))*inches/w; assert .3<=left<.65 and .3<=right<.65, (left,right); print("Room frame margins in inches:",round(left,3),round(right,3))',path.join(output,'print-'+paper+'.png'),paper==='letter'?'11':'17'],{stdio:'inherit'});
       await page.emulateMedia({media:'screen'});
     }
+    const beforeReserved=await state();
+    const screenNames=await page.locator('.room-stage .table-seat .seat-name').allTextContents();
+    await page.locator('#reserved-print').scrollIntoViewIfNeeded();
+    const reservedTop=(await page.locator('#reserved-print').boundingBox()).y;
+    await page.locator('#reserved-print').check();
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'reserved-print');
+    assert.ok(Math.abs((await page.locator('#reserved-print').boundingBox()).y-reservedTop)<1,'Print switch keeps its screen position');
+    assert.deepEqual(await state(),beforeReserved,'Print privacy must not modify stored names or assignments');
+    assert.deepEqual(await page.locator('.room-stage .table-seat .seat-name').allTextContents(),screenNames,'Screen names stay visible');
+    const reservedNames=await page.locator('#seats-print .table-seat.assigned .seat-name').allTextContents();
+    assert.ok(reservedNames.length>0&&reservedNames.every(name=>name==='Reserved'),'Every occupied printed seat uses Reserved');
+    assert.ok(await page.locator('#seats-print .rav-seat.assigned .seat-name').evaluateAll(nodes=>nodes.every(node=>node.textContent==='Reserved')));
+    assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-print-reserved')),'1');
+    const hiddenNames=beforeReserved.plans.find(plan=>plan.id===beforeReserved.activeId).people.map(person=>person.name);
+    for(const paper of ['letter','tabloid']){
+      await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
+      const pdf=path.join(output,'reserved-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
+      const text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
+      assert.match(text,/Reserved/);assert.doesNotMatch(text,/Print Reserved instead of names/);
+      for(const name of hiddenNames)assert.ok(!text.includes(name.replace(/\s+/g,' ')),'A personal name reached the Reserved printout');
+      assert.match(execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),/Pages:\s+1\b/);
+      await page.emulateMedia({media:'screen'});
+    }
+    await page.locator('#reserved-print').uncheck();
+    assert.deepEqual(await page.locator('.room-stage .table-seat .seat-name').allTextContents(),screenNames);
     // The organizer link exists in admin, and is absent from the public homepage.
     await page.goto(origin+'/'); assert.equal(await page.locator('a[href="/seats/"]').count(),0);
     await page.addInitScript(()=>localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()})));
@@ -461,18 +489,20 @@ const server = http.createServer((req,res) => {
     const touch=await browser.newContext({viewport:{width:375,height:800},isMobile:true,hasTouch:true});
     await touch.addInitScript(()=>sessionStorage.setItem('lakewood-commons-seats-unlock','open'));
     const touchPage=await touch.newPage();await touchPage.goto(origin+'/seats/');await createChart(touchPage);await touchPage.locator('.room-stage .table-item').first().waitFor();
-    const touchBox=await touchPage.locator('.room-stage [data-table="A4"][data-seat="2"] .seat-area').boundingBox();
+    const touchTarget=touchPage.locator('.room-stage [data-table="A4"][data-seat="2"] .seat-area');
+    await touchTarget.scrollIntoViewIfNeeded();
+    const touchBox=await touchTarget.boundingBox(),touchPageTop=await touchPage.evaluate(()=>scrollY);
     const cdp=await touch.newCDPSession(touchPage);
     const touchX=Math.round(touchBox.x+touchBox.width/2),touchY=Math.round(touchBox.y+touchBox.height/2);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:touchX,y:touchY}]});
     for(let step=1;step<=15;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:touchX,y:touchY-step*15}]});await touchPage.waitForTimeout(20);}
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touchPage.waitForTimeout(150);
-    assert.ok(await touchPage.evaluate(()=>scrollY>100),'Touch swipe over a table should scroll the page');
+    assert.ok(await touchPage.evaluate(before=>scrollY>before+100,touchPageTop),'Touch swipe over a table should scroll the page');
     assert.equal(await touchPage.locator('.room-stage [data-item="A1"]').getAttribute('transform'),'translate(25 78)');
     assert.equal(await touchPage.locator('.seat-editor:visible').count(),0);
-    await touchPage.evaluate(()=>scrollTo(0,0));await touchPage.waitForTimeout(100);
+    await touchPage.locator('.room-scroll').scrollIntoViewIfNeeded();
     const pinchBox=await touchPage.locator('.room-scroll').boundingBox(),pinchWidth=await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth);
-    const centerX=Math.round(pinchBox.x+pinchBox.width/2),centerY=Math.round(Math.min(650,pinchBox.y+100));
+    const centerX=Math.round(pinchBox.x+pinchBox.width/2),centerY=Math.round(pinchBox.y+pinchBox.height/2);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:centerX-60,y:centerY},{x:centerX+60,y:centerY}]});
     for(let step=1;step<=10;step++){await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:centerX-60-step*5,y:centerY},{x:centerX+60+step*5,y:centerY}]});await touchPage.waitForTimeout(20);}
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await touchPage.waitForTimeout(150);

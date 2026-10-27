@@ -1286,6 +1286,25 @@ the shipped hash in 0.004 seconds. This was put to the shul with both facts and 
 was that it does not really have to be hidden. So do not raise it again, and do not quietly
 "harden" it. Behind it is one browser's own localStorage and nothing else.
 
+## Seats chart scrolling
+
+The full-width Seats chart grows down the website page on desktop. Scroll the page
+to reach its back rows at the same readable size. Do not restore a viewport-height
+chart box with its own vertical scrollbar. The names sidebar may stay sticky and
+scroll independently. Horizontal chart panning still contains zoomed charts, and
+Whole chart remains an optional small overview. Seat dragging near the visible
+chart edge scrolls the page. `tests/seats-desktop.cjs` checks page wheel scrolling,
+back-row reachability, retained chart width, drag autoscroll and actual print PDFs.
+The bimah and every pillar draw square artwork centered within their saved
+footprints, without migrating positions or changing assignments. Like the Rav's
+shtender and amud, their print surfaces undo the chart's horizontal paper-fitting
+stretch. Verify squares in actual native PDFs across the supported paper sizes.
+Print Reserved instead of names is a device-only print switch, remembered in
+`lakewood-commons-seats-print-reserved`. It replaces every occupied chart seat,
+including the Rav, with Reserved on paper only. Empty-seat numbers, screen names,
+stored people, shared history, backups and seating-list exports remain unchanged.
+Print fitting checks the actual Reserved text when this switch is on.
+
 ## Verify before you call it done
 
 Generate a sheet and check: all pages 816px, rows equal within a page, interleaved order,

@@ -63,6 +63,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .print-settings{display:flex;gap:15px;padding-bottom:10px;flex-wrap:wrap}
 .print-settings label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--seats-muted)}
 .print-settings select{width:auto;min-height:34px;font-size:12px;background:#fff;color:var(--seats-navy);padding:6px 25px 6px 9px}
+.print-settings .reserved-print-toggle{display:inline-flex;gap:8px;min-height:36px;white-space:normal}
+@media(max-width:700px){.print-settings .reserved-print-toggle{flex:0 0 100%;min-height:44px}}
 .seats-workspace{display:grid;grid-template-columns:270px minmax(0,1fr);gap:15px;align-items:start}
 .seats-panel,.seats-canvas{background:#fff;border:1px solid var(--seats-border);border-radius:9px;min-width:0}
 .seats-panel{padding:18px;position:static;overflow:visible}
@@ -310,18 +312,14 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   .seats-people-mode .plan-line{margin-top:0}
   .seats-people-mode .seats-controls{margin-bottom:8px}
   .seats-people-mode .print-paper-hint{margin:0 0 8px}
-  .seats-people-mode .seats-workspace{position:sticky;top:12px;height:var(--seats-workspace-height,calc(100dvh - 255px));min-height:320px;grid-template-rows:minmax(0,1fr)}
-  .seats-people-mode .seats-panel{display:flex;flex-direction:column;min-height:0;height:100%;overflow:auto;padding:14px}
+  .seats-people-mode .seats-panel{position:sticky;top:12px;display:flex;flex-direction:column;min-height:0;height:var(--seats-sidebar-height,calc(100dvh - 255px));max-height:calc(100dvh - 24px);overflow:auto;padding:14px}
   .seats-people-mode .seats-panel>*{flex-shrink:0}
   .seats-people-mode .people-summary{margin:5px 0;padding:4px 8px;font-size:11px}
   .seats-people-mode .seats-panel .check-label{margin:7px 0}
   .seats-people-mode .people-list{flex:1 1 auto;min-height:130px;max-height:none}
   .seats-people-mode .seats-panel>.field-note{font-size:10px;line-height:1.4;margin:6px 0}
   .seats-people-mode .seats-panel details{margin-top:8px;padding-top:8px}
-  .seats-people-mode .seats-canvas{display:flex;flex-direction:column;height:100%;min-height:0}
-  .seats-people-mode .canvas-heading,.seats-people-mode .canvas-foot{flex-shrink:0}
-  .seats-people-mode .room-scroll{flex:1 1 auto;min-height:0;overflow:auto}
-  .seats-people-mode .room-stage.fits-room{height:100%}
+  .seats-people-mode .room-stage.fits-room{height:var(--seats-whole-height,400px)}
   .seats-people-mode .room-stage.fits-room>.room-diagram{height:100%}
 }
 @media print{
@@ -331,7 +329,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print{display:flex!important;flex-direction:column;width:min(var(--seats-page-width),100vw);height:min(var(--seats-page-height),calc(100vh - 1px));break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
   /* Anchor auto fit to the printable page, which can differ from Android's viewport. */
   #seats-print.auto-paper{position:fixed;inset:0;width:auto;height:auto;container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in) / 100cqw)}
-  #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .amud-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
+  #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .amud-surface,#seats-print .adaptive-print .square-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
   #seats-print .adaptive-print .vertical-lettering{transform:scaleY(var(--seats-print-correction))}
   #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}
   #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
