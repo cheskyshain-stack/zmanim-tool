@@ -405,7 +405,7 @@ const server = http.createServer((req,res) => {
     await page.addInitScript(()=>localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()})));
     await page.goto(origin+'/admin/'); await page.locator('a.admin-home-task[href="/seats/"]').waitFor();
     await page.locator('a.admin-home-task[href="/seats/"]').click(); await openDevice(page,originalPlan); await page.locator('.room-stage .table-item').first().waitFor();
-    await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Lock',exact:true}).click(); await page.locator('#seats-pin').waitFor();
+    await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Log out',exact:true}).click(); await page.locator('#seats-pin').waitFor();
     assert.equal(await page.locator('.room-diagram').count(),0);
     const blocked=await browser.newContext();
     await blocked.addInitScript(()=>{sessionStorage.setItem('lakewood-commons-seats-unlock','open'); Object.defineProperty(window,'localStorage',{get(){throw new Error('Storage disabled');}});});

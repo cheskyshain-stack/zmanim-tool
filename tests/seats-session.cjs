@@ -57,7 +57,7 @@ const server=http.createServer(async(req,res)=>{
     await page.screenshot({path:path.join(output,'idle-sign-in.png'),fullPage:true});
     await page.locator('#seats-name').fill('Synthetic Session Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.locator('#chart-name').waitFor();
     assert.equal(signIns,2);assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')).activeId),before.activeId);
-    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.getByRole('button',{name:'Sign out',exact:true}).click();await page.locator('#seats-unlock').waitFor();
+    await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.getByRole('button',{name:'Log out',exact:true}).click();await page.locator('#seats-unlock').waitFor();
     await page.reload();await page.locator('#seats-unlock').waitFor();assert.equal(signIns,2,'Sign out remains signed out after reload');
     assert.equal(requests.filter(request=>['POST','DELETE'].includes(request.method)&&request.route!=='/api/session').length,0);assert.deepEqual(errors,[]);
     console.log('PASS: one name/PIN login opens charts and name files, reload restores saved and empty charts without ghost files, pillars replace the requested chairs, active sessions continue and three idle hours require login, and sign-out persists.');console.log('Artifacts: '+output);
