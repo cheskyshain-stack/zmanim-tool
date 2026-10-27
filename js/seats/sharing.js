@@ -2,6 +2,7 @@ import { escAttr, escText } from '../util.js';
 import { seatsSharedApply, seatsSharedDiff, seatsSharedPlan, seatsSharedReverse } from './shared-model.js';
 import { seatsDescribeChanges, seatsRecordMetadata } from './activity.js';
 import { seatsNormalizeNameFile } from './name-files.js';
+import { seatsCreateNameEditor } from './name-editor.js';
 import { seatsChartName } from './chart-names.js';
 
 export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
@@ -11,11 +12,16 @@ const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
-  dialog.addEventListener('close', () => onDialogChange());
+  dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
+  const nameEditor = seatsCreateNameEditor({ dialog, request, notify,
+    isOpen: () => dialog.open && dialogMode === 'edit-names', back: showNameFiles,
+    show: contents => { namesRequest++; dialogMode = 'edit-names'; showDialog(contents); },
+  });
+  dialog.addEventListener('input', event => { if (event.target.closest('#name-file-editor')) nameEditor.remember(); });
   try {
     const saved = JSON.parse(localStorage.getItem(SEATS_NAME_UPLOADS) || '[]');
     if (Array.isArray(saved)) nameUploads = saved.slice(0, 20).map(file => ({ id: file.id, ...seatsNormalizeNameFile(file), remove: file.remove === true })).filter(file => /^[A-Za-z0-9_-]{8,100}$/.test(file.id || ''));
@@ -97,8 +103,9 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     finally { uploadingNames = false; changed(); if (dialog.open && dialogMode === 'names') refreshNameFiles(); }
   }
   function showNameFiles() {
+    nameEditor.cancel();
     dialogMode = 'names';
-    showDialog(`<h2 id="sharing-title">Name files</h2><p>Upload a list once to save it on the website. Anyone signed in can choose a file and add its names to their chart.</p><button class="primary" type="button" data-sharing="upload-names">Upload names</button><div id="name-upload-status" role="status"></div><div id="sharing-name-files" class="saved-pages-grid" aria-live="polite"></div><p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title">Name files</h2><p>Choose a list to add its names to your chart, or edit the saved file.</p><button class="primary" type="button" data-sharing="upload-names">Upload names</button><div id="name-upload-status" role="status"></div><ul id="sharing-name-files" class="saved-charts-list" aria-live="polite"></ul><p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
     refreshNameFiles();
   }
   function renderPendingNames() {
@@ -109,12 +116,12 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (!dialog.open || dialogMode !== 'names') return;
     const generation = ++namesRequest; renderPendingNames();
     const container = dialog.querySelector('#sharing-name-files');
-    if (!endpoint || !session) { container.innerHTML = `<p>Sign in on the website to open saved name files. Uploads are kept on this device while waiting.</p>${endpoint ? '<button class="primary" type="button" data-sharing="signin-names">Sign in to open name files</button>' : ''}`; return; }
+    if (!endpoint || !session) { container.innerHTML = `<li>Sign in on the website to open saved name files. Uploads are kept on this device while waiting.${endpoint ? '<button class="primary" type="button" data-sharing="signin-names">Sign in to open name files</button>' : ''}</li>`; return; }
     try {
       const result = await request('/api/name-lists');
       if (!dialog.open || dialogMode !== 'names' || generation !== namesRequest) return;
       nameFiles = result.files;
-      container.innerHTML = nameFiles.length ? nameFiles.map(file => `<div class="sharing-name-file"><button class="saved-page-card" type="button" data-sharing="use-names" data-id="${escAttr(file.id)}" aria-label="Use ${escAttr(file.name)}"><svg class="saved-page-icon" viewBox="0 0 64 76" fill="none" stroke="currentColor" aria-hidden="true" focusable="false"><path d="M9 3h33l13 13v57H9Z" fill="#fff" stroke-width="1.5"/><path d="M42 3v13h13M18 30h28M18 40h28M18 50h28M18 60h20" stroke-width="1.5"/></svg><strong><bdi>${escText(file.name)}</bdi></strong><small>${file.count} names</small><small>Uploaded ${escText(formatDate(file.createdAt))}<br>By ${escText(file.createdBy)}</small><span class="saved-page-open">Use list</span></button><button type="button" class="saved-file-delete danger" data-sharing="delete-names" data-id="${escAttr(file.id)}">Delete</button></div>`).join('') : '<p>No name files yet. Upload a list to save it here for everyone.</p>';
+      container.innerHTML = nameFiles.length ? nameFiles.map(file => `<li class="sharing-name-file sharing-plan saved-chart-row"><button class="saved-page-card" type="button" data-sharing="use-names" data-id="${escAttr(file.id)}" aria-label="Use ${escAttr(file.name)}"><strong><bdi>${escText(file.name)}</bdi></strong><small>${file.count} names</small><small class="saved-page-dates">${chartListDates({ ...file, updatedAt: file.updatedAt || file.createdAt, updatedBy: file.updatedBy || file.createdBy })}</small></button><div class="saved-chart-actions"><button type="button" data-sharing="edit-names" data-id="${escAttr(file.id)}">Edit</button><button type="button" class="saved-file-delete danger" data-sharing="delete-names" data-id="${escAttr(file.id)}">Delete</button></div></li>`).join('') : '<li>No name files yet. Upload a list to save it here for everyone.</li>';
       dialog.querySelector('.sharing-error').textContent = namesError;
     } catch (error) {
       if (!dialog.open || dialogMode !== 'names' || generation !== namesRequest) return;
@@ -284,7 +291,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     return true;
   }
   function showDialog(contents) {
-    dialog.classList.toggle('saved-pages-dialog', ['pages', 'names'].includes(dialogMode));
+    dialog.classList.toggle('saved-pages-dialog', ['pages', 'names', 'edit-names'].includes(dialogMode));
     dialog.innerHTML = contents;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
@@ -442,6 +449,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     }
   }
   dialog.addEventListener('submit', async event => {
+    if (event.target.id === 'name-file-editor') { event.preventDefault(); await nameEditor.save(); return; }
     event.preventDefault(); const button = dialog.querySelector('[type=submit]'); if (button) button.disabled = true;
     try {
       profile = dialog.querySelector('#sharing-name').value.trim();
@@ -456,6 +464,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'pages') { clearPageLink(); intent = 'pages'; showPlans(); return; }
     if (action === 'signin') { intent = 'pages'; showLogin(); return; }
     if (action === 'signin-names') { intent = 'names'; showLogin(); return; }
+    if (action === 'name-files') { showNameFiles(); return; }
     if (action === 'refresh') { refreshSitePages(); return; }
     if (action === 'new') { dialog.close(); newChart(); return; }
     if (action === 'upload-names') { pickNamesFile(); return; }
@@ -475,6 +484,8 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       else if (action === 'open') await openPlan(button.dataset.id);
       else if (action === 'copy-chart' || action === 'copy-local') await copyChartFile(button.dataset.id, action === 'copy-chart');
       else if (action === 'use-names') await chooseNameFile(button.dataset.id);
+      else if (action === 'edit-names') await nameEditor.open(button.dataset.id);
+      else if (action === 'reload-name-file') await nameEditor.reload();
       else if (action === 'delete-names') await deleteNameFile(button.dataset.id);
       else if (action === 'delete-chart' || action === 'delete-local') await deleteChartFile(button.dataset.id, action === 'delete-local');
       if (button.isConnected) button.disabled = false;
@@ -506,8 +517,8 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   window.addEventListener('offline', () => socket?.close());
   document.addEventListener('visibilitychange', () => { if (!document.hidden) { if (!endpoint) { start(); return; } connect(); drainNameUploads(); } });
   return {
-    close: () => { openRequest++; clearPageLink(); dialog.close(); },
-    get dialogMode() { return dialog.open ? dialogMode : null; },
+    close: () => { openRequest++; nameEditor.cancel(); clearPageLink(); dialog.close(); },
+    get dialogMode() { return dialog.open ? dialogMode === 'edit-names' ? 'names' : dialogMode : null; },
     start, open, localChanged, label, markup, decorate, canEdit, uploadNameFile, viewChanged: presence, leavePageLink: clearPageLink,
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },

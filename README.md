@@ -203,6 +203,11 @@ Log out ends the signed-in session and returns to the name and PIN form.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
 Add names opens a shared folder with Upload names and reusable saved lists.
+Name files use the same compact bordered rows as Saved charts. Choose a file's name
+to add its names to the chart, or Edit to rename it and add, correct or remove names
+in the one-name-per-line editor. Save changes updates that shared file in place for
+everyone; existing chart names and seat assignments stay independent. Local file
+drafts survive refresh. Conflicting saves keep the draft and offer Load latest version.
 Uploading Excel, CSV or text adds its names to the current chart and automatically
 saves a named file on the website, even if the chart itself has not been saved
 online. Other organizers can choose the file to add its names to another chart;

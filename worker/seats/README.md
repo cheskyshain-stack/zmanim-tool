@@ -96,3 +96,10 @@ and retried uploads from recreating removed files. Watched clients keep the late
 local chart copy when the shared file is deleted. All mutations require the server
 session and the existing allowed origin. API feature verification now includes
 sharedNameFiles and deleteFiles as well as changeHistory.
+
+Editing name files also requires editNameFiles in /api/info. POST /api/name-lists/:id
+updates a file in place using its revision and a stable operationId. The server keeps
+creation metadata, records the latest editor and date, rejects stale revisions with
+409 and deduplicates retries after a lost response. Legacy files start at revision 1.
+Deleted files cannot be edited or recreated by an old retry. The editor keeps each
+unfinished draft under lakewood-commons-seats-name-draft-v1-<file ID> on the device.
