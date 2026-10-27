@@ -29,22 +29,34 @@ const server=http.createServer((request,response)=>{
     const assigned=async(table,index=0)=>(await plan()).tables.find(entry=>entry.id===table).seats[index];
     for(const viewport of [{width:1366,height:768},{width:1920,height:1080}]){
       await page.setViewportSize(viewport);
-      const bounds=await page.evaluate(()=>Object.fromEntries(['.seats-panel','.seats-canvas','.room-scroll'].map(selector=>{const box=document.querySelector(selector).getBoundingClientRect();return [selector,{top:box.top,bottom:box.bottom}];})));
-      assert.ok(Object.values(bounds).every(box=>box.top>=0&&box.bottom<=viewport.height+1),JSON.stringify({viewport,bounds}));
+      await page.evaluate(()=>scrollTo(0,0));
+      await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
       const size=await page.locator('.room-scroll').evaluate(scroll=>{
         const a=scroll.querySelector('[data-item=A3] .table-surface').getBoundingClientRect(),d=scroll.querySelector('[data-item=D3] .table-surface').getBoundingClientRect();
-        return {available:scroll.clientWidth,painted:d.right-a.left,verticalScroll:scroll.scrollHeight>scroll.clientHeight};
+        const chart=scroll.querySelector('.room-diagram').getBoundingClientRect();
+        return {available:scroll.clientWidth,painted:d.right-a.left,height:chart.height,bottom:chart.bottom,verticalScroll:scroll.scrollHeight>scroll.clientHeight+1};
       });
       assert.ok(size.painted>size.available*.94,'Default chart fills the available width: '+JSON.stringify(size));
-      assert.ok(size.verticalScroll,'The full-width chart scrolls vertically instead of shrinking into a small area');
+      assert.ok(!size.verticalScroll,'The chart must not have a separate vertical scroll area');
+      assert.ok(size.bottom>viewport.height,'Full-width chart extends down the page at a readable size');
+      const chartBox=await page.locator('.room-scroll').boundingBox();
+      await page.mouse.move(chartBox.x+chartBox.width/2,Math.min(viewport.height-60,chartBox.y+100));await page.mouse.wheel(0,400);
+      await page.waitForFunction(()=>scrollY>100);
+      assert.equal(await page.locator('.room-scroll').evaluate(node=>node.scrollTop),0,'Wheel over the chart scrolls the page');
+      const backRow=page.locator('.room-stage [data-item=B9] .table-surface');await backRow.scrollIntoViewIfNeeded();
+      const backBox=await backRow.boundingBox();assert.ok(backBox.y>=0&&backBox.y+backBox.height<=viewport.height+1,'Page scrolling reaches the back row');
+      const afterWidth=await page.locator('.room-scroll').evaluate(scroll=>{const a=scroll.querySelector('[data-item=A3] .table-surface').getBoundingClientRect(),d=scroll.querySelector('[data-item=D3] .table-surface').getBoundingClientRect();return d.right-a.left;});
+      assert.ok(Math.abs(afterWidth-size.painted)<1,'Page scrolling must not shrink the chart');
       assert.ok(await page.locator('.people-list').evaluate(node=>node.clientHeight>=130));
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+      console.log(JSON.stringify({viewport,...size}));
       await page.screenshot({path:path.join(output,'desktop-'+viewport.width+'.png'),fullPage:true});
     }
     await page.setViewportSize({width:1366,height:768});
+    await page.evaluate(()=>scrollTo(0,0));
     await page.locator('#chart-view').selectOption('whole');
     assert.ok(await page.locator('.room-scroll').evaluate(node=>node.scrollHeight<=node.clientHeight+1));
-    await page.locator('#chart-view').selectOption('width');
+    assert.ok((await page.locator('.room-stage .room-diagram').boundingBox()).height<768,'Whole chart remains an optional small overview');
     await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});
     await page.locator('#seat-list').evaluate(node=>{node.open=true;});
     await page.locator('#selected-item').scrollIntoViewIfNeeded();
@@ -93,17 +105,20 @@ const server=http.createServer((request,response)=>{
     await page.getByRole('button',{name:'Undo',exact:true}).click();assert.deepEqual(await state(),beforeReturn);
     await page.getByRole('button',{name:'Redo',exact:true}).click();assert.equal(await assigned('B1'),null);
     await page.locator('#chart-view').selectOption('actual');
-    const scroll=page.locator('.room-scroll');assert.ok(await scroll.evaluate(node=>node.scrollHeight>node.clientHeight));
+    const scroll=page.locator('.room-scroll');assert.ok(await scroll.evaluate(node=>node.scrollHeight<=node.clientHeight+1));
     const box=await scroll.boundingBox(),pageTop=await page.evaluate(()=>scrollY);
-    await page.mouse.move(box.x+box.width/2,box.y+box.height/2);await page.mouse.wheel(0,250);await page.waitForTimeout(100);
-    assert.ok(await scroll.evaluate(node=>node.scrollTop>0),'The enlarged chart should scroll inside its pane');assert.equal(await page.evaluate(()=>scrollY),pageTop);
+    await page.mouse.move(box.x+box.width/2,Math.min(700,box.y+100));await page.mouse.wheel(0,250);
+    await page.waitForFunction(before=>scrollY>before,pageTop);
+    assert.equal(await scroll.evaluate(node=>node.scrollTop),0,'Enlarged charts also use page scrolling');
+    assert.ok(await scroll.evaluate(node=>node.scrollWidth>node.clientWidth),'Horizontal zoom stays inside the chart');
     await page.locator('#chart-view').selectOption('width');assert.equal(await scroll.evaluate(node=>node.scrollTop),0);
     const beforeCancel=await state();
     await page.locator('#chart-view').selectOption('actual');await seat('A2').scrollIntoViewIfNeeded();
-    const source=await seat('A2').boundingBox(),viewport=await scroll.boundingBox();
+    const source=await seat('A2').boundingBox(),viewport=await scroll.boundingBox(),beforeDragScroll=await page.evaluate(()=>scrollY);
     await page.mouse.move(source.x+source.width/2,source.y+source.height/2);await page.mouse.down();
-    await page.mouse.move(viewport.x+viewport.width/2,viewport.y+viewport.height-4,{steps:10});await page.waitForTimeout(350);
-    assert.ok(await scroll.evaluate(node=>node.scrollTop>0),'Dragging near the chart edge should scroll it');
+    await page.mouse.move(viewport.x+viewport.width/2,764,{steps:10});
+    await page.waitForFunction(before=>scrollY>before,beforeDragScroll);
+    assert.equal(await scroll.evaluate(node=>node.scrollTop),0,'Dragging near the visible chart edge scrolls the page');
     await page.keyboard.press('Escape');await page.mouse.up();assert.deepEqual(await state(),beforeCancel);assert.equal(await page.locator('.seat-drag-label').count(),0);
     await page.locator('#chart-view').selectOption('width');
     await page.screenshot({path:path.join(output,'assigned-desktop.png'),fullPage:true});
@@ -121,6 +136,6 @@ const server=http.createServer((request,response)=>{
     assert.equal(await page.locator('.seats-panel').evaluate(node=>getComputedStyle(node).overflowY),'visible','Phone page should keep normal page scrolling');
     assert.equal(await page.locator('[data-person][draggable="true"]').count(),0,'Phone names should retain normal touch scrolling');
     assert.deepEqual(errors,[]);
-    console.log('PASS: desktop panes fit, native list drag, seat moves, copy, displacement, unassign, Undo/Redo, chart zoom/scroll, drag autoscroll, cancel, printing from Assign names, and phone layout.');console.log('Artifacts: '+output);
+    console.log('PASS: full-width page scrolling, back-row reachability, native list drag, seat moves, copy, displacement, unassign, Undo/Redo, horizontal zoom, page drag autoscroll, cancel, printing and phone layout.');console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

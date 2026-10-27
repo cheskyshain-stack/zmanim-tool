@@ -13,7 +13,7 @@ const server=http.createServer((req,res)=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
   const {seatsCreateState,seatsCreatePlan,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState();
   sample.plans=Array.from({length:5},(_,i)=>{const plan=seatsCreatePlan(i===4?'Synthetic long chart title '.repeat(3).trim().slice(0,80):'Synthetic saved chart '+(i+1));seatsWriteName(plan,'A1',0,'Synthetic Person '+i);return plan;});sample.activeId=sample.plans[0].id;
-  const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
+  const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
   try{
     for(const width of [375,1440]){
       const context=await browser.newContext({viewport:{width,height:1000},isMobile:width===375,hasTouch:width===375}),page=await context.newPage(),errors=[],writes=[],patches=[];

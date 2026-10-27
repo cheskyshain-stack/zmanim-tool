@@ -12,7 +12,7 @@ export function seatsPrintGeometry(paper) {
 export function seatsPreparePrint(svg, geometry) {
   if (!svg) return;
   // Native paper changes happen during pagination. CSS container sizing adjusts
-  // the diagram, while these wrappers preserve lettering proportions and a square shtender.
+  // the diagram, while these wrappers preserve lettering and square fixture proportions.
   const adaptive = geometry.auto && CSS.supports('container-type', 'size') && CSS.supports('transform', 'scaleX(calc(1px / 1px))');
   if (adaptive) {
     svg.classList.add('adaptive-print');

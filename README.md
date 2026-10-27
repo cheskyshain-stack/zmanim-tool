@@ -60,13 +60,16 @@ same seat keeps its existing record. Each copy can be renamed independently.
 Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 On desktop, Seats opens the chart at the full available width and keeps the list
-beside it. Scroll vertically inside the chart to reach the back of the room.
+beside it. Scroll the website page to reach the back of the room at full width;
+the chart is not confined to a separate vertical scroll box.
 Drag a list name onto a seat to add it, keeping any existing assignment. Drag
 an assigned name directly between chart seats to move it. Ctrl/Option
 drag creates a separate copy for another person, and dropping an assigned name back
 in the list frees its seat. An occupied destination returns its former occupant to
 the waiting list. Undo/Redo also covers these changes. The view selector offers
-Full width, Whole chart, and 100%; plus/minus zoom within the chart pane.
+Full width, Whole chart, and 100%; plus/minus zoom keeps horizontal panning within
+the chart while the website page scrolls vertically. Whole chart is an optional
+smaller overview. The names panel stays alongside the chart while scrolling.
 Add names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
 The chart's Initials + last name switch shows each given-name initial and the full
@@ -74,6 +77,13 @@ surname, for example Yosef Chuam Cohen becomes Y C Cohen. It applies to the char
 and printouts, with the choice remembered on this device. Lists, editing, exports,
 backups and shared records keep full names. Switching the display does not edit the chart.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
+The bimah and pillars stay square on screen and on every supported paper size.
+Their artwork is centered within its saved footprint, preserving stored positions
+and assignments while automatic page fitting adjusts the rest of the room.
+Print Reserved instead of names replaces occupied-seat names with Reserved only
+in the printed chart, including the Rav's seat. Empty seats keep their numbers.
+The screen, saved chart, backups and seating-list exports keep the actual names.
+This print choice is remembered on the device and does not edit the shared chart.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly
 farther left, leaving 24 units beside D1 for the doorway. A plain opening
@@ -243,7 +253,7 @@ first/last-name ordering, unchanged assignments, exports, device preference, foc
 scroll and the undistorted PIN photo. `tests/seats-room-sharing.cjs` uses local
 Workerd and two browser organizers to verify one real legacy-room migration patch
 and no repeat after reload, with the displaced C1 name retained.
-`node tests/seats-desktop.cjs` checks desktop pane fitting, native drag/drop,
+`node tests/seats-desktop.cjs` checks full-width desktop page scrolling, native drag/drop,
 seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
 `node tests/seats-print.cjs` checks all page edges and corner-seat names in native
 Letter and Tabloid PDFs, Tabloid fitted to Letter, and larger printer margins,

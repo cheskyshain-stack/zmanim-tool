@@ -23,7 +23,8 @@ export function seatsCreateAssignment(root, { getPlan, getMode, onStart, onEnd, 
     if (scroll && point) {
       const box = scroll.getBoundingClientRect(), speed = (value, before, after) => value < before + 28 ? -Math.max(0, before + 28 - value) / 3 : value > after - 28 ? Math.max(0, value - after + 28) / 3 : 0;
       if (point.x >= box.left && point.x <= box.right && point.y >= box.top && point.y <= box.bottom) {
-        scroll.scrollLeft += speed(point.x, box.left, box.right); scroll.scrollTop += speed(point.y, box.top, box.bottom);
+        scroll.scrollLeft += speed(point.x, Math.max(0, box.left), Math.min(innerWidth, box.right));
+        window.scrollBy({ top: speed(point.y, Math.max(0, box.top), Math.min(innerHeight, box.bottom)), behavior: 'instant' });
         highlight(targetAt(point.x, point.y));
       }
     }
