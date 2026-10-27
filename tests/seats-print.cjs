@@ -73,7 +73,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
     const {seatsCreateState}=await import('../js/seats/model.js'),sample=seatsCreateState();
     sample.plans[0].name='Private Chart Title Example';
     sample.plans[0].objects.push({id:'test-case',type:'cabinet',label:'Test Sefarim',x:280,y:320,width:24,height:120});
-    sample.plans[0].objects.push({id:'test-pillar',type:'pillar',label:'Square Pillar',x:550,y:330,width:40,height:50});
+    sample.plans[0].objects.push({id:'test-pillar',type:'pillar',label:'Square Pillar',x:590,y:330,width:40,height:50});
     for(const width of [375,1440]){
       const context=await browser.newContext({viewport:{width,height:1050},isMobile:width===375,hasTouch:width===375});
       await context.addInitScript(state=>localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(state)),sample);
