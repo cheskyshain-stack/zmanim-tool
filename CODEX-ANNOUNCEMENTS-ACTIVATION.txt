@@ -13,6 +13,8 @@ SOURCE AND STATUS
 
 Repository: https://github.com/cheskyshain-stack/zmanim-tool
 Branch: feat/shul-announcements
+Draft PR: https://github.com/cheskyshain-stack/zmanim-tool/pull/220
+Tested feature commit: 47a4d46b19c6f0f68cfdd454844a8a03a374254e
 Base tested against: c7d77dd9cbf4b285e8bdebb402e876ff8f755efc
 Website: https://baismedrashoflakewoodcommons.org
 
