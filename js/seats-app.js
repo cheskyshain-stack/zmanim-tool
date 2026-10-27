@@ -11,13 +11,14 @@ import { seatsReadNames, seatsCsvCell } from './seats/import.js';
 import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
 import { seatsCreateRecords } from './seats/records.js';
 import { seatsStartMarkup } from './seats/start.js';
-import { seatsSortPeople } from './seats/name-sort.js';
+import { seatsSortPeople, seatsInitialsName } from './seats/name-sort.js';
 import { seatsChartName, seatsDatedChartName, seatsCopiedChartName } from './seats/chart-names.js';
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
+const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
 const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
 
 async function seatsEntry() {
@@ -36,7 +37,9 @@ function seatsStart(root, auth) {
   let sharing = null, printing = false, sharingLinks = '';
   let screen = 'home';
   let nameOrder = 'first';
+  let shortNames = false;
   try { if (localStorage.getItem(SEATS_NAME_SORT_KEY) === 'last') nameOrder = 'last'; } catch { /* Keep the default when preferences cannot be saved. */ }
+  try { shortNames = localStorage.getItem(SEATS_SHORT_NAMES_KEY) === '1'; } catch { /* Full names are the default. */ }
   const measure = document.createElement('canvas').getContext('2d');
   try {
     storedRaw = localStorage.getItem(SEATS_STORAGE_KEY);
@@ -281,13 +284,14 @@ function seatsStart(root, auth) {
     const current = plan(), geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
-    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(people.get(id), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
+    const displayName = name => shortNames ? seatsInitialsName(name) : name;
+    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
     for (const rav of current.objects.filter(object => object.type === 'rav' && people.has(object.seats[0]))) {
       const size = Math.min(rav.width - 2, rav.height - 30);
-      nameLayouts.push(seatsFitName(people.get(rav.seats[0]), size, size - 4, nameMeasure, 11));
+      nameLayouts.push(seatsFitName(displayName(people.get(rav.seats[0])), size, size - 4, nameMeasure, 11));
     }
     const commonFont = seatsCommonNameFont(nameLayouts);
-    const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(name, x, y, width, height, id, Math.min(commonFont, maxFont));
+    const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(displayName(name), x, y, width, height, id, Math.min(commonFont, maxFont));
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + entry.count + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
@@ -419,6 +423,7 @@ function seatsStart(root, auth) {
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
       <div class="seats-workspace no-print"><aside class="seats-panel">${peoplePanel()}<details id="people-extra-tools"><summary>Add names &amp; other tools</summary>${peopleManualTools()}<details id="room-settings"><summary>Table &amp; room settings</summary>${layoutPanel()}</details><div class="upload-area"><p class="field-note">Excel, CSV, or text. ${sharing?.linked(current.id) ? 'Names are shared with the other organizers.' : 'Names stay on this device until you save this page to the site.'}</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>There are 8 tables in the outside columns and 9 in each middle column. A7 has 3 seats. A8, C1, B6, and C6 have 4 seats. Other tables start with 5 seats. C1 and D1 have a small gap between them. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Choosing an existing name adds it to this seat and keeps its other seats. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Use Delete beside a name to remove one person. Delete names lets you select several people or delete the whole list, including seated people. Undo restores deleted names and seats.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Saved charts opens the folder of charts on the website and this device. Download a backup to keep a spare copy.</p>${sharing?.enabled ? '<p>Save puts the current chart on the website. Later changes save automatically. Anyone signed in can open it from Saved charts and edit it. Both people see each other’s changes. Undo keeps the other organizer’s work.</p>' : ''}<p>Printer paper (auto fit) fills the printable width and height of the paper selected in your printer dialog. Use Landscape and turn off browser headers and footers. For a fixed-size PDF, choose Letter or 11 × 17 and select Save as PDF. Match that size in the printer dialog, including Android’s paper-size picker.</p></details></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p><div class="canvas-buttons"><button type="button" data-action="undo" ${(sharing?.linked(current.id) ? sharing.canUndo() : history.length) ? '' : 'disabled'}>Undo</button><button type="button" data-action="redo" ${(sharing?.linked(current.id) ? sharing.canRedo() : future.length) ? '' : 'disabled'}>Redo</button><label class="chart-view-label"><span class="sr-only">Chart view</span><select id="chart-view"><option value="width" ${!zoom && !wholeRoom ? 'selected' : ''}>Full width</option><option value="whole" ${wholeRoom ? 'selected' : ''}>Whole chart</option><option value="actual" ${zoom === 1200 ? 'selected' : ''}>100%</option><option value="custom" hidden ${zoom && zoom !== 1200 ? 'selected' : ''}>${zoom ? Math.round(zoom / 1200 * 100) + '%' : 'Zoomed'}</option></select></label><output id="seats-zoom-level" class="sr-only" aria-label="Chart zoom">${zoom ? Math.round(zoom / 1200 * 100) + '%' : wholeRoom ? 'Whole chart' : 'Fit width'}</output><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div></div>
+        <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last name</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
         <div class="room-scroll"><div class="room-stage${zoom ? ' is-zoomed' : ''}${wholeRoom ? ' fits-room' : ''}" ${zoom ? `style="width:${zoom}px"` : ''}>${room}</div></div>
@@ -563,6 +568,7 @@ function seatsStart(root, auth) {
   }, { passive: true, capture: true });
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
+    if (id === 'short-names') { shortNames = control.checked; try { localStorage.setItem(SEATS_SHORT_NAMES_KEY, shortNames ? '1' : '0'); } catch { /* Keep the choice for this visit when storage is unavailable. */ } renderInPlace(); return; }
     if (id === 'people-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }
     if (id === 'selected-item' || id === 'layout-item') { selected = control.value; renderInPlace(); return; }

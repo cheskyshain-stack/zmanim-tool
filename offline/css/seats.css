@@ -84,6 +84,13 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .canvas-heading{display:flex;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 17px 10px}
 .canvas-heading h2{margin:0;font-size:20px}
 .canvas-heading p{font-size:11px;color:var(--seats-muted);margin:0;flex:1}
+.canvas-name-options{padding:0 17px 6px;flex-shrink:0}
+.chart-name-switch{display:inline-flex;align-items:center;gap:8px;min-height:36px;font-size:12px;cursor:pointer}
+.seats-app .chart-name-switch input{appearance:none;position:relative;width:32px;height:18px;min-height:18px;padding:0;margin:0;border:1px solid #9aa8b4;border-radius:12px;background:#dce1e7;flex-shrink:0;cursor:pointer}
+.chart-name-switch input::after{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #142b4633}
+.chart-name-switch input:checked{background:var(--seats-navy);border-color:var(--seats-navy)}
+.chart-name-switch input:checked::after{transform:translateX(14px)}
+@media(max-width:700px){.canvas-name-options{padding-left:12px;padding-right:12px}.chart-name-switch{min-height:44px}}
 .canvas-buttons{display:flex;gap:4px;align-items:center;flex-wrap:wrap}
 .canvas-buttons button{font-size:11px;padding:4px 8px;min-height:29px}
 .canvas-buttons [data-action=zoom-in],.canvas-buttons [data-action=zoom-out]{font-size:19px;width:29px;padding:0}
