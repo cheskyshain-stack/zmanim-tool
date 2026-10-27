@@ -80,10 +80,11 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true });
     if (url.pathname === '/api/name-lists' && request.method === 'GET') {
       const records = await this.ctx.storage.list({ prefix: 'names:' });
-      return seatsWorkerJson({ files: [...records.values()].filter(record => !record.deletedAt).map(({ id, name, names, createdAt, createdBy }) => ({ id, name, count: names.length, createdAt, createdBy })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+      return seatsWorkerJson({ files: [...records.values()].filter(record => !record.deletedAt).map(record => ({ id: record.id, name: record.name, count: record.names.length, createdAt: record.createdAt, createdBy: record.createdBy,
+        revision: record.revision || 1, updatedAt: record.updatedAt || record.createdAt, updatedBy: record.updatedBy || record.createdBy })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
     }
     if (url.pathname === '/api/name-lists' && request.method === 'POST') {
       try {
@@ -94,13 +95,30 @@ export class SeatsWorkspace {
           if (existing) return existing.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(existing);
           const records = await this.ctx.storage.list({ prefix: 'names:' });
           if ([...records.values()].filter(record => !record.deletedAt).length >= 50) return seatsWorkerJson({ error: 'There are already 50 name files. Delete an older file before uploading another.' }, 409);
-          const record = { id: body.id, ...contents, createdAt: new Date().toISOString(), createdBy: session.name };
+          const now = new Date().toISOString();
+          const record = { id: body.id, ...contents, revision: 1, createdAt: now, createdBy: session.name, updatedAt: now, updatedBy: session.name };
           await this.ctx.storage.put(key, record); this.broadcast({ type: 'name-lists-changed' });
           return seatsWorkerJson(record, 201);
         });
       } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
     }
     const nameFile = /^\/api\/name-lists\/([A-Za-z0-9_-]{8,100})$/.exec(url.pathname);
+    if (nameFile && request.method === 'POST') {
+      try {
+        const body = await this.body(request), contents = seatsNormalizeNameFile(body);
+        if (!Number.isSafeInteger(body.revision) || body.revision < 1 || !seatsWorkerId(body.operationId)) throw new Error('Reopen the name file before saving.');
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
+          if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
+          if (record.deletedAt) return seatsWorkerJson({ error: 'That name file was deleted. Your draft is kept on this device.' }, 410);
+          if (record.operationId === body.operationId) return seatsWorkerJson(record);
+          if ((record.revision || 1) !== body.revision) return seatsWorkerJson({ error: 'Someone saved a newer version. Your draft is kept. Load the latest version before making further changes.' }, 409);
+          const updated = { ...record, ...contents, revision: (record.revision || 1) + 1, operationId: body.operationId, updatedAt: new Date().toISOString(), updatedBy: session.name };
+          await this.ctx.storage.put(key, updated); this.broadcast({ type: 'name-lists-changed' });
+          return seatsWorkerJson(updated);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
     if (nameFile && ['GET', 'DELETE'].includes(request.method)) {
       return this.ctx.blockConcurrencyWhile(async () => {
         const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);

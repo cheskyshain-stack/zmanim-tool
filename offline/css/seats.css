@@ -290,6 +290,9 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .sharing-steps{padding-left:22px;font-size:13px;line-height:1.55}
 .sharing-steps li{padding:3px 0}
 .sharing-dialog input{font-size:16px}
+#name-file-editor fieldset{border:0;padding:0;margin:0;min-width:0}
+#name-file-editor textarea{min-height:240px;font-size:16px;line-height:1.5}
+#name-file-draft{color:var(--seats-muted);font-size:11px!important}
 .sharing-dialog #sharing-link{font-size:13px}
 .sharing-dialog #sharing-copy-status{color:#28664c;font-weight:600;min-height:20px}
 .sharing-dialog .dialog-actions{flex-wrap:wrap}
