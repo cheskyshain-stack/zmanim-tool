@@ -28,7 +28,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-start{width:min(100%,840px);margin:clamp(30px,8vh,80px) auto 70px}
 .seats-start-heading{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-bottom:28px}
 .seats-start-heading p{color:var(--seats-muted);font-size:15px;line-height:1.6;margin:12px 0 0}
-.seats-start .seats-start-lock{min-height:44px;background:transparent;border-color:transparent;text-decoration:underline;text-underline-offset:3px;font-size:12px;padding:8px}
+.seats-start .seats-start-logout{min-height:44px;background:transparent;border-color:transparent;text-decoration:underline;text-underline-offset:3px;font-size:12px;padding:8px}
 .seats-start-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .seats-start .seats-start-card{display:flex;flex-direction:column;align-items:start;position:relative;min-width:0;min-height:220px;padding:28px;text-align:left;background:#fff;border:1px solid var(--seats-border);border-radius:10px;box-shadow:0 2px 5px #142b4605;line-height:1.4}
 .seats-start .seats-start-card:hover{background:#fff;border-color:#7b93a9;box-shadow:0 3px 12px #142b460b}
@@ -270,6 +270,16 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .saved-chart-actions{display:flex;justify-content:center;gap:6px;flex-wrap:wrap;margin-top:5px}
 .saved-chart-actions button{font-size:11px;min-height:44px;padding:5px 9px}
 .saved-chart-actions .saved-file-delete{margin:0}
+.saved-charts-list{list-style:none;margin:10px 0;padding:0}
+.saved-charts-list>li{font-size:12px;line-height:1.5}
+.saved-charts-list .saved-chart-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:8px 0;border-bottom:1px solid var(--seats-border)}
+.seats-app .saved-charts-list .saved-page-card{align-items:flex-start;gap:3px;min-height:44px;padding:8px;text-align:left;background:transparent;border-color:transparent;border-radius:4px}
+.saved-charts-list .saved-page-card:hover{background:#edf3f8;border-color:transparent}
+.saved-charts-list .saved-page-card strong{font-size:14px}
+.saved-charts-list .saved-page-dates{display:flex;flex-wrap:wrap;column-gap:12px;text-align:left}
+.saved-charts-list .saved-page-open{margin-top:2px}
+.saved-charts-list .saved-chart-actions{margin:0;flex-wrap:nowrap;align-items:center}
+@media(max-width:700px){.saved-charts-list .saved-chart-row{gap:6px}.saved-charts-list .saved-chart-actions{flex-direction:column;gap:4px}.saved-charts-list .saved-chart-actions button{width:100%}.saved-charts-list .saved-page-card{padding:5px;min-height:44px}}
 .name-file-icon{font-size:38px;line-height:1.3;color:#5b7891}
 .pending-name-file{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12px;padding:8px 0;overflow-wrap:anywhere}
 .sharing-steps{padding-left:22px;font-size:13px;line-height:1.55}

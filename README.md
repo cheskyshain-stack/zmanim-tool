@@ -189,13 +189,17 @@ Charts with information save locally as they are edited. The main actions are Sa
 beside Print. The chart name is editable inline. Save uploads the current chart to
 the website once; later edits save there automatically. Anyone signed in can open
 the chart from Saved charts and edit it. There is no separate sharing step.
-The folder shows chart names, creation dates, last-edit dates and the last editor.
+Saved charts appear as a compact list with chart names, creation dates, last-edit
+dates and the last editor. Open a chart by its name; Copy chart and Delete stay beside it.
 Copy chart opens an independent copy with its layout, names and seat assignments.
 It gets a unique name ending in (copy) and starts its own dates and edit history.
 Copying a website chart saves the new chart on the website automatically. A device-only
 copy stays on this device until Save is pressed. Changes to a copy keep the original intact.
 New chart inside the folder opens a fresh layout directly. Seats home returns to the
 start page; history and backup downloads are under More.
+The phone or browser Back button returns from a chart, list or folder to Seats home,
+saving any name being typed. Forward reopens that view. Refresh keeps the current chart.
+Log out ends the signed-in session and returns to the name and PIN form.
 The PIN just entered to open Seats is reused in memory for the first server sign-in;
 the organizer supplies their name for history. The PIN is not saved to browser storage.
 Add names opens a shared folder with Upload names and reusable saved lists.

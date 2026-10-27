@@ -17,6 +17,7 @@ import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
 import { seatsSeatingRows, seatsSeatingCsv } from './seats/roster.js';
+import { seatsCreateNavigation } from './seats/navigation.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
@@ -35,7 +36,7 @@ function seatsStart(root, auth) {
   let deletingNames = false, deleteSelection = new Set();
   let overflowTables = new Set(), drag = null, suppressClick = false, conflict = false;
   let storedRaw = null, pinching = false;
-  let sharing = null, printing = false, sharingLinks = '';
+  let sharing = null, navigation = null, printing = false, sharingLinks = '';
   let screen = 'home';
   let nameOrder = 'first';
   let shortNames = false;
@@ -225,6 +226,7 @@ function seatsStart(root, auth) {
     if (readingNames) return alertMessage('Reading names. Please wait before changing charts.');
     if (editor.flush() === false) return false;
     editor.close();
+    sharing?.close();
     sharing?.leavePageLink();
     screen = 'home'; render(); zoomControls.refresh(); sharing?.viewChanged();
     window.scrollTo({ top: 0, behavior: 'instant' });
@@ -415,6 +417,7 @@ function seatsStart(root, auth) {
       <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}">${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || 'Empty')}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
   }
   function render() {
+    navigation?.sync();
     rememberView();
     document.body.classList.toggle('seats-roster-mode', screen === 'roster');
     if (screen === 'roster') { renderSeatList(); return; }
@@ -442,7 +445,7 @@ function seatsStart(root, auth) {
     const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
     setPrintPage(css);
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(savedLabel())}</span></div></div>
-      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
+      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="logout">Log out</button></div></details></div></section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
       <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
@@ -541,7 +544,7 @@ function seatsStart(root, auth) {
     'seat-list': showSeatList,
     'back-to-chart': showChart,
     'download-seated-list': () => download('seated-names.csv', seatsSeatingCsv(seatsSeatingRows(plan(), nameOrder)), 'text/csv;charset=utf-8'),
-    lock: () => auth.lock(),
+    logout: () => auth.lock(),
     'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': createChart,
     backup: () => { editor.flush(); const snapshot = storedState(); if (!snapshot) return alertMessage('Add names or change the setup before downloading a chart backup.'); const chartRecords = Object.fromEntries(snapshot.plans.map(plan => [plan.id, { ...records.info(plan.id), ...(sharing?.metadata(plan.id) || {}) }])); download('seats-backup.json', JSON.stringify({ ...snapshot, chartRecords }, null, 2), 'application/json'); },
@@ -704,6 +707,7 @@ function seatsStart(root, auth) {
     editor.flush(); save();
   });
   sharing = seatsCreateSharing({
+    onDialogChange: () => navigation?.sync(),
     getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen !== 'home', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
     activatePage, copyChart, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
@@ -747,6 +751,23 @@ function seatsStart(root, auth) {
     },
   });
   auth.onLock(() => { editor.flush(); save(); location.reload(); });
+  navigation = seatsCreateNavigation({
+    read: () => ({ screen, id: screen === 'home' ? null : plan().id, dialog: sharing.dialogMode }),
+    restore: async view => {
+      if (readingNames) { alertMessage('Reading names. Please wait before changing charts.'); return false; }
+      if (editor.flush() === false) return false;
+      sharing.close();
+      if (view.screen === 'home' || !state.plans.some(current => current.id === view.id)) showHome();
+      else {
+        editor.close(); state.activeId = view.id; selectedPerson = null;
+        screen = view.screen === 'roster' ? 'roster' : 'editor';
+        save(); render(); zoomControls.refresh(); sharing.viewChanged();
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+      if (['pages', 'names', 'history'].includes(view.dialog)) await sharing.open(view.dialog);
+      return true;
+    },
+  });
   render(); save(); zoomControls.refresh(); sharing.start();
 }
 
