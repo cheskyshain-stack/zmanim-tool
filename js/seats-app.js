@@ -7,7 +7,7 @@ import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js'
 import { seatsCreateWorkspace } from './seats/workspace.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
 import { seatsCreateEditor } from './seats/editor.js';
-import { seatsReadNames, seatsCsvCell } from './seats/import.js';
+import { seatsReadNames } from './seats/import.js';
 import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
 import { seatsCreateRecords } from './seats/records.js';
 import { seatsStartMarkup } from './seats/start.js';
@@ -16,6 +16,7 @@ import { seatsChartName, seatsDatedChartName, seatsCopiedChartName } from './sea
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
+import { seatsSeatingRows, seatsSeatingCsv } from './seats/roster.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
@@ -90,14 +91,14 @@ function seatsStart(root, auth) {
   for (const current of state.plans) current.name = seatsChartName(current.name, records.info(current.id));
   try {
     const view = JSON.parse(sessionStorage.getItem(SEATS_VIEW_KEY) || 'null');
-    if (!new URL(location.href).searchParams.has('page') && view?.screen === 'editor') {
+    if (!new URL(location.href).searchParams.has('page') && ['editor', 'roster'].includes(view?.screen)) {
       if (!state.plans.some(current => current.id === view.id) && view.draft) {
         const draft = seatsNormalizeState({ version: 1, activeId: view.draft.id, plans: [view.draft] }).plans[0];
         seatsUpgradePlan(draft);
         if (!seatsHasContent(draft)) state.plans = [...savedPlans(), draft];
       }
       if (state.plans.some(current => current.id === view.id)) {
-        state.activeId = view.id; screen = 'editor'; selected = typeof view.selected === 'string' ? view.selected : 'A1';
+        state.activeId = view.id; screen = view.screen; selected = typeof view.selected === 'string' ? view.selected : 'A1';
         zoom = Number.isFinite(view.zoom) && view.zoom >= 0 ? Math.min(6000, view.zoom) : 0; wholeRoom = view.whole === true;
       }
     }
@@ -140,7 +141,7 @@ function seatsStart(root, auth) {
   function rememberView() {
     try {
       sessionStorage.setItem(SEATS_VIEW_KEY, JSON.stringify({ screen, id: plan().id, selected, zoom, whole: wholeRoom,
-        draft: screen === 'editor' && !keepPlan(plan()) ? plan() : null }));
+        draft: screen !== 'home' && !keepPlan(plan()) ? plan() : null }));
     } catch { /* Stored charts still work when view preferences cannot be saved. */ }
   }
   function syncSaveStatus() {
@@ -230,6 +231,32 @@ function seatsStart(root, auth) {
     const heading = root.querySelector('h1');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
     return true;
+  }
+  function showSeatList() {
+    if (editor.flush() === false) return;
+    editor.close(); screen = 'roster'; render(); sharing?.viewChanged();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    const heading = root.querySelector('h1'); heading.tabIndex = -1; heading.focus({ preventScroll: true });
+  }
+  function showChart() {
+    screen = 'editor'; render(); zoomControls.refresh(); sharing?.viewChanged();
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }
+  function setPrintPage(css) {
+    let style = document.getElementById('seats-page-size');
+    if (!style) { style = document.createElement('style'); style.id = 'seats-page-size'; document.head.appendChild(style); }
+    if (style.textContent !== css) style.textContent = css;
+  }
+  function renderSeatList() {
+    const rows = seatsSeatingRows(plan(), nameOrder);
+    document.body.classList.remove('seats-people-mode');
+    document.title = 'Seated names | ' + plan().name;
+    setPrintPage('@page { size: letter portrait; margin: .5in; }');
+    root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="back-to-chart">← Back to chart</button>
+      <section class="seats-roster-controls no-print"><div><h1>Alphabetical seat list</h1><p><bdi>${html(plan().name)}</bdi></p></div><div class="seats-roster-actions"><button type="button" data-action="download-seated-list" ${rows.length ? '' : 'disabled'}>Download CSV</button><button type="button" class="primary" data-action="print" ${rows.length ? '' : 'disabled'}>Print / PDF</button></div><label for="roster-sort">Sort names <select id="roster-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></label><p>Full names, seated people only. This list follows changes to the chart.</p></section>
+      <section id="seats-roster-print"><header class="seats-roster-title"><h2>7:30 Minyan</h2><div><strong>Seated names</strong><p>Sorted by ${nameOrder === 'last' ? 'last' : 'first'} name · ${rows.length} assigned ${rows.length === 1 ? 'seat' : 'seats'}</p></div></header>
+      ${rows.length ? `<div class="seats-roster-columns"><table class="seats-roster-table"><colgroup><col class="roster-name"><col class="roster-table"><col class="roster-seat"></colgroup><thead><tr><th scope="col">Name</th><th scope="col">Table</th><th scope="col">Seat</th></tr></thead><tbody>${rows.map(row => `<tr><td><bdi>${html(row.name)}</bdi></td><td><bdi>${html(row.table)}</bdi></td><td>${row.seat}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty-list">No seats assigned yet. Assign names on the chart to create this list.</p>'}</section>
+      <p id="seats-notice" class="seats-notice no-print" role="status" aria-live="polite">${html(notice)}</p>`;
   }
   function createChart() {
     if (readingNames) return alertMessage('Reading names. Please wait before changing charts.');
@@ -389,6 +416,8 @@ function seatsStart(root, auth) {
   }
   function render() {
     rememberView();
+    document.body.classList.toggle('seats-roster-mode', screen === 'roster');
+    if (screen === 'roster') { renderSeatList(); return; }
     if (screen !== 'editor') {
       document.title = 'Seats | Bais Medrash of Lakewood Commons';
       document.body.classList.remove('seats-people-mode');
@@ -410,12 +439,10 @@ function seatsStart(root, auth) {
     document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');
     document.documentElement.style.setProperty('--seats-page-height', printGeometry.contentHeight + 'in');
     document.documentElement.style.setProperty('--seats-print-aspect', printGeometry.contentWidth / (printGeometry.contentHeight - printGeometry.header));
-    let pageSize = document.getElementById('seats-page-size');
-    if (!pageSize) { pageSize = document.createElement('style'); pageSize.id = 'seats-page-size'; document.head.appendChild(pageSize); }
     const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
-    if (pageSize.textContent !== css) pageSize.textContent = css;
+    setPrintPage(css);
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top no-print"><div><div class="title-line"><h1>Seats</h1><span class="tool-badge">SEATING PLANNER</span></div><div class="plan-line"><label for="chart-name">Chart name</label><input id="chart-name" value="${attr(current.name)}" maxlength="80"><span class="saved-label">${storageError ? 'Backup needed' : html(savedLabel())}</span></div></div>
-      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
+      <div class="top-actions"><button type="button" class="primary" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" data-action="print">Print / PDF</button><details id="chart-more" class="chart-more"><summary>More</summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="lock">Lock</button></div></details></div></section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
       <section class="seats-controls no-print"><div class="print-settings"><label>Print size <select id="paper-size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Printer paper (auto fit)</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter landscape</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17 landscape</option></select></label><label>Print style <select id="print-color"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Choose your paper size and <strong>Landscape</strong> in the printer dialog. The chart fills the printable width and height.' : `In the printer dialog, choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong>. Use <strong>Printer paper (auto fit)</strong> to fill a different paper size.`}</p>
@@ -510,7 +537,10 @@ function seatsStart(root, auth) {
     'zoom-actual': () => zoomControls.actual(),
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
-    print: () => { if (editor.flush() === false) return; if (overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
+    print: () => { if (editor.flush() === false) return; if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
+    'seat-list': showSeatList,
+    'back-to-chart': showChart,
+    'download-seated-list': () => download('seated-names.csv', seatsSeatingCsv(seatsSeatingRows(plan(), nameOrder)), 'text/csv;charset=utf-8'),
     lock: () => auth.lock(),
     'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': createChart,
@@ -520,12 +550,7 @@ function seatsStart(root, auth) {
     template: () => download('seats-names-example.csv', '\uFEFFName\r\nYosef Cohen\r\nMoshe Levi\r\n', 'text/csv;charset=utf-8'),
     'export-list': () => {
       editor.flush();
-      const rows = [['Name', 'Table', 'Seat']];
-      for (const person of seatsSortPeople(plan().people, nameOrder)) {
-        const table = seatsItems(plan()).find(entry => entry.seats.includes(person.id));
-        rows.push([person.name, table?.label || 'Unassigned', table ? table.seats.indexOf(person.id) + 1 : '']);
-      }
-      download('seats-list.csv', '\uFEFF' + rows.map(row => row.map(seatsCsvCell).join(',')).join('\r\n'), 'text/csv;charset=utf-8');
+      download('seats-list.csv', seatsSeatingCsv(seatsSeatingRows(plan(), nameOrder, true)), 'text/csv;charset=utf-8');
     },
     'add-names': () => { const names = root.querySelector('#new-names').value.split(/\r?\n/); change(() => { const result = seatsAddNames(plan(), names); notice = result.added + ' names added; ' + result.duplicates + ' duplicates skipped.'; }); },
     'toggle-delete-names': () => { editor.flush(); editor.close(); deletingNames = !deletingNames; deleteSelection.clear(); selectedPerson = null; renderInPlace(); },
@@ -569,7 +594,7 @@ function seatsStart(root, auth) {
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
     if (id === 'short-names') { shortNames = control.checked; try { localStorage.setItem(SEATS_SHORT_NAMES_KEY, shortNames ? '1' : '0'); } catch { /* Keep the choice for this visit when storage is unavailable. */ } renderInPlace(); return; }
-    if (id === 'people-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
+    if (id === 'people-sort' || id === 'roster-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }
     if (id === 'selected-item' || id === 'layout-item') { selected = control.value; renderInPlace(); return; }
     if (id === 'chart-view') { if (control.value === 'whole') zoomControls.fitWhole(); else if (control.value === 'actual') zoomControls.actual(); else zoomControls.fit(); return; }
@@ -671,7 +696,7 @@ function seatsStart(root, auth) {
     storedRaw = event.newValue;
     conflict = true; storageError = 'Seats changed in another tab. Reload to use that version, or download a backup before saving this version instead.'; renderInPlace();
   });
-  window.addEventListener('beforeprint', () => { printing = true; editor.flush(); document.body.classList.toggle('seats-print-error', overflowTables.size > 0); });
+  window.addEventListener('beforeprint', () => { printing = true; editor.flush(); document.body.classList.toggle('seats-print-error', screen === 'editor' && overflowTables.size > 0); });
   window.addEventListener('afterprint', () => { printing = false; document.body.classList.remove('seats-print-error'); sharing?.flush(); });
   window.addEventListener('pagehide', () => {
     const name = root.querySelector('#chart-name')?.value.trim();
@@ -679,7 +704,7 @@ function seatsStart(root, auth) {
     editor.flush(); save();
   });
   sharing = seatsCreateSharing({
-    getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen === 'editor', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
+    getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen !== 'home', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
     activatePage, copyChart, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },

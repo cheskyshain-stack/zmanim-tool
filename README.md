@@ -46,6 +46,12 @@ seats, preserves the room, and supports Undo and Redo.
 The Sort names selector orders the list by First name or Last name, ignoring common
 titles and suffixes. The choice is remembered on the device and also orders the
 downloaded seating list. Displayed names and seat assignments stay unchanged.
+More > Alphabetical seat list opens a live list of seated people with their full
+names, table labels and seat numbers. Sort by first or last name, print the list,
+or download it as CSV. Each occupied seat is included, including the Rav's seat
+and repeated assignments. Unassigned people are left out. Refresh keeps the list
+open, and Back to chart returns to the seating layout. Opening or sorting the list
+does not create or edit a saved chart.
 Click a seat and type a name, choose a suggested existing person, or copy and paste
 a name into a separate seat for a child. Copying creates a separate person record
 and keeps the original assignment. Choosing an already seated suggestion or list
