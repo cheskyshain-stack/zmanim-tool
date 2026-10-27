@@ -63,6 +63,10 @@ the waiting list. Undo/Redo also covers these changes. The view selector offers
 Full width, Whole chart, and 100%; plus/minus zoom within the chart pane.
 Add names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
+The chart's Initials + last name switch shows each given-name initial and the full
+surname, for example Yosef Chuam Cohen becomes Y C Cohen. It applies to the chart
+and printouts, with the choice remembered on this device. Lists, editing, exports,
+backups and shared records keep full names. Switching the display does not edit the chart.
 Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly

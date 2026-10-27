@@ -1,6 +1,26 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCompareNames, seatsSortPeople } from '../js/seats/name-sort.js';
+import { seatsCompareNames, seatsSortPeople, seatsInitialsName } from '../js/seats/name-sort.js';
+
+test('chart initials keep every given-name initial and the full surname', () => {
+  assert.equal(seatsInitialsName('Yosef Chuam Cohen'), 'Y C Cohen');
+  assert.equal(seatsInitialsName('yosef chuam cohen'), 'Y C Cohen');
+  assert.equal(seatsInitialsName('Amrom Yitzchok Friedman'), 'A Y Friedman');
+  assert.equal(seatsInitialsName('Rabbi Moshe Dovid Cohen Jr.'), 'M D Cohen Jr.');
+  assert.equal(seatsInitialsName('Y. C. Cohen'), 'Y C Cohen');
+});
+
+test('chart initials retain compound surnames, Hebrew and accented initials', () => {
+  assert.equal(seatsInitialsName('Sarah van der Meer'), 'S van der Meer');
+  assert.equal(seatsInitialsName('Ari Ben David'), 'A Ben David');
+  assert.equal(seatsInitialsName('Yosef Cohen-Levi'), 'Y Cohen-Levi');
+  assert.equal(seatsInitialsName('הרב משה דוד כהן'), 'מ ד כהן');
+  assert.equal(seatsInitialsName('Élie René Cohen'), 'É R Cohen');
+});
+
+test('single names and incomplete title-only names stay readable', () => {
+  for (const name of ['Cohen', 'הרב', 'Rabbi Cohen', 'R. Cohen', '']) assert.equal(seatsInitialsName(name),name);
+});
 
 const people = names => names.map((name, index) => ({ id: String(index), name }));
 const names = sorted => sorted.map(person => person.name);
