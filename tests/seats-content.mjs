@@ -40,6 +40,7 @@ test('the latest room update keeps older untouched charts empty', () => {
   for(const table of plan.tables.filter(table=>['B2','C2'].includes(table.id))){table.count=4;table.seats=[null,null,null,null];table.width=192;if(table.id==='C2')table.x+=48;}
   Object.assign(plan.objects.find(object=>object.id==='main-amud'),{x:568,y:164,width:64,height:48});
   plan.tables.find(table=>table.id==='B1').x=316;plan.objects.find(object=>object.type==='rav').x=665.5;
+  Object.assign(plan.objects.find(object=>object.type==='bimah'),{x:548,y:488,width:104,height:90});
   assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
 });
 

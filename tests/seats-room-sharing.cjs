@@ -31,7 +31,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   table('B1').x=308;legacy.objects.find(object=>object.type==='rav').x=661.5;
   for (const [id, count] of Object.entries({ C1: 5, A8: 3, B2: 4, C2: 4, B5: 4, C5: 4, D7: 3, D8: 3 })) seatsSetCount(table(id), count);
   Object.assign(table('C1'), { x: 695, y: 78, width: 240 }); Object.assign(table('D1'), { x: 935, y: 78, width: 240 });
-  legacy.objects.find(object => object.type === 'bimah').y = 452;
+  Object.assign(legacy.objects.find(object => object.type === 'bimah'),{x:548,y:452,width:104,height:90});
   for (const id of ['rear-case-side-left', 'rear-case-side-right']) Object.assign(legacy.objects.find(object => object.id === id), { y: 728, height: 208 });
   const displaced = seatsWriteName(legacy, 'C1', 4, 'Synthetic Fifth Seat Person').id;
   const retained = seatsWriteName(legacy, 'D7', 1, 'Synthetic Rear Seat Person').id;
@@ -52,7 +52,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
     for (const id of ['D7','D8']) assert.ok(Math.abs(get(id).x + get(id).width - 1175) < .001, id + ' sits near the right wall');
     const small = plan.objects.find(object => object.id === 'rear-case-a7');
     assert.deepEqual([small.x,small.y,small.width,small.height],[17,648,24,40]);
-    assert.equal(plan.objects.find(object => object.type === 'bimah').y, 488);
+    const bimah=plan.objects.find(object => object.type === 'bimah');assert.deepEqual([bimah.x,bimah.y,bimah.width,bimah.height],[558.4,497,83.2,72]);
     const amud = plan.objects.find(object => object.id === 'main-amud'); assert.deepEqual([amud.x,amud.y,amud.width,amud.height],[581,169,38,38]);
     for(const [id,seat] of [['B7',2],['C7',4]]){
       const table=get(id),pillar=plan.objects.find(object=>object.id==='seat-pillar-'+id+'-'+seat);
