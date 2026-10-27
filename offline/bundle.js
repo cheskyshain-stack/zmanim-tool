@@ -1,377 +1,3 @@
-// ==== zmanim/solar.js ====
-// Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
-// (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
-// All "day" values are fractional days (0 = midnight, 0.5 = noon) unless noted.
-// Dates are represented as plain UTC-midnight JS Date objects (calendar day only,
-// no time-of-day) - the fractional time-of-day for an event is returned separately
-// as a number of days, exactly like an Excel serial's fractional part.
-
-const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30); // day 0 in Excel's serial system
-
-/** Excel-style serial date number for a UTC-midnight calendar date (no 1900 leap bug
- *  correction - irrelevant for any date this app will ever be used for). */
-function excelSerial(date) {
-  return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
-}
-
-/** Calendar-day inverse of excelSerial, always at UTC midnight. Floor rather than
- *  round so a late time never becomes tomorrow. For calcTIMEZONE, preserve the
- *  fractional day in an instant instead: its 2am boundaries depend on the time. */
-function dateFromSerial(serial) {
-  return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
-}
-
-const D2R = Math.PI / 180;
-const R2D = 180 / Math.PI;
-const sind = (deg) => Math.sin(deg * D2R);
-const cosd = (deg) => Math.cos(deg * D2R);
-const tand = (deg) => Math.tan(deg * D2R);
-const asind = (x) => Math.asin(x) * R2D;
-const acosd = (x) => Math.acos(x) * R2D;
-
-// calcJD
-function calcJD(serial) {
-  return serial + 2415018.5;
-}
-// calcJDToJCent
-function calcJDToJCent(jd) {
-  return (jd - 2451545) / 36525;
-}
-// calcGeomMeanLongSun
-function geomMeanLongSun(t) {
-  return ((280.46646 + t * (36000.76983 + 0.0003032 * t)) % 360 + 360) % 360;
-}
-// calcGeomMeanAnomalySun
-function geomMeanAnomalySun(t) {
-  return 357.52911 + t * (35999.05029 - 0.0001537 * t);
-}
-// calcEccentricityEarthOrbit
-function eccentricityEarthOrbit(t) {
-  return 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
-}
-// calcSunEqOfCenter
-function sunEqOfCenter(t) {
-  const m = geomMeanAnomalySun(t);
-  return sind(m) * (1.914602 - t * (0.004817 + 0.000014 * t)) + sind(2 * m) * (0.019993 - 0.000101 * t) + sind(3 * m) * 0.000289;
-}
-// calcSunTrueLong
-function sunTrueLong(t) {
-  return geomMeanLongSun(t) + sunEqOfCenter(t);
-}
-// calcSunApparentLong
-function sunApparentLong(t) {
-  const omega = 125.04 - 1934.136 * t;
-  return sunTrueLong(t) - 0.00569 - 0.00478 * sind(omega);
-}
-// calcMeanObliquityOfEcliptic
-function meanObliquityOfEcliptic(t) {
-  const seconds = 21.448 - t * (46.815 + t * (0.00059 - t * 0.001813));
-  return 23 + (26 + seconds / 60) / 60;
-}
-// calcObliquityCorrection
-function obliquityCorrection(t) {
-  const omega = 125.04 - 1934.136 * t;
-  return meanObliquityOfEcliptic(t) + 0.00256 * cosd(omega);
-}
-// calcSunDeclination
-function sunDeclination(t) {
-  const e = obliquityCorrection(t);
-  const lambda = sunApparentLong(t);
-  return asind(sind(e) * sind(lambda));
-}
-// calcEquationOfTime (returned in fractional days, matching the workbook's /360)
-function equationOfTime(t) {
-  const epsilon = obliquityCorrection(t);
-  const long = geomMeanLongSun(t);
-  const e = eccentricityEarthOrbit(t);
-  const m = geomMeanAnomalySun(t);
-  const y = Math.pow(tand(epsilon / 2), 2);
-  const sin2long = sind(long * 2);
-  const sinm = sind(m);
-  const cos2long = cosd(2 * long);
-  const sin4long = sind(long * 4);
-  const sin2m = sind(m * 2);
-  const deg = (y * sin2long - 2 * e * sinm + 4 * e * y * sinm * cos2long - 0.5 * y * y * sin4long - 1.25 * e * e * sin2m) * R2D;
-  return deg / 360;
-}
-// calcHourAngleSunrise (degrees)
-function hourAngleSunrise(lat, solarDec, zenith) {
-  const cosH = cosd(zenith) / (cosd(lat) * cosd(solarDec)) - tand(lat) * tand(solarDec);
-  return acosd(Math.max(-1, Math.min(1, cosH)));
-}
-// calcRefraction (degrees)
-function refraction(altitude) {
-  const ta = tand(altitude);
-  let arcMin;
-  if (altitude > 85) arcMin = 0;
-  else if (altitude > 5) arcMin = 58.1 / ta - 0.07 / Math.pow(ta, 3) + 0.000086 / Math.pow(ta, 5);
-  else if (altitude > -0.575) arcMin = 1735 + altitude * (-518.2 + altitude * (103.4 + altitude * (-12.79 + altitude * 0.711)));
-  else arcMin = -20.774 / ta;
-  return arcMin / 3600;
-}
-// calcElevAdjust
-function elevAdjust(elevationMeters) {
-  return acosd(6356.9 / (6356.9 + elevationMeters / 1000));
-}
-// calcZENITH: horizonDeg is "degrees below the geometric horizon" (workbook default
-// 5/6°, i.e. solar radius + average refraction), so the zenith angle is 90 + horizonDeg
-// - NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
-// calcZENITH negates it back to +5/6 before adding 90; this function takes the
-// already-positive, human-readable value directly.)
-function zenith(horizonDeg) {
-  return 90 + horizonDeg;
-}
-
-// calcSunriseSetUTC: returns fractional day (UTC) for the given Julian day
-function sunriseSetUTC(rise, jDay, latitude, longitude, zenithDeg) {
-  const t = calcJDToJCent(jDay);
-  const eot = equationOfTime(t);
-  const solarDec = sunDeclination(t);
-  let hourAngle = hourAngleSunrise(latitude, solarDec, zenithDeg); // already in degrees (acosd)
-  if (!rise) hourAngle = -hourAngle;
-  const delta = longitude + hourAngle;
-  return 0.5 - delta / 360 - eot;
-}
-
-// calcSunriseSet: two-pass refinement, returns fractional UTC day
-function sunriseSet(rise, jDay, latitude, longitude, zenithDeg) {
-  const passOne = sunriseSetUTC(rise, jDay + (rise ? -0.25 : 0.25), latitude, longitude, zenithDeg);
-  return sunriseSetUTC(rise, jDay + passOne, latitude, longitude, zenithDeg);
-}
-
-/** The workbook uses 2am boundaries for both clock changes. Its calcTIMEZONE subtracts
- *  the zone's standard UTC offset for both boundaries; calcDST_LOCAL uses wall time. */
-function usDstActive(date, standardOffsetHours = 0) {
-  const year = date.getUTCFullYear();
-  const nthSunday = (y, month, nth) => {
-    const first = new Date(Date.UTC(y, month, 1));
-    const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
-    return new Date(Date.UTC(y, month, firstSunday + (nth - 1) * 7));
-  };
-  const boundaryOffset = (2 - standardOffsetHours) * 3600000;
-  const start = nthSunday(year, 2, 2).getTime() + boundaryOffset;
-  const end = nthSunday(year, 10, 1).getTime() + boundaryOffset;
-  return date.getTime() >= start && date.getTime() < end;
-}
-
-/** calcTIMEZONE / calcDST_LOCAL, simplified to the two DST rule types the workbook
- *  itself implements: 'us' (2nd Sun Mar - 1st Sun Nov) and 'none'.
- *  Returns { offsetHours, isDst } for local wall time represented in UTC Date fields,
- *  as calcDST_LOCAL does, and a timezone def
- *  { utcOffset, dstOffset, rule } as found in settings.TIMEZONES. */
-function timezoneOffset(date, tz) {
-  const isDst = tz.rule === 'us' && usDstActive(date);
-  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
-}
-
-/** calcTIMEZONE receives a UTC instant. Retain its time of day: a late-night zman
- *  can land on the next UTC date before that date's clock change has happened. */
-function timezoneOffsetUTC(instant, tz) {
-  const isDst = tz.rule === 'us' && usDstActive(instant, tz.utcOffset);
-  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
-}
-
-/** calcLATITUDE: clamps to +-89.8 like the workbook (avoids poles blowing up the math). */
-function clampLatitude(lat) {
-  return Math.max(-89.8, Math.min(89.8, lat));
-}
-
-/**
- * SUNRISE/SUNSET core used by every zman in zmanim.js.
- * @param {boolean} rise true for sunrise, false for sunset
- * @param {Date} date UTC-midnight calendar date
- * @param {number} horizonDeg horizon adjustment in degrees (workbook default 5/6)
- * @param {object} settings {latitude, longitude, elevation, timezone}
- * @param {boolean} useElevation whether to fold elevation into the horizon (SUNRISE_elev/SUNSET_elev pass true only if settings.useElevation)
- * @returns {number} fractional day offset from `date`'s local midnight (e.g. 0.25 = 6:00am)
- */
-function sunEvent(rise, date, horizonDeg, settings, useElevation) {
-  const lat = clampLatitude(settings.latitude);
-  const lon = settings.longitude;
-  const elevM = useElevation ? settings.elevation : 0;
-  const z = zenith(horizonDeg) + elevAdjust(elevM);
-  const serial = excelSerial(date);
-  const eventUTC = sunriseSet(rise, calcJD(serial), lat, lon, z);
-  const { offsetHours } = timezoneOffsetUTC(new Date(EXCEL_EPOCH_UTC + (serial + eventUTC) * 86400000), settings.timezone);
-  return eventUTC + offsetHours / 24;
-}
-
-/* Where the shul is, right now, in the frame every zman here is written in: which
-   calendar day it is there and how far into it. It lives beside timezoneOffset, the
-   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
-   into the week view, so anything importing it from there dragged the week view along
-   and put nav-helpers in a cycle with it. */
-/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
- *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
- *  second (see untilNextChange in luach.js).
- *
- *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
- *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
- *  still on another zone should be told when מנחה is there, not have the countdown quietly
- *  shifted by however far it has travelled.
- *
- *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
- *  the charts use. The source's fall boundary uses the standard UTC offset, while the
- *  platform knows the actual instant when the clocks move. The old whole-day fallback
- *  was an hour out from midnight until the switch at 2am on both transition dates.
- *
- *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
- *  or a settings entry with no name to look up. It follows the workbook's precise
- *  calcTIMEZONE boundaries, including its standard-offset fall boundary. */
-function shulNow(now, settings) {
-  const zone = settings.timezone?.id;
-  if (zone) {
-    try {
-      const parts = new Intl.DateTimeFormat('en-CA', {
-        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-      }).formatToParts(now);
-      const at = {};
-      for (const part of parts) at[part.type] = part.value;
-      const serial = Math.round(
-        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
-      );
-      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
-      // milliseconds are added back off the instant itself, since the parts stop at seconds.
-      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
-        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
-      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
-    } catch {
-      // No Intl timezone support: fall through to the arithmetic.
-    }
-  }
-  const { offsetHours } = timezoneOffsetUTC(now, settings.timezone);
-  const local = now.getTime() / 60000 + offsetHours * 60;
-  const day = Math.floor(local / 1440);
-  return { serial: day + 25569, mins: local - day * 1440 };
-}
-
-// ==== announced.js ====
-// Times the shul has announced differently from the board, for a day or two.
-//
-// It happens: the chart says one thing, the gabbai says another from the amud, and for those
-// few days the site should say what was announced rather than what was computed. This is that
-// list, and it is deliberately a small ugly one.
-//
-// What it is not:
-//
-//  - Not a calculation. Nothing here reaches the formulas, the rules, or a saved chart, so
-//    next week and next year are exactly what they were: the entry swaps one printed time for
-//    another on the way to the screen and that is all it does.
-//  - Not the printed board. The wall chart is drawn from the chart's own row and is not read
-//    through this, so a board that has already been hung is not contradicted by the page
-//    quoting it.
-//  - Not permanent. Every entry carries the days it is for, and a day outside them is not
-//    touched. Once the last day is past the entry does nothing at all, so a forgotten one is
-//    dead weight rather than a wrong time: delete it when you notice it.
-//
-// A real change to the schedule belongs in Settings or in a rule, not here. This is for the
-// two days between "they announced something else" and "the board is right again".
-
-/** One entry a change.
- *
- *  `from` and `to` are the days it covers, inclusive, as plain dates. `column` is the
- *  Weekday chart's own column letter, B for מעריב and C for מנחה, so a swap cannot reach a
- *  time in another row that happens to read the same. `was` and `now` are the times as they
- *  are printed. `why` is for whoever finds this later.
- *
- *  Nothing is here most of the time, and that is the normal state of this file. */
-const ANNOUNCED = [
-  {
-    from: '2026-09-09',
-    to: '2026-09-10',
-    column: 'B',
-    was: '8:15',
-    now: '8:10',
-    why: 'The first מעריב was announced at 8:10 for these two days. The board and the '
-      + 'formula both stay at 8:15, which is where it goes back to on the 11th.',
-  },
-];
-
-/** A plain date to the serial the rest of the program counts in.
- *
- *  Built through Date.UTC rather than the local-time Date(y, m-1, d) constructor this used
- *  to call: that reads y/m/d as midnight in whatever zone the runtime itself is in, and
- *  excelSerial then reads the UTC day back off it, which disagreed with itself for a
- *  visitor whose own device is not on US time - `2026-09-09` came back as the 8th for a
- *  reader ahead of UTC. These three numbers are a calendar date on their own, with nothing
- *  to do with anybody's clock, so nothing here should ask what time zone anybody is in. */
-function serialOf(iso) {
-  const [y, m, d] = String(iso).split('-').map(Number);
-  return y && m && d ? excelSerial(new Date(Date.UTC(y, m - 1, d))) : null;
-}
-
-/** Today, in the shul's own time zone - not the reader's device and not this UTC
- *  container's. The entries are about the next day or two of the shul's own schedule, so
- *  "today" has to be Lakewood's, the same as everywhere else this question is asked
- *  (shulNow); reading it off the UTC calendar day instead used to call it tomorrow for
- *  several hours every evening, Eastern time being behind UTC. */
-const today = (settings) => shulNow(new Date(), settings).serial;
-
-/** The entries that are live at all: an entry is only ever live during its own days, so one
- *  left in this file after its day has passed changes nothing. */
-function live(settings) {
-  const now = today(settings);
-  return ANNOUNCED.filter((a) => {
-    const from = serialOf(a.from);
-    const to = serialOf(a.to);
-    return from != null && to != null && now >= from && now <= to;
-  });
-}
-
-/** One cell as it should be read on one day.
- *
- *  Given the Weekday chart's cell text and the day it is being read for, hands back the same
- *  text with any announced time swapped in. The time is matched whole, so 8:15 does not touch
- *  an 18:15 or an 8:155, and only the first one on the line is swapped: these lines are a run
- *  of מנינים in order and the announcement is about one of them.
- *
- *  The text goes back through this before it is parsed rather than after, so the minutes
- *  behind it move with it: "what is on next" counts down to the time it is showing rather
- *  than to the one on the board. */
-function announcedCell(text, columnKey, serial, settings) {
-  let out = String(text ?? '');
-  for (const a of live(settings)) {
-    if (a.column !== columnKey) continue;
-    const from = serialOf(a.from);
-    const to = serialOf(a.to);
-    if (serial < from || serial > to) continue;
-    // The time as a pattern, with anything a regex would read as punctuation taken
-    // literally: these are times, but the escape is what makes that a fact rather than a
-    // hope about what somebody types into this file later.
-    const wanted = String(a.was).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    out = out.replace(new RegExp(`(?<!\\d)${wanted}(?!\\d)`), a.now);
-  }
-  return out;
-}
-
-/** And the same cell on the week's own block, which is one line for the whole week rather
- *  than a line a day.
- *
- *  Swapped where the week has a day in the entry's range. The block cannot say "8:10 on two
- *  of these days and 8:15 on the others" without becoming a table, and for the day or two an
- *  entry lives the thing to show the reader is what is being announced. It is back to the
- *  board's own time the morning after the entry runs out.
- *
- *  `anchor` is the week's Shabbos, the way every week is keyed here; the days the Weekday
- *  chart speaks for are the Sunday through Thursday before it, which is offset 6 to offset 2
- *  back from the Shabbos. The same walk posters/day.js makes over a week. */
-function announcedWeekCell(text, columnKey, anchor, settings) {
-  const sunday = anchor - 6;
-  for (let day = sunday; day <= sunday + 4; day += 1) {
-    const swapped = announcedCell(text, columnKey, day, settings);
-    if (swapped !== String(text ?? '')) return swapped;
-  }
-  return String(text ?? '');
-}
-
-/** Whether anything is live, so a screen can say why it is not quoting the board. Nothing
- *  reads it yet; it is here because the first question anyone asks about a swapped time is
- *  "is that right?" and the answer should be somewhere. */
-function announcedNow(settings) {
-  return live(settings).map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
-}
-
 // ==== ui/keep-position.js ====
 // Redraw controls in place, including their open panels and keyboard focus.
 // Restore synchronously so a later user scroll or page navigation is never undone.
@@ -874,6 +500,254 @@ function differsFromSchedule(a, b) {
     .replace(/[\s,/]+/g, ' ')
     .trim();
   return bare(a) !== bare(b);
+}
+
+// ==== zmanim/solar.js ====
+// Solar position core, ported 1:1 from the workbook's calc* LAMBDA functions
+// (Lakewood Commons Zmanim tables.xlsx, FUNCTIONS sheet / defined names).
+// All "day" values are fractional days (0 = midnight, 0.5 = noon) unless noted.
+// Dates are represented as plain UTC-midnight JS Date objects (calendar day only,
+// no time-of-day) - the fractional time-of-day for an event is returned separately
+// as a number of days, exactly like an Excel serial's fractional part.
+
+const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30); // day 0 in Excel's serial system
+
+/** Excel-style serial date number for a UTC-midnight calendar date (no 1900 leap bug
+ *  correction - irrelevant for any date this app will ever be used for). */
+function excelSerial(date) {
+  return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
+}
+
+/** Calendar-day inverse of excelSerial, always at UTC midnight. Floor rather than
+ *  round so a late time never becomes tomorrow. For calcTIMEZONE, preserve the
+ *  fractional day in an instant instead: its 2am boundaries depend on the time. */
+function dateFromSerial(serial) {
+  return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
+}
+
+const D2R = Math.PI / 180;
+const R2D = 180 / Math.PI;
+const sind = (deg) => Math.sin(deg * D2R);
+const cosd = (deg) => Math.cos(deg * D2R);
+const tand = (deg) => Math.tan(deg * D2R);
+const asind = (x) => Math.asin(x) * R2D;
+const acosd = (x) => Math.acos(x) * R2D;
+
+// calcJD
+function calcJD(serial) {
+  return serial + 2415018.5;
+}
+// calcJDToJCent
+function calcJDToJCent(jd) {
+  return (jd - 2451545) / 36525;
+}
+// calcGeomMeanLongSun
+function geomMeanLongSun(t) {
+  return ((280.46646 + t * (36000.76983 + 0.0003032 * t)) % 360 + 360) % 360;
+}
+// calcGeomMeanAnomalySun
+function geomMeanAnomalySun(t) {
+  return 357.52911 + t * (35999.05029 - 0.0001537 * t);
+}
+// calcEccentricityEarthOrbit
+function eccentricityEarthOrbit(t) {
+  return 0.016708634 - t * (0.000042037 + 0.0000001267 * t);
+}
+// calcSunEqOfCenter
+function sunEqOfCenter(t) {
+  const m = geomMeanAnomalySun(t);
+  return sind(m) * (1.914602 - t * (0.004817 + 0.000014 * t)) + sind(2 * m) * (0.019993 - 0.000101 * t) + sind(3 * m) * 0.000289;
+}
+// calcSunTrueLong
+function sunTrueLong(t) {
+  return geomMeanLongSun(t) + sunEqOfCenter(t);
+}
+// calcSunApparentLong
+function sunApparentLong(t) {
+  const omega = 125.04 - 1934.136 * t;
+  return sunTrueLong(t) - 0.00569 - 0.00478 * sind(omega);
+}
+// calcMeanObliquityOfEcliptic
+function meanObliquityOfEcliptic(t) {
+  const seconds = 21.448 - t * (46.815 + t * (0.00059 - t * 0.001813));
+  return 23 + (26 + seconds / 60) / 60;
+}
+// calcObliquityCorrection
+function obliquityCorrection(t) {
+  const omega = 125.04 - 1934.136 * t;
+  return meanObliquityOfEcliptic(t) + 0.00256 * cosd(omega);
+}
+// calcSunDeclination
+function sunDeclination(t) {
+  const e = obliquityCorrection(t);
+  const lambda = sunApparentLong(t);
+  return asind(sind(e) * sind(lambda));
+}
+// calcEquationOfTime (returned in fractional days, matching the workbook's /360)
+function equationOfTime(t) {
+  const epsilon = obliquityCorrection(t);
+  const long = geomMeanLongSun(t);
+  const e = eccentricityEarthOrbit(t);
+  const m = geomMeanAnomalySun(t);
+  const y = Math.pow(tand(epsilon / 2), 2);
+  const sin2long = sind(long * 2);
+  const sinm = sind(m);
+  const cos2long = cosd(2 * long);
+  const sin4long = sind(long * 4);
+  const sin2m = sind(m * 2);
+  const deg = (y * sin2long - 2 * e * sinm + 4 * e * y * sinm * cos2long - 0.5 * y * y * sin4long - 1.25 * e * e * sin2m) * R2D;
+  return deg / 360;
+}
+// calcHourAngleSunrise (degrees)
+function hourAngleSunrise(lat, solarDec, zenith) {
+  const cosH = cosd(zenith) / (cosd(lat) * cosd(solarDec)) - tand(lat) * tand(solarDec);
+  return acosd(Math.max(-1, Math.min(1, cosH)));
+}
+// calcRefraction (degrees)
+function refraction(altitude) {
+  const ta = tand(altitude);
+  let arcMin;
+  if (altitude > 85) arcMin = 0;
+  else if (altitude > 5) arcMin = 58.1 / ta - 0.07 / Math.pow(ta, 3) + 0.000086 / Math.pow(ta, 5);
+  else if (altitude > -0.575) arcMin = 1735 + altitude * (-518.2 + altitude * (103.4 + altitude * (-12.79 + altitude * 0.711)));
+  else arcMin = -20.774 / ta;
+  return arcMin / 3600;
+}
+// calcElevAdjust
+function elevAdjust(elevationMeters) {
+  return acosd(6356.9 / (6356.9 + elevationMeters / 1000));
+}
+// calcZENITH: horizonDeg is "degrees below the geometric horizon" (workbook default
+// 5/6°, i.e. solar radius + average refraction), so the zenith angle is 90 + horizonDeg
+// - NOT 90 - horizonDeg. (The workbook stores its SETTINGS horizon cell as -5/6 and its
+// calcZENITH negates it back to +5/6 before adding 90; this function takes the
+// already-positive, human-readable value directly.)
+function zenith(horizonDeg) {
+  return 90 + horizonDeg;
+}
+
+// calcSunriseSetUTC: returns fractional day (UTC) for the given Julian day
+function sunriseSetUTC(rise, jDay, latitude, longitude, zenithDeg) {
+  const t = calcJDToJCent(jDay);
+  const eot = equationOfTime(t);
+  const solarDec = sunDeclination(t);
+  let hourAngle = hourAngleSunrise(latitude, solarDec, zenithDeg); // already in degrees (acosd)
+  if (!rise) hourAngle = -hourAngle;
+  const delta = longitude + hourAngle;
+  return 0.5 - delta / 360 - eot;
+}
+
+// calcSunriseSet: two-pass refinement, returns fractional UTC day
+function sunriseSet(rise, jDay, latitude, longitude, zenithDeg) {
+  const passOne = sunriseSetUTC(rise, jDay + (rise ? -0.25 : 0.25), latitude, longitude, zenithDeg);
+  return sunriseSetUTC(rise, jDay + passOne, latitude, longitude, zenithDeg);
+}
+
+/** The workbook uses 2am boundaries for both clock changes. Its calcTIMEZONE subtracts
+ *  the zone's standard UTC offset for both boundaries; calcDST_LOCAL uses wall time. */
+function usDstActive(date, standardOffsetHours = 0) {
+  const year = date.getUTCFullYear();
+  const nthSunday = (y, month, nth) => {
+    const first = new Date(Date.UTC(y, month, 1));
+    const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
+    return new Date(Date.UTC(y, month, firstSunday + (nth - 1) * 7));
+  };
+  const boundaryOffset = (2 - standardOffsetHours) * 3600000;
+  const start = nthSunday(year, 2, 2).getTime() + boundaryOffset;
+  const end = nthSunday(year, 10, 1).getTime() + boundaryOffset;
+  return date.getTime() >= start && date.getTime() < end;
+}
+
+/** calcTIMEZONE / calcDST_LOCAL, simplified to the two DST rule types the workbook
+ *  itself implements: 'us' (2nd Sun Mar - 1st Sun Nov) and 'none'.
+ *  Returns { offsetHours, isDst } for local wall time represented in UTC Date fields,
+ *  as calcDST_LOCAL does, and a timezone def
+ *  { utcOffset, dstOffset, rule } as found in settings.TIMEZONES. */
+function timezoneOffset(date, tz) {
+  const isDst = tz.rule === 'us' && usDstActive(date);
+  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
+}
+
+/** calcTIMEZONE receives a UTC instant. Retain its time of day: a late-night zman
+ *  can land on the next UTC date before that date's clock change has happened. */
+function timezoneOffsetUTC(instant, tz) {
+  const isDst = tz.rule === 'us' && usDstActive(instant, tz.utcOffset);
+  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
+}
+
+/** calcLATITUDE: clamps to +-89.8 like the workbook (avoids poles blowing up the math). */
+function clampLatitude(lat) {
+  return Math.max(-89.8, Math.min(89.8, lat));
+}
+
+/**
+ * SUNRISE/SUNSET core used by every zman in zmanim.js.
+ * @param {boolean} rise true for sunrise, false for sunset
+ * @param {Date} date UTC-midnight calendar date
+ * @param {number} horizonDeg horizon adjustment in degrees (workbook default 5/6)
+ * @param {object} settings {latitude, longitude, elevation, timezone}
+ * @param {boolean} useElevation whether to fold elevation into the horizon (SUNRISE_elev/SUNSET_elev pass true only if settings.useElevation)
+ * @returns {number} fractional day offset from `date`'s local midnight (e.g. 0.25 = 6:00am)
+ */
+function sunEvent(rise, date, horizonDeg, settings, useElevation) {
+  const lat = clampLatitude(settings.latitude);
+  const lon = settings.longitude;
+  const elevM = useElevation ? settings.elevation : 0;
+  const z = zenith(horizonDeg) + elevAdjust(elevM);
+  const serial = excelSerial(date);
+  const eventUTC = sunriseSet(rise, calcJD(serial), lat, lon, z);
+  const { offsetHours } = timezoneOffsetUTC(new Date(EXCEL_EPOCH_UTC + (serial + eventUTC) * 86400000), settings.timezone);
+  return eventUTC + offsetHours / 24;
+}
+
+/* Where the shul is, right now, in the frame every zman here is written in: which
+   calendar day it is there and how far into it. It lives beside timezoneOffset, the
+   only thing it needs, rather than in upcoming.js where it was: upcoming.js reaches
+   into the week view, so anything importing it from there dragged the week view along
+   and put nav-helpers in a cycle with it. */
+/** Where the clock stands at the shul right now, as an Excel serial and minutes into that
+ *  day, with the minutes carrying their fraction so the countdown can be scheduled to the
+ *  second (see untilNextChange in luach.js).
+ *
+ *  Read in the shul's own timezone rather than the phone's. Almost everyone looking at this
+ *  is in Lakewood and the two are the same, but the board is Lakewood's either way: a phone
+ *  still on another zone should be told when מנחה is there, not have the countdown quietly
+ *  shifted by however far it has travelled.
+ *
+ *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
+ *  the charts use. The source's fall boundary uses the standard UTC offset, while the
+ *  platform knows the actual instant when the clocks move. The old whole-day fallback
+ *  was an hour out from midnight until the switch at 2am on both transition dates.
+ *
+ *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
+ *  or a settings entry with no name to look up. It follows the workbook's precise
+ *  calcTIMEZONE boundaries, including its standard-offset fall boundary. */
+function shulNow(now, settings) {
+  const zone = settings.timezone?.id;
+  if (zone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+      }).formatToParts(now);
+      const at = {};
+      for (const part of parts) at[part.type] = part.value;
+      const serial = Math.round(
+        (Date.UTC(Number(at.year), Number(at.month) - 1, Number(at.day)) - Date.UTC(1899, 11, 30)) / 86400000,
+      );
+      // hour12: false gives 24 for midnight on some engines, hence the modulo. The
+      // milliseconds are added back off the instant itself, since the parts stop at seconds.
+      const mins = (Number(at.hour) % 24) * 60 + Number(at.minute)
+        + Number(at.second) / 60 + (now.getTime() % 1000) / 60000;
+      if (Number.isFinite(serial) && Number.isFinite(mins)) return { serial, mins };
+    } catch {
+      // No Intl timezone support: fall through to the arithmetic.
+    }
+  }
+  const { offsetHours } = timezoneOffsetUTC(now, settings.timezone);
+  const local = now.getTime() / 60000 + offsetHours * 60;
+  const day = Math.floor(local / 1440);
+  return { serial: day + 25569, mins: local - day * 1440 };
 }
 
 // ==== hebrew-calendar.js ====
@@ -3581,6 +3455,7 @@ const ADMIN_NAV_SECTIONS = [
   ] },
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
     { tab: 'preview', icon: 'site', description: 'Choose a date and time to see how the congregation website will look.' },
+    { href: '/announcements/manage/', label: 'Post announcements', icon: 'texts', description: 'Write shul announcements and manage who can post them.' },
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
     { href: '/seats/', label: 'Seats', icon: 'generate', description: 'Arrange tables, assign names, and print the shul seating plan.' },
@@ -4254,6 +4129,132 @@ function setPrintPage(size) {
   // Only when it changes: rewriting a style element invalidates styles for the whole
   // document, and these render functions run on every arrow press.
   if (el.textContent !== css) el.textContent = css;
+}
+
+// ==== announced.js ====
+// Times the shul has announced differently from the board, for a day or two.
+//
+// It happens: the chart says one thing, the gabbai says another from the amud, and for those
+// few days the site should say what was announced rather than what was computed. This is that
+// list, and it is deliberately a small ugly one.
+//
+// What it is not:
+//
+//  - Not a calculation. Nothing here reaches the formulas, the rules, or a saved chart, so
+//    next week and next year are exactly what they were: the entry swaps one printed time for
+//    another on the way to the screen and that is all it does.
+//  - Not the printed board. The wall chart is drawn from the chart's own row and is not read
+//    through this, so a board that has already been hung is not contradicted by the page
+//    quoting it.
+//  - Not permanent. Every entry carries the days it is for, and a day outside them is not
+//    touched. Once the last day is past the entry does nothing at all, so a forgotten one is
+//    dead weight rather than a wrong time: delete it when you notice it.
+//
+// A real change to the schedule belongs in Settings or in a rule, not here. This is for the
+// two days between "they announced something else" and "the board is right again".
+
+/** One entry a change.
+ *
+ *  `from` and `to` are the days it covers, inclusive, as plain dates. `column` is the
+ *  Weekday chart's own column letter, B for מעריב and C for מנחה, so a swap cannot reach a
+ *  time in another row that happens to read the same. `was` and `now` are the times as they
+ *  are printed. `why` is for whoever finds this later.
+ *
+ *  Nothing is here most of the time, and that is the normal state of this file. */
+const ANNOUNCED = [
+  {
+    from: '2026-09-09',
+    to: '2026-09-10',
+    column: 'B',
+    was: '8:15',
+    now: '8:10',
+    why: 'The first מעריב was announced at 8:10 for these two days. The board and the '
+      + 'formula both stay at 8:15, which is where it goes back to on the 11th.',
+  },
+];
+
+/** A plain date to the serial the rest of the program counts in.
+ *
+ *  Built through Date.UTC rather than the local-time Date(y, m-1, d) constructor this used
+ *  to call: that reads y/m/d as midnight in whatever zone the runtime itself is in, and
+ *  excelSerial then reads the UTC day back off it, which disagreed with itself for a
+ *  visitor whose own device is not on US time - `2026-09-09` came back as the 8th for a
+ *  reader ahead of UTC. These three numbers are a calendar date on their own, with nothing
+ *  to do with anybody's clock, so nothing here should ask what time zone anybody is in. */
+function serialOf(iso) {
+  const [y, m, d] = String(iso).split('-').map(Number);
+  return y && m && d ? excelSerial(new Date(Date.UTC(y, m - 1, d))) : null;
+}
+
+/** Today, in the shul's own time zone - not the reader's device and not this UTC
+ *  container's. The entries are about the next day or two of the shul's own schedule, so
+ *  "today" has to be Lakewood's, the same as everywhere else this question is asked
+ *  (shulNow); reading it off the UTC calendar day instead used to call it tomorrow for
+ *  several hours every evening, Eastern time being behind UTC. */
+const today = (settings) => shulNow(new Date(), settings).serial;
+
+/** The entries that are live at all: an entry is only ever live during its own days, so one
+ *  left in this file after its day has passed changes nothing. */
+function live(settings) {
+  const now = today(settings);
+  return ANNOUNCED.filter((a) => {
+    const from = serialOf(a.from);
+    const to = serialOf(a.to);
+    return from != null && to != null && now >= from && now <= to;
+  });
+}
+
+/** One cell as it should be read on one day.
+ *
+ *  Given the Weekday chart's cell text and the day it is being read for, hands back the same
+ *  text with any announced time swapped in. The time is matched whole, so 8:15 does not touch
+ *  an 18:15 or an 8:155, and only the first one on the line is swapped: these lines are a run
+ *  of מנינים in order and the announcement is about one of them.
+ *
+ *  The text goes back through this before it is parsed rather than after, so the minutes
+ *  behind it move with it: "what is on next" counts down to the time it is showing rather
+ *  than to the one on the board. */
+function announcedCell(text, columnKey, serial, settings) {
+  let out = String(text ?? '');
+  for (const a of live(settings)) {
+    if (a.column !== columnKey) continue;
+    const from = serialOf(a.from);
+    const to = serialOf(a.to);
+    if (serial < from || serial > to) continue;
+    // The time as a pattern, with anything a regex would read as punctuation taken
+    // literally: these are times, but the escape is what makes that a fact rather than a
+    // hope about what somebody types into this file later.
+    const wanted = String(a.was).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out = out.replace(new RegExp(`(?<!\\d)${wanted}(?!\\d)`), a.now);
+  }
+  return out;
+}
+
+/** And the same cell on the week's own block, which is one line for the whole week rather
+ *  than a line a day.
+ *
+ *  Swapped where the week has a day in the entry's range. The block cannot say "8:10 on two
+ *  of these days and 8:15 on the others" without becoming a table, and for the day or two an
+ *  entry lives the thing to show the reader is what is being announced. It is back to the
+ *  board's own time the morning after the entry runs out.
+ *
+ *  `anchor` is the week's Shabbos, the way every week is keyed here; the days the Weekday
+ *  chart speaks for are the Sunday through Thursday before it, which is offset 6 to offset 2
+ *  back from the Shabbos. The same walk posters/day.js makes over a week. */
+function announcedWeekCell(text, columnKey, anchor, settings) {
+  const sunday = anchor - 6;
+  for (let day = sunday; day <= sunday + 4; day += 1) {
+    const swapped = announcedCell(text, columnKey, day, settings);
+    if (swapped !== String(text ?? '')) return swapped;
+  }
+  return String(text ?? '');
+}
+
+/** Whether anything is live, so a screen can say why it is not quoting the board. Nothing
+ *  reads it yet; it is here because the first question anyone asks about a swapped time is
+ *  "is that right?" and the answer should be somewhere. */
+function announcedNow(settings) {
+  return live(settings).map((a) => ({ ...a, on: dateFromSerial(serialOf(a.from)) }));
 }
 
 // ==== overrides.js ====
