@@ -85,6 +85,25 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .canvas-heading h2{margin:0;font-size:20px}
 .canvas-heading p{font-size:11px;color:var(--seats-muted);margin:0;flex:1}
 .canvas-name-options{padding:0 17px 6px;flex-shrink:0}
+.seats-roster-mode #seats-app{max-width:900px}
+.seats-roster-controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.seats-roster-controls>div:first-child{min-width:0;max-width:100%;overflow-wrap:anywhere}
+.seats-roster-controls h1{font-size:30px}
+.seats-roster-controls p{font-size:12px;color:var(--seats-muted);margin:6px 0 0}
+.seats-roster-controls>p{flex-basis:100%;margin:0}
+.seats-roster-controls label{display:flex;align-items:center;gap:8px;font-size:12px}
+.seats-roster-controls select{width:auto}
+.seats-roster-actions{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+#seats-roster-print{background:#fff;border:1px solid var(--seats-border);border-radius:8px;padding:20px}
+.seats-roster-title{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;border-bottom:2px solid var(--seats-navy);padding-bottom:12px;margin-bottom:8px}
+.seats-roster-title h2{margin:0;font-size:24px}
+.seats-roster-title p{font-size:11px;color:var(--seats-muted);margin:3px 0 0}
+.seats-roster-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:14px}
+.seats-roster-table .roster-name{width:64%}.seats-roster-table .roster-table{width:24%}.seats-roster-table .roster-seat{width:12%}
+.seats-roster-table th,.seats-roster-table td{text-align:left;padding:8px;border-bottom:1px solid var(--seats-border);overflow-wrap:anywhere;vertical-align:top}
+.seats-roster-table th{font-size:12px;background:#f0f3f5}
+.seats-roster-table th:last-child,.seats-roster-table td:last-child{text-align:center}
+@media(max-width:700px){.seats-roster-controls h1{font-size:26px}.seats-roster-actions{margin-left:0}.seats-roster-actions button{min-height:44px}#seats-roster-print{padding:12px}.seats-roster-table th,.seats-roster-table td{padding:7px 4px}.seats-roster-table .roster-name{width:62%}.seats-roster-table .roster-table{width:24%}.seats-roster-table .roster-seat{width:14%}}
 .chart-name-switch{display:inline-flex;align-items:center;gap:8px;min-height:36px;font-size:12px;cursor:pointer}
 .seats-app .chart-name-switch input{appearance:none;position:relative;width:32px;height:18px;min-height:18px;padding:0;margin:0;border:1px solid #9aa8b4;border-radius:12px;background:#dce1e7;flex-shrink:0;cursor:pointer}
 .chart-name-switch input::after{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #142b4633}
@@ -289,7 +308,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 }
 @media print{
   html,body.seats-app{margin:0!important;padding:0!important;background:#fff!important;color:#000!important;width:auto!important;min-width:0!important;height:auto!important}
-  .no-print,.seats-header,#seats-app>:not(#seats-print){display:none!important}
+  .no-print,.seats-header,#seats-app>:not(#seats-print):not(#seats-roster-print){display:none!important}
   #seats-app{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;min-height:0!important}
   #seats-print{display:flex!important;flex-direction:column;width:min(var(--seats-page-width),100vw);height:min(var(--seats-page-height),calc(100vh - 1px));break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
   /* Anchor auto fit to the printable page, which can differ from Android's viewport. */
@@ -304,6 +323,17 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print .room-item{cursor:default}
   #seats-print .shtender-surface,#seats-print .amud-surface{vector-effect:non-scaling-stroke}
   #seats-print .table-seat:hover .seat-area{fill:transparent}
+  #seats-roster-print{display:block!important;margin:0;padding:0;border:0;border-radius:0;background:#fff;color:#000}
+  .seats-roster-title{break-after:avoid;margin-bottom:.08in;padding-bottom:.12in;border-color:#000}
+  .seats-roster-title h2{font-size:17pt}
+  .seats-roster-title strong{font-size:11pt}
+  .seats-roster-title p{font-size:9pt;color:#333}
+  .seats-roster-columns{columns:2;column-gap:.25in}
+  .seats-roster-table{font-size:10pt;line-height:1.2}
+  .seats-roster-table th{font-size:9pt;background:#eee}
+  .seats-roster-table th,.seats-roster-table td{padding:1pt 3pt;border-color:#bbb}
+  .seats-roster-table thead{display:table-header-group}
+  .seats-roster-table tr{break-inside:avoid}
   .seats-print-error #seats-print{display:none!important}
   .seats-print-error #seats-app::after{display:block;content:'Some names do not fit inside their tables. Increase table width or depth before printing.';font:16pt Arial}
 }
