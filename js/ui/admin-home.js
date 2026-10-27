@@ -16,6 +16,7 @@ export const ADMIN_NAV_SECTIONS = [
   ] },
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
     { tab: 'preview', icon: 'site', description: 'Choose a date and time to see how the congregation website will look.' },
+    { href: '/announcements/manage/', label: 'Post announcements', icon: 'texts', description: 'Write shul announcements and manage who can post them.' },
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
     { href: '/seats/', label: 'Seats', icon: 'generate', description: 'Arrange tables, assign names, and print the shul seating plan.' },

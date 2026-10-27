@@ -430,7 +430,7 @@ def build_dep_graph(files):
     return texts, deps
 
 
-def topo_sort(deps):
+def topo_sort(deps, entry=None):
     order = []
     visited = set()
     temp = set()
@@ -447,7 +447,7 @@ def topo_sort(deps):
         visited.add(key)
         order.append(key)
 
-    for key in sorted(deps):
+    for key in ([entry] if entry else sorted(deps)):
         visit(key)
     return order
 
@@ -593,7 +593,7 @@ def stamp_css_versions(page: Path, prefix: str):
         digest = hashlib.md5((ROOT / "css" / name).read_bytes()).hexdigest()[:8]
         return f'href="{prefix}css/{name}?v={digest}"'
 
-    stamped = re.sub(r'href="(?:\.\./)?css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
+    stamped = re.sub(r'href="(?:\.\./)*css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
     if stamped != html:
         page.write_text(stamped, encoding="utf-8", newline="\n")
 
@@ -982,7 +982,7 @@ def stamp_js_versions(page: Path, prefix: str, entry: str):
     else:
         html = html.replace("</head>", block + "\n</head>")
     html = re.sub(
-        r'src="(?:\.\./)?js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
+        r'src="(?:\.\./)*js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
         lambda m: f'src="{prefix}js/{entry}?v={digest(JS_DIR / entry)}"',
         html,
     )
@@ -1005,9 +1005,9 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "announcements", "offline"]
 DIST_FILES = ["index.html", "404.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
-              "CNAME"]
+              "CNAME", "announcements-sw.js"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
 # byte: there is nothing of ours in it to take out, and re-emitting somebody else's MIT code
 # through our scanner is a risk taken for no gain.
@@ -1083,7 +1083,8 @@ def write_dist():
 def main():
     files = all_js_files()
     texts, deps = build_dep_graph(files)
-    order = topo_sort(deps)
+    # Separate public/editor programs must never execute in the offline admin.
+    order = topo_sort(deps, ENTRY)
     all_exports = {key: export_names(text) for key, text in texts.items()}
 
     chunks = []
@@ -1137,6 +1138,10 @@ def main():
     # Seats is a separate browser-local tool, with its own PIN and no public route.
     stamp_css_versions(ROOT / "seats" / "index.html", "../")
     stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
+    stamp_css_versions(ROOT / "announcements" / "index.html", "../")
+    stamp_js_versions(ROOT / "announcements" / "index.html", "../", "announcements/public.js")
+    stamp_css_versions(ROOT / "announcements" / "manage" / "index.html", "../../")
+    stamp_js_versions(ROOT / "announcements" / "manage" / "index.html", "../../", "announcements/manage.js")
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain

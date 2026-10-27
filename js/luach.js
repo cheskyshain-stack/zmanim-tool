@@ -26,6 +26,7 @@ import { hasParsha } from './hebrew-calendar.js';
 import { wireInstalledSystemBars } from './ui/system-bars.js';
 import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
 import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
+import { announcementEndpoint } from './announcements/api.js';
 
 enableWebsitePreview(location.search);
 
@@ -546,6 +547,7 @@ function homeHtml(published) {
         ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>
     </nav>
+    <a class="luach-announcements no-print" href="/announcements/" hidden>Shul announcements <span aria-hidden="true">&rarr;</span></a>
     </div>
     </div>
     ${siteFooterHtml(s)}`;
@@ -783,6 +785,8 @@ function renderHome(published) {
   main.innerHTML = homeHtml(published);
   refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
+  const announcements = main.querySelector('.luach-announcements');
+  announcementEndpoint().then(() => { if (announcements?.isConnected) announcements.hidden = false; }).catch(() => {});
   // The card is drawn here as well as by the ticker, so the row is asked here too rather
   // than waiting for the first tick, which may be an hour off.
   markNextInline(main);

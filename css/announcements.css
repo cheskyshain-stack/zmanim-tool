@@ -1,0 +1,54 @@
+@font-face { font-family: 'Frank Ruhl Libre'; src: url('../assets/fonts/frank-ruhl-libre.woff2') format('woff2'); font-weight: 400 700; font-display: swap; }
+:root { color-scheme: only light; font: 16px/1.5 Arial,sans-serif; color: #142b46; background: #faf7f0; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; }
+.luach-system-area { display: none; }
+@media screen {
+  html.has-system-area { scroll-padding-bottom: env(safe-area-inset-bottom,0px); }
+  html.has-system-area body { padding-bottom: env(safe-area-inset-bottom,0px); }
+  html.has-system-area .luach-system-area { display: block; position: fixed; left: 0; bottom: 0; width: 100vw; height: env(safe-area-inset-bottom,0px); background: #142b46; pointer-events: none; z-index: 10000; }
+}
+a { color: #142b46; text-underline-offset: 3px; }
+button,input,textarea { font: inherit; }
+button { min-height: 44px; padding: .6rem 1rem; background: white; border: 1px solid #cac8be; border-radius: 9px; color: #142b46; cursor: pointer; }
+button:hover { background: #f3eedf; }
+button:disabled { opacity: .55; cursor: default; }
+button.primary { color: white; background: #142b46; border-color: #142b46; }
+button.danger { color: #972d28; }
+:focus-visible { outline: 3px solid #a58d43; outline-offset: 3px; }
+.announcement-header { min-height: 76px; display: flex; align-items: center; gap: 1.2rem; padding: 1rem max(1rem,calc((100% - 68rem)/2)); background: #142b46; border-bottom: 2px solid #b19a59; color: #ddd; }
+.announcement-header a { color: white; font-weight: 700; text-decoration: none; padding: .3rem 0; }
+.announcement-page { width: min(100% - 2rem,42rem); margin: 2rem auto 3rem; }
+.announcement-manage { width: min(100% - 2rem,56rem); }
+h1,h2,h3 { font-family: 'Frank Ruhl Libre',Georgia,serif; line-height: 1.2; overflow-wrap: anywhere; }
+h1 { font-size: 2.5rem; margin: 0 0 .6rem; }
+h2 { font-size: 1.7rem; margin: .4rem 0 .8rem; }
+h3 { font-size: 1.35rem; margin: .2rem 0; }
+.announcement-lead { color: #6d7477; margin: 0 0 1.8rem; }
+.announcement-notifications { margin-bottom: 1.5rem; }
+.announcement-note,.announcement-meta { color: #6d7477; font-size: .875rem; }
+.announcement-note { margin: .6rem 0; }
+.announcement-meta { margin: 0 0 .5rem; }
+.announcement-message,.announcement-panel,.announcement-empty { padding: 1.5rem; background: white; border: 1px solid #e1e0d9; border-radius: 14px; margin: 0 0 1rem; }
+.announcement-message.is-selected { border-color: #a58d43; box-shadow: 0 0 0 2px #d9cc9d; }
+.announcement-body { white-space: pre-wrap; overflow-wrap: anywhere; margin: 0; }
+.announcement-error { color: #972d28; white-space: pre-wrap; }
+.announcement-success { color: #2c6642; }
+.announcement-status:empty { display: none; }
+.announcement-footer { width: min(100% - 2rem,42rem); text-align: center; margin: 3rem auto 2rem; padding-top: 1.5rem; border-top: 1px solid #e1e0d9; font-family: Georgia,serif; }
+.announcement-footer span { display: inline-block; margin-top: .5rem; font: .875rem Arial,sans-serif; color: #6d7477; }
+.announcement-form { display: grid; gap: 1rem; }
+.announcement-form label { display: grid; gap: .4rem; font-size: .9rem; color: #56616a; }
+.announcement-form input,.announcement-form textarea { width: 100%; min-width: 0; min-height: 44px; border: 1px solid #cac8be; border-radius: 7px; padding: .65rem; background: white; color: #142b46; }
+.announcement-form textarea { min-height: 190px; resize: vertical; }
+.announcement-form .announcement-link { min-height: 90px; overflow-wrap: anywhere; font-size: .8rem; }
+.announcement-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .7rem; }
+.announcement-session { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; margin: 1.5rem 0; }
+.announcement-list-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 0; border-top: 1px solid #e7e5dd; }
+.announcement-list-row:first-child { border: 0; }
+.announcement-list-row > div { min-width: 0; }
+.announcement-list-row p { margin: .35rem 0; overflow-wrap: anywhere; }
+.announcement-list-row .announcement-actions { flex-shrink: 0; }
+.announcement-access { margin-top: 2rem; }
+@media(max-width:540px) { h1 { font-size: 2.1rem; } .announcement-message,.announcement-panel,.announcement-empty { padding: 1.1rem; } .announcement-list-row { align-items: flex-start; flex-direction: column; } .announcement-header { gap: .9rem; font-size: .9rem; } }

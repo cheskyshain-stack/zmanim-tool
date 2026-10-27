@@ -1,0 +1,175 @@
+CODEX DESKTOP: ACTIVATE SHUL ANNOUNCEMENTS
+Prepared October 27, 2026
+
+USER'S GOAL
+
+Give someone access to post shul announcements on the congregation website.
+Visitors should have an option to receive phone notifications for new messages.
+Start with a test person. The user said they can connect Cloudflare from their
+computer in the morning. Finish this prepared implementation; do not rebuild
+the site on another platform.
+
+SOURCE AND STATUS
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Branch: feat/shul-announcements
+Base tested against: c7d77dd9cbf4b285e8bdebb402e876ff8f755efc
+Website: https://baismedrashoflakewoodcommons.org
+
+The implementation is prepared on this branch and locally tested. It is NOT
+merged, connected to a production announcements service, or live on the website.
+data/announcements.json intentionally has an empty endpoint. Existing schedules,
+Seats and statistics remain in place. No real visitors were subscribed and no
+real phone notifications were sent during development.
+
+This chat's Wrangler whoami returned not authenticated. A Cloudflare plugin
+was not available. The GitHub integration could not list Actions secrets.
+Do not assume that this computer has a login either: check whoami normally.
+Never ask the user to paste Cloudflare tokens or passwords into chat.
+
+WHAT IS BUILT
+
+- Public announcements at /announcements/, styled to match the navy/cream site.
+- A compact homepage link, shown after the service endpoint is connected.
+- Post announcements in Admin opens /announcements/manage/.
+- Separate server-checked owner/editor accounts. The existing admin PIN is not
+  used to authorize live announcements.
+- Owner creates one-use posting links, valid for seven days, and can revoke
+  editor access. Removing access invalidates that person's sessions immediately.
+- Use a test person fills Test poster and test-poster@example.test. This is a
+  synthetic login identifier; no email is sent. The owner shares the posting
+  link privately and the person chooses a password.
+- Editors can preview, save drafts, publish, edit and remove announcements.
+  They cannot add users or change the schedule settings through this account.
+- Plain text, Hebrew, line breaks and optional removal after a New York date.
+- First publication queues one encrypted Web Push alert. Drafts and subsequent
+  edits do not send another alert. Concurrent edits reject stale revisions.
+- Visitors explicitly enable notifications on their own device. No permission
+  request happens until that button is pressed. They can turn them off there.
+- iPhone installation help; actual phone delivery still needs verification.
+
+GET THE PREPARED WORK
+
+Inspect the current worktree and preserve all local user changes. Read CLAUDE.md.
+Use an isolated worktree if this computer has other unfinished changes.
+
+  git fetch origin
+  git switch feat/shul-announcements
+  git pull --ff-only
+
+If main advanced, merge the current main into this branch. Preserve all Seats
+changes and regenerate build output instead of hand-merging import maps.
+
+READ THESE FILES
+
+  worker/announcements/README.md
+  worker/announcements/worker.js
+  worker/announcements/wrangler.jsonc
+  scripts/activate-announcements.mjs
+  js/announcements/manage.js
+  js/announcements/public.js
+  js/announcements/notifications.js
+  announcements-sw.js
+  tests/announcements.cjs
+
+CLOUDFLARE ACTIVATION
+
+Use the same authorized Cloudflare account as Seats and statistics:
+  04b085d9f19ac1ba6d333e0006fc94c1
+
+This feature creates only the separate zmanim-announcements Worker and its own
+SQLite Durable Object. Do not alter zmanim-seats, zmanim-traffic, their secrets,
+data or schedules, or the separate Shul View service.
+
+  npm ci --prefix worker/announcements
+  node worker/announcements/node_modules/wrangler/bin/wrangler.js whoami
+
+If needed, use the same command with login and let the user sign in through the
+normal browser flow. Do not inspect or print credential files.
+
+  node scripts/activate-announcements.mjs --dry-run
+  node scripts/activate-announcements.mjs
+
+The activation script deploys the new Worker, uses the actual returned service
+URL, verifies server protection, and updates data/announcements.json. It creates
+a bootstrap hash as a server secret if no owner exists. The private owner setup
+link is saved in a new Lakewood-Announcements-Setup-*.txt file in the user's home
+directory, outside Git. Its path is printed; the raw token is not printed.
+If an owner already exists, the script preserves the owner and notification keys.
+
+No paid plan is selected by the script. If Cloudflare requires a billing or plan
+change, explain the actual response and get the user's decision. Do not change
+plans, substitute a temporary account, or promise unlimited free usage.
+
+VERIFY THE COMPLETE CHANGE
+
+Run with Node 24:
+
+  python build-offline.py
+  node scripts/build-schedule-api.mjs
+  node --check offline/bundle.js
+  node --check announcements-sw.js
+  node tests/announcements.cjs
+  node --test tests/admin-home.mjs tests/website-clock.mjs tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
+  node tests/website-preview.cjs
+  git diff --check
+
+Use the project's usual Playwright/Chromium and pdftotext prerequisites. Browser
+tests use fresh random localhost ports. The announcements test runs the real
+bundled Worker in Workerd with isolated storage. Its local service binding catches
+every synthetic test push before it leaves the runtime. It independently decrypts
+a real payload, tests owner/editor permissions, one-use invitations, revocation,
+drafts, expiry, revisions, Hebrew and injection safety, phone/desktop layouts,
+visitor opt-in/opt-out, and the actual service worker's local synthetic display.
+
+The offline copy is tested over localhost, including a real chart PDF. file://
+navigation was blocked by the managed browser policy in the preparation session;
+also open the offline file directly on this computer if available. The build now
+includes only app.js dependencies in the offline bundle, so the standalone public
+and editor programs do not execute there. Existing preview checks passed across
+all five congregation pages with unchanged ordinary/preview chart PDF text.
+
+PUBLISH AND CREATE THE OWNER
+
+The user has requested this feature and deferred account connection until the
+morning. Publishing the completed, tested feature is authorized. Keep the prepared
+PR as a draft until the service is connected and verified, then update its final
+description, make it ready and merge it. Preserve any newer main changes.
+
+Follow the existing GitHub Pages deployment. Rebuild generated HTML and offline
+files, commit the verified endpoint, publish, and wait for the live asset hashes
+and service URL to match. Do not claim it is live after only a local test.
+
+Once published, have the user open the private owner setup file and follow its
+link. They enter their own name, email and a password of at least 12 characters.
+The setup token stops working after the owner is created. Keep that password in
+a password manager. Never commit the setup file or an invitation link.
+
+TRY THE TEST PERSON AND A REAL PHONE
+
+1. In the owner posting page, open Posting access, press Use a test person, then
+   Create posting link. Share/open that one-use link in a separate browser or
+   private window. Set a test editor password.
+2. Verify the editor sees message tools but no Posting access controls. Verify
+   attempting owner operations with that editor session is refused by the server.
+3. Save a draft and confirm it is absent from the public feed. Preview it.
+4. On the user's own phone, open /announcements/. On supported iPhone versions,
+   add the site to Home Screen in Safari and reopen from the icon first.
+5. Press Notify me of new messages and allow the browser permission. Only enable
+   the user's own test device for this check.
+6. With the user's agreement on the test message text, publish it once. Confirm
+   it appears publicly and a real phone notification arrives while the page is
+   closed. Tap the alert and check that it opens the correct message.
+7. Edit that message and verify it does not send a second alert. Remove the test
+   message and check that it disappears. Test notification opt-out if wanted.
+8. Remove the test editor's access. Their existing session must stop working.
+
+The development tests verified encryption, dispatch, real local service worker
+display and mocked browser subscription controls. They are not proof of actual
+Android/iPhone delivery. Report the device check separately and honestly.
+
+FINISHING NOTE
+
+No em dashes anywhere. Preserve scroll and focus on in-place controls. Keep all
+credentials, real names, subscription endpoints and QA artifacts out of Git.
+Do not clear site data or modify unrelated Seats work to resolve a cache issue.

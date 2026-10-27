@@ -920,6 +920,24 @@ Export/Import in Settings moves it between devices.
   checkbox, and all five card/ACH forms. Cardknox's Rav's Fund tab strip itself remains
   700px wide, but its tab labels and payment controls fit the narrower phone viewport.
 
+## Shul announcements
+
+`/announcements/` reads the separate server-backed message feed. Posting access
+at `/announcements/manage/` uses server-checked owner/editor accounts, never the
+existing admin PIN. Only the owner creates one-use invitations or revokes access.
+Keep account and subscription data private. Drafts do not appear publicly or send
+pushes. First publication queues one encrypted notification; editing does not
+send another. Preserve safe plain-text Hebrew, optional New York expiry dates,
+optimistic revisions and immediate revocation of sessions. Only request phone
+permission from a visitor's explicit button click. Keep iPhone installation help.
+The service worker is scoped to announcements and must not cache or intercept
+the congregation's schedules. `worker/announcements/README.md` covers activation
+and the real local Worker/browser/encryption checks. Keep its endpoint disabled
+until the new service has been verified. Do not change Seats, statistics or Shul
+View services. Private setup and invitation links must never reach Git or logs.
+The offline bundle includes only modules reachable from app.js so standalone
+posting and public-page programs cannot execute inside the offline admin.
+
 ## Public schedule API
 
 Admin **Website preview** (`/admin/#preview`) embeds the real congregation pages with
