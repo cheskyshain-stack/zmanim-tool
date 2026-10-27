@@ -302,11 +302,15 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   function dateDetails(record) {
     return `<span>Created: ${escText(formatDate(record.createdAt))}</span><span>Last edited: ${escText(formatDate(record.updatedAt))}</span>${record.updatedBy ? `<span>Edited by: ${escText(record.updatedBy)}</span>` : ''}`;
   }
+  function chartListDates(record) {
+    const date = value => value && Number.isFinite(Date.parse(value))
+      ? `<time datetime="${escAttr(value)}" title="${escAttr(formatDate(value))}">${escText(new Date(value).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }))}</time>` : 'Not recorded';
+    return `<span>Created: ${date(record.createdAt)}</span><span>Last edited: ${date(record.updatedAt)}${record.updatedBy ? ` · ${escText(record.updatedBy)}` : ''}</span>`;
+  }
   function pageCard(plan, site = false) {
     const metadata = site ? seatsRecordMetadata(plan) : chartMetadata(plan.id);
     const name = seatsChartName(plan.name, metadata);
-    const location = site ? 'On the website' : (plan.id === current().id ? 'Current page · ' : '') + (entries.has(plan.id) ? 'Device copy of a site page' : 'Saved on this device');
-    return `<li class="sharing-plan saved-chart-row ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${dateDetails(metadata)}</small><small>${escText(location)}</small><span class="saved-page-open">Open chart →</span></button><div class="saved-chart-actions"><button type="button" data-sharing="${site ? 'copy-chart' : 'copy-local'}" data-id="${escAttr(plan.id)}">Copy chart</button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div></li>`;
+    return `<li class="sharing-plan saved-chart-row ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${chartListDates(metadata)}</small></button><div class="saved-chart-actions"><button type="button" aria-label="Copy chart" data-sharing="${site ? 'copy-chart' : 'copy-local'}" data-id="${escAttr(plan.id)}">Copy</button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div></li>`;
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
