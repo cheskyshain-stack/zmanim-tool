@@ -6,7 +6,7 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'front-door-gap-2026-10-26';
+export const SEATS_ROOM_UPDATE = 'wider-aron-2026-10-27';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
 export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 24 };
@@ -14,10 +14,12 @@ export const SEATS_CROSS_WALKWAY = { top: 586, bottom: 648 };
 export const SEATS_BACK_WALKWAY_Y = 888;
 export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B6', 'C6'];
 const SEATS_AMUD_SIZE = 38;
-const SEATS_ARON_WIDTH = 88;
+const SEATS_ARON_WIDTH = 126;
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_ROW_GAP = 48, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
 const SEATS_TABLE_LEFT = SEATS_BOUNDS.left + SEATS_TABLE_WALL_GAP, SEATS_TABLE_RIGHT = SEATS_BOUNDS.right - SEATS_TABLE_WALL_GAP;
+// B1 keeps half of the former 43-unit gap beside A1.
+const SEATS_B1_RIGHT = SEATS_TABLE_LEFT + SEATS_STANDARD_WIDTH * 2 + 21.5;
 const seatsRowY = row => row >= 7 ? SEATS_CROSS_WALKWAY.bottom + (row - 7) * SEATS_ROW_PITCH : SEATS_BOUNDS.top + SEATS_TABLE_WALL_GAP + (row - 1) * SEATS_ROW_PITCH;
 const SEATS_COLUMN_GAP = (SEATS_TABLE_RIGHT - SEATS_TABLE_LEFT - SEATS_STANDARD_WIDTH * 4) / 3;
 const SEATS_COLUMN_CENTERS = { A: SEATS_TABLE_LEFT + SEATS_STANDARD_WIDTH / 2,
@@ -82,7 +84,8 @@ export function seatsSyncFront(plan) {
   }
   const b1 = plan.tables.find(table => table.id === 'B1');
   const { aron } = seatsFront(plan);
-  if (b1 && b1.x + b1.width > aron.x - 8) b1.x = Math.max(SEATS_BOUNDS.left, aron.x - 8 - b1.width);
+  const b1Right = Math.min(SEATS_B1_RIGHT, aron.x - SEATS_TABLE_WALL_GAP);
+  if (b1 && b1.x + b1.width > b1Right) b1.x = Math.max(SEATS_BOUNDS.left, b1Right - b1.width);
   const rav = plan.objects.find(object => object.type === 'rav');
   if (rav) Object.assign(rav, seatsFront(plan).rav);
 }
@@ -306,7 +309,10 @@ function seatsUpdateAmud(plan) {
 }
 function seatsFrontClearanceNeeded(plan) {
   const b1 = plan.tables.find(table => table.id === 'B1');
-  return Boolean(b1 && b1.x + b1.width > seatsFront(plan).aron.x - SEATS_TABLE_WALL_GAP + .001);
+  const { aron } = seatsFront(plan), rav = plan.objects.find(object => object.type === 'rav');
+  return Boolean(b1 && b1.x + b1.width > Math.min(SEATS_B1_RIGHT, aron.x - SEATS_TABLE_WALL_GAP) + .001
+    || rav && rav.x < aron.x + aron.width + SEATS_TABLE_WALL_GAP - .001
+      && rav.y < aron.y + aron.height && rav.y + rav.height > aron.y);
 }
 function seatsDoorClearanceNeeded(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');

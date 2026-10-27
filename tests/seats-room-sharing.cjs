@@ -28,6 +28,7 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   legacy.objects = legacy.objects.filter(object => object.id !== 'rear-case-a7' && !object.id.startsWith('seat-pillar-'));
   Object.assign(legacy.objects.find(object => object.id === 'main-amud'), { x: 568, y: 164, width: 64, height: 48 });
   const table = id => legacy.tables.find(entry => entry.id === id);
+  table('B1').x=308;legacy.objects.find(object=>object.type==='rav').x=661.5;
   for (const [id, count] of Object.entries({ C1: 5, A8: 3, B2: 4, C2: 4, B5: 4, C5: 4, D7: 3, D8: 3 })) seatsSetCount(table(id), count);
   Object.assign(table('C1'), { x: 695, y: 78, width: 240 }); Object.assign(table('D1'), { x: 935, y: 78, width: 240 });
   legacy.objects.find(object => object.type === 'bimah').y = 452;
@@ -42,6 +43,8 @@ const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
   function assertUpdated(record) {
     const plan = record.plan, get = id => plan.tables.find(entry => entry.id === id);
     assert.equal(plan.layoutVersion, 12, 'The migrated chart retains the deployed wire format');
+    assert.equal(get('B1').x,286.5,'The former 43-unit gap beside B1 is halved');
+    const rav=plan.objects.find(object=>object.type==='rav');assert.equal(rav.x,671);assert.equal(rav.width,40);
     for (const [id, count] of Object.entries({ C1: 4, A8: 4, B2: 5, C2: 5, B5: 5, C5: 5, D7: 5, D8: 5 })) assert.equal(get(id).count, count, id);
     assert.equal(seatsItems(plan).reduce((sum, entry) => sum + (entry.count || 0), 0), 165);
     assert.ok(Math.abs(get('D1').x - get('C1').x - get('C1').width - 8) < .001, 'C1 and D1 have the requested gap');
