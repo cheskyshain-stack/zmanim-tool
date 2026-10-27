@@ -80,8 +80,8 @@ beside standard five-seat tables. The shorter tables retain extra clearance arou
 the amud and bimah. The bimah is slightly farther back, clear of the fifth-row
 tables and chairs, while B5 and C5 keep their standard column alignment.
 Tables near the front and side walls have a small visual gap from the wall.
-The back-right tables share the same right edge. A central bimah
-is included. The amud has a plain surface without a decorative symbol.
+The back-right tables share the same right edge. The central bimah is 20%
+narrower and shorter, keeping its center at the same position. The amud has a plain surface without a decorative symbol.
 A walkway separates rows 6 and 7, with row 7 meeting its back edge and an entrance in
 each side wall. These are open passages without door leaves or swings. Two doors
 at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
@@ -163,7 +163,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-wider-aron-2026-10-27` before changes are saved.
+`lakewood-commons-seats-v1-before-room-smaller-bimah-2026-10-27` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 

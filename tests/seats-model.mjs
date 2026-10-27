@@ -37,7 +37,7 @@ test('34-table starting layout has the extra middle tables at the back and the s
     assert.equal(byRow(8).y-byRow(7).y-byRow(7).height,48);
     if(byRow(9))assert.equal(byRow(9).y-byRow(8).y-byRow(8).height,48);
   }
-  assert.equal(plan.objects.find(object=>object.type==='bimah').x,548);
+  assert.equal(plan.objects.find(object=>object.type==='bimah').x,558.4);
   for (const table of plan.tables) {
     for (const other of [...plan.tables.filter(other=>other.id!==table.id),...plan.objects]) {
       assert.ok(table.x+table.width<=other.x || other.x+other.width<=table.x || table.y+table.height<=other.y || other.y+other.height<=table.y,table.id+' overlaps '+other.id);
@@ -217,7 +217,7 @@ test('tables beside the amud and bimah align on the edges away from the fixtures
     seatsSetCount(byId(id),3,plan);assert.equal(byId(id).x+byId(id).width,byId(reference).x+byId(reference).width);
   }
   const bimah=plan.objects.find(object=>object.type==='bimah');
-  assert.equal(bimah.y,488);
+  assert.equal(bimah.y,497);
   for(const id of ['B5','C5'])assert.ok(byId(id).y+byId(id).height+14<bimah.y,'Bimah is behind the fifth-row chairs');
   assert.equal(byId('B5').x,byId('B4').x);assert.equal(byId('C5').x+byId('C5').width,byId('C4').x+byId('C4').width);
   seatsSetCount(byId('B5'),3,plan);seatsSetCount(byId('C5'),3,plan);
@@ -282,7 +282,7 @@ test('version 5 plans widen automatic tables and preserve their B5/C5 fifth-seat
   assert.deepEqual(plan.people,before.people);assert.deepEqual(byId('B8'),{...before.tables.find(table=>table.id==='B8'),y:736});
   assert.deepEqual(plan.objects.find(object=>object.id==='custom-pillar'),before.objects.find(object=>object.id==='custom-pillar'));
   const bimah=plan.objects.find(object=>object.type==='bimah');
-  assert.equal(bimah.y,488);assert.ok(byId('B5').y+byId('B5').height+14<bimah.y);assert.ok(byId('C5').y+byId('C5').height+14<bimah.y);
+  assert.equal(bimah.y,497);assert.ok(byId('B5').y+byId('B5').height+14<bimah.y);assert.ok(byId('C5').y+byId('C5').height+14<bimah.y);
   assert.deepEqual(seatsNormalizeState(state),state);
   const upgraded=JSON.stringify(plan);assert.equal(seatsUpgradePlan(plan),0);assert.equal(JSON.stringify(plan),upgraded);
 });
@@ -414,7 +414,7 @@ test('version 10 plans evenly space all standard rows and keep assignments, size
   const state=seatsCreateState(),plan=state.plans[0],byId=id=>plan.tables.find(table=>table.id===id);
   for(const table of plan.tables){const row=Number(table.id.slice(1));table.y=row>=7?598+(row-7)*110:70+(row-1)*80;}
   for(const cabinet of plan.objects.filter(object=>object.id.startsWith('rear-case-side-'))){cabinet.y=708;cabinet.height=228;}
-  plan.objects.find(object=>object.id==='main-amud').y=148;plan.objects.find(object=>object.type==='bimah').y=420;
+  plan.objects.find(object=>object.id==='main-amud').y=148;Object.assign(plan.objects.find(object=>object.type==='bimah'),{x:548,y:420,width:104,height:90});
   byId('B8').width=225;byId('B8').autoSize=false;byId('A3').height=48;
   plan.objects.push({id:'custom-pillar',type:'pillar',label:'Pillar',x:600,y:750,width:25,height:30});
   seatsWriteName(plan,'A2',0,'Parent Cohen');seatsWriteName(plan,'B9',0,'Parent Cohen');
@@ -422,7 +422,7 @@ test('version 10 plans evenly space all standard rows and keep assignments, size
   assert.equal(seatsNormalizeState(state).plans[0].layoutVersion,10);assert.equal(seatsUpgradePlan(plan),0);
   assert.equal(plan.layoutVersion,12);assert.deepEqual(plan.people,before.people);
   for(const table of plan.tables){const old=before.tables.find(old=>old.id===table.id);assert.equal(table.y,rowTop(Number(table.id.slice(1))));assert.deepEqual({...table,y:old.y},old);}
-  assert.equal(plan.objects.find(object=>object.id==='main-amud').y,164);assert.equal(plan.objects.find(object=>object.type==='bimah').y,488);
+  assert.equal(plan.objects.find(object=>object.id==='main-amud').y,164);assert.equal(plan.objects.find(object=>object.type==='bimah').y,497);
   assert.deepEqual(plan.objects.find(object=>object.id==='custom-pillar'),before.objects.find(object=>object.id==='custom-pillar'));
   for(const cabinet of plan.objects.filter(object=>object.id.startsWith('rear-case-side-'))){assert.equal(cabinet.y,798);assert.equal(cabinet.y+cabinet.height,936);}
   assert.deepEqual(plan.objects.filter(object=>['rear-case-left','rear-case-center','rear-case-right'].includes(object.id)),before.objects.filter(object=>['rear-case-left','rear-case-center','rear-case-right'].includes(object.id)));
@@ -440,7 +440,7 @@ test('version 11 wall tables gain clear space while names, sizes and manual row 
   }
   for(const cabinet of plan.objects.filter(object=>object.id.startsWith('rear-case-side-'))){cabinet.y=728;cabinet.height=208;}
   Object.assign(plan.objects.find(object=>object.type==='rav'),seatsFront(plan).rav);
-  plan.objects.find(object=>object.id==='main-amud').y=156;plan.objects.find(object=>object.type==='bimah').y=444;
+  plan.objects.find(object=>object.id==='main-amud').y=156;Object.assign(plan.objects.find(object=>object.type==='bimah'),{x:548,y:444,width:104,height:90});
   Object.assign(byId('B8'),{width:225,autoSize:false,y:750});
   seatsWriteName(plan,'A1',0,'Parent Cohen');seatsWriteName(plan,'B9',0,'Parent Cohen');seatsWriteName(plan,'rav-seat',0,'Rav Cohen');
   plan.layoutVersion=11;const before=structuredClone(plan);
@@ -578,6 +578,24 @@ test('the smaller amud adds the fifth B2/C2 seats while keeping names, outer edg
   assert.deepEqual(plan.objects.filter(object=>object.id!=='main-amud'),before.objects.filter(object=>object.id!=='main-amud'));
   assert.equal(seatsNeedsUpgrade(plan),false);assert.deepEqual(seatsNormalizeState(state),state);
   const after=JSON.stringify(plan);seatsUpgradePlan(plan);assert.equal(JSON.stringify(plan),after);
+});
+
+test('the Bimah shrinks 20 percent around its center once and preserves names and other layout edits', () => {
+  const plan=seatsCreateState().plans[0],bimah=plan.objects.find(object=>object.type==='bimah');
+  Object.assign(bimah,{x:548,y:488,width:104,height:90});
+  plan.tables.find(table=>table.id==='B8').x-=11;seatsWriteName(plan,'B5',0,'Synthetic Assigned Person');const before=structuredClone(plan);
+  assert.equal(seatsNeedsUpgrade(plan),true);assert.equal(seatsUpgradePlan(plan),0);
+  assert.equal(bimah.width,104*.8);assert.equal(bimah.height,90*.8);assert.equal(bimah.x+bimah.width/2,600);assert.equal(bimah.y+bimah.height/2,533);
+  assert.deepEqual(plan.tables,before.tables);assert.deepEqual(plan.people,before.people);
+  assert.deepEqual(plan.objects.filter(object=>object.id!==bimah.id),before.objects.filter(object=>object.id!==bimah.id));
+  assert.equal(seatsNeedsUpgrade(plan),false);const after=JSON.stringify(plan);seatsUpgradePlan(plan);assert.equal(JSON.stringify(plan),after);
+});
+
+test('shrinking a moved standard Bimah keeps its center while custom-sized objects stay unchanged', () => {
+  const plan=seatsCreateState().plans[0],bimah=plan.objects.find(object=>object.type==='bimah');
+  Object.assign(bimah,{x:560,y:500,width:104,height:90});
+  plan.objects.push({id:'custom-bimah',type:'bimah',label:'Custom',x:350,y:700,width:100,height:80});const custom=structuredClone(plan.objects.at(-1));
+  assert.equal(seatsUpgradePlan(plan),0);assert.equal(bimah.x+bimah.width/2,612);assert.equal(bimah.y+bimah.height/2,545);assert.deepEqual(plan.objects.at(-1),custom);
 });
 
 test('a wider centered Aron halves the former gap beside B1 without changing names, capacity or unrelated layout', () => {

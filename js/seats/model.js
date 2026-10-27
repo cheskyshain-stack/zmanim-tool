@@ -6,7 +6,7 @@ export const SEATS_TABLE_HEIGHT = 40;
 export const SEATS_DEFAULT_NAME = '7:30 מנין';
 export const SEATS_LAYOUT_VERSION = 12;
 // Keep the stored format compatible with the existing shared service.
-export const SEATS_ROOM_UPDATE = 'wider-aron-2026-10-27';
+export const SEATS_ROOM_UPDATE = 'smaller-bimah-2026-10-27';
 export const SEATS_TABLE_WALL_GAP = 8;
 export const SEATS_FRONT_TABLE_GAP = 8;
 export const SEATS_FRONT_RIGHT_DOOR = { top: 78, bottom: 126, clearance: 24 };
@@ -15,6 +15,7 @@ export const SEATS_BACK_WALKWAY_Y = 888;
 export const SEATS_FOUR_SEAT_TABLES = ['C1', 'A8', 'B6', 'C6'];
 const SEATS_AMUD_SIZE = 38;
 const SEATS_ARON_WIDTH = 126;
+const SEATS_BIMAH = { x: 558.4, y: 497, width: 83.2, height: 72 };
 const SEATS_STANDARD_WIDTH = SEATS_SEAT_WIDTH * 5;
 const SEATS_ROW_GAP = 48, SEATS_ROW_PITCH = SEATS_TABLE_HEIGHT + SEATS_ROW_GAP;
 const SEATS_TABLE_LEFT = SEATS_BOUNDS.left + SEATS_TABLE_WALL_GAP, SEATS_TABLE_RIGHT = SEATS_BOUNDS.right - SEATS_TABLE_WALL_GAP;
@@ -112,6 +113,17 @@ function seatsOldSideCases(plan) {
 }
 function seatsOldBimah(plan) {
   return plan.objects.find(object => object.type === 'bimah' && object.x === 548 && object.y === 452 && object.width === 104 && object.height === 90);
+}
+
+function seatsLargeBimahs(plan) {
+  return plan.objects.filter(object => object.type === 'bimah' && object.width === 104 && object.height === 90);
+}
+function seatsShrinkBimahs(plan) {
+  for (const bimah of seatsLargeBimahs(plan)) {
+    bimah.x += (bimah.width - SEATS_BIMAH.width) / 2;
+    bimah.y += (bimah.height - SEATS_BIMAH.height) / 2;
+    bimah.width = SEATS_BIMAH.width; bimah.height = SEATS_BIMAH.height;
+  }
 }
 function seatsJoinedFront(plan) {
   const c1 = plan.tables.find(table => table.id === 'C1'), d1 = plan.tables.find(table => table.id === 'D1');
@@ -321,7 +333,7 @@ function seatsDoorClearanceNeeded(plan) {
 }
 export function seatsNeedsUpgrade(plan) {
   return plan.layoutVersion !== SEATS_LAYOUT_VERSION || seatsEarlierRoomUpdate(plan) || seatsOldRearInset(plan)
-    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id) || Boolean(seatsOldAmud(plan)) || seatsMissingPillars(plan).length > 0 || seatsFrontClearanceNeeded(plan) || seatsDoorClearanceNeeded(plan);
+    || !plan.objects.some(object => object.id === SEATS_A7_CABINET.id) || Boolean(seatsOldAmud(plan)) || seatsMissingPillars(plan).length > 0 || seatsFrontClearanceNeeded(plan) || seatsDoorClearanceNeeded(plan) || seatsLargeBimahs(plan).length > 0;
 }
 
 export function seatsUpgradePlan(plan) {
@@ -333,6 +345,7 @@ export function seatsUpgradePlan(plan) {
     seatsAddA7Cabinet(plan);
     seatsUpdateAmud(plan);
     seatsAddPillars(plan);
+    seatsShrinkBimahs(plan);
     if (seatsFrontClearanceNeeded(plan) || seatsDoorClearanceNeeded(plan)) seatsSyncFront(plan);
     return 0;
   }
@@ -404,6 +417,7 @@ export function seatsUpgradePlan(plan) {
   seatsAddA7Cabinet(plan);
   seatsUpdateAmud(plan);
   seatsAddPillars(plan);
+  seatsShrinkBimahs(plan);
   plan.layoutVersion = SEATS_LAYOUT_VERSION;
   return released;
 }
@@ -419,7 +433,7 @@ export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
     for (let row = 1; row <= rows; row++) tables.push(seatsDefaultTable(column, row));
   });
   const plan = { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION, tables,
-    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', x: 548, y: 488, width: 104, height: 90 }],
+    objects: [{ id: seatsUid(), type: 'bimah', label: 'Bimah', ...SEATS_BIMAH }],
     people: [], paper: 'auto', monochrome: true };
   seatsRearLayout(plan);
   seatsSyncAisleTables(plan);
