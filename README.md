@@ -68,8 +68,9 @@ The rav's separate, assignable chair faces the room across its square shtender. 
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly
 farther left, leaving 24 units beside D1 for the doorway. A plain opening
 beside it has no door leaf or swing. The Aron Kodesh stays centered on
-the front wall, independently of table movement and resizing. Its wider 88-unit
-front leaves B1 slightly farther left, with an 8-unit gap. Front tables leave
+the front wall, independently of table movement and resizing. Its wider 126-unit
+front leaves B1 farther left, halving the former 43-unit gap beside A1. The Rav's
+shtender keeps its size and clearance beside the Aron. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
 when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between the five-seat B2 and C2 tables.
 B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
@@ -162,7 +163,7 @@ seat counts, and other custom positions. Version 3 plans also receive the table
 alignment changes. Older plans also receive the revised room
 layout and explicitly three-seat and four-seat tables; any excess names return to
 the waiting list. The browser keeps the original pre-update JSON in
-`lakewood-commons-seats-v1-before-room-front-door-gap-2026-10-26` before changes are saved.
+`lakewood-commons-seats-v1-before-room-wider-aron-2026-10-27` before changes are saved.
 Original shared snapshots receive a separate backup with their local chart ID. Earlier room
 snapshots are retained when present. Backups and seat-list exports include the rav's seat.
 
