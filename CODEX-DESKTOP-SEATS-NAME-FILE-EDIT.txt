@@ -1,0 +1,62 @@
+Deploy the tested Seats name-file editor service
+
+Website: https://baismedrashoflakewoodcommons.org/seats/
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Tested application commit: c8aa896fbcb3ea938f985af95089a2ce94b98cad
+Prepared branch: feat/seats-edit-name-files
+PR: https://github.com/cheskyshain-stack/zmanim-tool/pull/229
+
+The user authorized adding an editor for shared name files and making their folder
+look like the compact saved-chart list. The website UI is being published by web
+Codex. Desktop only needs to deploy the shared service using its existing
+Cloudflare login, then verify the capability. No new account, database, migration,
+PIN, URL or secret is needed. Do not ask for or print an API token.
+
+Web Codex attempted the service-only GitHub workflow, run 40591983804. Its tests
+passed, but deployment stopped because the CLOUDFLARE_API_TOKEN repository secret
+is missing. Web Codex's Wrangler is also not signed in. Desktop previously deployed
+this service successfully with its own Cloudflare login.
+
+1. Fetch origin and use an isolated worktree at the tested application commit above,
+   or the merged PR if it contains that commit. Keep unrelated local work intact.
+2. Deploy with Desktop's existing configured Cloudflare login:
+
+   npx wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+
+   Expected Worker: zmanim-seats
+   Expected endpoint: https://zmanim-seats.cheskyshain.workers.dev
+   Expected account ID: 04b085d9f19ac1ba6d333e0006fc94c1
+
+   Preserve the existing SEATS_WORKSPACE binding, SeatsWorkspace class, Durable
+   Object ID and v1 migration. Do not delete storage or deploy the statistics
+   Worker. No seating chart or existing name file needs modification.
+3. Verify the deployed service. Requests need this Origin header:
+   https://baismedrashoflakewoodcommons.org
+
+   POST /api/session with JSON {"name":"Name-file deployment check","pin":"4444"}.
+   Keep the returned token in memory only. Send it as Authorization: Bearer <token>
+   when reading GET /api/info. Confirm editNameFiles is true and chartDates,
+   changeHistory, sharedNameFiles and deleteFiles remain true. Do not print the
+   token, congregation names, chart titles or private responses.
+4. Report that the service is deployed and editNameFiles is verified. Do not create,
+   edit or delete a real congregation name file for this verification. Do not merge
+   unrelated pull requests. The web chat handles website publication and final QA.
+
+What was implemented and tested
+
+- A compact bordered Name files list with file name/count, dates, editor, Edit and
+  Delete. Clicking the file name adds its names to the chart as before.
+- File-name and one-name-per-line editing. Save updates the same file ID and keeps
+  original creation metadata. Existing charts retain their own names/assignments.
+- POST /api/name-lists/:id accepts name, names, revision and operationId. It records
+  updatedAt/updatedBy, deduplicates retries, rejects stale revisions with 409, and
+  cannot resurrect a deleted file. Older name files start at revision 1.
+- Local per-file drafts survive refresh. The editor offers Load latest version on
+  a conflict and retains typed text after network errors.
+- /api/info reports editNameFiles only in the updated service. The website refuses
+  to open editing against an older service instead of making an unsupported save.
+- 68 deployment unit tests passed. Real local Workerd and Chromium checks passed
+  for two organizers, lost-response retries, concurrent edits, old-file metadata,
+  validation/deletion, refresh drafts, list reuse and phone/desktop layouts.
+- Navigation and three-hour session browser checks passed. Offline/site/API builds,
+  syntax and diff checks passed. All test names were synthetic.

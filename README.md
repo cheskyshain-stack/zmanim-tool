@@ -208,6 +208,7 @@ to add its names to the chart, or Edit to rename it and add, correct or remove n
 in the one-name-per-line editor. Save changes updates that shared file in place for
 everyone; existing chart names and seat assignments stay independent. Local file
 drafts survive refresh. Conflicting saves keep the draft and offer Load latest version.
+Editing requires the shared service to report editNameFiles in /api/info.
 Uploading Excel, CSV or text adds its names to the current chart and automatically
 saves a named file on the website, even if the chart itself has not been saved
 online. Other organizers can choose the file to add its names to another chart;
