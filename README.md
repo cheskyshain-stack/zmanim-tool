@@ -80,10 +80,11 @@ Names are drawn inside the tables; small chairs are on one side facing the Aron.
 The bimah and pillars stay square on screen and on every supported paper size.
 Their artwork is centered within its saved footprint, preserving stored positions
 and assignments while automatic page fitting adjusts the rest of the room.
-Print Reserved instead of names replaces occupied-seat names with Reserved only
-in the printed chart, including the Rav's seat. Empty seats keep their numbers.
-The screen, saved chart, backups and seating-list exports keep the actual names.
-This print choice is remembered on the device and does not edit the shared chart.
+Reserved instead of names sits beside Initials + last name and replaces occupied-seat
+names with Reserved on both the chart and its printout, including the Rav's seat.
+Empty seats keep their numbers. The People list, seat editor, saved chart, backups
+and seating-list exports keep the actual names. This display choice is remembered
+on the device and does not edit the shared chart.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly
 farther left, leaving 24 units beside D1 for the doorway. A plain opening

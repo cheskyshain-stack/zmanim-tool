@@ -1299,11 +1299,14 @@ The bimah and every pillar draw square artwork centered within their saved
 footprints, without migrating positions or changing assignments. Like the Rav's
 shtender and amud, their print surfaces undo the chart's horizontal paper-fitting
 stretch. Verify squares in actual native PDFs across the supported paper sizes.
-Print Reserved instead of names is a device-only print switch, remembered in
-`lakewood-commons-seats-print-reserved`. It replaces every occupied chart seat,
-including the Rav, with Reserved on paper only. Empty-seat numbers, screen names,
-stored people, shared history, backups and seating-list exports remain unchanged.
-Print fitting checks the actual Reserved text when this switch is on.
+Reserved instead of names is a device-only display switch beside Initials + last
+name, remembered in `lakewood-commons-seats-print-reserved`. It replaces every
+occupied chart seat, including the Rav, with Reserved on both the page and paper
+so the organizer can see the print labels before printing. Empty-seat numbers,
+the People list, seat editor, stored people, shared history, backups and seating-list
+exports remain unchanged. Both display fitting and print fitting check the actual
+Reserved text when this switch is on. Switching it off restores the chosen full-name
+or initials display.
 
 ## Verify before you call it done
 
