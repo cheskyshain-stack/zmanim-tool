@@ -405,23 +405,44 @@ const server = http.createServer((req,res) => {
     }
     const beforeReserved=await state();
     const screenNames=await page.locator('.room-stage .table-seat .seat-name').allTextContents();
+    assert.ok(await page.locator('#reserved-print').evaluate(node=>node.closest('.canvas-name-options')?.contains(document.querySelector('#short-names'))),'Name display switches belong together above the chart');
     await page.locator('#reserved-print').scrollIntoViewIfNeeded();
     const reservedTop=(await page.locator('#reserved-print').boundingBox()).y;
     await page.locator('#reserved-print').check();
     assert.equal(await page.evaluate(()=>document.activeElement.id),'reserved-print');
     assert.ok(Math.abs((await page.locator('#reserved-print').boundingBox()).y-reservedTop)<1,'Print switch keeps its screen position');
-    assert.deepEqual(await state(),beforeReserved,'Print privacy must not modify stored names or assignments');
-    assert.deepEqual(await page.locator('.room-stage .table-seat .seat-name').allTextContents(),screenNames,'Screen names stay visible');
+    assert.deepEqual(await state(),beforeReserved,'Reserved display must not modify stored names or assignments');
+    const previewNames=await page.locator('.room-stage .table-seat.assigned .seat-name').allTextContents();
+    assert.ok(previewNames.length>0&&previewNames.every(name=>name==='Reserved'),'The page previews Reserved in every occupied seat');
+    assert.ok(await page.locator('.room-stage .rav-seat.assigned .seat-name').evaluateAll(nodes=>nodes.every(node=>node.textContent==='Reserved')));
     const reservedNames=await page.locator('#seats-print .table-seat.assigned .seat-name').allTextContents();
     assert.ok(reservedNames.length>0&&reservedNames.every(name=>name==='Reserved'),'Every occupied printed seat uses Reserved');
     assert.ok(await page.locator('#seats-print .rav-seat.assigned .seat-name').evaluateAll(nodes=>nodes.every(node=>node.textContent==='Reserved')));
     assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-print-reserved')),'1');
+    const initialsBeforeReserved=await page.locator('#short-names').isChecked();
+    await page.locator('#short-names').setChecked(!initialsBeforeReserved);
+    assert.deepEqual(await page.locator('.room-stage .table-seat.assigned .seat-name').allTextContents(),previewNames,'Reserved takes precedence over initials on the preview');
+    await page.locator('#short-names').setChecked(initialsBeforeReserved);
+    const reservedPlan=beforeReserved.plans.find(plan=>plan.id===beforeReserved.activeId),reservedTable=reservedPlan.tables.find(table=>table.seats.some(Boolean)),reservedSeat=reservedTable.seats.findIndex(Boolean);
+    await page.locator('.room-stage [data-table="'+reservedTable.id+'"][data-seat="'+reservedSeat+'"] .seat-area').click();
+    assert.equal(await page.locator('#seat-name-input').inputValue(),reservedPlan.people.find(person=>person.id===reservedTable.seats[reservedSeat]).name,'Seat editing keeps the real name while Reserved is shown');
+    await page.locator('#seat-name-input').press('Escape');
+    assert.deepEqual(await state(),beforeReserved);
+    for(const width of [1440,393,375]){
+      await page.setViewportSize({width,height:1050});
+      assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Reserved preview fits '+width);
+      const switches=await page.locator('.canvas-name-options .chart-name-switch').evaluateAll(nodes=>nodes.map(node=>{const box=node.getBoundingClientRect();return {left:box.left,right:box.right,top:box.top};}));
+      assert.ok(switches.every(box=>box.left>=0&&box.right<=width),'Both display switches fit the page');
+      if(width===1440)assert.ok(Math.abs(switches[0].top-switches[1].top)<1,'Desktop display switches sit beside each other');
+      await page.locator('.seats-canvas').screenshot({path:path.join(output,'reserved-preview-'+width+'.png')});
+    }
+    await page.setViewportSize({width:1440,height:1050});
     const hiddenNames=beforeReserved.plans.find(plan=>plan.id===beforeReserved.activeId).people.map(person=>person.name);
     for(const paper of ['letter','tabloid']){
       await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
       const pdf=path.join(output,'reserved-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
       const text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
-      assert.match(text,/Reserved/);assert.doesNotMatch(text,/Print Reserved instead of names/);
+      assert.match(text,/Reserved/);assert.doesNotMatch(text,/Reserved instead of names/);
       for(const name of hiddenNames)assert.ok(!text.includes(name.replace(/\s+/g,' ')),'A personal name reached the Reserved printout');
       assert.match(execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),/Pages:\s+1\b/);
       await page.emulateMedia({media:'screen'});
