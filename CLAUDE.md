@@ -74,15 +74,18 @@ in compact form. The whole-occasion page has that section separately, so do not 
 Pages with just one design remain available with either selection. Keep
 plus/minus/Current controls and position/focus during changes.
 The Occasion dropdown has Yom Tov, Rosh Chodesh and Other schedules sections.
-Rosh Hashana and Yom Kippur are direct separate choices; Selichos, Tzom Gedalia,
-Shabbos Shuva and the after-Yom-Kippur page are separate other occasions.
+Rosh Hashana and Yom Kippur are one choice, opening the whole-occasion page with
+all its schedules. Netz is a separate direct choice for their combined Vasikin page.
+Individual and paired pages remain in the Page dropdown. Selichos, Tzom Gedalia,
+Shabbos Shuva and the after-Yom-Kippur page are also separate other occasions.
 Rosh Chodesh appears once in the main Occasion dropdown and the Add-page Occasion
 picker. Selecting that main occasion opens all available months for the year.
 The separate Month picker offers **All Rosh Chodesh** and each available month,
 including both leap-year Adars and omitting Shabbos-only handouts. Keep its stepper.
 The main Occasion dropdown also offers **All Yom Tov**. These selections open the
-matching available pages using the normal multi-page print job. All Yom Tov omits other
-Yomim Noraim occasions and alternate combined posters. Show unavailable holiday
+matching available pages using the normal multi-page print job. All Yom Tov uses the
+whole Rosh Hashana/Yom Kippur page once, plus the Netz page, without duplicate individual
+Yomim Noraim or alternate paired posters. Show unavailable holiday
 groups, including Shavuos, clearly without adding an empty printed page.
 Save the active collection and its `category/yomtov` or `category/roshchodesh`
 route. Changing year rebuilds the applicable set; design and margin changes retain
@@ -91,8 +94,8 @@ one page. Adding, removing, pairing or reordering pages leaves the automatic set
 and preserves the user's edited print job, including after reload.
 Use `specialOccasionChoices` for the main and Add-page dropdowns. Direct dropdown
 values use `poster:` without changing the canonical saved poster keys, group names
-or routes. Older paired/whole-occasion selections remain accessible and appear in
-the dropdown while selected. Occasion plus/minus follow the displayed dropdown order,
+or routes. Older paired/whole-occasion selections remain accessible in the Page
+dropdown under their occasion. Occasion plus/minus follow the displayed dropdown order,
 including All Yom Tov and the boundaries between its three sections.
 Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
 Keep the selection panel compact, capped at 30rem rather than filling a wide screen.

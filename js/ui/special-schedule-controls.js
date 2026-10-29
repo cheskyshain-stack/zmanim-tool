@@ -3,7 +3,8 @@ import { switchHtml } from './switch.js';
 import { printButtonHtml } from './print-page.js';
 
 const YOM_TOV = new Set(['ראש השנה יום כיפור', 'סוכות', 'פסח', 'שבועות']);
-const NORAIM_OCCASIONS = new Set(['slichos', 'roshhashana', 'tzomgedalia', 'shuva', 'yomkippur', 'afteryk']);
+const NORAIM_GROUP = 'ראש השנה יום כיפור';
+const NORAIM_OTHER_OCCASIONS = new Set(['slichos', 'tzomgedalia', 'shuva', 'afteryk']);
 export const SPECIAL_COLLECTIONS = [
   { kind: 'yomtov', value: 'all:yomtov', name: 'All Yom Tov', category: 'Yom Tov' },
   { kind: 'roshchodesh', value: 'all:roshchodesh', name: 'All Rosh Chodesh', category: 'Rosh Chodesh' },
@@ -11,27 +12,34 @@ export const SPECIAL_COLLECTIONS = [
 
 export function specialCollectionEntries(catalog, kind) {
   return catalog.filter(entry => {
-    if (!entry.value || entry.whole || entry.locations || entry.poster?.combined || entry.poster?.extra) return false;
+    if (!entry.value) return false;
+    if (kind === 'yomtov' && entry.group === NORAIM_GROUP) return entry.whole || entry.key === 'vasikinboth';
+    if (entry.whole || entry.locations || entry.poster?.combined || entry.poster?.extra) return false;
     if (kind === 'roshchodesh') return entry.group === 'ראש חודש' && entry.poster?.dated;
     if (kind !== 'yomtov' || !YOM_TOV.has(entry.group)) return false;
-    return entry.group !== 'ראש השנה יום כיפור' || ['roshhashana', 'yomkippur'].includes(entry.key);
+    return true;
   }).sort((a, b) => (a.value.span?.from ?? Infinity) - (b.value.span?.from ?? Infinity));
 }
 
 // Keep the underlying poster groups and saved keys while exposing direct occasions.
-export function specialOccasionChoices(groups, catalog, { selectedKey = null, availableOnly = false } = {}) {
+export function specialOccasionChoices(groups, catalog, { availableOnly = false } = {}) {
   const choices = [];
   const posterChoice = (entry, category) => ({ value: `poster:${entry.key}`, key: entry.key,
     name: entry.whole ? `${entry.group} · ${entry.label}` : entry.label, group: entry.group,
     category, from: entry.value?.span?.from ?? Infinity, disabled: !entry.value });
   for (const group of groups) {
     const entries = catalog.filter(entry => entry.group === group.name);
-    if (group.name === 'ראש השנה יום כיפור') {
+    if (group.name === NORAIM_GROUP) {
+      const whole = entries.find(entry => entry.whole && entry.value);
+      const first = entries.find(entry => entry.value && entry.key !== 'vasikinboth');
+      if (!availableOnly || first) choices.push({ value: group.name, name: group.name, group: group.name,
+        defaultKey: whole?.key || first?.key, category: 'Yom Tov', from: whole?.value.span?.from ?? group.firstStart ?? Infinity });
       for (const entry of entries) {
-        if (!NORAIM_OCCASIONS.has(entry.key) && entry.key !== selectedKey) continue;
+        if (!NORAIM_OTHER_OCCASIONS.has(entry.key) && entry.key !== 'vasikinboth') continue;
         if (availableOnly && !entry.value) continue;
-        choices.push(posterChoice(entry, ['roshhashana', 'yomkippur', 'pair', 'vasikinboth'].includes(entry.key) || entry.whole
-          ? 'Yom Tov' : 'Other schedules'));
+        choices.push(entry.key === 'vasikinboth'
+          ? { ...posterChoice(entry, 'Yom Tov'), name: 'נץ · ותיקין' }
+          : posterChoice(entry, 'Other schedules'));
       }
     } else {
       if (availableOnly && !entries.some(entry => entry.value)) continue;

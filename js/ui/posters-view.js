@@ -3253,7 +3253,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     if (collection) { selectCollection(collection.kind); return; }
     const choice = occasions.find(choice => choice.value === value);
     if (choice?.group === 'ראש חודש') selectCollection('roshchodesh');
-    else if (choice) toGroup(choice.group, choice.key);
+    else if (choice) toGroup(choice.group, choice.key || choice.defaultKey);
   };
   container.querySelector('#poster-year').addEventListener('change', event => { chosenYear = Number(event.target.value); pendingAddition = null; commit(); });
   for (const [id, offset] of [['poster-year-back', -1], ['poster-year-next', 1]]) container.querySelector('#' + id).addEventListener('click', () => {
@@ -3332,7 +3332,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     const available = catalog.filter(entry => entry.value && (!half || resolve(entry.key)?.half));
     const choice = specialOccasionChoices(groups, available, { selectedKey: pendingAddition.key, availableOnly: true })
       .find(choice => choice.value === event.target.value);
-    if (choice) { pendingAddition.group = choice.group; pendingAddition.key = choice.key || null; again(); }
+    if (choice) { pendingAddition.group = choice.group; pendingAddition.key = choice.key || choice.defaultKey || null; again(); }
   });
   addition?.querySelector('[data-add-choice]').addEventListener('change', event => { pendingAddition.key = event.target.value; again(); });
   addition?.addEventListener('submit', event => {
