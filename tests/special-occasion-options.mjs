@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { specialOccasionChoices, occasionOptions, SPECIAL_COLLECTIONS, specialCollectionEntries } from '../js/ui/special-schedule-controls.js';
+import { specialOccasionChoices, occasionOptions, orderedOccasionChoices, SPECIAL_COLLECTIONS, specialCollectionEntries } from '../js/ui/special-schedule-controls.js';
 
 const groups = [
   { name: 'ראש השנה יום כיפור', firstStart: 1 }, { name: 'סוכות', firstStart: 15 },
@@ -82,4 +82,13 @@ test('All Yom Tov leads its section while the main list contains one Rosh Chodes
   assert(html.includes('<optgroup label="Rosh Chodesh"><option value="ראש חודש" selected'));
   assert(!html.includes('value="all:roshchodesh"'));
   assert(!occasionOptions(choices, 'ראש חודש').includes('value="all:'));
+});
+
+test('occasion navigation follows the displayed sections and includes the All selection', () => {
+  const choices = specialOccasionChoices(groups, catalog);
+  const before = JSON.stringify(choices);
+  const ordered = orderedOccasionChoices(choices, SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov'));
+  assert.deepEqual(ordered.map(choice => choice.value), ['all:yomtov', 'poster:roshhashana', 'poster:yomkippur',
+    'סוכות', 'פסח', 'שבועות', 'ראש חודש', 'poster:slichos', 'poster:tzomgedalia', 'poster:shuva', 'poster:afteryk', 'חנוכה']);
+  assert.equal(JSON.stringify(choices), before);
 });

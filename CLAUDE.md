@@ -92,7 +92,8 @@ and preserves the user's edited print job, including after reload.
 Use `specialOccasionChoices` for the main and Add-page dropdowns. Direct dropdown
 values use `poster:` without changing the canonical saved poster keys, group names
 or routes. Older paired/whole-occasion selections remain accessible and appear in
-the dropdown while selected. Plus/minus follow the expanded chronological choices.
+the dropdown while selected. Occasion plus/minus follow the displayed dropdown order,
+including All Yom Tov and the boundaries between its three sections.
 Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
 Keep the selection panel compact, capped at 30rem rather than filling a wide screen.
 Each dropdown comes first with its minus/plus pair on the right; Current sits beside

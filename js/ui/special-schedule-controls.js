@@ -42,12 +42,22 @@ export function specialOccasionChoices(groups, catalog, { selectedKey = null, av
   return choices.sort((a, b) => a.from - b.from);
 }
 
+const OCCASION_SECTIONS = ['Yom Tov', 'Rosh Chodesh', 'Other schedules'];
+
+// The dropdown and its steppers must share the same order, including All Yom Tov.
+export function orderedOccasionChoices(groups, collections = []) {
+  const choices = [...collections, ...groups.map(group => typeof group === 'string' ? { name: group } : group)]
+    .map(choice => ({ ...choice, value: choice.value ?? choice.name,
+      category: choice.category || (choice.name === 'ראש חודש' ? 'Rosh Chodesh'
+        : YOM_TOV.has(choice.name) ? 'Yom Tov' : 'Other schedules') }));
+  return OCCASION_SECTIONS.flatMap(label => choices.filter(choice => choice.category === label));
+}
+
 // Keep chronological order within each section, including custom occasions.
 export function occasionOptions(groups, selected, collections = []) {
-  const choices = groups.map(group => typeof group === 'string' ? { name: group } : group);
-  return ['Yom Tov', 'Rosh Chodesh', 'Other schedules'].map(label => {
-    const members = [...collections.filter(choice => choice.category === label), ...choices.filter(choice => (choice.category || (choice.name === 'ראש חודש' ? 'Rosh Chodesh'
-      : YOM_TOV.has(choice.name) ? 'Yom Tov' : 'Other schedules')) === label)];
+  const choices = orderedOccasionChoices(groups, collections);
+  return OCCASION_SECTIONS.map(label => {
+    const members = choices.filter(choice => choice.category === label);
     return members.length ? `<optgroup label="${label}">${members.map(choice =>
       `<option value="${escAttr(choice.value ?? choice.name)}" ${(choice.value ?? choice.name) === selected ? 'selected' : ''} ${choice.disabled ? 'disabled' : ''}>${escAttr(choice.name)}</option>`).join('')}</optgroup>` : '';
   }).join('');
@@ -68,8 +78,8 @@ export function specialScheduleControls(c) {
         <button type="button" id="poster-group-now" class="special-field-reset" aria-label="Current occasion" ${!c.current || !c.collection && c.current.name === c.group?.name && c.current.key === c.selected ? 'disabled' : ''}>Current</button></div>
         <div class="poster-year-step">
           <select id="poster-group" aria-labelledby="poster-group-label">${occasionOptions(c.groups, c.occasionValue, c.collections)}</select>
-          <button type="button" id="poster-group-back" aria-label="Previous occasion" ${c.gAt === 0 ? 'disabled' : ''}>&minus;</button>
-          <button type="button" id="poster-group-next" aria-label="Next occasion" ${c.gAt === c.groups.length - 1 ? 'disabled' : ''}>+</button>
+          <button type="button" id="poster-group-back" aria-label="Previous occasion" ${c.previousOccasion ? '' : 'disabled'}>&minus;</button>
+          <button type="button" id="poster-group-next" aria-label="Next occasion" ${c.nextOccasion ? '' : 'disabled'}>+</button>
         </div></div>
       ${toggle('poster-design', 'Design', [{ value: 'new', label: 'New design', on: c.design === 'new' }, { value: 'old', label: 'Old design', on: c.design === 'old' }])}
       ${c.asara ? `<div class="special-asara-options">${switchHtml('poster-asara-option', 'Asara B’Teves schedule', [
