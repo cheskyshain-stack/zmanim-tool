@@ -14,7 +14,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
-  let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0;
+  let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0, initialized = false;
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
@@ -329,13 +329,15 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     keepPosition(dialog, () => {
       dialog.querySelector('#sharing-plans').innerHTML = siteContents;
       dialog.querySelector('#sharing-device-plans').innerHTML = devicePages(siteIds);
+      dialog.querySelector('#sharing-device-plans').setAttribute('aria-busy', 'false');
       dialog.scrollTop = top;
     });
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
     listRequest++;
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section><section class="saved-pages-section"><h3>On this device</h3><ul id="sharing-device-plans" class="saved-charts-list">${devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Log out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    const loading = !initialized || Boolean(endpoint && session);
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${!initialized ? '<li>Loading saved charts…</li>' : endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section><section class="saved-pages-section"><h3>On this device</h3><ul id="sharing-device-plans" class="saved-charts-list" aria-busy="${loading}">${loading ? '<li>Loading saved charts…</li>' : devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Log out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
@@ -517,13 +519,19 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
         const desired = clean(plan, entry.remoteId), changes = seatsSharedDiff(entry.observed, desired);
         if (changes.length) { entry.observed = desired; queueChanges(entry, changes); }
       }
-      changed(); connect();
+      initialized = true; changed(); connect();
       if (pendingPage) {
         if (!session || session.expires <= Date.now()) showLogin(); else await continueIntent();
       } else if (nameUploads.length) { intent = 'names'; if (!session || session.expires <= Date.now()) showLogin(); else await drainNameUploads(); }
       else if (dialog.open && dialogMode === 'names') { intent = 'names'; if (!session) showLogin(); else refreshNameFiles(); }
       else if (dialog.open && dialogMode === 'pages') showPlans();
     } catch { /* Local plans keep working when the shared service is unavailable. */ }
+    finally {
+      if (!initialized) {
+        initialized = true;
+        if (dialog.open && dialogMode === 'pages') showPlans();
+      }
+    }
   }
   window.addEventListener('online', () => { if (!endpoint) { start(); return; } connect(); drainNameUploads(); });
   window.addEventListener('offline', () => socket?.close());
