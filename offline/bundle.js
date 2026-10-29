@@ -1484,8 +1484,13 @@ function specialDaysInWeek(shabbosSerial, settings) {
 }
 
 // ==== pagination.js ====
-// Splits a generated week list across however many printable pages the user chooses
-// (3, 4, or any other count), by user-chosen per-page counts.
+/** Winter includes Adar's extra month; summer is always the usual length. */
+function defaultSeasonPageCount(season, hebrewYear) {
+  const yearLength = roshHashana(hebrewYear - 3760) - roshHashana(hebrewYear - 3761);
+  return season === 'choref' && yearLength > 365 ? 3 : 2;
+}
+
+// Splits a generated week list across the chosen number of printable pages.
 function validatePageSizes(total, sizes) {
   const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
   if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
@@ -1494,7 +1499,7 @@ function validatePageSizes(total, sizes) {
 }
 
 /** Even default split across `numPages` pages, used to pre-fill the page-size inputs before
- *  the user adjusts them, and to size a season chart's own three pages when nobody has typed
+ *  the user adjusts them, and to size a season chart's pages when nobody has typed
  *  a custom split.
  *
  *  A season's three pages split unevenly on purpose when the weeks do not divide by three,
@@ -1506,8 +1511,7 @@ function validatePageSizes(total, sizes) {
  *
  *  Only for a season's own three pages: `season` has to be 'kayitz' or 'choref' and
  *  `numPages` has to be exactly 3, or this falls back to the plain even split, remainder
- *  absorbed by the earlier pages one at a time, which is what any other page count still
- *  uses (nobody has asked for a rule about four or five pages, only about a season's three). */
+ *  absorbed by the earlier pages one at a time, which is what any other page count uses. */
 function defaultPageSizes(total, numPages, season) {
   if (numPages === 3 && (season === 'kayitz' || season === 'choref')) {
     const full = Math.ceil(total / 3);
@@ -3319,7 +3323,7 @@ function firstWeekdayPageRangeForSummer(settings, tables) {
   const season = 'kayitz';
   const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
-  const sizes = defaultPageSizes(weeks.length, 3, season);
+  const sizes = defaultPageSizes(weeks.length, defaultSeasonPageCount(season, hebrewYear), season);
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
   const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
   const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
@@ -3328,7 +3332,7 @@ function firstWeekdayPageRangeForSummer(settings, tables) {
 }
 
 /** Regenerate three Hebrew years before and after the current year from shared formulas.
- * Previously published sheets supply page splits only; times are always recalculated. */
+ * Use the current season split rather than a previously published sheet's old defaults. */
 function buildAutomaticCharts(config, tables, now = new Date()) {
   const settings = { ...DEFAULT_SETTINGS, ...config.settings,
     sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
@@ -3351,7 +3355,7 @@ function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3, s.season);
+    const sizes = valid(custom) ? custom : defaultPageSizes(s.weeks.length, defaultSeasonPageCount(s.season, s.year), s.season);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
@@ -12541,7 +12545,7 @@ function howFar(item) {
 // Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
 // and Next above it.
 //
-// A season chart runs to three pages and there can be two seasons in play at once.
+// A season chart has two parts, or three in a leap-year winter.
 // Showing all of them at once means finding the right one before reading a single time,
 // so this opens on the stretch covering now and pages from there, exactly as the week
 // view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
@@ -12869,7 +12873,7 @@ function drawGenerate(container, state, tables, onGenerate, onOpenTab) {
   container.innerHTML = `
     <div class="gen-column">
     <h2>Print a season chart</h2>
-    <p class="hint">The site generates charts automatically with three pages per season. Use this screen to adjust rows per page for a local print copy.</p>
+    <p class="hint">Seasons are split into two parts, or three for winter in a Hebrew leap year. Use this screen to adjust rows per page for a local print copy.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
@@ -13023,7 +13027,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     <form id="page-form" class="form-grid">
       <fieldset>
         <legend>How many printable pages?</legend>
-        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
+        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', defaultSeasonPageCount(season, hebrewYear), { min: 1, max: 8 })}</label>
       </fieldset>
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
@@ -13082,7 +13086,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         : `All ${total} weeks placed.`;
   }
 
-  renderSizeInputs(3);
+  renderSizeInputs(Number(numPagesInput.value));
   renderAlloc();
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
@@ -13201,7 +13205,7 @@ function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p>The congregation website generates its seasonal charts automatically. There is no seasonal sending or publishing step.</p>
         <p><strong>Weekly schedules</strong> shows one week at a time. <strong>Seasonal charts → View charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
-        <p>Each season uses three Shabbos pages and three matching weekday pages. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
+        <p>Each season has two parts, with three for winter in a Hebrew leap year. Every part has a Shabbos chart and a matching weekday chart. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
       </div>
     </details>
     <details class="panel">

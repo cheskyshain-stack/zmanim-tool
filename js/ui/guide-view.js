@@ -8,7 +8,7 @@ export function renderGuide(container, onOpenTab) {
       <div class="panel-body">
         <p>The congregation website generates its seasonal charts automatically. There is no seasonal sending or publishing step.</p>
         <p><strong>Weekly schedules</strong> shows one week at a time. <strong>Seasonal charts → View charts</strong> shows the full chart, with Previous, Today, and Next controls.</p>
-        <p>Each season uses three Shabbos pages and three matching weekday pages. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
+        <p>Each season has two parts, with three for winter in a Hebrew leap year. Every part has a Shabbos chart and a matching weekday chart. Times are recalculated from the schedule formulas; old saved cell edits are not carried onto the public site.</p>
       </div>
     </details>
     <details class="panel">

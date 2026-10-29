@@ -1,6 +1,6 @@
 import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
-import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
+import { validatePageSizes, defaultSeasonPageCount, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 import { escText } from '../util.js';
 import { keepPosition } from './keep-position.js';
@@ -21,7 +21,7 @@ function drawGenerate(container, state, tables, onGenerate, onOpenTab) {
   container.innerHTML = `
     <div class="gen-column">
     <h2>Print a season chart</h2>
-    <p class="hint">The site generates charts automatically with three pages per season. Use this screen to adjust rows per page for a local print copy.</p>
+    <p class="hint">Seasons are split into two parts, or three for winter in a Hebrew leap year. Use this screen to adjust rows per page for a local print copy.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
@@ -175,7 +175,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
     <form id="page-form" class="form-grid">
       <fieldset>
         <legend>How many printable pages?</legend>
-        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
+        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', defaultSeasonPageCount(season, hebrewYear), { min: 1, max: 8 })}</label>
       </fieldset>
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
@@ -234,7 +234,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         : `All ${total} weeks placed.`;
   }
 
-  renderSizeInputs(3);
+  renderSizeInputs(Number(numPagesInput.value));
   renderAlloc();
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));
