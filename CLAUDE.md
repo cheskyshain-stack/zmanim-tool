@@ -138,6 +138,12 @@ old pairings, location styles, sets and duplicate copies. Skip Shabbos-only Rosh
 Chodesh selections in a standalone handout when stepping to a new year; explicitly
 queued unavailable pages must be resolved before printing.
 
+Automatic seasons use two parts, except winter in a Hebrew leap year uses three.
+Use `defaultSeasonPageCount` for the automatic charts, Generate defaults and the
+summer first-page badge range. Keep matching weekday parts aligned by date. Older
+published sheet splits must not restore the retired three-part default; explicit
+`chartLayouts` and saved local print copies retain their chosen layouts.
+
 Seasonal charts and saved charts print on separate Letter pages without a visible
 paper/layout label above Print. Together on Letter and 11 x 17 choices are removed;
 old remembered combined values fall back to separate pages without changing stored

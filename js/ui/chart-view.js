@@ -1,7 +1,7 @@
 // Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
 // and Next above it.
 //
-// A season chart runs to three pages and there can be two seasons in play at once.
+// A season chart has two parts, or three in a leap-year winter.
 // Showing all of them at once means finding the right one before reading a single time,
 // so this opens on the stretch covering now and pages from there, exactly as the week
 // view does. It is the same rendering the printed chart uses (buildSheetPages), read-only

@@ -1,5 +1,12 @@
-// Splits a generated week list across however many printable pages the user chooses
-// (3, 4, or any other count), by user-chosen per-page counts.
+import { roshHashana } from './hebrew-calendar.js';
+
+/** Winter includes Adar's extra month; summer is always the usual length. */
+export function defaultSeasonPageCount(season, hebrewYear) {
+  const yearLength = roshHashana(hebrewYear - 3760) - roshHashana(hebrewYear - 3761);
+  return season === 'choref' && yearLength > 365 ? 3 : 2;
+}
+
+// Splits a generated week list across the chosen number of printable pages.
 export function validatePageSizes(total, sizes) {
   const sum = sizes.reduce((a, b) => a + (Number(b) || 0), 0);
   if (sum !== total) return `Page sizes add up to ${sum}, but there are ${total} weeks. They must add up to exactly ${total}.`;
@@ -8,7 +15,7 @@ export function validatePageSizes(total, sizes) {
 }
 
 /** Even default split across `numPages` pages, used to pre-fill the page-size inputs before
- *  the user adjusts them, and to size a season chart's own three pages when nobody has typed
+ *  the user adjusts them, and to size a season chart's pages when nobody has typed
  *  a custom split.
  *
  *  A season's three pages split unevenly on purpose when the weeks do not divide by three,
@@ -20,8 +27,7 @@ export function validatePageSizes(total, sizes) {
  *
  *  Only for a season's own three pages: `season` has to be 'kayitz' or 'choref' and
  *  `numPages` has to be exactly 3, or this falls back to the plain even split, remainder
- *  absorbed by the earlier pages one at a time, which is what any other page count still
- *  uses (nobody has asked for a rule about four or five pages, only about a season's three). */
+ *  absorbed by the earlier pages one at a time, which is what any other page count uses. */
 export function defaultPageSizes(total, numPages, season) {
   if (numPages === 3 && (season === 'kayitz' || season === 'choref')) {
     const full = Math.ceil(total / 3);
