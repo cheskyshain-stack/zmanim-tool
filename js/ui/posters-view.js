@@ -1055,7 +1055,7 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
      Out of Settings, so a shul that has cropped its own photo in has it here as well, and
      alt="" because the name beside it already says what it is. */
   const icon = onepage
-    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">`
+    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage, true))}" alt="">`
     : '';
   const head = chartHead
     /* The wall chart's header, copied: the same markup and the same classes, so the two are
