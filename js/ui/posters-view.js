@@ -47,7 +47,7 @@ import { switchHtml, wireSwitch } from './switch.js';
 import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
 import { attachZmanimReference } from './zmanim-references.js';
 import { posterReferenceDates } from '../zmanim/references.js';
-import { specialScheduleControls, occasionOptions, specialOccasionChoices, SPECIAL_COLLECTIONS, specialCollectionEntries } from './special-schedule-controls.js';
+import { specialScheduleControls, occasionOptions, orderedOccasionChoices, specialOccasionChoices, SPECIAL_COLLECTIONS, specialCollectionEntries } from './special-schedule-controls.js';
 import { normalizeHalfPagePairs } from './half-page-pairs.js';
 import { newPrintPage, normalizePrintPages, specialPrintPlan } from './special-print-job.js';
 
@@ -3190,7 +3190,13 @@ export function renderPosters(container, state, routeChanged, tables) {
   const occasions = specialOccasionChoices(groups, catalog, { selectedKey: primary?.key });
   const occasion = (primary?.key && occasions.find(choice => choice.key === primary.key))
     || occasions.find(choice => !choice.key && choice.group === group?.name);
-  const occasionAt = occasions.indexOf(occasion);
+  const collections = SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov').map(collection => ({ ...collection,
+    disabled: !specialCollectionEntries(catalog, collection.kind).length }));
+  const occasionValue = chosenCollection === 'yomtov' ? 'all:yomtov' : occasion?.value;
+  const occasionSteps = orderedOccasionChoices(occasions, collections).filter(choice => !choice.disabled);
+  const occasionAt = occasionSteps.findIndex(choice => choice.value === occasionValue);
+  const previousOccasion = occasionSteps[occasionAt - 1]?.value;
+  const nextOccasion = occasionSteps[occasionAt + 1]?.value;
   chosenGroup = group?.name;
   chosen = primary?.key || null;
   if (!chosenPrintPages.length && primary && !chosenCollection) chosenPrintPages = [newPrintPage(primary.key, chosenCopiesPerPage === 2 && resolve(primary.key)?.half ? primary.key : '')];
@@ -3199,13 +3205,11 @@ export function renderPosters(container, state, routeChanged, tables) {
   rememberBar();
   const entries = plan.frames.flatMap(frame => [frame.left, frame.right]).filter(Boolean);
   const own = primary?.poster?.own;
-  const collections = SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov').map(collection => ({ ...collection,
-    disabled: !specialCollectionEntries(catalog, collection.kind).length }));
   const unavailable = chosenCollection === 'yomtov' ? [...new Set(occasions.filter(choice => choice.category === 'Yom Tov').map(choice => choice.group))]
     .filter(name => !collectionEntries.some(entry => entry.group === name)) : [];
   container.className = `is-sheet-view is-special-schedules${plan.landscape ? ' is-half-letter-print is-half-paired-print' : ''}`;
   container.innerHTML = specialScheduleControls({ year, years, at: years.indexOf(year), preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`,
-    groups: occasions, group, occasionValue: chosenCollection === 'yomtov' ? 'all:yomtov' : occasion?.value, gAt: occasionAt, current,
+    groups: occasions, group, occasionValue, previousOccasion, nextOccasion, current,
     selected: primary?.key, choices: chosenCollection === 'yomtov' ? [] : choices, design: chosenDesign, collections, collection: chosenCollection, unavailable,
     pAt: chosenCollection === 'roshchodesh' ? -1 : pAt, pCount: pageChoices.length, pageCurrent, allMonths: chosenCollection === 'roshchodesh',
     asara: group?.name === 'עשרה בטבת', count: plan.frames.length, landscape: plan.landscape,
@@ -3257,8 +3261,8 @@ export function renderPosters(container, state, routeChanged, tables) {
   });
   container.querySelector('#poster-year-today').addEventListener('click', () => { chosenYear = null; pendingAddition = null; commit(); });
   container.querySelector('#poster-group').addEventListener('change', event => toOccasion(event.target.value));
-  container.querySelector('#poster-group-back').addEventListener('click', () => toOccasion(occasions[occasionAt - 1]?.value));
-  container.querySelector('#poster-group-next').addEventListener('click', () => toOccasion(occasions[occasionAt + 1]?.value));
+  container.querySelector('#poster-group-back').addEventListener('click', () => toOccasion(previousOccasion));
+  container.querySelector('#poster-group-next').addEventListener('click', () => toOccasion(nextOccasion));
   container.querySelector('#poster-group-now').addEventListener('click', () => toGroup(current?.name, current?.key));
   container.querySelector('#poster-pick')?.addEventListener('change', event => event.target.value === 'all:roshchodesh'
     ? selectCollection('roshchodesh') : selectPrimary(event.target.value));

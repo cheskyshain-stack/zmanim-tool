@@ -130,6 +130,22 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#poster-group').inputValue(), 'all:yomtov');
       assert.deepEqual(await keys(), holidays);
       await page.goForward(); await settle(); assert.deepEqual(await keys(), ['pesach']);
+      await page.locator('#poster-group').selectOption('all:yomtov'); await settle();
+      const occasionOrder = await page.locator('#poster-group option').evaluateAll(options => options.filter(option => !option.disabled).map(option => option.value));
+      assert.equal(occasionOrder[0], 'all:yomtov');
+      assert(await page.locator('#poster-group-back').isDisabled(), 'All Yom Tov is the beginning of the occasion list');
+      for (const value of occasionOrder.slice(1)) {
+        await page.locator('#poster-group-next').click(); await settle();
+        assert.equal(await page.locator('#poster-group').inputValue(), value, '+ follows the next displayed occasion');
+      }
+      assert(await page.locator('#poster-group-next').isDisabled(), 'The last occasion disables +');
+      for (const value of occasionOrder.slice(0, -1).reverse()) {
+        await page.locator('#poster-group-back').click(); await settle();
+        assert.equal(await page.locator('#poster-group').inputValue(), value, '- follows the previous displayed occasion');
+      }
+      assert(await page.locator('#poster-group-back').isDisabled());
+      assert.deepEqual(await keys(), holidays, 'Stepping back to All restores the whole holiday collection');
+      checks.push({ width, occasionOrder, forwardAndBackward: true });
       await openAllMonths();
       await page.locator('[data-job-action=remove]').first().click(); await settle();
       assert.deepEqual(await keys(), months.slice(1)); assert.equal((await saved()).collection, null);
