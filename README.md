@@ -202,6 +202,9 @@ the website once; later edits save there automatically. Anyone signed in can ope
 the chart from Saved charts and edit it. There is no separate sharing step.
 Saved charts appear as a compact list with chart names, creation dates, last-edit
 dates and the last editor. Open a chart by its name; Copy chart and Delete stay beside it.
+When a website chart is listed, its linked device copy is hidden from On this device.
+Separate local charts stay visible, including ones with the same name. If the website
+list is unavailable, device copies remain available to open locally.
 Copy chart opens an independent copy with its layout, names and seat assignments.
 It gets a unique name ending in (copy) and starts its own dates and edit history.
 Copying a website chart saves the new chart on the website automatically. A device-only
