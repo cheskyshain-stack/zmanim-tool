@@ -14,6 +14,7 @@ const catalog = [
   entry('yomkippur', 'יום כיפור', groups[0].name, 12), entry('tzomgedalia', 'צום גדליה', groups[0].name, 8),
   entry('shuva', 'שבת שובה', groups[0].name, 10), entry('afteryk', 'Starting after יום כיפור', groups[0].name, 14),
   entry('pair', 'ראש השנה יום כיפור על דף אחד', groups[0].name, 5, { poster: { combined: true } }),
+  entry('vasikinboth', 'מנין ותיקין · ראש השנה ויום כיפור', groups[0].name, 5),
   entry('slichostzom', 'סליחות וצום גדליה', groups[0].name, 1, { poster: { combined: true } }),
   entry('occasion:' + groups[0].name, 'Whole occasion on one page', groups[0].name, 1, { whole: true }),
   entry('sukkos', 'סוכות', groups[1].name, 15), entry('pesach', 'פסח', groups[3].name, 190),
@@ -22,24 +23,28 @@ const catalog = [
     .map(([month, name, from]) => entry('roshchodesh' + month, 'ראש חודש ' + name, groups[2].name, from, { poster: { dated: true } })),
 ];
 
-test('main holidays stay direct and Rosh Chodesh appears as one occasion', () => {
+test('Rosh Hashana and Yom Kippur share one occasion and Netz stays directly available', () => {
   const before = JSON.stringify({ groups, catalog });
   const choices = specialOccasionChoices(groups, catalog);
   assert.deepEqual(choices.filter(choice => choice.category === 'Yom Tov').map(choice => choice.name),
-    ['ראש השנה', 'יום כיפור', 'סוכות', 'פסח', 'שבועות']);
+    ['ראש השנה יום כיפור', 'נץ · ותיקין', 'סוכות', 'פסח', 'שבועות']);
+  assert.equal(choices.find(choice => choice.value === groups[0].name).defaultKey, 'occasion:' + groups[0].name);
+  assert.equal(choices.find(choice => choice.key === 'vasikinboth').value, 'poster:vasikinboth');
+  assert(!choices.some(choice => ['roshhashana', 'yomkippur'].includes(choice.key)));
   assert.deepEqual(choices.filter(choice => choice.category === 'Rosh Chodesh').map(choice => [choice.value, choice.group]),
     [['ראש חודש', 'ראש חודש']]);
   assert.deepEqual(choices.filter(choice => choice.category === 'Other schedules').map(choice => choice.key || choice.value),
     ['slichos', 'tzomgedalia', 'shuva', 'afteryk', 'חנוכה']);
-  assert.equal(choices.find(choice => choice.key === 'yomkippur').group, 'ראש השנה יום כיפור');
   assert.equal(JSON.stringify({ groups, catalog }), before, 'The saved groups and source keys are not rewritten');
 });
 
-test('saved paired and whole-occasion pages have a correctly classified selected choice', () => {
-  for (const [key, category] of [['pair', 'Yom Tov'], ['slichostzom', 'Other schedules'],
-    ['occasion:' + groups[0].name, 'Yom Tov']]) {
-    const choice = specialOccasionChoices(groups, catalog, { selectedKey: key }).find(choice => choice.key === key);
-    assert.equal(choice.category, category); assert.equal(choice.value, 'poster:' + key);
+test('saved paired and whole-occasion pages retain their shared main occasion', () => {
+  for (const key of ['pair', 'slichostzom', 'occasion:' + groups[0].name]) {
+    const choices = specialOccasionChoices(groups, catalog, { selectedKey: key });
+    const choice = choices.find(choice => choice.value === groups[0].name);
+    assert.equal(choice.category, 'Yom Tov');
+    assert(!choices.some(choice => choice.key === key), 'A saved page does not duplicate its main occasion');
+    assert(catalog.some(entry => entry.key === key), 'The original page remains available');
   }
   const custom = entry('own:rc', 'Saved Rosh Chodesh schedule', 'ראש חודש', 30, { poster: { own: { id: 'rc' } } });
   const choices = specialOccasionChoices(groups, [...catalog, custom], { selectedKey: custom.key });
@@ -57,7 +62,9 @@ test('individual and missing months stay out of the main occasion list', () => {
 
 test('addition pickers offer only available sources and preserve safe option labels', () => {
   const choices = specialOccasionChoices(groups, catalog.filter(entry => entry.poster?.dated || entry.key === 'slichos'), { availableOnly: true });
-  assert(!choices.some(choice => choice.category === 'Yom Tov'));
+  assert.equal(choices.find(choice => choice.category === 'Yom Tov').defaultKey, 'slichos',
+    'A half-page picker can fall back to its available Selichos handout');
+  assert(!choices.some(choice => choice.key === 'vasikinboth'));
   const html = occasionOptions(choices, 'ראש חודש');
   assert(html.includes('label="Rosh Chodesh"')); assert(html.includes('value="ראש חודש" selected'));
   assert(!html.includes('ראש חודש שבט'));
@@ -68,7 +75,7 @@ test('addition pickers offer only available sources and preserve safe option lab
 test('All collections use available original schedules without duplicated or unrelated pages', () => {
   const before = JSON.stringify(catalog);
   assert.deepEqual(specialCollectionEntries(catalog, 'yomtov').map(entry => entry.key),
-    ['roshhashana', 'yomkippur', 'sukkos', 'pesach']);
+    ['occasion:' + groups[0].name, 'vasikinboth', 'sukkos', 'pesach']);
   assert.deepEqual(specialCollectionEntries(catalog, 'roshchodesh').map(entry => entry.key),
     ['roshchodesh8', 'roshchodesh9', 'roshchodesh13', 'roshchodesh14']);
   assert.deepEqual(specialCollectionEntries(catalog, 'unknown'), []);
@@ -88,7 +95,7 @@ test('occasion navigation follows the displayed sections and includes the All se
   const choices = specialOccasionChoices(groups, catalog);
   const before = JSON.stringify(choices);
   const ordered = orderedOccasionChoices(choices, SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov'));
-  assert.deepEqual(ordered.map(choice => choice.value), ['all:yomtov', 'poster:roshhashana', 'poster:yomkippur',
+  assert.deepEqual(ordered.map(choice => choice.value), ['all:yomtov', 'ראש השנה יום כיפור', 'poster:vasikinboth',
     'סוכות', 'פסח', 'שבועות', 'ראש חודש', 'poster:slichos', 'poster:tzomgedalia', 'poster:shuva', 'poster:afteryk', 'חנוכה']);
   assert.equal(JSON.stringify(choices), before);
 });
