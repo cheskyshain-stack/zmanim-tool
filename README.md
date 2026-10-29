@@ -85,6 +85,10 @@ names with Reserved on both the chart and its printout, including the Rav's seat
 Empty seats keep their numbers. The People list, seat editor, saved chart, backups
 and seating-list exports keep the actual names. This display choice is remembered
 on the device and does not edit the shared chart.
+The Room design switch previews illustrated bookcases with framed shelves and varied
+upright, stacked and leaning books. It applies to the chart and printouts and starts
+off. The choice is remembered on this device so more room details can be added to
+this optional view later.
 The rav's separate, assignable chair faces the room across its square shtender. It sits
 between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly
 farther left, leaving 24 units beside D1 for the doorway. A plain opening

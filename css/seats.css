@@ -123,6 +123,9 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-stage{min-width:100%;max-width:none}
 .room-diagram{display:block;width:100%;height:auto;color:#23354a;--seat-fill:#edf3f7;--table-fill:#fbf5e8;--object-fill:#f1f3f4}
 .room-diagram.monochrome{color:#111;--seat-fill:#fff;--table-fill:#fff;--object-fill:#fff}
+.room-object>.object-surface.cabinet-designed-surface{fill:#fff}
+.cabinet-design{fill:#fff;stroke:currentColor;stroke-width:.8;stroke-linejoin:round;pointer-events:none}
+.cabinet-design .cabinet-frame,.cabinet-design .book-band{fill:none}
 .room-boundary{fill:#fff;stroke:currentColor;stroke-width:3}
 .aron{fill:var(--table-fill);stroke:currentColor;stroke-width:1.5}
 .aron-label,.room-landmark .seat-name{font-family:Georgia,'David Libre',serif;font-weight:600;fill:currentColor}
