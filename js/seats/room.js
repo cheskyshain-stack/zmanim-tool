@@ -1,5 +1,5 @@
 import { escAttr, escText } from '../util.js';
-import { seatsFront, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGHT_DOOR } from './model.js';
+import { seatsFront, SEATS_BOUNDS, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGHT_DOOR } from './model.js';
 
 export function seatsRoomFeatures(plan) {
   const cross = SEATS_CROSS_WALKWAY;
@@ -24,16 +24,22 @@ export function seatsRoomFeatures(plan) {
 }
 
 function seatsBookcaseDesign(object) {
-  const { width, height } = object, vertical = height > width, inset = 2;
-  const columns = vertical ? 1 : Math.max(1, Math.round(width / (height * 1.8)));
-  const rows = vertical ? Math.max(1, Math.round(height / (width * 1.15))) : 1;
-  const bayWidth = (width - inset * 2) / columns, bayHeight = (height - inset * 2) / rows;
+  const vertical = object.height > object.width, inset = 2;
+  const width = vertical ? object.height : object.width, height = vertical ? object.width : object.height;
+  const centerX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right) / 2, centerY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom) / 2;
+  const facing = vertical ? object.x + object.width / 2 < centerX ? 'east' : 'west'
+    : object.y + object.height / 2 < centerY ? 'south' : 'north';
+  // Draw one horizontal run, then turn its books toward the room's interior.
+  const transform = facing === 'east' ? `translate(${object.width} 0) rotate(90)`
+    : facing === 'west' ? `translate(0 ${object.height}) rotate(-90)`
+      : facing === 'south' ? `translate(${object.width} ${object.height}) rotate(180)` : '';
+  const columns = Math.max(1, Math.round(width / (height * 1.8)));
+  const bayWidth = (width - inset * 2) / columns, bayHeight = height - inset * 2;
   const n = value => Math.round(value * 100) / 100;
   const art = [`<rect class="cabinet-frame" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}"/>`];
-  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
-    const left = inset + column * bayWidth, top = inset + row * bayHeight, seed = row + column;
+  for (let column = 0; column < columns; column++) {
+    const left = inset + column * bayWidth, top = inset, seed = column;
     if (column) art.push(`<path class="cabinet-frame" d="M${n(left)} ${inset} V${height - inset}"/>`);
-    if (row) art.push(`<path class="cabinet-frame" d="M${inset} ${n(top)} H${width - inset}"/>`);
     const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = bayHeight - 2.2;
     const count = Math.max(3, Math.min(7, Math.floor(w / (h * .24 + 1.2)))), slot = w / count;
     for (let index = 0; index < count; index++) {
@@ -51,7 +57,7 @@ function seatsBookcaseDesign(object) {
       }
     }
   }
-  return `<g class="cabinet-design" aria-hidden="true">${art.join('')}</g>`;
+  return `<g class="cabinet-design" data-facing="${facing}"${transform ? ` transform="${transform}"` : ''} aria-hidden="true">${art.join('')}</g>`;
 }
 
 export function seatsCabinetArt(object, drawName, designed = false) {
