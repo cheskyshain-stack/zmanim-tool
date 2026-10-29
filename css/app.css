@@ -4241,6 +4241,42 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .poster.is-onepage.is-weeksheet .poster-legend {
   font-size: 10.5pt; font-weight: 700; line-height: 1.5;
 }
+
+/* The divider belongs to the letterhead, above the Netz title and location. */
+.poster.is-modern-vasikin { --netz-scale: 1; padding: var(--op-pad, 0.2in); }
+.poster.is-modern-vasikin .page-header {
+  flex: none; --sheet-header-scale: 0.88;
+  padding-bottom: 17px; margin-bottom: 14px;
+  border-bottom: 1.5pt solid var(--op-rule);
+}
+.netz-intro { flex: none; width: 100%; text-align: center; margin: 0 0 20px; padding: 5px 0 0; }
+.netz-motto { font-size: calc(18pt * var(--netz-scale)); line-height: 1.25; margin: 0 0 8px; }
+.netz-title {
+  font-family: inherit; font-size: calc(22pt * var(--netz-scale)); line-height: 1.25;
+  color: #000; margin: 0 0 6px; font-weight: 700;
+}
+.netz-location { font-size: calc(17pt * var(--netz-scale)); line-height: 1.25; margin: 0; }
+.netz-block { flex: none; width: 100%; }
+.poster.is-modern-vasikin .onepage-sec-head {
+  font-size: calc(22pt * var(--netz-scale)); line-height: 1.2; text-align: center; padding: 7px 10px; margin: 0;
+}
+.netz-days { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; direction: rtl; padding: 0 17px; }
+.netz-day { min-width: 0; position: relative; }
+.netz-day + .netz-day::before { content: ''; position: absolute; right: -13px; top: 48px; bottom: 2px; width: 1px; background: var(--op-hair); }
+.netz-day h3 { font-size: calc(19pt * var(--netz-scale)); line-height: 1.2; text-align: center; font-weight: 700; margin: 14px 0 7px; }
+.netz-rows { width: 100%; max-width: 310px; margin: auto; }
+.netz-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 32px; direction: rtl;
+  font-size: calc(22pt * var(--netz-scale)); line-height: 1.2;
+  padding: calc(8px * var(--netz-scale)) 10px; border-bottom: 0.5pt solid var(--op-hair); white-space: nowrap;
+}
+.netz-row:last-child { border-bottom: 0; }
+.netz-row strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.netz-kippur { margin-top: calc(26px * var(--netz-scale)); }
+.netz-kippur .netz-rows { padding-top: 7px; }
+.netz-footer { flex: none; width: 100%; margin-top: auto; padding-top: 8px; border-top: 1pt solid var(--op-rule); text-align: center; font-family: Georgia, serif; font-size: 8pt; line-height: 1.35; }
+.netz-footer p { margin: 0; }
+
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
 /* Air between the lines of a run that has been cut in two or three, and only there.
