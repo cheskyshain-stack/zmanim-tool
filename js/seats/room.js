@@ -23,7 +23,38 @@ export function seatsRoomFeatures(plan) {
     <g class="room-door closed-door" data-door="back-right" data-kind="closed" aria-label="Back right door"><path class="door-gap" d="M909 960 H959"/><path class="door-leaf" d="M909 960 H959 M909 956 V964 M959 956 V964"/></g>`;
 }
 
-export function seatsCabinetArt(object, drawName) {
+function seatsBookcaseDesign(object) {
+  const { width, height } = object, vertical = height > width, inset = 2;
+  const columns = vertical ? 1 : Math.max(1, Math.round(width / (height * 1.8)));
+  const rows = vertical ? Math.max(1, Math.round(height / (width * 1.15))) : 1;
+  const bayWidth = (width - inset * 2) / columns, bayHeight = (height - inset * 2) / rows;
+  const n = value => Math.round(value * 100) / 100;
+  const art = [`<rect class="cabinet-frame" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}"/>`];
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    const left = inset + column * bayWidth, top = inset + row * bayHeight, seed = row + column;
+    if (column) art.push(`<path class="cabinet-frame" d="M${n(left)} ${inset} V${height - inset}"/>`);
+    if (row) art.push(`<path class="cabinet-frame" d="M${inset} ${n(top)} H${width - inset}"/>`);
+    const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = bayHeight - 2.2;
+    const count = Math.max(3, Math.min(7, Math.floor(w / (h * .24 + 1.2)))), slot = w / count;
+    for (let index = 0; index < count; index++) {
+      const bookX = x + index * slot, bookHeight = h * (.72 + ((seed + index * 2) % 5) * .055), bottom = y + h;
+      if (index === count - 2 && seed % 3 === 0) {
+        const stack = bookHeight / 3;
+        for (let volume = 0; volume < 3; volume++) art.push(`<rect class="book-volume" x="${n(bookX + slot * .08)}" y="${n(bottom - bookHeight + volume * stack)}" width="${n(slot * .84)}" height="${n(stack - .45)}"/>`);
+      } else if (index === count - 1 && seed % 2 === 0) {
+        const lean = slot * .24, bookWidth = slot * .58, bookLeft = bookX + slot * (seed % 4 ? .34 : .1), shift = seed % 4 ? -lean : lean;
+        art.push(`<path class="book-volume leaning-book" d="M${n(bookLeft)} ${n(bottom)} L${n(bookLeft + shift)} ${n(bottom - bookHeight)} H${n(bookLeft + shift + bookWidth)} L${n(bookLeft + bookWidth)} ${n(bottom)} Z"/>`);
+      } else {
+        const bookWidth = slot * (.68 + ((seed + index) % 3) * .06), bookLeft = bookX + slot * .08, bookTop = bottom - bookHeight;
+        art.push(`<rect class="book-volume" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
+        if ((seed + index) % 3 === 0) art.push(`<path class="book-band" d="M${n(bookLeft)} ${n(bookTop + bookHeight * .22)} h${n(bookWidth)} M${n(bookLeft)} ${n(bookTop + bookHeight * .33)} h${n(bookWidth)}"/>`);
+      }
+    }
+  }
+  return `<g class="cabinet-design" aria-hidden="true">${art.join('')}</g>`;
+}
+
+export function seatsCabinetArt(object, drawName, designed = false) {
   const vertical = object.height > object.width;
   const length = vertical ? object.height : object.width, depth = vertical ? object.width : object.height;
   const spines = Array.from({ length: Math.max(0, Math.floor((length - 8) / 12)) }, (_, index) => {
@@ -31,7 +62,7 @@ export function seatsCabinetArt(object, drawName) {
     return vertical ? `<path d="M4 ${coordinate} h${object.width - 8}" class="shelf-line"/>`
       : `<path d="M${coordinate} 4 v${object.height - 8}" class="shelf-line"/>`;
   }).join('');
-  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface"/>${spines}`;
+  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface${designed ? ' cabinet-designed-surface' : ''}"/>${designed ? seatsBookcaseDesign(object) : spines}`;
   if (object.id.startsWith('rear-case-')) return surface;
   const labelWidth = Math.min(length - 6, Math.max(60, object.label.length * 5.5));
   return `${surface}<g transform="translate(${object.width / 2} ${object.height / 2})${vertical ? ' rotate(-90)' : ''}"><rect class="cabinet-label-bg" x="${-labelWidth / 2}" y="${-(depth - 6) / 2}" width="${labelWidth}" height="${depth - 6}"/>
