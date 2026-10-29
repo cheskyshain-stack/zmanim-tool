@@ -76,6 +76,15 @@ plus/minus/Current controls and position/focus during changes.
 The Occasion dropdown has Yom Tov, Rosh Chodesh and Other schedules sections.
 Rosh Hashana and Yom Kippur are one choice, opening the whole-occasion page with
 all its schedules. Netz is a separate direct choice for their combined Vasikin page.
+Netz has the approved New design: the original building picture and chart header,
+with the divider immediately below that header, then its motto, title and location.
+The two Rosh Hashana days appear side by side above the centered Yom Kippur schedule,
+with shaded section bars, ruled rows and the shul address at the foot. Keep all 15
+source times, including sunrise seconds and explanation traces. Old design retains
+the framed original. The public Special Schedules page uses the new Netz layout.
+Fit large margins without clipping text or splitting the portrait Letter page.
+`tests/modern-netz-design.cjs` checks both designs, years with Shabbos headings,
+margin extremes, original photo, explanation traces, public pages and native PDFs.
 Individual and paired pages remain in the Page dropdown. Selichos, Tzom Gedalia,
 Shabbos Shuva and the after-Yom-Kippur page are also separate other occasions.
 Rosh Chodesh appears once in the main Occasion dropdown and the Add-page Occasion

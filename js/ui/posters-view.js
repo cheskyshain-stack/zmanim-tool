@@ -947,7 +947,7 @@ export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(
         label: VS_TEXT.who,
         span: vasikin.span,
         when: when(vasikin.span.from, vasikin.span.to),
-        html: renderVasikinPoster(vasikin, settings),
+        html: renderModernVasikinPoster(vasikin, settings),
       });
     }
   }
@@ -1029,12 +1029,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false, chanukah = false, halfpage = false, shacharis = false, asaraDetailed = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, modernVasikin = false, both = false, chanukah = false, halfpage = false, shacharis = false, asaraDetailed = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
     + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
-    + `${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}${shacharis ? ' is-shacharis' : ''}${asaraDetailed ? ' is-asara-detailed' : ''}`;
+    + `${modernVasikin ? ' is-modern-vasikin' : ''}${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}${shacharis ? ' is-shacharis' : ''}${asaraDetailed ? ' is-asara-detailed' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -1199,14 +1199,28 @@ function renderRoshHashanaPoster(poster, settings) {
   return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
 }
 
-/** A מנין ותיקין sheet: the occasion and the year, the two lines that say whose minyan it is,
- *  and then five lines a day.
- *
- *  Nothing of its own. The title is the title every sheet on this tab carries, the two lines
- *  under it are .poster-line, which is what the שבת שובה sheet says its own lines with, the day
- *  headings are .poster-day, and the rows are the ראש השנה sheet's rows. It was drawn with a
- *  header block of its own for a while and that was a page layout nobody had asked for: a new
- *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
+/** The approved Netz layout, using the existing day's lines and explanation traces.
+ *  Sunrise keeps its seconds, with no generic whole-minute rounding note. */
+function renderModernVasikinPoster(poster, settings) {
+  const rows = day => `<div class="netz-rows">${day.lines.map(line => `<div class="netz-row">
+    <span lang="he">${escAttr(line.label)}</span><strong dir="ltr">${timeHtml({ text: line.text, trace: line.trace })}</strong>
+  </div>`).join('')}</div>`;
+  const sections = poster.sections.map((section, index) => `<section class="netz-block${index ? ' netz-kippur' : ''}">
+    <h3 class="onepage-sec-head" lang="he">${escAttr(section.heading)}</h3>
+    ${section.days.length > 1 ? `<div class="netz-days">${section.days.map(day => `<section class="netz-day">
+      <h3 lang="he">${escAttr(day.heading)}</h3>${rows(day)}</section>`).join('')}</div>` : rows(section.days[0])}
+  </section>`).join('');
+  const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
+  const body = `<div class="netz-intro">
+    <p class="netz-motto" lang="he">${escAttr(VS_TEXT.motto)}</p>
+    <h2 class="netz-title" lang="he">${escAttr(VS_TEXT.who)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <p class="netz-location" lang="he">${escAttr(VS_TEXT.where)} · <bdi dir="ltr">${escAttr(VS_TEXT.address)}</bdi></p>
+  </div>${sections}
+  ${address ? `<footer class="netz-footer" dir="ltr">${address.split('\n').map(line => `<p>${escAttr(line)}</p>`).join('')}</footer>` : ''}`;
+  return posterShell(settings, body, [], { onepage: true, chartHead: true, modernVasikin: true });
+}
+
+/** The original framed layout remains available under Old design. */
 function renderVasikinPoster(poster, settings) {
   /* The day's heading stands above its rows box rather than inside it, which the other sheets
      do not need and this one does: the rule between יום א' and יום ב' is drawn down the side of
@@ -2837,10 +2851,11 @@ export function fitPoster(container) {
     fitOnePage(container);
     fitSukkos(container);
     fitChanukah(container);
+    fitModernVasikin(container);
     fitHalfPage(container);
   };
   decide();
-  if (document.fonts.status !== 'loaded' && container.querySelector('.poster.is-halfpage,.poster.is-chanukah')) {
+  if (document.fonts.status !== 'loaded' && container.querySelector('.poster.is-halfpage,.poster.is-chanukah,.poster.is-modern-vasikin')) {
     document.fonts.ready.then(() => {
       if (document.body.contains(all[0])) keepPosition(container, decide);
     });
@@ -2864,6 +2879,32 @@ function fitChanukah(container) {
       if (sheet.querySelector('.poster-legend').getBoundingClientRect().bottom <= limit - 1) break;
     }
     sheet.style.zoom = zoom;
+  }
+}
+
+// Fit at the preview's actual zoom so phone row rounding cannot crowd the footer.
+function fitModernVasikin(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-modern-vasikin')) {
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    sheet.classList.toggle('is-mono', chosenInk === 'mono');
+    const fits = () => {
+      const rect = sheet.getBoundingClientRect(), css = getComputedStyle(sheet);
+      const zoom = rect.width / sheet.offsetWidth;
+      const bottom = rect.bottom - parseFloat(css.paddingBottom) * zoom;
+      const footer = sheet.querySelector('.netz-footer');
+      const last = sheet.querySelector('.netz-block:last-of-type');
+      return sheet.scrollHeight <= sheet.clientHeight && sheet.scrollWidth <= sheet.clientWidth
+        && last.getBoundingClientRect().bottom <= (footer ? footer.getBoundingClientRect().top - 8 * zoom : bottom) + 0.5 * zoom
+        && [...sheet.querySelectorAll('.netz-row,.netz-title,.netz-location')].every(el => {
+          const box = el.getBoundingClientRect();
+          return el.scrollWidth <= el.clientWidth + 1 && box.right <= rect.right - parseFloat(css.paddingRight) * zoom + 0.5
+            && box.left >= rect.left + parseFloat(css.paddingLeft) * zoom - 0.5;
+        });
+    };
+    for (let scale = 1; scale >= 0.7; scale = Math.round((scale - 0.025) * 1000) / 1000) {
+      sheet.style.setProperty('--netz-scale', scale);
+      if (fits()) break;
+    }
   }
 }
 
@@ -3064,8 +3105,9 @@ function resolveSpecialPage(entry, settings, year) {
   const original = entry.poster;
   const half = Boolean(original?.handout || entry.locations || chosenDesign === 'new' && HALF_PAGE_POSTERS.has(original?.key));
   const modern = entry.whole || original?.own || original?.handout || entry.locations
-    || chosenDesign === 'new' && (half || original?.key !== 'shuva' && Boolean(ONEPAGE_SECTIONS[original?.key]));
+    || chosenDesign === 'new' && (half || original?.key === 'vasikinboth' || original?.key !== 'shuva' && Boolean(ONEPAGE_SECTIONS[original?.key]));
   const render = () => {
+    if (modern && original?.key === 'vasikinboth') return renderModernVasikinPoster(entry.value, settings);
     if (original?.handout) return renderShacharisHandout(entry.value, settings, { standalone: true });
     if (half) return renderHalfSchedulePoster(entry.value, original.key, settings, { standalone: true, asaraShacharis: entry.locations ? 'locations' : 'compact' });
     if (modern && original?.key === 'slichos') return renderOnePagePoster({
@@ -3217,7 +3259,7 @@ export function renderPosters(container, state, routeChanged, tables) {
     margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD, padSteps: padSteps(), padLabel,
     ink: chosenInk, brk: chosenBreak, orientation: chosenOrientation,
     canPad: entries.some(entry => entry.modern || entry.half),
-    canColumns: entries.some(entry => entry.modern && !entry.half), canTurn: entries.some(entry => !entry.modern && entry.poster?.orientations),
+    canColumns: entries.some(entry => entry.modern && !entry.half && entry.poster?.key !== 'vasikinboth'), canTurn: entries.some(entry => !entry.modern && entry.poster?.orientations),
     copyText: Boolean(!chosenCollection && primary?.value && primary.poster?.erevText),
     conflict: primary?.conflict, conflictPick, chartLabel,
   }) + `<div id="poster-sheet">${chosenPrintPages.length ? renderSpecialPrintJob(chosenPrintPages, plan, groups, catalog, resolve, year)
