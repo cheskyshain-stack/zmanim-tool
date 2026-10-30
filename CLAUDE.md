@@ -1006,9 +1006,26 @@ Round the total minutes up before splitting into units, omit zero minutes at an 
 hour, and keep the existing minute refresh and return-to-tab refresh behavior.
 Keep each number together with its unit when the narrow Friday cards wrap.
 When both home time cards are present, align their headings, clock times and countdown
-areas in matching rows, with the event and room between the clock and countdown.
+areas in matching rows, with the Hebrew event and room above the large clock time,
+followed by the countdown.
 Keep the complete countdown wording and omit decorative card/hourglass icons in the
 pair so phone text has room. A single card retains its icon and wider inline layout.
+
+The candle-lighting half opens a ZIP-code lookup on tap or keyboard activation.
+Keep its ordinary visible design without a hint or extra label. The main card always
+retains the published shul location and time. ZIP results appear only in the dialog,
+for the clicked card's date, and never mutate settings, charts or the schedule API.
+Resolve five-digit U.S. ZIP locations through Hebcal's CORS-enabled Zmanim API,
+using only its location metadata, with quiet attribution inside the dialog.
+Calculate the result with the shared candle-lighting formula at zero elevation,
+using the configured minutes-before-sunset setting and the location's actual IANA
+offset at sunset. Show the city, date, local time zone and minutes-before-sunset.
+Keep requests on demand, cancel them on input changes, close or navigation, and
+prevent late responses from replacing a newer result. Pause home-card replacements
+while the dialog is open so minute ticks preserve the input and focus return.
+`tests/candle-lighting-lookup.mjs` and `tests/candle-lighting-lookup.cjs` cover
+location validation, calendar/time-zone cases, failures, keyboard/touch interaction,
+timer refreshes and preservation of the shul's displayed time and settings.
 
 The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
 read that off the chart's H column alone, which only ever has one on a **Friday with a שבת row

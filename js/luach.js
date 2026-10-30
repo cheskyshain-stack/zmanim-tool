@@ -26,6 +26,7 @@ import { hasParsha } from './hebrew-calendar.js';
 import { wireInstalledSystemBars } from './ui/system-bars.js';
 import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
 import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
+import { wireCandleLightingDialog } from './ui/candle-lighting-dialog.js';
 
 enableWebsitePreview(location.search);
 
@@ -36,6 +37,7 @@ const main = document.getElementById('main');
  *  reloading is a thing that happens. null means "whichever is next", the page's own
  *  default. */
 let weekShowing = null;
+let candleDialogCleanup = null;
 
 /** Reload this tab after it has sat open a full day, so a page left running on a kiosk or a
  *  phone that is never actually closed eventually picks up fresh data - a republished
@@ -68,6 +70,7 @@ const openedAt = Date.now();
 let lastInteraction = openedAt;
 const tabIsStale = () => Date.now() - openedAt >= REFRESH_AFTER_MS;
 const donationPanelOpen = () => Boolean(document.querySelector('.luach-give-frame:not([hidden])'));
+const candleDialogOpen = () => Boolean(main.querySelector('.luach-candle-dialog[open]'));
 
 /** What it takes to land back where the reader was. The page itself needs nothing saved -
  *  reload() repeats the same address - so this is only the scroll position and, on
@@ -116,21 +119,21 @@ function watchForStaleTab() {
   // The only trigger that waits rather than acting the moment it is asked: everything
   // else below is already a safe moment on its own.
   setInterval(() => {
-    if (!tabIsStale() || donationPanelOpen()) return;
+    if (!tabIsStale() || donationPanelOpen() || candleDialogOpen()) return;
     if (Date.now() - lastInteraction < IDLE_BEFORE_REFRESH_MS) return;
     reloadInPlace();
   }, 60000);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen()) reloadInPlace();
+    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
   });
   window.addEventListener('pageshow', (ev) => {
     // persisted: restored from the back-forward cache, i.e. a tab that sat aside for a
     // while - not the ordinary pageshow every fresh load also fires, which openedAt being
     // brand new already keeps tabIsStale() from acting on.
-    if (ev.persisted && tabIsStale() && !donationPanelOpen()) reloadInPlace();
+    if (ev.persisted && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
   });
   window.addEventListener('focus', () => {
-    if (tabIsStale() && !donationPanelOpen()) reloadInPlace();
+    if (tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
   });
 }
 
@@ -481,7 +484,8 @@ function nextUpHtml([minyan, candles]) {
     const when = howFar(item);
     const description = `<bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
       ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}`;
-    return `<div class="luach-next-box ${tone}">
+    const lookup = tone === 'is-candles' ? ` role="button" tabindex="0" aria-haspopup="dialog" aria-label="Candle lighting, ${escAttr(clock(item.mins))} ${escAttr(meridiem(item.mins))}. Look up another ZIP code" data-candle-date="${escAttr(item.serial)}"` : '';
+    return `<div class="luach-next-box ${tone}"${lookup}>
       <p class="luach-next-head">${escAttr(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
@@ -677,6 +681,11 @@ function startNextUp(published) {
     // the card could not come back when midnight rolled into a day that has one.
     const home = main.querySelector('.luach-home');
     if (!home) return stopNextUp(); // the page moved on
+    if (candleDialogOpen()) {
+      clearTimeout(nextUpTimer);
+      nextUpTimer = setTimeout(draw, 60000);
+      return;
+    }
     refreshHomeDate(settings);
     const items = nextUpState(published, settings);
     const html = nextUpHtml(items);
@@ -786,6 +795,7 @@ function renderHome(published) {
   // The card is drawn here as well as by the ticker, so the row is asked here too rather
   // than waiting for the first tick, which may be an hour off.
   markNextInline(main);
+  candleDialogCleanup = wireCandleLightingDialog(main, resolveSettings(published.settings));
   openTheDoor();
   startNextUp(published);
 
@@ -1217,6 +1227,8 @@ function stampPage(where) {
 }
 
 function route(published, { preserveWeekShowing = false } = {}) {
+  candleDialogCleanup?.();
+  candleDialogCleanup = null;
   const where = whereAmI();
   setPrintPage('letter landscape');
   // One address per page. Arriving on /#week leaves the bar reading /#week, which is a

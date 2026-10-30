@@ -169,6 +169,11 @@ async function fixtures() {
                 if (actualClock !== clock(item.mins) || time.querySelector('small').textContent !== meridiem(item.mins)) problems.push('clock text changed');
                 if (what.textContent !== item.name || (where?.textContent || '') !== (item.place || '')) problems.push('name or room text changed');
                 if ((when?.textContent || '').replace(/\u00a0/g, ' ') !== howFar(item)) problems.push('countdown text changed');
+                if (paired) {
+                  const description = box(column.querySelector('.luach-next-description'));
+                  if (description.bottom > box(time).top + 1) problems.push('event description is not above its time');
+                  if (when && box(time).bottom > box(column.querySelector('.luach-next-when')).top + 1) problems.push('countdown is not below its time');
+                }
                 const pieces = [...column.querySelectorAll('.luach-next-head,.luach-next-time,.luach-next-what,.luach-next-where,.luach-next-countdown')].map(el => {
                   const range = document.createRange();
                   range.selectNodeContents(el);
@@ -189,9 +194,9 @@ async function fixtures() {
                 }
                 const border = parseFloat(getComputedStyle(time).borderRightWidth);
                 if (border > 0 && ![what, where].filter(Boolean).every(el => overlaps(box(time), { ...box(el), left: box(time).left, right: box(time).right }))) problems.push('divider beside wrapped text');
-                alignment.push({ heading: box(column.querySelector('.luach-next-head')).top, time: box(time).top, countdown: when ? box(column.querySelector('.luach-next-when')).top : null });
+                alignment.push({ heading: box(column.querySelector('.luach-next-head')).top, description: paired ? box(column.querySelector('.luach-next-description')).top : null, time: box(time).top, countdown: when ? box(column.querySelector('.luach-next-when')).top : null });
               }
-              if (alignment.length === 2) for (const key of ['heading', 'time', 'countdown']) {
+              if (alignment.length === 2) for (const key of ['heading', 'description', 'time', 'countdown']) {
                 if (alignment.every(item => item[key] !== null) && Math.abs(alignment[0][key] - alignment[1][key]) > 1) problems.push('paired ' + key + ' rows misaligned');
               }
             }

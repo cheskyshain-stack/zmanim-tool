@@ -2406,12 +2406,12 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   .luach-next-what { font-size: 1.2rem; }
 }
 
-/* Paired cards share four rows: heading, time, description and countdown. The flexible
+/* Paired cards share four rows: heading, description, time and countdown. The flexible
    description row absorbs any extra room, leaving both times and countdowns aligned.
    Hide the decorative marks here so complete hour-and-minute wording has the full width. */
 .luach-next.is-paired .luach-next-box {
   display: grid; grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto auto 1fr auto; row-gap: 0.35rem;
+  grid-template-rows: auto 1fr auto auto; row-gap: 0.35rem;
   padding-inline: 0.65rem;
 }
 .luach-next.is-paired .luach-next-head {
@@ -2422,14 +2422,38 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next.is-paired .luach-next-main { display: contents; }
 .luach-next.is-paired .luach-next-mark,
 .luach-next.is-paired .luach-next-wait { display: none; }
-.luach-next.is-paired .luach-next-time { grid-row: 2; border: 0; padding: 0; }
+.luach-next.is-paired .luach-next-time { grid-row: 3; border: 0; padding: 0; }
 .luach-next.is-paired .luach-next-description {
-  grid-row: 3; min-height: 2rem; align-content: center; align-items: baseline;
+  grid-row: 2; min-height: 2rem; align-content: center; align-items: baseline;
 }
 .luach-next.is-paired .luach-next-when {
   grid-row: 4; margin: 0; min-height: 2.7em; font-size: 0.82rem; line-height: 1.35;
 }
 .luach-next-countdown { text-wrap: balance; }
+.luach-next-box[data-candle-date] { cursor: pointer; }
+.luach-next-box[data-candle-date]:focus-visible { outline: 2px solid #a88b43; outline-offset: -2px; border-radius: 10px; }
+.luach-candle-dialog { width: min(25rem,calc(100% - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 34px 24px 20px; overflow: auto; border: 1px solid #ded8c7; border-radius: 18px; background: #faf7f0; color: #142b46; text-align: left; box-shadow: 0 16px 48px #142b4638; font: 400 15px/1.5 Arial,sans-serif; }
+.luach-candle-dialog::backdrop { background: #142b4670; }
+.luach-candle-close { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #64707c; font: 400 28px/1 Arial,sans-serif; cursor: pointer; }
+.luach-candle-dialog h2 { margin: 0; font: 700 28px/1.2 Georgia,serif; }
+.luach-candle-date { margin: 8px 0 22px; color: #64707c; font-size: 13px; }
+.luach-candle-form label { display: block; margin-bottom: 6px; font-weight: 600; }
+.luach-candle-fields { display: flex; gap: 10px; }
+.luach-candle-fields input { flex: 1; min-width: 0; width: 0; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ccc7ba; border-radius: 10px; background: white; color: #142b46; font: 400 17px/1.3 Arial,sans-serif; }
+.luach-candle-fields button { min-height: 44px; padding: 10px 14px; border: 1px solid #142b46; border-radius: 10px; background: #142b46; color: white; font: 600 14px/1.3 Arial,sans-serif; cursor: pointer; }
+.luach-candle-fields button:disabled { opacity: .6; cursor: wait; }
+.luach-candle-dialog :is(input,button,a):focus-visible { outline: 2px solid #a88b43; outline-offset: 2px; }
+.luach-candle-status { margin: 14px 0 0; font-size: 13px; }
+.luach-candle-status:empty { display: none; }
+.luach-candle-status.is-result { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.luach-candle-result { margin-top: 20px; padding: 18px; border: 1px solid #ded8c7; border-radius: 12px; background: white; text-align: center; }
+.luach-candle-result p { margin: 0; }
+.luach-candle-location { font-weight: 600; }
+.luach-candle-result .luach-candle-clock { margin: 8px 0 4px; font: 700 40px/1.15 Georgia,serif; }
+.luach-candle-zone,.luach-candle-day,.luach-candle-method { color: #64707c; font-size: 12px; }
+.luach-candle-result .luach-candle-method { margin-top: 12px; }
+.luach-candle-credit { margin: 18px 0 0; color: #64707c; font-size: 11px; }
+.luach-candle-credit a { color: inherit; }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
 .luach-item {
