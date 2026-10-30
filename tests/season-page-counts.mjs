@@ -25,7 +25,7 @@ test('automatic charts replace the published three-part summer and align every w
   const before = JSON.stringify(config);
   const state = buildAutomaticCharts(config, tables, new Date('2026-10-29T12:00:00Z'));
   assert.deepEqual(state.sheets.find(s => s.id === 'auto-kayitz-5786').pageSizes, [11, 11]);
-  assert.deepEqual(state.sheets.find(s => s.id === 'auto-choref-5787').pageSizes, [10, 10, 8]);
+  assert.deepEqual(state.sheets.find(s => s.id === 'auto-choref-5787').pageSizes, [8, 10, 10]);
   for (const sheet of state.sheets.filter(s => s.season !== 'weekday')) {
     const companion = state.sheets.find(s => s.linkedSheetId === sheet.id);
     assert.equal(sheet.pageSizes.length, defaultSeasonPageCount(sheet.season, sheet.hebrewYear));
