@@ -4,7 +4,7 @@ const http = require('node:http');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
-const root = path.resolve(__dirname, '../dist');
+const root = process.env.CANDLE_LOOKUP_ROOT || path.resolve(__dirname, '../dist');
 const output = process.env.CANDLE_LOOKUP_OUTPUT || '/tmp/candle-lighting-lookup';
 const locations = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/candle-zip-locations.json')));
 fs.mkdirSync(output, { recursive: true });
@@ -56,6 +56,45 @@ const server = http.createServer((req, res) => {
       assert(await input.evaluate(el => el === document.activeElement));
       assert.match(await dialog.locator('.luach-candle-date').innerText(), /Friday, October 30, 2026/);
       assert.equal(requests.length, 0, 'Opening alone does not request a ZIP');
+      if (width < 760) {
+        // Model Android's keyboard: only visualViewport shrinks and pans, while
+        // the layout viewport stays full height. Desktop Chromium has no OS keyboard.
+        await page.evaluate(() => {
+          const view = visualViewport, fields = ['width', 'height', 'offsetTop', 'offsetLeft'];
+          const originals = fields.map(key => [key, Object.getOwnPropertyDescriptor(view, key)]);
+          const geometry = { width: innerWidth, height: innerHeight, offsetTop: 0, offsetLeft: 0 };
+          for (const key of fields) Object.defineProperty(view, key, { configurable: true, get: () => geometry[key] });
+          window.candleKeyboardViewport = {
+            set(values) { Object.assign(geometry, values); view.dispatchEvent(new Event('resize')); view.dispatchEvent(new Event('scroll')); },
+            restore() { for (const [key, descriptor] of originals) { if (descriptor) Object.defineProperty(view, key, descriptor); else delete view[key]; } view.dispatchEvent(new Event('resize')); },
+          };
+        });
+        for (const geometry of [
+          { width, height: 450, offsetTop: 0, offsetLeft: 0 },
+          { width, height: 360, offsetTop: 72, offsetLeft: 0 },
+          { width, height: 250, offsetTop: 0, offsetLeft: 0 },
+          { width, height: 180, offsetTop: 40, offsetLeft: 0 },
+          { width: width - 30, height: 340, offsetTop: 40, offsetLeft: 15 },
+        ]) {
+          await page.evaluate(geometry => window.candleKeyboardViewport.set(geometry), geometry);
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+          const measured = await dialog.evaluate(el => {
+            const box = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom }; };
+            return { layoutHeight: innerHeight, dialog: box(el), fields: box(el.querySelector('.luach-candle-fields')), scrollTop: el.scrollTop };
+          });
+          assert.equal(measured.layoutHeight, 900, 'Keyboard simulation leaves the layout viewport full height');
+          for (const [name, box] of Object.entries({ dialog: measured.dialog, fields: measured.fields })) {
+            assert(box.top >= geometry.offsetTop && box.bottom <= geometry.offsetTop + geometry.height,
+              name + ' stays above the keyboard: ' + JSON.stringify({ geometry, measured }));
+            assert(box.left >= geometry.offsetLeft && box.right <= geometry.offsetLeft + geometry.width);
+          }
+          assert(measured.fields.top >= measured.dialog.top && measured.fields.bottom <= measured.dialog.bottom, 'Both ZIP input and Show time are visible inside the scrolling dialog');
+          if (geometry.height === 450) await page.screenshot({ path: path.join(output, 'keyboard-area-' + width + '.png'), clip: { x: 0, y: 0, width, height: geometry.height } });
+          checks.push({ width, keyboardGeometry: geometry, measured });
+        }
+        await page.evaluate(() => window.candleKeyboardViewport.restore());
+        await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      }
       const submit = async zip => { await input.fill(zip); await dialog.getByRole('button', { name: 'Show time', exact: true }).click(); };
       await submit('1234');
       await status.filter({ hasText: 'five-digit' }).waitFor();
@@ -66,7 +105,9 @@ const server = http.createServer((req, res) => {
       assert.match(await dialog.locator('.luach-candle-location').innerText(), /Beverly Hills/);
       assert.equal(await dialog.locator('.luach-candle-clock').innerText(), '5:44 PM');
       assert.equal(await dialog.locator('.luach-candle-zone').innerText(), 'Pacific Daylight Time');
-      assert.match(await dialog.locator('.luach-candle-method').innerText(), /18 minutes before sunset/);
+      assert.equal(await dialog.locator('.luach-candle-countdown').innerText(), 'in 13 hours 27 minutes');
+      assert(!((await dialog.innerText()).includes('minutes before sunset')), 'The removed explanation stays off the popup');
+      assert(!(await input.evaluate(el => el === document.activeElement)), 'Valid submission dismisses the input keyboard');
       assert.equal(await trigger().locator('.luach-next-time').innerText(), shulTime);
       assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage })), saved);
       const bounds = await dialog.boundingBox();
@@ -74,6 +115,7 @@ const server = http.createServer((req, res) => {
       assert(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), 'The dialog fits without sideways scrolling');
       await page.screenshot({ path: path.join(output, 'result-' + width + '.png'), fullPage: true });
       await page.clock.fastForward(61000);
+      assert.notEqual(await dialog.locator('.luach-candle-countdown').innerText(), 'in 13 hours 27 minutes', 'The popup countdown refreshes while it stays open');
       assert(await dialog.isVisible(), 'Minute refresh preserves the dialog');
       assert.equal(await input.inputValue(), '90210');
       assert.equal(await trigger().locator('.luach-next-time').innerText(), shulTime);
@@ -115,6 +157,16 @@ const server = http.createServer((req, res) => {
         await dialog.locator('.luach-candle-location').filter({ hasText: 'Lakewood' }).waitFor();
         assert.equal(await dialog.locator('.luach-candle-clock').innerText(), '5:38 PM');
       }
+      await input.fill('08701');
+      await input.press('Enter');
+      await dialog.locator('.luach-candle-result:not([hidden])').waitFor();
+      assert(!(await input.evaluate(el => el === document.activeElement)), 'The keyboard Go action also blurs the ZIP input');
+      await page.clock.setSystemTime(new Date('2026-10-30T21:38:00Z'));
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      assert.equal(await dialog.locator('.luach-candle-countdown').innerText(), 'now');
+      await page.clock.setSystemTime(new Date('2026-10-30T21:44:00Z'));
+      await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+      assert.equal(await dialog.locator('.luach-candle-countdown').innerText(), 'Candle lighting has passed');
       if (width === 1440) {
         const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
         assert(await dialog.isHidden(), 'Printing dismisses the popup');

@@ -2432,7 +2432,7 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next-countdown { text-wrap: balance; }
 .luach-next-box[data-candle-date] { cursor: pointer; }
 .luach-next-box[data-candle-date]:focus-visible { outline: 2px solid #a88b43; outline-offset: -2px; border-radius: 10px; }
-.luach-candle-dialog { width: min(25rem,calc(100% - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 34px 24px 20px; overflow: auto; border: 1px solid #ded8c7; border-radius: 18px; background: #faf7f0; color: #142b46; text-align: left; box-shadow: 0 16px 48px #142b4638; font: 400 15px/1.5 Arial,sans-serif; }
+.luach-candle-dialog { position: fixed; inset: var(--candle-view-y,50%) auto auto var(--candle-view-x,50%); transform: translate(-50%,-50%); width: min(25rem,calc(var(--candle-view-width,100vw) - 32px)); max-width: calc(var(--candle-view-width,100vw) - 32px); max-height: calc(var(--candle-view-height,100dvh) - 32px); box-sizing: border-box; margin: 0; padding: 34px 24px 20px; overflow: auto; border: 1px solid #ded8c7; border-radius: 18px; background: #faf7f0; color: #142b46; text-align: left; box-shadow: 0 16px 48px #142b4638; font: 400 15px/1.5 Arial,sans-serif; }
 .luach-candle-dialog::backdrop { background: #142b4670; }
 .luach-candle-close { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #64707c; font: 400 28px/1 Arial,sans-serif; cursor: pointer; }
 .luach-candle-dialog h2 { margin: 0; font: 700 28px/1.2 Georgia,serif; }
@@ -2450,8 +2450,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-candle-result p { margin: 0; }
 .luach-candle-location { font-weight: 600; }
 .luach-candle-result .luach-candle-clock { margin: 8px 0 4px; font: 700 40px/1.15 Georgia,serif; }
-.luach-candle-zone,.luach-candle-day,.luach-candle-method { color: #64707c; font-size: 12px; }
-.luach-candle-result .luach-candle-method { margin-top: 12px; }
+.luach-candle-zone,.luach-candle-day { color: #64707c; font-size: 12px; }
+.luach-candle-result .luach-candle-countdown { margin-top: 12px; color: #7d652d; font-size: 14px; text-wrap: balance; }
 .luach-candle-credit { margin: 18px 0 0; color: #64707c; font-size: 11px; }
 .luach-candle-credit a { color: inherit; }
 
