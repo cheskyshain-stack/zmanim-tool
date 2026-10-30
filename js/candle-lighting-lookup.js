@@ -59,5 +59,6 @@ export function candleTimeAtLocation(serial, location, settings) {
   if (!Number.isFinite(mins)) throw new Error('The candle-lighting time could not be calculated.');
   const timeZoneName = new Intl.DateTimeFormat('en-US', { timeZone: location.timeZone, timeZoneName: 'long' })
     .formatToParts(sunsetInstant).find(part => part.type === 'timeZoneName').value;
-  return { mins, minutesBefore, timeZoneName, dayOffset: Math.floor(mins / 1440) };
+  const instant = date.getTime() + Math.round((mins - localSettings.timezone.utcOffset * 60) * 60000);
+  return { mins, minutesBefore, timeZoneName, dayOffset: Math.floor(mins / 1440), instant };
 }

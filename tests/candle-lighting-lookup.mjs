@@ -23,6 +23,8 @@ test('ZIP results retain the established formula across a year and all supported
   }
   assert.equal(JSON.stringify(settings), original, 'The shul settings are never changed');
   assert.equal(candleTimeAtLocation(serial('2026-10-30'), place('08701'), settings).mins, 17 * 60 + 38, 'Matches the posted Lakewood time');
+  assert.equal(new Date(candleTimeAtLocation(serial('2026-10-30'), place('08701'), settings).instant).toISOString(), '2026-10-30T21:38:00.000Z');
+  assert.equal(new Date(candleTimeAtLocation(serial('2026-10-30'), place('90210'), settings).instant).toISOString(), '2026-10-31T00:44:00.000Z', 'Countdown uses the selected location instant, including the next UTC day');
 });
 
 test('DST changes, Arizona, Hawaii and Puerto Rico use the location date and zone', () => {
