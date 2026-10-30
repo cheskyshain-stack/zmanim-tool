@@ -51,7 +51,9 @@ test('61 years keep Chanukah on one matching Shabbos/weekday part for every offe
       if (JSON.stringify(sizes) !== JSON.stringify(defaultPageSizes(weeks.length, count, 'choref'))) adjusted++;
     }
     assert.equal(JSON.stringify(weeks), before);
-    assert.equal(defaultSeasonPageSizes(weeks, 'choref', year).length, defaultSeasonPageCount('choref', year));
+    const defaults = defaultSeasonPageSizes(weeks, 'choref', year);
+    assert.equal(defaults.length, defaultSeasonPageCount('choref', year));
+    assert(Math.max(...defaults) - Math.min(...defaults) <= 1, year + ' keeps the default winter parts evenly balanced');
   }
   assert(adjusted > 0);
 });
@@ -61,8 +63,10 @@ test('winter thirds prefer the extra week in the middle, with Chanukah taking pr
   assert.deepEqual(defaultPageSizes(28, 3, 'choref'), [9, 10, 9]);
   assert.deepEqual(defaultPageSizes(29, 3, 'choref'), [10, 10, 9]);
   assert.deepEqual(defaultPageSizes(30, 3, 'choref'), [10, 10, 10]);
-  const winter = computeSeasonWeeks('choref', 5787, settings, tables).weeks;
-  assert.deepEqual(defaultSeasonPageSizes(winter, 'choref', 5787), [8, 10, 10]);
+  for (const year of [5784, 5787]) {
+    const winter = computeSeasonWeeks('choref', year, settings, tables).weeks;
+    assert.deepEqual(defaultSeasonPageSizes(winter, 'choref', year), [10, 9, 9]);
+  }
   for (const year of [5786, 5787, 5790]) {
     const weeks = computeSeasonWeeks('kayitz', year, settings, tables).weeks;
     for (const count of [1, 2, 3, 4, 8]) assert.deepEqual(defaultSeasonPageSizes(weeks, 'kayitz', year, count), defaultPageSizes(weeks.length, count, 'kayitz'));

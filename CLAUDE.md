@@ -148,8 +148,10 @@ first: 28 weeks is 9/10/9. Default winter boundaries must keep all Chanukah rows
 on one part, on both the
 Shabbos and weekday charts. Use `defaultSeasonPageSizes`, including each Shabbos
 anchor's preceding weekdays, so a Sunday tail is not split off. When a boundary
-cuts Chanukah, end the preceding part before the holiday and balance the remaining
-parts. In 5790 this is 9/10/9 weeks, matching the approved PDF: part one ends with
+cuts Chanukah, compare the safe boundaries before and after the holiday and
+rebalance the remaining parts. Choose the most even allocation, breaking ties
+before Chanukah. Thus 5784 and 5787 use 10/9/9 rather than 8/10/10. In 5790 the
+split remains 9/10/9, matching the approved PDF: part one ends with
 Vayeshev, part two runs Miketz through Terumah, and part three starts Tetzaveh.
 Keeping Chanukah together takes priority over balancing the parts evenly.
 Generate's default allocations use the same rule.

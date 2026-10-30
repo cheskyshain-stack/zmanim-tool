@@ -24,8 +24,10 @@ const server = http.createServer((req, res) => {
       });
       const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
       const settle = () => page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
-      for (const fixture of [{ season: 'kayitz', year: 5786, count: 2 }, { season: 'choref', year: 5786, count: 2 },
-        { season: 'choref', year: 5787, count: 3 }, { season: 'kayitz', year: 5787, count: 2 }, { season: 'choref', year: 5790, count: 3 }]) {
+      const fixtures = Array.from({ length: 7 }, (_, index) => 5784 + index).flatMap(year => ['choref', 'kayitz'].map(season => ({
+        season, year, count: season === 'choref' && [5784, 5787, 5790].includes(year) ? 3 : 2,
+      })));
+      for (const fixture of fixtures) {
         await page.goto(origin + '/admin/?split-check=' + fixture.season + '-' + fixture.year + '#generate');
         await page.locator('label[for=season-' + fixture.season + ']').click();
         await page.locator('input[name=hebrewYear]').fill(String(fixture.year));
@@ -33,11 +35,13 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.locator('input[name=numPages]').inputValue(), String(fixture.count));
         assert.equal(await page.locator('.page-size').count(), fixture.count, 'The allocation inputs match the default page count');
         const sizes = await page.locator('.page-size').evaluateAll(inputs => inputs.map(input => Number(input.value)));
+        assert(Math.max(...sizes) - Math.min(...sizes) <= 1, 'Default parts stay evenly balanced');
+        if (fixture.season === 'choref' && [5784, 5787].includes(fixture.year)) assert.deepEqual(sizes, [10, 9, 9]);
         if (fixture.season === 'choref' && fixture.year === 5790) assert.deepEqual(sizes, [9, 10, 9], 'Match the approved PDF, with Chanukah on the middle chart');
         await page.locator('#page-form button[type=submit]').click(); await page.locator('#pages .page').first().waitFor(); await settle();
         assert.equal(await page.locator('#pages .page').count(), fixture.count * 2);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
-        const times = await page.locator('#pages').evaluate(el => [...new Set(el.innerText.match(/\b\d{1,2}:\d{2}\b/g) || [])]);
+        const times = await page.locator('#pages').evaluate(el => [...new Set(el.innerText.match(/(?<![\d:])\d{1,2}:\d{2}(?::\d{2})?(?![\d:])/g) || [])]);
         await page.emulateMedia({ media: 'print' }); await settle();
         const geometry = await page.locator('#pages .page').evaluateAll(pages => pages.map(page => {
           const box = page.getBoundingClientRect(), footer = page.querySelector('.page-footer').getBoundingClientRect();
@@ -66,6 +70,8 @@ const server = http.createServer((req, res) => {
       for (const sheet of automatic) {
         const leap = [5784, 5787, 5790].includes(sheet.year);
         assert.equal(sheet.sizes.length, sheet.season === 'choref' && leap ? 3 : 2);
+        assert(Math.max(...sheet.sizes) - Math.min(...sheet.sizes) <= 1);
+        if (sheet.season === 'choref' && [5784, 5787].includes(sheet.year)) assert.deepEqual(sheet.sizes, [10, 9, 9]);
       }
       assert.deepEqual(automatic.find(s => s.season === 'kayitz' && s.year === 5786).sizes, [11, 11]);
       if (output) await page.screenshot({ path: path.join(output, width + '-public-summer.png'), fullPage: true });
