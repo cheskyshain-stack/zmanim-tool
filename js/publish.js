@@ -2,7 +2,7 @@ import { websiteNow } from './website-clock.js';
 import { loadTables } from './data-loader.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
 import { computeSeasonWeeks, computeWeekdayWeeks, nextAvailableYearFor } from './sheets/weeks.js';
-import { defaultSeasonPageCount, defaultPageSizes, alignPageSizesTo } from './pagination.js';
+import { defaultSeasonPageSizes, alignPageSizesTo } from './pagination.js';
 import { hebrewDateExtended } from './hebrew-calendar.js';
 import { excelSerial } from './zmanim/solar.js';
 // Publishing a season for the congregation.
@@ -181,7 +181,7 @@ export function firstWeekdayPageRangeForSummer(settings, tables) {
   const season = 'kayitz';
   const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
-  const sizes = defaultPageSizes(weeks.length, defaultSeasonPageCount(season, hebrewYear), season);
+  const sizes = defaultSeasonPageSizes(weeks, season, hebrewYear);
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
   const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
   const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
@@ -213,7 +213,7 @@ export function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : defaultPageSizes(s.weeks.length, defaultSeasonPageCount(s.season, s.year), s.season);
+    const sizes = valid(custom) ? custom : defaultSeasonPageSizes(s.weeks, s.season, s.year);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
