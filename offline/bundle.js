@@ -1517,8 +1517,8 @@ function defaultPageSizes(total, numPages, season) {
 }
 
 /** Keep every Chanukah week on one part, including its Sunday-Friday weekday rows.
- *  Prefer ending the preceding part before Chanukah, then balance the remaining
- *  parts. Keeping Chanukah together takes priority over balancing the parts evenly. */
+ *  Compare both safe sides of Chanukah and rebalance the remaining parts. Prefer
+ *  the most even result, breaking ties before the holiday. */
 function defaultSeasonPageSizes(weeks, season, hebrewYear, numPages = defaultSeasonPageCount(season, hebrewYear)) {
   const sizes = defaultPageSizes(weeks.length, numPages, season);
   if (season !== 'choref' || numPages < 2) return sizes;
@@ -1533,11 +1533,17 @@ function defaultSeasonPageSizes(weeks, season, hebrewYear, numPages = defaultSea
     const cut = cuts[i];
     if (cut <= first || cut > last) continue;
     const remainingParts = numPages - i;
-    const next = [first, last + 1].find(value => value > cuts[i - 1] && weeks.length - value >= remainingParts);
-    if (next == null) continue;
-    cuts[i] = next;
-    const tail = defaultPageSizes(weeks.length - next, remainingParts, season);
-    for (let j = 0; j < tail.length; j++) cuts[i + j + 1] = cuts[i + j] + tail[j];
+    const candidates = [first, last + 1].filter(value => value > cuts[i - 1] && weeks.length - value >= remainingParts)
+      .map(next => {
+        const adjusted = cuts.slice();
+        adjusted[i] = next;
+        const tail = defaultPageSizes(weeks.length - next, remainingParts, season);
+        for (let j = 0; j < tail.length; j++) adjusted[i + j + 1] = adjusted[i + j] + tail[j];
+        const counts = adjusted.slice(1).map((value, index) => value - adjusted[index]);
+        return { cuts: adjusted, next, spread: Math.max(...counts) - Math.min(...counts), squares: counts.reduce((sum, n) => sum + n * n, 0) };
+      });
+    candidates.sort((a, b) => a.spread - b.spread || a.squares - b.squares || a.next - b.next);
+    if (candidates.length) cuts.splice(0, cuts.length, ...candidates[0].cuts);
   }
   return cuts.slice(1).map((cut, index) => cut - cuts[index]);
 }
