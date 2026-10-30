@@ -143,12 +143,16 @@ Use `defaultSeasonPageCount` for the automatic charts, Generate defaults and the
 summer first-page badge range. Keep matching weekday parts aligned by date. Older
 published sheet splits must not restore the retired three-part default; explicit
 `chartLayouts` and saved local print copies retain their chosen layouts.
-Default winter boundaries must keep all Chanukah rows on one part, on both the
+Three-part winters use a balanced split, putting an extra week in the middle
+first: 28 weeks is 9/10/9. Default winter boundaries must keep all Chanukah rows
+on one part, on both the
 Shabbos and weekday charts. Use `defaultSeasonPageSizes`, including each Shabbos
-anchor's preceding weekdays, so a Sunday tail is not split off. Shift only a
-boundary that cuts Chanukah, to the closest safe boundary; on a tie, finish it on
-the earlier part. Keeping Chanukah together takes priority over the third part
-being shortest. Generate's default allocations use the same rule.
+anchor's preceding weekdays, so a Sunday tail is not split off. When a boundary
+cuts Chanukah, end the preceding part before the holiday and balance the remaining
+parts. In 5790 this is 9/10/9 weeks, matching the approved PDF: part one ends with
+Vayeshev, part two runs Miketz through Terumah, and part three starts Tetzaveh.
+Keeping Chanukah together takes priority over balancing the parts evenly.
+Generate's default allocations use the same rule.
 
 Seasonal charts and saved charts print on separate Letter pages without a visible
 paper/layout label above Print. Together on Letter and 11 x 17 choices are removed;

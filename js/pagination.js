@@ -14,25 +14,18 @@ export function validatePageSizes(total, sizes) {
   return null;
 }
 
-/** Even default split across `numPages` pages, used to pre-fill the page-size inputs before
- *  the user adjusts them, and to size a season chart's pages when nobody has typed
- *  a custom split.
- *
- *  A season's three pages split unevenly on purpose when the weeks do not divide by three,
- *  and the short page sits at whichever end the shul asked for rather than being spread a
- *  week at a time across all three. A 28 week חורף season is 10, 10, 8: the last page is the
- *  short one. A 28 week קיץ season is the same three numbers reversed, 8, 10, 10, the first
- *  page short. Each is two full pages of `ceil(total / 3)` and one page of whatever is left,
- *  which is never more than two weeks shorter than a full page.
- *
- *  Only for a season's own three pages: `season` has to be 'kayitz' or 'choref' and
- *  `numPages` has to be exactly 3, or this falls back to the plain even split, remainder
- *  absorbed by the earlier pages one at a time, which is what any other page count uses. */
+/** Balance winter thirds, putting an extra week in the middle first: 28 is 9/10/9.
+ *  The explicitly chosen three-page summer layout keeps its shorter first page.
+ *  Other page counts use an even split with the remainder on the earlier pages. */
 export function defaultPageSizes(total, numPages, season) {
-  if (numPages === 3 && (season === 'kayitz' || season === 'choref')) {
+  if (numPages === 3 && season === 'choref') {
+    const base = Math.floor(total / 3), remainder = total % 3;
+    return [base + (remainder === 2 ? 1 : 0), base + (remainder ? 1 : 0), base];
+  }
+  if (numPages === 3 && season === 'kayitz') {
     const full = Math.ceil(total / 3);
     const short = total - full * 2;
-    return season === 'choref' ? [full, full, short] : [short, full, full];
+    return [short, full, full];
   }
   const base = Math.floor(total / numPages);
   const rem = total % numPages;
@@ -40,8 +33,8 @@ export function defaultPageSizes(total, numPages, season) {
 }
 
 /** Keep every Chanukah week on one part, including its Sunday-Friday weekday rows.
- *  Move only the offending boundary. On an equal-distance choice, finish Chanukah
- *  on the earlier part. This takes priority over making the final part shortest. */
+ *  Prefer ending the preceding part before Chanukah, then balance the remaining
+ *  parts. Keeping Chanukah together takes priority over balancing the parts evenly. */
 export function defaultSeasonPageSizes(weeks, season, hebrewYear, numPages = defaultSeasonPageCount(season, hebrewYear)) {
   const sizes = defaultPageSizes(weeks.length, numPages, season);
   if (season !== 'choref' || numPages < 2) return sizes;
@@ -55,9 +48,12 @@ export function defaultSeasonPageSizes(weeks, season, hebrewYear, numPages = def
   for (let i = 1; i < cuts.length - 1; i++) {
     const cut = cuts[i];
     if (cut <= first || cut > last) continue;
-    const candidates = [last + 1, first].filter(value => value > cuts[i - 1] && value < cuts[i + 1]);
-    candidates.sort((a, b) => Math.abs(a - cut) - Math.abs(b - cut) || b - a);
-    if (candidates.length) cuts[i] = candidates[0];
+    const remainingParts = numPages - i;
+    const next = [first, last + 1].find(value => value > cuts[i - 1] && weeks.length - value >= remainingParts);
+    if (next == null) continue;
+    cuts[i] = next;
+    const tail = defaultPageSizes(weeks.length - next, remainingParts, season);
+    for (let j = 0; j < tail.length; j++) cuts[i + j + 1] = cuts[i + j] + tail[j];
   }
   return cuts.slice(1).map((cut, index) => cut - cuts[index]);
 }

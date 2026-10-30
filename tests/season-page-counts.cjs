@@ -33,7 +33,7 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.locator('input[name=numPages]').inputValue(), String(fixture.count));
         assert.equal(await page.locator('.page-size').count(), fixture.count, 'The allocation inputs match the default page count');
         const sizes = await page.locator('.page-size').evaluateAll(inputs => inputs.map(input => Number(input.value)));
-        if (fixture.season === 'choref' && fixture.year === 5790) assert.deepEqual(sizes, [11, 9, 8], 'Chanukah including its Sunday tail stays on the first chart');
+        if (fixture.season === 'choref' && fixture.year === 5790) assert.deepEqual(sizes, [9, 10, 9], 'Match the approved PDF, with Chanukah on the middle chart');
         await page.locator('#page-form button[type=submit]').click(); await page.locator('#pages .page').first().waitFor(); await settle();
         assert.equal(await page.locator('#pages .page').count(), fixture.count * 2);
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
@@ -70,17 +70,23 @@ const server = http.createServer((req, res) => {
       assert.deepEqual(automatic.find(s => s.season === 'kayitz' && s.year === 5786).sizes, [11, 11]);
       if (output) await page.screenshot({ path: path.join(output, width + '-public-summer.png'), fullPage: true });
       checks.push({ width, public: automatic });
+      await page.goto(origin + '/chart/?count=off&website-preview=2029-11-23T15%3A00%3A00.000Z');
+      await page.locator('#chart-host .page').first().waitFor(); await settle();
+      assert((await page.locator('.week-nav-when').innerText()).includes('December 1, 2029'), 'The first public part ends before Chanukah');
+      assert(!(await page.locator('#chart-host .shacharis-panel').innerText()).includes('חנוכה'));
+      if (output) await page.screenshot({ path: path.join(output, width + '-public-before-chanukah.png'), fullPage: true });
       await page.goto(origin + '/chart/?count=off&website-preview=2029-12-07T15%3A00%3A00.000Z');
       await page.locator('#chart-host .page').first().waitFor(); await settle();
-      assert((await page.locator('.week-nav-when').innerText()).includes('December 15, 2029'), 'The first public part includes the final Chanukah weekday row');
+      assert((await page.locator('.week-nav-when').innerText()).includes('December 8, 2029'));
+      assert((await page.locator('.week-nav-when').innerText()).includes('February 9, 2030'));
       assert((await page.locator('#chart-host .pages').innerText()).includes('חנוכה'));
-      if (output) await page.screenshot({ path: path.join(output, width + '-public-chanukah-first.png'), fullPage: true });
-      await page.goto(origin + '/chart/?count=off&website-preview=2029-12-23T15%3A00%3A00.000Z');
+      if (output) await page.screenshot({ path: path.join(output, width + '-public-chanukah-middle.png'), fullPage: true });
+      await page.goto(origin + '/chart/?count=off&website-preview=2030-03-01T15%3A00%3A00.000Z');
       await page.locator('#chart-host .page').first().waitFor(); await settle();
-      assert((await page.locator('.week-nav-when').innerText()).includes('December 22, 2029'));
-      assert(!(await page.locator('#chart-host .pages').innerText()).includes('חנוכה'), 'No Chanukah remainder is printed on the second part');
+      assert((await page.locator('.week-nav-when').innerText()).includes('February 16, 2030'));
+      assert(!(await page.locator('#chart-host .pages').innerText()).includes('חנוכה'), 'No Chanukah remainder is printed on the third part');
       if (output) await page.screenshot({ path: path.join(output, width + '-public-after-chanukah.png'), fullPage: true });
-      checks.push({ width, publicChanukah: 'first part only', secondPartStarts: '2029-12-22' });
+      checks.push({ width, publicChanukah: 'middle part only', secondPartStarts: '2029-12-08', thirdPartStarts: '2030-02-16' });
       await context.close();
     }
     assert.deepEqual(errors, []);

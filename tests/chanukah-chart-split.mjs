@@ -15,15 +15,17 @@ const touchedShabbos = week => chanukahYearFor(week.serial, settings) || chanuka
 const touchedWeekday = week => chanukahDaysInWeek(week.serial, settings).length > 0;
 const pagesContaining = (weeks, sizes, predicate) => splitWeeksIntoPages(weeks, sizes).map((page, index) => page.some(predicate) ? index : -1).filter(index => index >= 0);
 
-test('5790 keeps the final Sunday of Chanukah with the first part', () => {
+test('5790 matches the approved 9/10/9 PDF, with all Chanukah on the middle part', () => {
   const state = buildAutomaticCharts(config, tables, new Date('2026-10-30T12:00:00Z'));
   const sheet = state.sheets.find(s => s.id === 'auto-choref-5790'), weekday = state.sheets.find(s => s.linkedSheetId === sheet.id);
-  assert.deepEqual(sheet.pageSizes, [11, 9, 8]);
+  assert.deepEqual(sheet.pageSizes, [9, 10, 9]);
   const pages = splitWeeksIntoPages(sheet.weeks, sheet.pageSizes);
-  assert.equal(pages[0].at(-1).date.toISOString().slice(0, 10), '2029-12-15');
-  assert.equal(pages[1][0].date.toISOString().slice(0, 10), '2029-12-22');
-  assert.deepEqual(pagesContaining(sheet.weeks, sheet.pageSizes, touchedShabbos), [0]);
-  assert.deepEqual(pagesContaining(weekday.weeks, weekday.pageSizes, touchedWeekday), [0]);
+  assert.equal(pages[0].at(-1).date.toISOString().slice(0, 10), '2029-12-01');
+  assert.equal(pages[1][0].date.toISOString().slice(0, 10), '2029-12-08');
+  assert.equal(pages[1].at(-1).date.toISOString().slice(0, 10), '2030-02-09');
+  assert.equal(pages[2][0].date.toISOString().slice(0, 10), '2030-02-16');
+  assert.deepEqual(pagesContaining(sheet.weeks, sheet.pageSizes, touchedShabbos), [1]);
+  assert.deepEqual(pagesContaining(weekday.weeks, weekday.pageSizes, touchedWeekday), [1]);
   const sundayTail = weekday.weeks.find(week => week.date.toISOString().slice(0, 10) === '2029-12-15');
   assert.equal(chanukahDaysInWeek(sundayTail.serial, settings).length, 1, 'The partial final week contains a real Chanukah Sunday');
 });
@@ -34,7 +36,7 @@ test('61 years keep Chanukah on one matching Shabbos/weekday part for every offe
     const weeks = computeSeasonWeeks('choref', year, settings, tables).weeks;
     const weekday = computeWeekdayWeeks('choref', year, settings, tables).weeks;
     const before = JSON.stringify(weeks);
-    for (const count of [1, 2, 3, 4, 8]) {
+    for (let count = 1; count <= 8; count++) {
       const sizes = defaultSeasonPageSizes(weeks, 'choref', year, count);
       assert.equal(sizes.length, count); assert(sizes.every(size => size > 0));
       assert.equal(sizes.reduce((a, b) => a + b, 0), weeks.length);
@@ -54,9 +56,13 @@ test('61 years keep Chanukah on one matching Shabbos/weekday part for every offe
   assert(adjusted > 0);
 });
 
-test('unaffected winter splits and all summer defaults retain their existing allocation', () => {
+test('winter thirds prefer the extra week in the middle, with Chanukah taking priority', () => {
+  assert.deepEqual(defaultPageSizes(27, 3, 'choref'), [9, 9, 9]);
+  assert.deepEqual(defaultPageSizes(28, 3, 'choref'), [9, 10, 9]);
+  assert.deepEqual(defaultPageSizes(29, 3, 'choref'), [10, 10, 9]);
+  assert.deepEqual(defaultPageSizes(30, 3, 'choref'), [10, 10, 10]);
   const winter = computeSeasonWeeks('choref', 5787, settings, tables).weeks;
-  assert.deepEqual(defaultSeasonPageSizes(winter, 'choref', 5787), [10, 10, 8]);
+  assert.deepEqual(defaultSeasonPageSizes(winter, 'choref', 5787), [8, 10, 10]);
   for (const year of [5786, 5787, 5790]) {
     const weeks = computeSeasonWeeks('kayitz', year, settings, tables).weeks;
     for (const count of [1, 2, 3, 4, 8]) assert.deepEqual(defaultSeasonPageSizes(weeks, 'kayitz', year, count), defaultPageSizes(weeks.length, count, 'kayitz'));
