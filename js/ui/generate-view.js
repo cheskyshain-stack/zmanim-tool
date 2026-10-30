@@ -1,6 +1,6 @@
 import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
-import { validatePageSizes, defaultSeasonPageCount, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
+import { validatePageSizes, defaultSeasonPageCount, defaultSeasonPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 import { escText } from '../util.js';
 import { keepPosition } from './keep-position.js';
@@ -202,7 +202,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages, season);
+    const defaults = defaultSeasonPageSizes(weeks, season, hebrewYear, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }

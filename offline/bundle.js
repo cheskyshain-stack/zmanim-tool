@@ -1523,6 +1523,29 @@ function defaultPageSizes(total, numPages, season) {
   return Array.from({ length: numPages }, (_, i) => base + (i < rem ? 1 : 0));
 }
 
+/** Keep every Chanukah week on one part, including its Sunday-Friday weekday rows.
+ *  Move only the offending boundary. On an equal-distance choice, finish Chanukah
+ *  on the earlier part. This takes priority over making the final part shortest. */
+function defaultSeasonPageSizes(weeks, season, hebrewYear, numPages = defaultSeasonPageCount(season, hebrewYear)) {
+  const sizes = defaultPageSizes(weeks.length, numPages, season);
+  if (season !== 'choref' || numPages < 2) return sizes;
+  const firstDay = dateFromHebrew(25, 9, hebrewYear), lastDay = firstDay + 7;
+  const protectedWeeks = weeks.map((week, index) => week.serial >= firstDay && week.serial - 6 <= lastDay ? index : -1)
+    .filter(index => index >= 0);
+  if (protectedWeeks.length < 2) return sizes;
+  const first = protectedWeeks[0], last = protectedWeeks.at(-1);
+  const cuts = [0];
+  for (const size of sizes) cuts.push(cuts.at(-1) + size);
+  for (let i = 1; i < cuts.length - 1; i++) {
+    const cut = cuts[i];
+    if (cut <= first || cut > last) continue;
+    const candidates = [last + 1, first].filter(value => value > cuts[i - 1] && value < cuts[i + 1]);
+    candidates.sort((a, b) => Math.abs(a - cut) - Math.abs(b - cut) || b - a);
+    if (candidates.length) cuts[i] = candidates[0];
+  }
+  return cuts.slice(1).map((cut, index) => cut - cuts[index]);
+}
+
 /** Per-page counts that break `targetWeeks` at the same dates `sourceSizes` breaks
  *  `sourceWeeks` - so a Weekday chart's page 1 covers the same stretch of the year as
  *  its Shabbos sheet's page 1, even though the two lists aren't the same length (the
@@ -3323,7 +3346,7 @@ function firstWeekdayPageRangeForSummer(settings, tables) {
   const season = 'kayitz';
   const hebrewYear = nextAvailableYearFor(season, resolved);
   const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
-  const sizes = defaultPageSizes(weeks.length, defaultSeasonPageCount(season, hebrewYear), season);
+  const sizes = defaultSeasonPageSizes(weeks, season, hebrewYear);
   const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
   const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
   const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
@@ -3355,7 +3378,7 @@ function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : defaultPageSizes(s.weeks.length, defaultSeasonPageCount(s.season, s.year), s.season);
+    const sizes = valid(custom) ? custom : defaultSeasonPageSizes(s.weeks, s.season, s.year);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',
@@ -13054,7 +13077,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages, season);
+    const defaults = defaultSeasonPageSizes(weeks, season, hebrewYear, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
