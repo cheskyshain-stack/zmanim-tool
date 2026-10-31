@@ -29,7 +29,7 @@ export function wireCandleLightingDialog(root, settings) {
     dialog.style.setProperty('--candle-view-width', `${width}px`);
     dialog.style.setProperty('--candle-view-height', `${height}px`);
     dialog.style.setProperty('--candle-view-x', `${(view?.offsetLeft || 0) + width / 2}px`);
-    dialog.style.setProperty('--candle-view-y', `${(view?.offsetTop || 0) + height / 2}px`);
+    dialog.style.setProperty('--candle-view-y', `${(view?.offsetTop || 0) + 16}px`);
     // On a very short landscape screen, scroll only inside the dialog to keep the
     // complete input/button row above the keyboard. The page behind it stays put.
     if (document.activeElement === dialog.querySelector('input')) {

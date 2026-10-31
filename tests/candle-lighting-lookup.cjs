@@ -54,6 +54,7 @@ const server = http.createServer((req, res) => {
       await open();
       const dialog = page.locator('.luach-candle-dialog'), input = dialog.locator('input'), status = dialog.locator('[role=status]');
       assert(await input.evaluate(el => el === document.activeElement));
+      assert(Math.abs((await dialog.boundingBox()).y - 16) < 1, 'The popup opens near the top of the screen');
       assert.match(await dialog.locator('.luach-candle-date').innerText(), /Friday, October 30, 2026/);
       assert.equal(requests.length, 0, 'Opening alone does not request a ZIP');
       if (width < 760) {
@@ -83,6 +84,7 @@ const server = http.createServer((req, res) => {
             return { layoutHeight: innerHeight, dialog: box(el), fields: box(el.querySelector('.luach-candle-fields')), scrollTop: el.scrollTop };
           });
           assert.equal(measured.layoutHeight, 900, 'Keyboard simulation leaves the layout viewport full height');
+          assert(Math.abs(measured.dialog.top - geometry.offsetTop - 16) < 1, 'The popup stays at the top of the visible area');
           for (const [name, box] of Object.entries({ dialog: measured.dialog, fields: measured.fields })) {
             assert(box.top >= geometry.offsetTop && box.bottom <= geometry.offsetTop + geometry.height,
               name + ' stays above the keyboard: ' + JSON.stringify({ geometry, measured }));
@@ -111,6 +113,7 @@ const server = http.createServer((req, res) => {
       assert.equal(await trigger().locator('.luach-next-time').innerText(), shulTime);
       assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage })), saved);
       const bounds = await dialog.boundingBox();
+      assert(Math.abs(bounds.y - 16) < 1, 'Showing a result retains the same top position');
       assert(bounds.x >= 0 && bounds.x + bounds.width <= width && bounds.y >= 0 && bounds.y + bounds.height <= 900);
       assert(await dialog.evaluate(el => el.scrollWidth <= el.clientWidth), 'The dialog fits without sideways scrolling');
       await page.screenshot({ path: path.join(output, 'result-' + width + '.png'), fullPage: true });
