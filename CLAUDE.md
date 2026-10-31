@@ -1029,8 +1029,10 @@ while the dialog is open so minute ticks preserve the input and focus return.
 `tests/candle-lighting-lookup.mjs` and `tests/candle-lighting-lookup.cjs` cover
 location validation, calendar/time-zone cases, failures, keyboard/touch interaction,
 timer refreshes and preservation of the shul's displayed time and settings.
-Center the dialog inside `visualViewport`, tracking its height and offsets when the
-phone keyboard opens, closes or pans the visible area. Keep the ZIP field and Show
+Anchor the dialog 16px below the top of `visualViewport`, centered horizontally,
+so it opens in the top half of the screen and keeps the same top position when
+showing a result. Track its height and offsets when the phone keyboard opens,
+closes or pans the visible area. Keep the ZIP field and Show
 time button inside that area, scrolling only the dialog on short screens. Blur the
 ZIP field after a valid submission so the keyboard clears the result. Remove viewport
 listeners on close/navigation. Test keyboard geometry with the layout viewport held
