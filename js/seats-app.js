@@ -16,7 +16,7 @@ import { seatsChartName, seatsDatedChartName, seatsCopiedChartName } from './sea
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
-import { seatsSeatingRows, seatsSeatingCsv } from './seats/roster.js';
+import { seatsSeatingRows, seatsSeatingCsv, seatsRosterRows, seatsRosterCsv } from './seats/roster.js';
 import { seatsCreateNavigation } from './seats/navigation.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
@@ -256,14 +256,14 @@ function seatsStart(root, auth) {
     if (style.textContent !== css) style.textContent = css;
   }
   function renderSeatList() {
-    const rows = seatsSeatingRows(plan(), nameOrder);
+    const rows = seatsRosterRows(plan(), nameOrder);
     document.body.classList.remove('seats-people-mode');
     document.title = 'Seated names | ' + plan().name;
     setPrintPage('@page { size: letter portrait; margin: .5in; }');
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="back-to-chart">← Back to chart</button>
-      <section class="seats-roster-controls no-print"><div><h1>Alphabetical seat list</h1><p><bdi>${html(plan().name)}</bdi></p></div><div class="seats-roster-actions"><button type="button" data-action="download-seated-list" ${rows.length ? '' : 'disabled'}>Download CSV</button><button type="button" class="primary" data-action="print" ${rows.length ? '' : 'disabled'}>Print / PDF</button></div><label for="roster-sort">Sort names <select id="roster-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></label><p>Full names, seated people only. This list follows changes to the chart.</p></section>
-      <section id="seats-roster-print"><header class="seats-roster-title"><h2>7:30 Minyan</h2><div><strong>Seated names</strong><p>Sorted by ${nameOrder === 'last' ? 'last' : 'first'} name · ${rows.length} assigned ${rows.length === 1 ? 'seat' : 'seats'}</p></div></header>
-      ${rows.length ? `<div class="seats-roster-columns"><table class="seats-roster-table"><colgroup><col class="roster-name"><col class="roster-table"><col class="roster-seat"></colgroup><thead><tr><th scope="col">Name</th><th scope="col">Table</th><th scope="col">Seat</th></tr></thead><tbody>${rows.map(row => `<tr><td><bdi>${html(row.name)}</bdi></td><td><bdi>${html(row.table)}</bdi></td><td>${row.seat}</td></tr>`).join('')}</tbody></table></div>` : '<p class="empty-list">No seats assigned yet. Assign names on the chart to create this list.</p>'}</section>
+      <section class="seats-roster-controls no-print"><div><h1>Alphabetical seat list</h1><p><bdi>${html(plan().name)}</bdi></p></div><div class="seats-roster-actions"><button type="button" data-action="download-seated-list" ${rows.length ? '' : 'disabled'}>Download CSV</button><button type="button" class="primary" data-action="print" ${rows.length ? '' : 'disabled'}>Print / PDF</button></div><label for="roster-sort">Sort names <select id="roster-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></label><p>Each seated name appears once, with all its tables.</p></section>
+      <section id="seats-roster-print"><header class="seats-roster-title"><h2>7:30 Minyan</h2><div><strong>Seated names</strong><p>Sorted by ${nameOrder === 'last' ? 'last' : 'first'} name · ${rows.length} ${rows.length === 1 ? 'name' : 'names'}</p></div></header>
+      ${rows.length ? `<div class="seats-roster-columns"><table class="seats-roster-table"><colgroup><col class="roster-name"><col class="roster-table"></colgroup><thead><tr><th scope="col">Name</th><th scope="col">Table</th></tr></thead><tbody>${rows.map(row => `<tr><td><bdi>${html(row.name)}</bdi></td><td><bdi>${html(row.table)}</bdi></td></tr>`).join('')}</tbody></table></div>` : '<p class="empty-list">No seats assigned yet. Assign names on the chart to create this list.</p>'}</section>
       <p id="seats-notice" class="seats-notice no-print" role="status" aria-live="polite">${html(notice)}</p>`;
   }
   function createChart() {
@@ -560,7 +560,7 @@ function seatsStart(root, auth) {
     print: () => { if (editor.flush() === false) return; if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
     'seat-list': showSeatList,
     'back-to-chart': showChart,
-    'download-seated-list': () => download('seated-names.csv', seatsSeatingCsv(seatsSeatingRows(plan(), nameOrder)), 'text/csv;charset=utf-8'),
+    'download-seated-list': () => download('seated-names.csv', seatsRosterCsv(seatsRosterRows(plan(), nameOrder)), 'text/csv;charset=utf-8'),
     logout: () => auth.lock(),
     'rename-plan': () => { const name = window.prompt('Page name', plan().name); if (name?.trim()) change(() => { plan().name = name.trim().slice(0, 80); }, 'Page renamed.'); },
     'new-plan': createChart,
