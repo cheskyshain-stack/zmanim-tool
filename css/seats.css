@@ -237,8 +237,6 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .sharing-status{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:0 0 12px;padding:8px 11px;border:1px solid #d9dde1;border-radius:5px;background:#fff;font-size:12px}
 .sharing-state{font-weight:600;color:#88641b}
 .sharing-state.connected{color:#28664c}
-.sharing-peers{color:var(--seats-muted)}
-.table-seat.is-remote .seat-area{stroke:#347b60;stroke-width:2;fill:#e9f4ec}
 .sharing-dialog{max-width:580px;max-height:85vh;overflow:auto}
 .sharing-dialog p{font-size:13px;line-height:1.5}
 .sharing-dialog label{margin:12px 0 5px}

@@ -272,8 +272,11 @@ settings in the server history. History is paginated and Undo adds its own entry
 Older charts whose creation date was never recorded show Not recorded. Local
 dates and the 200 most recent local changes use a separate browser record; backup
 downloads include those records and restores retain known creation dates.
-Committed edits appear live, with the other organizer's name and active seat. Independent
-seat changes merge, Undo affects only that organizer's edits, and conflicting
+Committed edits appear live. Viewing a chart and typing an unfinished name do not
+announce the organizer's presence or active seat. There is no viewer list or remote
+seat highlight; saved edits still retain their author and time in change history.
+Independent seat changes merge, stale seat drafts require review before replacing
+a newer saved name, Undo affects only that organizer's edits, and conflicting
 offline changes are kept as a separate local copy. Restoring a backup creates
 independent local plans. Shared editing stays disabled until its Cloudflare service
 is deployed and `data/seats-sync.json` points to the verified service. See

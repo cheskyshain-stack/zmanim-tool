@@ -11,12 +11,12 @@ export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, restoreLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, restoreLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0, initialized = false;
-  let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
+  let peers = [], pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
   const trash = seatsCreateTrash({ dialog, request, restoreLocal, notify, getName: () => session?.name || profile,
@@ -157,18 +157,17 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     }
     if (localHistory.length) { metadata.updatedAt = localHistory.at(-1).at; metadata.updatedBy = localHistory.at(-1).by; metadata.history = localHistory; }
     keepDeletedCopy(entry.localId, metadata);
-    presence(); changed(); notify('Chart deleted from the website. Its copy on this device was kept.');
+    changed(); notify('Chart deleted from the website. Its copy on this device was kept.');
   }
   async function deleteChartFile(id, deviceOnly = false) {
     const plan = deviceOnly ? local(id) : sitePlans.find(plan => plan.id === id);
     if (!plan || !window.confirm('Move “' + plan.name + '” to Trash for 60 days ' + (deviceOnly ? 'on this device?' : 'on the website for everyone? Copies on devices will stay available.'))) return;
-    if (deviceOnly) { trash.archive(plan, chartMetadata(id)); entries.delete(id); persist(); changed(); removeLocal(id); watch(); presence(); changed(); }
+    if (deviceOnly) { trash.archive(plan, chartMetadata(id)); entries.delete(id); persist(); changed(); removeLocal(id); watch(); changed(); }
     else { await trash.requireService(); await request('/api/plans/' + encodeURIComponent(id), { method: 'DELETE' }); detachDeleted(id); }
     if (dialog.open && dialogMode === 'pages') { if (endpoint && session) await refreshSitePages(); else updatePlanLists(dialog.querySelector('#sharing-plans').innerHTML); trash.refresh(); }
   }
   function send(message) { if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
   function watch() { send({ type: 'watch', ids: [...new Set([...entries.values()].map(entry => entry.remoteId))] }); }
-  function presence() { send({ type: 'presence', planId: isViewingChart() ? entries.get(current()?.id)?.remoteId || null : null, seat: activeSeat }); }
   function transmit(entry) {
     if (!entry.ready || !entry.queue.length || !ready) return;
     const first = entry.queue[0];
@@ -201,7 +200,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (message.type === 'ready') {
       ready = true; retryCount = 0;
       for (const entry of entries.values()) { entry.ready = false; for (const operation of entry.queue) delete operation.sent; }
-      watch(); presence(); changed(); drainNameUploads();
+      watch(); changed(); drainNameUploads();
       if (dialog.open && dialogMode === 'names') refreshNameFiles();
       else if (dialog.open && dialogMode === 'pages') refreshSitePages();
       return;
@@ -211,8 +210,8 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       if (entry) applySnapshot(entry, message);
     } else if (message.type === 'plan-deleted') detachDeleted(message.id);
     else if (message.type === 'name-lists-changed' && dialog.open && dialogMode === 'names') refreshNameFiles();
-    else if (message.type === 'presence') { peers = message.peers || []; changed(); }
-    else if (message.type === 'busy') notify(message.name + ' is editing that seat. Choose another seat while they finish.');
+    else if (message.type === 'presence') peers = message.peers || [];
+    else if (message.type === 'busy') notify('That seat is being edited. Choose another seat while it is being saved.');
     else if (message.type === 'error') notify(message.error || 'That shared update could not be saved.');
     else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'pages') refreshSitePages();
     if (['plans-changed', 'name-lists-changed'].includes(message.type)) trash.refresh();
@@ -256,7 +255,6 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       const desired = clean(plan, entry.remoteId), changes = seatsSharedDiff(entry.observed, desired);
       if (changes.length) { entry.observed = desired; queueChanges(entry, changes); }
     }
-    presence();
   }
   function undo(redo = false) {
     const entry = entries.get(current().id), source = redo ? entry?.redo : entry?.undo;
@@ -280,21 +278,11 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   function peersHere() { const id = entries.get(current()?.id)?.remoteId; return id ? peers.filter(peer => peer.clientId !== clientId && peer.planId === id) : []; }
   function markup() {
     const entry = entries.get(current()?.id); if (!entry) return '';
-    const others = peersHere(), text = others.map(peer => peer.name + (peer.seat ? ' editing ' + peer.seat.replace(':', ' · Seat ').replace(/Seat (\d+)$/, (_, index) => 'Seat ' + (Number(index) + 1)) : ' is viewing this plan')).join(' · ');
-    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${entry.base.updatedBy ? `<span class="sharing-audit">Last edited by ${escText(entry.base.updatedBy)} · ${escText(formatDate(entry.base.updatedAt))}</span>` : ''}${text ? `<span class="sharing-peers">${escText(text)}</span>` : ''}`;
-  }
-  function decorate(root) {
-    root.querySelectorAll('.is-remote').forEach(node => { node.classList.remove('is-remote'); node.removeAttribute('data-organizer'); });
-    for (const peer of peersHere()) {
-      if (!peer.seat) continue;
-      const separator = peer.seat.lastIndexOf(':'), id = peer.seat.slice(0, separator), index = peer.seat.slice(separator + 1);
-      const node = root.querySelector('.room-stage [data-table="' + CSS.escape(id) + '"][data-seat="' + CSS.escape(index) + '"]');
-      if (node) { node.classList.add('is-remote'); node.dataset.organizer = peer.name; }
-    }
+    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${entry.base.updatedBy ? `<span class="sharing-audit">Last edited by ${escText(entry.base.updatedBy)} · ${escText(formatDate(entry.base.updatedAt))}</span>` : ''}`;
   }
   function canEdit(tableId, index) {
     const busy = peersHere().find(peer => peer.seat === tableId + ':' + index);
-    if (busy) { notify(busy.name + ' is editing that seat. Choose another seat while they finish.'); return false; }
+    if (busy) { notify('That seat is being edited. Choose another seat while it is being saved.'); return false; }
     return true;
   }
   function showDialog(contents) {
@@ -398,7 +386,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     } finally { publishing = false; changed(); }
     const entry = { localId: plan.id, remoteId, base: record, observed: clean(record.plan), queue: [], undo: [], redo: [], ready: false, error: '' };
     entries.set(plan.id, entry); pendingPublish = null; persist(); localChanged();
-    connect(); watch(); presence(); changed();
+    connect(); watch(); changed();
     dialog.close(); notify('Chart saved in Saved charts on the website. Later changes save automatically.');
   }
   async function copyChartFile(id, site) {
@@ -418,7 +406,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       if (!dialog.open || dialogMode !== 'pages' || panel !== dialog.querySelector('#sharing-plans')) return;
       if (!source) throw new Error('This chart is no longer available. Refresh Saved charts and try again.');
       if (!copyChart(source, sitePlans.map(plan => seatsChartName(plan.name, seatsRecordMetadata(plan))))) return;
-      dialog.close(); presence();
+      dialog.close();
       if (site) {
         try { await publish(); }
         catch (error) { notify('Your copy is saved on this device. Press Save to put it on the website. ' + error.message); }
@@ -440,7 +428,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     entries.set(localId, entry);
     applySnapshot(entry, { ...record, type: 'snapshot' });
     updatePlan(localId, clean(entry.observed, localId), true); persist();
-    dialog.close(); connect(); watch(); presence(); changed();
+    dialog.close(); connect(); watch(); changed();
     if (pendingPage === id) clearPageLink();
   }
   async function continueIntent() {
@@ -494,7 +482,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'cancel-name-upload') { const file = nameUploads.find(file => file.id === button.dataset.id); if (file && window.confirm('Delete “' + file.name + '” from name files? Names on charts will stay.')) { file.remove = true; persistNameUploads(); renderPendingNames(); drainNameUploads(); } return; }
     if (action === 'history-load') { loadHistory(button.dataset.before); return; }
     if (action === 'history-refresh') { showHistory(); return; }
-    if (action === 'local') { if (activatePage(button.dataset.id) !== false) { dialog.close(); presence(); } return; }
+    if (action === 'local') { if (activatePage(button.dataset.id) !== false) dialog.close(); return; }
     if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
       if ([...entries.values()].some(entry => entry.queue.length) && !window.confirm('Some changes are waiting to sync. Sign out and keep them on this device?')) return;
@@ -551,7 +539,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   return {
     close: () => { openRequest++; nameEditor.cancel(); clearPageLink(); dialog.close(); },
     get dialogMode() { return dialog.open ? dialogMode === 'edit-names' ? 'names' : dialogMode : null; },
-    start, open, localChanged, label, markup, decorate, canEdit, uploadNameFile, viewChanged: presence, leavePageLink: clearPageLink,
+    start, open, localChanged, label, markup, canEdit, uploadNameFile, leavePageLink: clearPageLink,
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },
@@ -560,7 +548,6 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     linked: id => entries.has(id),
     canUndo: () => Boolean(entries.get(current()?.id)?.undo.length), canRedo: () => Boolean(entries.get(current()?.id)?.redo.length),
     undo: () => undo(), redo: () => undo(true),
-    activity: value => { activeSeat = value ? value.tableId + ':' + value.index : null; presence(); },
     flush: () => { if (!isBusy()) { const messages = pendingMessages; pendingMessages = []; messages.forEach(receive); } },
   };
 }

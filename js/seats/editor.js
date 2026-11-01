@@ -1,7 +1,7 @@
 import { escAttr, escText } from '../util.js';
 import { seatsWriteName, seatsItems, seatsSeatBlocked } from './model.js';
 
-export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true, onActivity = () => {} }) {
+export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true }) {
   const card = document.createElement('section');
   card.className = 'seat-editor no-print'; card.hidden = true;
   card.setAttribute('aria-label', 'Edit seat'); document.body.appendChild(card);
@@ -24,7 +24,6 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
   }
   function close() {
     active = null; card.hidden = true;
-    onActivity(null);
     document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
   }
   function save({ personId = null, duplicate = false, next = 0 } = {}) {
@@ -80,7 +79,6 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     onSelect(tableId);
     const person = personAt(tableId, index);
     active = { tableId, index, original: JSON.stringify(person ? { id: person.id, name: person.name } : null) };
-    onActivity({ tableId, index });
     const name = blocked ? person.name : initial ?? person?.name ?? '';
     card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
     card.hidden = false; position();

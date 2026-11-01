@@ -72,7 +72,7 @@ SEATS_WRANGLER_BIN=/path/to/wrangler node tests/seats-sharing.cjs
 
 The browser test uses fresh random ports, a local Workerd runtime, isolated
 temporary storage and three Chromium contexts. All test names are synthetic.
-It checks server PIN protection, presence, simultaneous assignments, draft text,
+It checks server PIN protection, private viewing and typing, simultaneous assignments, draft text,
 Undo/Redo, offline reconnection, reload persistence, desktop and phone layouts.
 The existing Seats browser and actual PDF print checks must also pass.
 
