@@ -139,6 +139,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .table-seat.assigned .seat-area{fill:var(--seat-fill)}
 .table-seat .seat-name{fill:currentColor;font-family:Arial,sans-serif;font-weight:400;pointer-events:none}
 .table-seat .empty-seat{font:11px Arial,sans-serif;fill:#737373;pointer-events:none}
+.table-seat.blocked-seat[aria-disabled=true]{cursor:default}
+.table-seat .blocked-seat-label{font:9px Arial,sans-serif;fill:#777;pointer-events:none}
 .chair-marker{fill:none;stroke:currentColor;stroke-width:.9;pointer-events:none}
 .pending-seats{font:11px Arial,sans-serif;fill:#777;pointer-events:none}
 .room-item{cursor:pointer}

@@ -29,10 +29,10 @@ print(json.dumps({'pages':len(doc),'printedNames':len(names),'fullNamesRetained'
 `;
 (async()=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
-  const {seatsCreateState,seatsWriteName,seatsAddNames}=await import('../js/seats/model.js'),{seatsParseDelimited}=await import('../js/seats/import.js');
+  const {seatsCreateState,seatsWriteName,seatsAddNames,seatsSeatBlocked}=await import('../js/seats/model.js'),{seatsParseDelimited}=await import('../js/seats/import.js');
   const sample=seatsCreateState(),plan=sample.plans[0];plan.name='SyntheticRosterTitle'.repeat(4);plan.paper='tabloid';
   let index=0;
-  for(const table of [...plan.tables,...plan.objects.filter(o=>o.type==='rav')])for(let seat=0;seat<table.count;seat++)seatsWriteName(plan,table.id,seat,'Person '+String(++index).padStart(3,'0')+' Family'+String(166-index).padStart(3,'0'),{duplicate:true});
+  for(const table of [...plan.tables,...plan.objects.filter(o=>o.type==='rav')])for(let seat=0;seat<table.count;seat++){const name='Person '+String(++index).padStart(3,'0')+' Family'+String(166-index).padStart(3,'0');if(seatsSeatBlocked(plan,table.id,seat)){const person={id:crypto.randomUUID(),name};plan.people.push(person);table.seats[seat]=person.id;}else seatsWriteName(plan,table.id,seat,name,{duplicate:true});}
   const a1=plan.tables.find(t=>t.id==='A1'),first=plan.people.find(p=>p.id===a1.seats[0]);plan.people.find(p=>p.id===a1.seats[1]).name=first.name;plan.people.find(p=>p.id===a1.seats[2]).name=first.name;
   plan.people.find(p=>p.id===a1.seats[3]).name='Z'.repeat(130);plan.tables.find(t=>t.id==='A2').label='Side table';seatsAddNames(plan,['Never Seated Person']);
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});

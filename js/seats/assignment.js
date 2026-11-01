@@ -1,4 +1,4 @@
-import { seatsItems } from './model.js';
+import { seatsItems, seatsSeatBlocked } from './model.js';
 
 export const seatsCanDragNames = () => matchMedia('(min-width:701px) and (pointer:fine)').matches;
 
@@ -9,7 +9,7 @@ export function seatsCreateAssignment(root, { getPlan, getMode, onStart, onEnd, 
   }
   function targetAt(x, y) {
     const node = document.elementFromPoint(x, y), seat = node?.closest('.room-stage .table-seat[data-seat]');
-    if (seat) return { node: seat, tableId: seat.dataset.table, index: Number(seat.dataset.seat) };
+    if (seat) return seatsSeatBlocked(getPlan(), seat.dataset.table, Number(seat.dataset.seat)) ? null : { node: seat, tableId: seat.dataset.table, index: Number(seat.dataset.seat) };
     const waiting = node?.closest('#people-list');
     return waiting ? { node: waiting, waiting: true } : null;
   }

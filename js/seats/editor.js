@@ -1,5 +1,5 @@
 import { escAttr, escText } from '../util.js';
-import { seatsWriteName, seatsItems } from './model.js';
+import { seatsWriteName, seatsItems, seatsSeatBlocked } from './model.js';
 
 export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true, onActivity = () => {} }) {
   const card = document.createElement('section');
@@ -39,12 +39,17 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
       return false;
     }
     close();
-    const ok = commit(() => seatsWriteName(getPlan(), target.tableId, target.index, name, { personId, duplicate }), 'Seat saved.');
+    const unchangedBlocked = seatsSeatBlocked(getPlan(), target.tableId, target.index) && name.trim() === (now?.name || '') && !personId && !duplicate;
+    const ok = unchangedBlocked || commit(() => seatsWriteName(getPlan(), target.tableId, target.index, name, { personId, duplicate }), 'Seat saved.');
     if (!ok) return false;
     if (next) {
       const seats = seatsItems(getPlan()).flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
       const index = seats.findIndex(seat => seat.tableId === target.tableId && seat.index === target.index);
-      const destination = seats[(index + next + seats.length) % seats.length];
+      let destination;
+      for (let step = 1; step <= seats.length; step++) {
+        const candidate = seats[(index + next * step + seats.length * step) % seats.length];
+        if (!seatsSeatBlocked(getPlan(), candidate.tableId, candidate.index)) { destination = candidate; break; }
+      }
       if (destination) open(destination.tableId, destination.index);
     } else seatNode(target.tableId, target.index)?.focus({ preventScroll: true });
   }
@@ -66,6 +71,8 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     position();
   }
   function open(tableId, index, initial) {
+    const blocked = seatsSeatBlocked(getPlan(), tableId, index);
+    if (blocked && !personAt(tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
     if (!canEdit(tableId, index)) return;
     if (active && save() === false) return;
     const table = seatsItems(getPlan()).find(entry => entry.id === tableId);
@@ -74,13 +81,19 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     const person = personAt(tableId, index);
     active = { tableId, index, original: JSON.stringify(person ? { id: person.id, name: person.name } : null) };
     onActivity({ tableId, index });
-    const name = initial ?? personAt(tableId, index)?.name ?? '';
+    const name = blocked ? person.name : initial ?? person?.name ?? '';
     card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
     card.hidden = false; position();
     const input = card.querySelector('input'); input.focus({ preventScroll: true });
+    if (blocked) {
+      input.readOnly = true;
+      card.querySelector('[type=submit]').disabled = true;
+      card.querySelector('[data-editor=paste]').disabled = true;
+      card.querySelector('p').textContent = 'This position is blocked by a pillar. Clear this name or drag it to another seat.';
+    }
     if (initial === undefined) input.select();
     else input.setSelectionRange(input.value.length, input.value.length);
-    suggest(); sync();
+    if (!blocked) suggest(); sync();
   }
   function sync() {
     document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
@@ -90,11 +103,12 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     const name = active && active.tableId === tableId && active.index === index ? card.querySelector('input').value.trim() : personAt(tableId, index)?.name;
     if (!name) { notify('This seat has no name to copy.'); return; }
     copied = name;
-    card.querySelector('[data-editor="paste"]')?.removeAttribute('disabled');
+    if (!active || !seatsSeatBlocked(getPlan(), active.tableId, active.index)) card.querySelector('[data-editor="paste"]')?.removeAttribute('disabled');
     notify('Name copied. Select another seat and use Paste name or Ctrl+V.');
   }
   function pasteName(tableId = active?.tableId, index = active?.index) {
     if (!copied || tableId === undefined) return;
+    if (seatsSeatBlocked(getPlan(), tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
     if (!canEdit(tableId, index)) return;
     close();
     commit(() => seatsWriteName(getPlan(), tableId, index, copied, { duplicate: true }), 'Copied name to a separate seat.');
