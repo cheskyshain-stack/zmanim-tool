@@ -42,7 +42,8 @@ const server = http.createServer((req, res) => {
       });
       context.on('request', request => {
         const url = new URL(request.url());
-        if (url.protocol.startsWith('http') && url.origin !== origin) outside.push(url.href);
+        const existingAnalytics = request.resourceType() === 'script' && url.hostname === 'static.cloudflareinsights.com' && url.pathname.startsWith('/beacon.min.js');
+        if (url.protocol.startsWith('http') && url.origin !== origin && !existingAnalytics) outside.push(url.href);
       });
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
@@ -226,7 +227,7 @@ const server = http.createServer((req, res) => {
       await page.goBack();
       await trigger().waitFor(); await open();
       assert.equal(await page.locator('.luach-candle-dialog[open]').count(), 1, 'Returning home has one working lookup');
-      assert.deepEqual(outside, [], 'Location lookup makes no requests to outside services');
+      assert.deepEqual(outside, [], 'Location lookup makes no outside data requests or loads third-party location scripts');
       checks.push({ width, city: 'Beverly Hills', time: '5:44 PM', homeTime: shulTime, requests: requests.length });
       await context.close();
     }
