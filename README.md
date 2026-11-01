@@ -221,6 +221,17 @@ Charts with information save locally as they are edited. The main actions are Sa
 beside Print. The chart name is editable inline. Save uploads the current chart to
 the website once; later edits save there automatically. Anyone signed in can open
 the chart from Saved charts and edit it. There is no separate sharing step.
+
+Seats checks for a newer build when opened or returned to the foreground, and
+periodically while connected. A cache-bypassing version request reloads the same
+chart with fresh versioned assets only when no seat editor, name-list draft,
+dialog, upload, drag, print job or shared save is in progress. The current chart
+and sign-in are retained, and a failed local backup prevents the reload. Offline
+or invalid version responses leave the tool working; a stale replacement response
+cannot start a reload loop. The build stamps matching versions into the Seats HTML
+and `/seats/version.json`. An older tab without this checker needs one fresh load
+before it can check subsequent releases automatically.
+
 Saved charts appear as a compact list with chart names, creation dates, last-edit
 dates and the last editor. Open a chart by its name; Copy chart and Delete stay beside it.
 When a website chart is listed, its linked device copy is hidden from On this device.

@@ -19,6 +19,7 @@ import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
 import { seatsSeatingRows, seatsSeatingCsv, seatsRosterRows, seatsRosterCsv } from './seats/roster.js';
 import { seatsCreateNavigation } from './seats/navigation.js';
 import { seatsFormatName } from './seats/name-format.js';
+import { seatsCreateUpdates } from './seats/updates.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
@@ -28,17 +29,20 @@ const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
 
 async function seatsEntry() {
   const root = document.getElementById('seats-app');
+  const updates = seatsCreateUpdates();
+  if (await updates.check()) return;
+  updates.protect(() => !root.querySelector('#seats-unlock'));
   const auth = await seatsOpenSession(root);
-  seatsStart(root, auth);
+  seatsStart(root, auth, updates);
 }
 
-function seatsStart(root, auth) {
+function seatsStart(root, auth, updates) {
   let state = seatsCreateState(), storageError = '', notice = '', selected = 'A1';
   let selectedPerson = null, search = '', showAssigned = false, zoom = 0, wholeRoom = false, history = [], future = [], importing = false;
   let readingNames = 0;
   let deletingNames = false, deleteSelection = new Set();
   let overflowTables = new Set(), drag = null, suppressClick = false, conflict = false;
-  let storedRaw = null, pinching = false;
+  let storedRaw = null, pinching = false, assigning = false;
   let sharing = null, navigation = null, printing = false, sharingLinks = '';
   let screen = 'home';
   let nameOrder = 'first';
@@ -131,8 +135,8 @@ function seatsStart(root, auth) {
   });
   const assignmentControls = seatsCreateAssignment(root, {
     getPlan: plan, getMode: () => 'people',
-    onStart: () => { suppressClick = true; },
-    onEnd: () => { setTimeout(() => { suppressClick = false; }, 0); },
+    onStart: () => { assigning = true; suppressClick = true; },
+    onEnd: () => { assigning = false; setTimeout(() => { suppressClick = false; }, 0); },
     onDrop: dropName,
   });
   const workspaceControls = seatsCreateWorkspace(root, {
@@ -797,6 +801,10 @@ function seatsStart(root, auth) {
       return true;
     },
   });
+  updates.protect(() => !conflict && !storageError && !readingNames && !importing && !drag && !assigning && !pinching && !printing && !sharing.updating
+    && !document.querySelector('dialog[open],.seat-editor:not([hidden])')
+    && !document.activeElement?.matches('input,textarea,select,[contenteditable="true"]')
+    && !root.querySelector('#new-names')?.value.trim(), save);
   render(); save(); zoomControls.refresh(); sharing.start();
 }
 

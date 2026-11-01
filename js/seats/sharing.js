@@ -567,6 +567,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },
+    get updating() { return publishing || copyingChart || uploadingNames || [...entries.values()].some(entry => entry.queue.length); },
     get nameFilesLabel() { return nameUploads.length ? 'Add names (' + nameUploads.length + (uploadingNames ? ' saving)' : ' waiting)') : 'Add names'; },
     get enabled() { return Boolean(endpoint); },
     linked: id => entries.has(id),
