@@ -2454,8 +2454,6 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-candle-result .luach-candle-clock { margin: 8px 0 4px; font: 700 40px/1.15 Georgia,serif; }
 .luach-candle-zone,.luach-candle-day { color: #64707c; font-size: 12px; }
 .luach-candle-result .luach-candle-countdown { margin-top: 12px; color: #7d652d; font-size: 14px; text-wrap: balance; }
-.luach-candle-credit { margin: 18px 0 0; color: #64707c; font-size: 11px; }
-.luach-candle-credit a { color: inherit; }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
 .luach-item {

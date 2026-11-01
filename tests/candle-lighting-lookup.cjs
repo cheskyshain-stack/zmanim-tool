@@ -61,6 +61,7 @@ const server = http.createServer((req, res) => {
       const open = async () => { if (width < 760) await trigger().tap(); else await trigger().click(); await page.locator('.luach-candle-dialog[open]').waitFor(); };
       await open();
       const dialog = page.locator('.luach-candle-dialog'), input = dialog.locator('input'), status = dialog.locator('[role=status]');
+      assert.equal(await dialog.locator('a[href*="NOTICE"],.luach-candle-credit').count(), 0, 'The popup has no data-source credit link');
       assert(await input.evaluate(el => el === document.activeElement));
       assert(Math.abs((await dialog.boundingBox()).y - 16) < 1, 'The popup opens near the top of the screen');
       assert.match(await dialog.locator('.luach-candle-date').innerText(), /Friday, October 30, 2026/);
