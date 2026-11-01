@@ -13,8 +13,11 @@ Only the congregation site's origin is allowed. Request logging is disabled.
 Local plans and backups stay available. Sharing is opt-in: choose Save to site,
 then Save this plan to the site. The second organizer chooses Shared plans and
 opens that same plan. Each subsequent committed edit saves automatically. The
-other person's name and active seat appear beside the chart. Draft typing remains
-local until saved with Enter, Tab, Save, or selecting another seat.
+active seat is reserved and highlighted anonymously for other editors. There is
+no viewer list or live organizer name. Only open seat editors send reservations;
+browsing a chart leaves its presence unset. The input waits for the service's
+reservation confirmation, and a busy seat cannot be typed into or saved. Draft
+typing remains local until saved with Enter, Tab, Save, or selecting another seat.
 
 Updates contain individual field and seat changes with their original values.
 Changes to different seats merge; a conflicting change is rejected as a unit.
@@ -72,7 +75,8 @@ SEATS_WRANGLER_BIN=/path/to/wrangler node tests/seats-sharing.cjs
 
 The browser test uses fresh random ports, a local Workerd runtime, isolated
 temporary storage and three Chromium contexts. All test names are synthetic.
-It checks server PIN protection, private viewing and typing, simultaneous assignments, draft text,
+It checks server PIN protection, private viewing, anonymous seat reservations,
+simultaneous same-seat clicks, independent assignments, draft text,
 Undo/Redo, offline reconnection, reload persistence, desktop and phone layouts.
 The existing Seats browser and actual PDF print checks must also pass.
 

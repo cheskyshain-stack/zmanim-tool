@@ -75,7 +75,7 @@ const server=http.createServer((request,response)=>{
     const dropTarget=await seat('A1').boundingBox();await page.mouse.move(dropTarget.x+dropTarget.width/2,dropTarget.y+dropTarget.height/2,{steps:15});await page.mouse.up();
     assert.equal(await assigned('A1'),yosef.id,'Drag from the list should assign the name');
     const draftId=await assigned('A3');
-    assert.equal((await plan()).people.find(person=>person.id===draftId)?.name,'Draft person','Dropping a name should save the open seat draft');
+    assert.equal((await plan()).people.find(person=>person.id===draftId)?.name,'Draft Person','Dropping a name should save and format the open seat draft');
     assert.equal(await page.locator('.seat-editor:visible').count(),0);
     async function moveSeat(from,to,copy=false){
       const a=await from.boundingBox(),b=await to.boundingBox();if(copy)await page.keyboard.down('Control');
@@ -127,7 +127,7 @@ const server=http.createServer((request,response)=>{
       const pdf=path.join(output,'assign-mode-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
       const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
       assert.match(info,/Pages:\s+1\b/);assert.match(info,paper==='letter'?/792 x 612 pts/:/1224 x 792 pts/);
-      assert.match(text,/Yosef Cohen/);assert.match(text,/Draft person/);assert.doesNotMatch(text,/Drag names|Upload names|Add names/);
+      assert.match(text,/Yosef Cohen/);assert.match(text,/Draft Person/);assert.doesNotMatch(text,/Drag names|Upload names|Add names/);
       await page.emulateMedia({media:'screen'});
     }
     await page.setViewportSize({width:375,height:850});

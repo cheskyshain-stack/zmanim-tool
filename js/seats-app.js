@@ -117,6 +117,8 @@ function seatsStart(root, auth) {
     seatNode: (tableId, index) => root.querySelector('.room-stage .table-seat[data-table="' + CSS.escape(tableId) + '"][data-seat="' + index + '"]'),
     onSelect: tableId => { selected = tableId; renderInPlace(); }, notify: alertMessage,
     canEdit: canEditSeat,
+    onActivity: value => sharing?.activity(value),
+    editStatus: (tableId, index) => sharing?.editStatus(tableId, index) || '',
   });
 
   const zoomControls = seatsCreateZoom(root, {
@@ -473,6 +475,7 @@ function seatsStart(root, auth) {
 
       <section id="seats-print" class="seats-print${current.paper === 'auto' ? ' auto-paper' : ''}"><header><h1 class="minyan-logo" aria-label="7:30 Minyan"><span class="minyan-logo-time">7:30</span> <span class="minyan-logo-name">Minyan</span></h1></header>${printRoom}</section>`;
     seatsPreparePrint(root.querySelector('#seats-print .room-diagram'), printGeometry);
+    sharing?.decorate(root);
     workspaceControls.refresh(); assignmentControls.refresh();
   }
   function dropName(data, target) {
@@ -772,6 +775,7 @@ function seatsStart(root, auth) {
       syncSaveStatus();
       const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Add names';
       const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
+      sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
     },
   });

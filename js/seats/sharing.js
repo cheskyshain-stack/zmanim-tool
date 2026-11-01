@@ -16,7 +16,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0, initialized = false;
-  let peers = [], pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
+  let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
   const trash = seatsCreateTrash({ dialog, request, restoreLocal, notify, getName: () => session?.name || profile,
@@ -168,6 +168,10 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function send(message) { if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
   function watch() { send({ type: 'watch', ids: [...new Set([...entries.values()].map(entry => entry.remoteId))] }); }
+  function reserveSeat() {
+    const entry = activeSeat ? entries.get(current()?.id) : null;
+    send({ type: 'presence', planId: entry?.remoteId || null, seat: entry ? activeSeat : null });
+  }
   function transmit(entry) {
     if (!entry.ready || !entry.queue.length || !ready) return;
     const first = entry.queue[0];
@@ -200,7 +204,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (message.type === 'ready') {
       ready = true; retryCount = 0;
       for (const entry of entries.values()) { entry.ready = false; for (const operation of entry.queue) delete operation.sent; }
-      watch(); changed(); drainNameUploads();
+      watch(); reserveSeat(); changed(); drainNameUploads();
       if (dialog.open && dialogMode === 'names') refreshNameFiles();
       else if (dialog.open && dialogMode === 'pages') refreshSitePages();
       return;
@@ -210,7 +214,12 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       if (entry) applySnapshot(entry, message);
     } else if (message.type === 'plan-deleted') detachDeleted(message.id);
     else if (message.type === 'name-lists-changed' && dialog.open && dialogMode === 'names') refreshNameFiles();
-    else if (message.type === 'presence') peers = message.peers || [];
+    else if (message.type === 'presence') {
+      peers = (message.peers || []).map(({ clientId, planId, seat }) => ({ clientId, planId, seat }));
+      const entry = activeSeat && entries.get(current()?.id);
+      if (entry && !peers.some(peer => peer.planId === entry.remoteId && peer.seat === activeSeat)) reserveSeat();
+      changed();
+    }
     else if (message.type === 'busy') notify('That seat is being edited. Choose another seat while it is being saved.');
     else if (message.type === 'error') notify(message.error || 'That shared update could not be saved.');
     else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'pages') refreshSitePages();
@@ -280,10 +289,25 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     const entry = entries.get(current()?.id); if (!entry) return '';
     return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${entry.base.updatedBy ? `<span class="sharing-audit">Last edited by ${escText(entry.base.updatedBy)} · ${escText(formatDate(entry.base.updatedAt))}</span>` : ''}`;
   }
+  function decorate(root) {
+    root.querySelectorAll('.is-remote').forEach(node => node.classList.remove('is-remote'));
+    for (const peer of peersHere()) {
+      if (!peer.seat) continue;
+      const separator = peer.seat.lastIndexOf(':'), id = peer.seat.slice(0, separator), index = peer.seat.slice(separator + 1);
+      root.querySelector('.room-stage [data-table="' + CSS.escape(id) + '"][data-seat="' + CSS.escape(index) + '"]')?.classList.add('is-remote');
+    }
+  }
   function canEdit(tableId, index) {
     const busy = peersHere().find(peer => peer.seat === tableId + ':' + index);
     if (busy) { notify('That seat is being edited. Choose another seat while it is being saved.'); return false; }
     return true;
+  }
+  function editStatus(tableId, index) {
+    const entry = entries.get(current()?.id);
+    if (!entry || !ready) return '';
+    const seat = tableId + ':' + index;
+    if (peersHere().some(peer => peer.seat === seat)) return 'That seat is being edited. Choose another seat while it is being saved.';
+    return peers.some(peer => peer.clientId === clientId && peer.planId === entry.remoteId && peer.seat === seat) ? '' : 'Checking that this seat is available…';
   }
   function showDialog(contents) {
     dialog.classList.toggle('saved-pages-dialog', ['pages', 'names', 'edit-names'].includes(dialogMode));
@@ -539,7 +563,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   return {
     close: () => { openRequest++; nameEditor.cancel(); clearPageLink(); dialog.close(); },
     get dialogMode() { return dialog.open ? dialogMode === 'edit-names' ? 'names' : dialogMode : null; },
-    start, open, localChanged, label, markup, canEdit, uploadNameFile, leavePageLink: clearPageLink,
+    start, open, localChanged, label, markup, decorate, canEdit, editStatus, uploadNameFile, leavePageLink: clearPageLink,
     metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },
@@ -548,6 +572,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     linked: id => entries.has(id),
     canUndo: () => Boolean(entries.get(current()?.id)?.undo.length), canRedo: () => Boolean(entries.get(current()?.id)?.redo.length),
     undo: () => undo(), redo: () => undo(true),
+    activity: value => { activeSeat = value ? value.tableId + ':' + value.index : null; peers = peers.filter(peer => peer.clientId !== clientId); reserveSeat(); },
     flush: () => { if (!isBusy()) { const messages = pendingMessages; pendingMessages = []; messages.forEach(receive); } },
   };
 }

@@ -272,9 +272,12 @@ settings in the server history. History is paginated and Undo adds its own entry
 Older charts whose creation date was never recorded show Not recorded. Local
 dates and the 200 most recent local changes use a separate browser record; backup
 downloads include those records and restores retain known creation dates.
-Committed edits appear live. Viewing a chart and typing an unfinished name do not
-announce the organizer's presence or active seat. There is no viewer list or remote
-seat highlight; saved edits still retain their author and time in change history.
+Committed edits appear live. Viewing a chart does not announce the organizer's
+presence. Only an active seat editor reserves that seat, with an anonymous highlight
+and busy-seat message for other editors. There is no viewer list or live organizer
+name. Shared seat inputs wait for the service to confirm the reservation, including
+when two organizers open the same seat together. Closing the editor or disconnecting
+releases it. Saved edits still retain their author and time in change history.
 Independent seat changes merge, stale seat drafts require review before replacing
 a newer saved name, Undo affects only that organizer's edits, and conflicting
 offline changes are kept as a separate local copy. Restoring a backup creates
