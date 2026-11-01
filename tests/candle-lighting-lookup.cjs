@@ -6,7 +6,6 @@ const { execFileSync } = require('node:child_process');
 const { chromium } = require('playwright');
 const root = process.env.CANDLE_LOOKUP_ROOT || path.resolve(__dirname, '../dist');
 const output = process.env.CANDLE_LOOKUP_OUTPUT || '/tmp/candle-lighting-lookup';
-const locations = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/candle-zip-locations.json')));
 fs.mkdirSync(output, { recursive: true });
 const server = http.createServer((req, res) => {
   let file = path.resolve(root, '.' + req.url.split('?')[0]);
@@ -23,19 +22,27 @@ const server = http.createServer((req, res) => {
   const checks = [], errors = [];
   try {
     for (const width of (process.env.CANDLE_LOOKUP_WIDTHS || '320,393,760,1440').split(',').map(Number)) {
-      const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 760, hasTouch: width < 760, reducedMotion: 'reduce' });
+      const context = await browser.newContext({ viewport: { width, height: 900 }, isMobile: width < 760, hasTouch: width < 760, reducedMotion: 'reduce', timezoneId: 'Europe/London' });
       await context.addInitScript(() => localStorage.setItem('zmanim-nocount', '1'));
+      await context.addInitScript(() => {
+        window.candleGeoCalls = 0;
+        const original = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+        navigator.geolocation.getCurrentPosition = (...args) => { window.candleGeoCalls++; return original(...args); };
+      });
       let mode = 'success', pending = null;
       const requests = [];
-      await context.route('https://www.hebcal.com/zmanim?**', async route => {
+      const outside = [];
+      await context.route('**/assets/location-data/v1/**', async route => {
         requests.push(route.request().url());
-        if (process.env.CANDLE_LOOKUP_REAL_API) return route.continue();
-        const zip = new URL(route.request().url()).searchParams.get('zip');
+        if (process.env.CANDLE_LOOKUP_REAL_DATA || !route.request().url().includes('/zips/')) return route.continue();
         if (mode === 'pending') await new Promise(resolve => { pending = resolve; });
         if (mode === 'network') return route.abort();
         if (mode === 'service') return route.fulfill({ status: 503, body: '{}' });
-        if (!locations[zip]) return route.fulfill({ status: 404, body: '{}' });
-        return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: JSON.stringify({ location: locations[zip], times: { sunset: 'ignore remote times' } }) });
+        return route.continue();
+      });
+      context.on('request', request => {
+        const url = new URL(request.url());
+        if (url.protocol.startsWith('http') && url.origin !== origin) outside.push(url.href);
       });
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
@@ -57,6 +64,7 @@ const server = http.createServer((req, res) => {
       assert(Math.abs((await dialog.boundingBox()).y - 16) < 1, 'The popup opens near the top of the screen');
       assert.match(await dialog.locator('.luach-candle-date').innerText(), /Friday, October 30, 2026/);
       assert.equal(requests.length, 0, 'Opening alone does not request a ZIP');
+      assert.equal(await page.evaluate(() => window.candleGeoCalls), 0, 'Opening the popup never requests device location');
       if (width < 760) {
         // Model Android's keyboard: only visualViewport shrinks and pans, while
         // the layout viewport stays full height. Desktop Chromium has no OS keyboard.
@@ -136,11 +144,11 @@ const server = http.createServer((req, res) => {
       await submit('00000');
       await status.filter({ hasText: 'not found' }).waitFor();
       assert(await dialog.locator('.luach-candle-result').isHidden(), 'Invalid ZIP removes any old result');
-      if (!process.env.CANDLE_LOOKUP_REAL_API) {
+      if (!process.env.CANDLE_LOOKUP_REAL_DATA) {
         mode = 'network'; await submit('10001');
         await status.filter({ hasText: 'internet connection' }).waitFor();
         mode = 'service'; await submit('10001');
-        await status.filter({ hasText: 'unavailable' }).waitFor();
+        await status.filter({ hasText: 'could not be loaded' }).waitFor();
         mode = 'pending'; await submit('10001');
         await page.waitForFunction(() => document.querySelector('.luach-candle-form').getAttribute('aria-busy') === 'true');
         await page.waitForTimeout(50);
@@ -150,7 +158,7 @@ const server = http.createServer((req, res) => {
         await dialog.locator('.luach-candle-location').filter({ hasText: 'Lakewood' }).waitFor();
         assert.equal(await dialog.locator('.luach-candle-clock').innerText(), '5:38 PM');
         assert.match(await dialog.locator('.luach-candle-zone').innerText(), /Eastern Daylight Time/);
-        mode = 'pending'; await submit('00901');
+        mode = 'pending'; await submit('96799');
         await page.waitForTimeout(50);
         await page.clock.fastForward(12001);
         await status.filter({ hasText: 'timed out' }).waitFor();
@@ -164,6 +172,36 @@ const server = http.createServer((req, res) => {
       await input.press('Enter');
       await dialog.locator('.luach-candle-result:not([hidden])').waitFor();
       assert(!(await input.evaluate(el => el === document.activeElement)), 'The keyboard Go action also blurs the ZIP input');
+      assert.equal(await page.evaluate(() => window.candleGeoCalls), 0, 'ZIP lookup never asks for device location');
+      await context.grantPermissions(['geolocation']);
+      for (const fixture of [
+        { latitude: 40.068, longitude: -74.205, clock: '5:38 PM', zone: 'Eastern Daylight Time' },
+        { latitude: 33.4484, longitude: -112.074, clock: '5:19 PM', zone: 'Mountain Standard Time' },
+      ]) {
+        await context.setGeolocation({ latitude: fixture.latitude, longitude: fixture.longitude, accuracy: 10 });
+        await dialog.getByRole('button', { name: 'Use my location', exact: true }).click();
+        await dialog.locator('.luach-candle-result:not([hidden])').waitFor();
+        assert.equal(await dialog.locator('.luach-candle-location').innerText(), 'Current location');
+        assert.equal(await dialog.locator('.luach-candle-clock').innerText(), fixture.clock);
+        assert.equal(await dialog.locator('.luach-candle-zone').innerText(), fixture.zone, 'GPS determines the zone rather than the device clock zone');
+        assert.equal(await trigger().locator('.luach-next-time').innerText(), shulTime);
+      }
+      assert.equal(await page.evaluate(() => window.candleGeoCalls), 2);
+      assert.equal(await page.evaluate(() => JSON.stringify({ ...localStorage })), saved, 'Device coordinates and settings are not persisted');
+      await page.screenshot({ path: path.join(output, 'gps-' + width + '.png'), fullPage: true });
+      await page.evaluate(() => { navigator.geolocation.getCurrentPosition = (success, error) => error({ code: 1 }); });
+      await dialog.getByRole('button', { name: 'Use my location', exact: true }).click();
+      await status.filter({ hasText: 'Location access was denied' }).waitFor();
+      await page.evaluate(() => { navigator.geolocation.getCurrentPosition = success => { window.candleLatePosition = success; }; });
+      await dialog.getByRole('button', { name: 'Use my location', exact: true }).click();
+      await status.filter({ hasText: 'Finding your location' }).waitFor();
+      await dialog.getByRole('button', { name: 'Close candle-lighting lookup' }).click();
+      await open(); await submit('11214');
+      await dialog.locator('.luach-candle-location').filter({ hasText: 'Brooklyn' }).waitFor();
+      await page.evaluate(() => window.candleLatePosition({ coords: { latitude: 40.068, longitude: -74.205 } }));
+      assert.match(await dialog.locator('.luach-candle-location').innerText(), /Brooklyn/, 'A cancelled location request cannot replace a later ZIP result');
+      await submit('08701');
+      await dialog.locator('.luach-candle-result:not([hidden])').waitFor();
       await page.clock.setSystemTime(new Date('2026-10-30T21:38:00Z'));
       await page.evaluate(() => window.dispatchEvent(new Event('focus')));
       assert.equal(await dialog.locator('.luach-candle-countdown').innerText(), 'now');
@@ -174,7 +212,7 @@ const server = http.createServer((req, res) => {
         const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true });
         assert(await dialog.isHidden(), 'Printing dismisses the popup');
         const text = execFileSync('pdftotext', ['-raw', '-', '-'], { input: pdf, encoding: 'utf8' });
-        assert(!text.includes('ZIP locations') && !text.includes('Show time'), 'Lookup controls are excluded from paper');
+        assert(!text.includes('Location data credits') && !text.includes('Use my location') && !text.includes('Show time'), 'Lookup controls are excluded from paper');
         fs.writeFileSync(path.join(output, 'home.pdf'), pdf);
         await open();
       }
@@ -188,6 +226,7 @@ const server = http.createServer((req, res) => {
       await page.goBack();
       await trigger().waitFor(); await open();
       assert.equal(await page.locator('.luach-candle-dialog[open]').count(), 1, 'Returning home has one working lookup');
+      assert.deepEqual(outside, [], 'Location lookup makes no requests to outside services');
       checks.push({ width, city: 'Beverly Hills', time: '5:44 PM', homeTime: shulTime, requests: requests.length });
       await context.close();
     }

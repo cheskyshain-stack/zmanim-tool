@@ -1173,7 +1173,12 @@ def main():
     # copied only top-level files and choked the moment a folder appeared.
     assets_out = OUT_DIR / "assets"
     assets_out.mkdir(exist_ok=True)
+    import shutil
+    shutil.rmtree(assets_out / "location-data", ignore_errors=True)
     for f in (ROOT / "assets").rglob("*"):
+        # ZIP/GPS lookup belongs to the public website, not the USB admin app.
+        if "location-data" in f.relative_to(ROOT / "assets").parts:
+            continue
         if not f.is_file():
             continue
         dest = assets_out / f.relative_to(ROOT / "assets")

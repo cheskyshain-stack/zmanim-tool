@@ -2,6 +2,7 @@ import { candleZipLocation, candleTimeAtLocation } from '../candle-lighting-look
 import { dateFromSerial } from '../zmanim/solar.js';
 import { clock, meridiem, howFar } from '../upcoming.js';
 import { websiteNow } from '../website-clock.js';
+import { candleDeviceLocation, CANDLE_LOCATION_ROOT } from '../location-data.js';
 
 /** Delegate from the stable homepage so minute-by-minute card replacements still work. */
 export function wireCandleLightingDialog(root, settings) {
@@ -62,27 +63,29 @@ export function wireCandleLightingDialog(root, settings) {
         <label for="luach-candle-zip">U.S. ZIP code</label>
         <div class="luach-candle-fields"><input id="luach-candle-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" aria-describedby="luach-candle-status" required><button type="submit">Show time</button></div>
       </form>
+      <button type="button" class="luach-candle-device">Use my location</button>
       <p id="luach-candle-status" class="luach-candle-status" role="status" aria-live="polite"></p>
       <div class="luach-candle-result" hidden><p class="luach-candle-location"></p><p class="luach-candle-clock"></p><p class="luach-candle-zone"></p><p class="luach-candle-day" hidden></p><p class="luach-candle-countdown" role="timer"></p></div>
-      <p class="luach-candle-credit">ZIP locations: <a href="https://www.hebcal.com/" target="_blank" rel="noopener noreferrer">Hebcal</a></p>`;
+      <p class="luach-candle-credit"><a href="${CANDLE_LOCATION_ROOT}/NOTICE.txt" target="_blank" rel="noopener noreferrer">Location data credits</a></p>`;
     root.appendChild(dialog);
     const form = dialog.querySelector('form'), input = dialog.querySelector('input'), button = form.querySelector('button');
+    const deviceButton = dialog.querySelector('.luach-candle-device');
     const status = dialog.querySelector('.luach-candle-status'), result = dialog.querySelector('.luach-candle-result');
-    const reset = () => { cancel(); stopCountdown(); button.disabled = false; form.removeAttribute('aria-busy'); status.textContent = ''; status.classList.remove('is-result'); result.hidden = true; input.removeAttribute('aria-invalid'); };
+    const reset = () => { cancel(); stopCountdown(); button.disabled = false; deviceButton.disabled = false; form.removeAttribute('aria-busy'); status.textContent = ''; status.classList.remove('is-result'); result.hidden = true; input.removeAttribute('aria-invalid'); };
     input.addEventListener('input', reset);
-    form.addEventListener('submit', async event => {
-      event.preventDefault(); reset();
+    const lookup = async useDevice => {
+      reset();
       const zip = input.value.trim();
-      if (!/^\d{5}$/.test(zip)) {
+      if (!useDevice && !/^\d{5}$/.test(zip)) {
         status.textContent = 'Enter a five-digit U.S. ZIP code.';
         input.setAttribute('aria-invalid', 'true'); input.focus({ preventScroll: true }); return;
       }
       input.blur();
-      button.disabled = true; form.setAttribute('aria-busy', 'true'); status.textContent = 'Looking up ZIP code…';
+      button.disabled = true; deviceButton.disabled = true; form.setAttribute('aria-busy', 'true'); status.textContent = useDevice ? 'Finding your location…' : 'Looking up ZIP code…';
       const current = generation, controller = new AbortController(); request = controller;
-      timer = setTimeout(() => controller.abort(), 12000);
+      timer = setTimeout(() => controller.abort(), useDevice ? 20000 : 12000);
       try {
-        const location = await candleZipLocation(zip, controller.signal);
+        const location = await (useDevice ? candleDeviceLocation(controller.signal) : candleZipLocation(zip, controller.signal));
         if (current !== generation || !dialog.open) return;
         const time = candleTimeAtLocation(serial, location, settings);
         dialog.querySelector('.luach-candle-location').textContent = location.title;
@@ -106,9 +109,11 @@ export function wireCandleLightingDialog(root, settings) {
         status.textContent = error.name === 'AbortError' ? 'The lookup timed out. Please try again.'
           : error instanceof TypeError ? 'Could not connect. Check your internet connection and try again.' : error.message;
       } finally {
-        if (current === generation) { clearTimeout(timer); timer = null; request = null; button.disabled = false; form.removeAttribute('aria-busy'); }
+        if (current === generation) { clearTimeout(timer); timer = null; request = null; button.disabled = false; deviceButton.disabled = false; form.removeAttribute('aria-busy'); }
       }
-    });
+    };
+    form.addEventListener('submit', event => { event.preventDefault(); lookup(false); });
+    deviceButton.addEventListener('click', () => lookup(true));
     dialog.querySelector('.luach-candle-close').addEventListener('click', () => dialog.close());
     dialog.addEventListener('click', event => {
       if (event.target !== dialog) return;
