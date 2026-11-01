@@ -1,0 +1,63 @@
+Enable 60-day Trash recovery for Seats using the existing Cloudflare login
+
+The website interface is being published by the web chat. Please deploy only the
+tested shared-service update. Do not publish, rebuild or roll back the website.
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Tested application commit: a837a878910897f99917ec6d640585a426dd6235
+Worker: zmanim-seats
+Cloudflare account: 04b085d9f19ac1ba6d333e0006fc94c1
+Configuration: worker/seats/wrangler.jsonc
+Existing endpoint: https://zmanim-seats.cheskyshain.workers.dev
+
+Why Desktop is needed:
+The web environment has no Cloudflare login. GitHub service-only run
+https://github.com/cheskyshain-stack/zmanim-tool/actions/runs/41277827248
+passed all 72 tests, then failed because CLOUDFLARE_API_TOKEN is missing.
+Use the Cloudflare login already available on this computer. Do not ask the user
+to paste a token into chat or commit a credential.
+
+Deployment:
+1. Fetch origin and use a fresh worktree at the exact tested application commit.
+   Preserve any existing working files and do not switch their checkout in place.
+2. Verify the configured account and existing zmanim-seats Worker.
+3. From that worktree run:
+   npx --yes wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+4. Preserve the existing SeatsWorkspace Durable Object binding, migration tag,
+   class, lakewood-commons object name, saved records and allowed origin.
+   No new binding, namespace or migration is needed. Do not delete stored data.
+
+What this update does:
+- Adds trash60Days:true to the authenticated /api/info response.
+- GET /api/trash lists deleted chart/name-file metadata for 60 days.
+- POST /api/plans/:id/restore and /api/name-lists/:id/restore restore the original
+  file ID and contents, retain creation dates and record the restoring organizer.
+- Restore requests include the original deletedAt timestamp. Retries are safe,
+  and delayed requests cannot undo a later deletion of that file.
+- Older soft-deleted files are included within their original 60-day deadline.
+- The daily alarm removes expired file contents and chart history after 60 days.
+  Small deletion markers remain so old offline uploads cannot recreate them.
+- The website blocks new shared deletions until this capability is available.
+  Device chart Trash and restore work independently of this deployment.
+
+Validation already completed:
+72 unit tests, including exact retention boundaries, legacy deleted records,
+idempotent restore, stale requests, original IDs/dates/assignments, history,
+folder limits, expiry cleanup and stale-upload protection.
+Real Chromium and local Workerd checks at phone/desktop widths cover restoring
+from another organizer's device, reload, name files, storage-full protection,
+the old-service gate, existing sharing, navigation and start screens.
+
+After deployment, verify read-only against production:
+- Send Origin: https://baismedrashoflakewoodcommons.org on all service requests.
+- POST /api/session with name "Trash activation check" and PIN "4444".
+- Keep its token in memory only and use Authorization: Bearer <token>.
+- GET /api/info must return HTTP 200 and trash60Days:true. Preserve all existing
+  feature flags, including editNameFiles, sharedNameFiles and changeHistory.
+- GET /api/trash must return HTTP 200 with a files array.
+- Do not print tokens, names, chart contents, file metadata or private history.
+- Do not delete or restore a real production chart/file as a deployment test.
+
+Report deployment success and the verified capability flag. No website PR merge
+or further code changes are needed. If deployment fails, report the exact blocker
+without claiming shared recovery is enabled.
