@@ -118,9 +118,13 @@ right edge with the same small gap from the right wall as the front tables.
 Their chairs stay in front of the shortened side bookcase. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
 A very small fixed bookcase sits against the left wall beside A7, clear of its table and chairs.
-Two fixed pillars occupy the chair positions at B7 seat 2 and C7 seat 4. Existing names
-are retained, and covered chair symbols are hidden. The remaining two pillar locations
-have not yet been specified.
+Two fixed pillars occupy the chair positions at B7 seat 2 and C7 seat 4. Those
+positions show Pillar and cannot receive a new assignment by typing, clicking,
+copying, dragging or the seat list. Tab and Shift+Tab skip them, and they do not
+count toward usable capacity. Existing names on an older blocked position remain
+visible, can be dragged out or cleared, and stay in reports and backups. Loading
+a chart never deletes those names. Front pillars placed before B4 and C4 align
+with the rear pair and leave all B4/C4 seats usable. Covered chair symbols are hidden.
 Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
 The same gap separates table rows from front to back, with a wider entrance walkway

@@ -1,6 +1,6 @@
 import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
-import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
+import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsSeatBlocked, seatsUsableCount, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
@@ -115,7 +115,7 @@ function seatsStart(root, auth) {
     getPlan: plan, commit: change,
     seatNode: (tableId, index) => root.querySelector('.room-stage .table-seat[data-table="' + CSS.escape(tableId) + '"][data-seat="' + index + '"]'),
     onSelect: tableId => { selected = tableId; renderInPlace(); }, notify: alertMessage,
-    canEdit: (tableId, index) => sharing?.canEdit(tableId, index) !== false,
+    canEdit: canEditSeat,
     onActivity: value => sharing?.activity(value),
   });
 
@@ -327,15 +327,15 @@ function seatsStart(root, auth) {
     }
     const commonFont = seatsCommonNameFont(nameLayouts);
     const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(displayName(name), x, y, width, height, id, Math.min(commonFont, maxFont));
-    const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + entry.count + ' seats'))}"` : '';
+    const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
       const labelY = table.y < SEATS_BOUNDS.top + 18 ? SEATS_BOUNDS.top - 5 - table.y : -5;
       const seats = Array.from({ length: count }, (_, index) => {
-        const name = people.get(table.seats[index]);
-        return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="0" aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || 'empty'))}"` : ''}>
+        const name = people.get(table.seats[index]), blocked = seatsSeatBlocked(current, table.id, index);
+        return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}${blocked ? ' blocked-seat' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="${blocked && !name ? '-1' : '0'}"${blocked && !name ? ' aria-disabled="true"' : ''} aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || (blocked ? 'Pillar, unavailable' : 'empty')))}"` : ''}>
           <rect class="seat-area" x="${svgNumber(index * width + 1)}" y="2" width="${svgNumber(Math.max(1, width - 2))}" height="${table.height - 4}"/>
-          ${name ? seatName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="empty-seat" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${index + 1}</text>`}
+          ${name ? seatName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="${blocked ? 'blocked-seat-label' : 'empty-seat'}" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${blocked ? 'Pillar' : index + 1}</text>`}
           ${seatsChairPillar(current, table.id, index + 1) ? '' : `<path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>`}
         </g>`;
       }).join('');
@@ -367,7 +367,7 @@ function seatsStart(root, auth) {
     </svg>`;
   }
   function tableOptions() {
-    return `<optgroup label="Tables">${plan().tables.map(table => `<option value="${attr(table.id)}" ${selected === table.id ? 'selected' : ''}>${html(table.label)}${table.count === null ? ' · seats not set' : ' · ' + table.count + ' seats'}</option>`).join('')}</optgroup>${plan().objects.length ? `<optgroup label="Room objects">${plan().objects.map(object => `<option value="${attr(object.id)}" ${selected === object.id ? 'selected' : ''}>${html(object.label)}</option>`).join('')}</optgroup>` : ''}`;
+    return `<optgroup label="Tables">${plan().tables.map(table => `<option value="${attr(table.id)}" ${selected === table.id ? 'selected' : ''}>${html(table.label)}${table.count === null ? ' · seats not set' : ' · ' + seatsUsableCount(plan(), table) + ' seats'}</option>`).join('')}</optgroup>${plan().objects.length ? `<optgroup label="Room objects">${plan().objects.map(object => `<option value="${attr(object.id)}" ${selected === object.id ? 'selected' : ''}>${html(object.label)}</option>`).join('')}</optgroup>` : ''}`;
   }
   function layoutPanel() {
     const entry = item(), isTable = entry && !entry.type, fixed = seatsIsFixed(entry);
@@ -423,7 +423,7 @@ function seatsStart(root, auth) {
   function peopleManualTools() {
     const table = seatsItems(plan()).find(entry => entry.id === selected);
     return `<details id="manual-names"><summary>Add names</summary><label for="new-names">One name per line</label><textarea id="new-names" rows="4" placeholder="English or Hebrew names"></textarea><button type="button" data-action="add-names">Add names</button></details>
-      <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}">${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || 'Empty')}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
+      <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}" ${seatsSeatBlocked(plan(), table.id, index) && !id ? 'disabled' : ''}>${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || (seatsSeatBlocked(plan(), table.id, index) ? 'Pillar' : 'Empty'))}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
   }
   function render() {
     navigation?.sync();
@@ -444,7 +444,7 @@ function seatsStart(root, auth) {
     if (!plan().people.length) deletingNames = false;
     overflowTables = new Set();
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
-    const capacity = seatsItems(current).reduce((total, table) => total + (table.count ?? 0), 0);
+    const capacity = seatsItems(current).reduce((total, table) => total + seatsUsableCount(current, table), 0);
     const room = diagram();
     const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
     document.title = 'Seats | ' + current.name;
@@ -481,6 +481,7 @@ function seatsStart(root, auth) {
     editor.flush(); editor.close();
     const person = plan().people.find(person => person.id === data.personId); if (!person) return;
     const source = seatsItems(plan()).find(table => table.seats.includes(person.id));
+    if (!target.waiting && seatsSeatBlocked(plan(), target.tableId, target.index)) return alertMessage('This position is blocked by a pillar. Choose another seat.');
     if (!target.waiting && sharing?.canEdit(target.tableId, target.index) === false) return;
     if (target.waiting) {
       if (source) change(() => seatsAssign(plan(), source.id, source.seats.indexOf(person.id), null), person.name + ' returned to the waiting list.');
@@ -497,11 +498,17 @@ function seatsStart(root, auth) {
       else seatsAssign(plan(), table.id, target.index, person.id);
     }, (copying ? 'Copied ' : 'Assigned ') + person.name + ' to ' + table.label + ', seat ' + (target.index + 1) + '.' + (previous && previous.id !== person.id ? ' ' + previous.name + ' is waiting for a seat.' : ''));
   }
+  function canEditSeat(tableId, index) {
+    const table = seatsItems(plan()).find(entry => entry.id === tableId);
+    if (seatsSeatBlocked(plan(), tableId, index) && !table?.seats[index]) { alertMessage('This position is blocked by a pillar. Choose another seat.'); return false; }
+    return sharing?.canEdit(tableId, index) !== false;
+  }
   function openSeat(tableId, index) {
-    if (sharing?.canEdit(tableId, index) === false) return;
+    if (!canEditSeat(tableId, index)) return;
     const table = seatsItems(plan()).find(entry => entry.id === tableId);
     if (!table || index >= (table.count ?? 0)) return;
     if (selectedPerson) {
+      if (seatsSeatBlocked(plan(), tableId, index)) return alertMessage('This position is blocked by a pillar. Choose another seat.');
       const person = plan().people.find(entry => entry.id === selectedPerson);
       change(() => seatsWriteName(plan(), table.id, index, person.name, { personId: person.id }), person.name + ' added to ' + table.label + ', seat ' + (index + 1) + '. Existing seats kept.');
       selectedPerson = null; renderInPlace(); return;

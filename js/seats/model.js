@@ -43,6 +43,18 @@ export function seatsChairPillar(plan, tableId, seat) {
     && object.y < top + 11 && object.y + object.height > top);
 }
 
+export const seatsSeatBlocked = (plan, tableId, index) => Boolean(seatsChairPillar(plan, tableId, index + 1));
+export const seatsUsableCount = (plan, table) => table.seats.reduce((total, _, index) => total + (seatsSeatBlocked(plan, table.id, index) ? 0 : 1), 0);
+
+export function seatsFrontPillars(plan) {
+  return [['B4', 'B7', 2], ['C4', 'C7', 4]].flatMap(([id, rearId, seat]) => {
+    const table = plan.tables.find(table => table.id === id), rear = plan.objects.find(object => object.id === 'seat-pillar-' + rearId + '-' + seat);
+    if (!table || plan.objects.some(object => object.id === 'front-pillar-' + id)) return [];
+    const center = rear ? rear.x + rear.width / 2 : table.x + table.width * (seat - .5) / (table.count || 5);
+    return [{ id: 'front-pillar-' + id, type: 'pillar', label: 'Pillar in front of ' + id, x: center - 10, y: table.y - 28, width: 20, height: 20 }];
+  });
+}
+
 function seatsMissingPillars(plan) {
   return SEATS_PILLAR_SEATS.flatMap(([id, seat]) => {
     const table = plan.tables.find(table => table.id === id);
@@ -56,7 +68,7 @@ function seatsAddPillars(plan) {
 
 export function seatsIsFixed(entry) {
   return entry?.type === 'cabinet' && [SEATS_A7_CABINET, ...SEATS_BACK_CABINETS].some(cabinet => cabinet.id === entry.id)
-    || entry?.type === 'pillar' && SEATS_PILLAR_SEATS.some(([id, seat]) => entry.id === 'seat-pillar-' + id + '-' + seat);
+    || entry?.type === 'pillar' && (SEATS_PILLAR_SEATS.some(([id, seat]) => entry.id === 'seat-pillar-' + id + '-' + seat) || ['front-pillar-B4', 'front-pillar-C4'].includes(entry.id));
 }
 
 export function seatsItems(plan) {
@@ -471,6 +483,7 @@ export function seatsWriteName(plan, tableId, index, text, { duplicate = false, 
   if (!table || index < 0 || index >= (table.count ?? 0)) throw new Error('Choose a seat first.');
   let name = String(text).replace(/\s+/g, ' ').trim();
   if (!name) { seatsAssign(plan, tableId, index, null); return null; }
+  if (seatsSeatBlocked(plan, tableId, index)) throw new Error('This position is blocked by a pillar. Choose another seat.');
   if (name.length > 160) throw new Error('Names must be 160 characters or shorter.');
   const key = value => value.normalize('NFC').toLocaleLowerCase();
   const assigned = seatsAssigned(plan);
@@ -498,6 +511,7 @@ export function seatsAssign(plan, tableId, index, personId) {
     throw new Error('Choose a seat inside a table first.');
   }
   if (personId !== null && !plan.people.some(person => person.id === personId)) throw new Error('Choose a person first.');
+  if (personId !== null && table.seats[index] !== personId && seatsSeatBlocked(plan, tableId, index)) throw new Error('This position is blocked by a pillar. Choose another seat.');
   // Moving someone frees their previous seat, and a displaced person stays on the list.
   for (const item of seatsItems(plan)) item.seats = item.seats.map(id => id === personId ? null : id);
   table.seats[index] = personId;

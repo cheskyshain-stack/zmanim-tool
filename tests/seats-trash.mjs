@@ -94,3 +94,13 @@ test('local recovery keeps the complete chart and metadata across reload and ref
   first.add(chart.plan, {}, 'Organizer'); t.mock.timers.tick(SEATS_TRASH_MS); assert.equal(reloaded.list().length, 0);
   data.set(SEATS_TRASH_KEY, '{broken'); assert.throws(() => reloaded.add(chart.plan, {}, 'Organizer'), /Nothing was deleted/);
 });
+
+test('unavailable browser storage does not prevent opening Seats and refuses deletion safely', () => {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+  try {
+    Object.defineProperty(globalThis, 'localStorage', { configurable: true, get() { throw new Error('Storage disabled'); } });
+    const trash = seatsCreateLocalTrash();
+    assert.throws(() => trash.list(), /Trash could not be opened/);
+    assert.throws(() => trash.add({ id: 'synthetic-chart' }, {}, 'Organizer'), /Nothing was deleted/);
+  } finally { if (previous) Object.defineProperty(globalThis, 'localStorage', previous); else delete globalThis.localStorage; }
+});
