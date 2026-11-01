@@ -5,12 +5,13 @@ import { seatsDescribeChanges, seatsRecordMetadata } from './activity.js';
 import { seatsNormalizeNameFile } from './name-files.js';
 import { seatsCreateNameEditor } from './name-editor.js';
 import { seatsChartName } from './chart-names.js';
+import { seatsCreateTrash } from './trash-ui.js';
 
 export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, isViewingChart = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, restoreLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
@@ -18,6 +19,8 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
+  const trash = seatsCreateTrash({ dialog, request, restoreLocal, notify, getName: () => session?.name || profile,
+    connected: () => Boolean(endpoint && session), refreshLists: () => dialogMode === 'pages' ? refreshSitePages() : dialogMode === 'names' ? refreshNameFiles() : null });
   const nameEditor = seatsCreateNameEditor({ dialog, request, notify,
     isOpen: () => dialog.open && dialogMode === 'edit-names', back: showNameFiles,
     show: contents => { namesRequest++; dialogMode = 'edit-names'; showDialog(contents); },
@@ -106,7 +109,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   function showNameFiles() {
     nameEditor.cancel();
     dialogMode = 'names';
-    showDialog(`<h2 id="sharing-title">Name files</h2><p>Choose a list to add its names to your chart, or edit the saved file.</p><button class="primary" type="button" data-sharing="upload-names">Upload names</button><div id="name-upload-status" role="status"></div><ul id="sharing-name-files" class="saved-charts-list" aria-live="polite"></ul><p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title">Name files</h2><p>Choose a list to add its names to your chart, or edit the saved file.</p><button class="primary" type="button" data-sharing="upload-names">Upload names</button><div id="name-upload-status" role="status"></div><ul id="sharing-name-files" class="saved-charts-list" aria-live="polite"></ul>${trash.markup()}<p class="sharing-error" role="alert"></p><div class="dialog-actions"><button type="button" data-sharing="close">Close</button></div>`);
     refreshNameFiles();
   }
   function renderPendingNames() {
@@ -124,6 +127,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       nameFiles = result.files;
       container.innerHTML = nameFiles.length ? nameFiles.map(file => `<li class="sharing-name-file sharing-plan saved-chart-row"><button class="saved-page-card" type="button" data-sharing="use-names" data-id="${escAttr(file.id)}" aria-label="Use ${escAttr(file.name)}"><strong><bdi>${escText(file.name)}</bdi></strong><small>${file.count} names</small><small class="saved-page-dates">${chartListDates({ ...file, updatedAt: file.updatedAt || file.createdAt, updatedBy: file.updatedBy || file.createdBy })}</small></button><div class="saved-chart-actions"><button type="button" data-sharing="edit-names" data-id="${escAttr(file.id)}">Edit</button><button type="button" class="saved-file-delete danger" data-sharing="delete-names" data-id="${escAttr(file.id)}">Delete</button></div></li>`).join('') : '<li>No name files yet. Upload a list to save it here for everyone.</li>';
       dialog.querySelector('.sharing-error').textContent = namesError;
+      trash.refresh();
     } catch (error) {
       if (!dialog.open || dialogMode !== 'names' || generation !== namesRequest) return;
       if (!session) { intent = 'names'; showLogin(error.message); return; }
@@ -136,7 +140,8 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   async function deleteNameFile(id) {
     const file = nameFiles.find(file => file.id === id);
-    if (!file || !window.confirm('Delete “' + file.name + '” from the website? Names already added to charts will stay on those charts.')) return;
+    if (!file || !window.confirm('Move “' + file.name + '” to Trash for 60 days? Names already added to charts will stay on those charts.')) return;
+    await trash.requireService();
     await request('/api/name-lists/' + encodeURIComponent(id), { method: 'DELETE' });
     if (dialog.open && dialogMode === 'names') await refreshNameFiles();
   }
@@ -156,10 +161,10 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   async function deleteChartFile(id, deviceOnly = false) {
     const plan = deviceOnly ? local(id) : sitePlans.find(plan => plan.id === id);
-    if (!plan || !window.confirm('Delete “' + plan.name + '” from ' + (deviceOnly ? 'this device?' : 'the website for everyone? Copies on devices will stay available.'))) return;
-    if (deviceOnly) { entries.delete(id); persist(); changed(); removeLocal(id); watch(); presence(); changed(); }
-    else { await request('/api/plans/' + encodeURIComponent(id), { method: 'DELETE' }); detachDeleted(id); }
-    if (dialog.open && dialogMode === 'pages') showPlans();
+    if (!plan || !window.confirm('Move “' + plan.name + '” to Trash for 60 days ' + (deviceOnly ? 'on this device?' : 'on the website for everyone? Copies on devices will stay available.'))) return;
+    if (deviceOnly) { trash.archive(plan, chartMetadata(id)); entries.delete(id); persist(); changed(); removeLocal(id); watch(); presence(); changed(); }
+    else { await trash.requireService(); await request('/api/plans/' + encodeURIComponent(id), { method: 'DELETE' }); detachDeleted(id); }
+    if (dialog.open && dialogMode === 'pages') { if (endpoint && session) await refreshSitePages(); else updatePlanLists(dialog.querySelector('#sharing-plans').innerHTML); trash.refresh(); }
   }
   function send(message) { if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
   function watch() { send({ type: 'watch', ids: [...new Set([...entries.values()].map(entry => entry.remoteId))] }); }
@@ -210,6 +215,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     else if (message.type === 'busy') notify(message.name + ' is editing that seat. Choose another seat while they finish.');
     else if (message.type === 'error') notify(message.error || 'That shared update could not be saved.');
     else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'pages') refreshSitePages();
+    if (['plans-changed', 'name-lists-changed'].includes(message.type)) trash.refresh();
   }
   function connect() {
     if (!endpoint || !session || session.expires <= Date.now() || socket && socket.readyState < WebSocket.CLOSING) return;
@@ -332,12 +338,13 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       dialog.querySelector('#sharing-device-plans').setAttribute('aria-busy', 'false');
       dialog.scrollTop = top;
     });
+    trash.refresh();
   }
   function showPlans(error = '') {
     dialogMode = 'pages';
     listRequest++;
     const loading = !initialized || Boolean(endpoint && session);
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${!initialized ? '<li>Loading saved charts…</li>' : endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section><section class="saved-pages-section"><h3>On this device</h3><ul id="sharing-device-plans" class="saved-charts-list" aria-busy="${loading}">${loading ? '<li>Loading saved charts…</li>' : devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section><p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Log out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${!initialized ? '<li>Loading saved charts…</li>' : endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section><section class="saved-pages-section"><h3>On this device</h3><ul id="sharing-device-plans" class="saved-charts-list" aria-busy="${loading}">${loading ? '<li>Loading saved charts…</li>' : devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section>${trash.markup()}<p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Log out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
@@ -480,6 +487,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'signin-names') { intent = 'names'; showLogin(); return; }
     if (action === 'name-files') { showNameFiles(); return; }
     if (action === 'refresh') { refreshSitePages(); return; }
+    if (action === 'refresh-trash') { trash.refresh(); return; }
     if (action === 'new') { dialog.close(); newChart(); return; }
     if (action === 'upload-names') { pickNamesFile(); return; }
     if (action === 'retry-names') { drainNameUploads(); return; }
@@ -493,6 +501,9 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); dialog.close(); changed(); onSignOut?.(); return;
     }
     button.disabled = true;
+    const errorNode = dialog.querySelector('.sharing-error'), trashStatus = dialog.querySelector('#trash-status');
+    if (errorNode) errorNode.textContent = '';
+    if (trashStatus) trashStatus.textContent = '';
     try {
       if (action === 'publish') await publish();
       else if (action === 'open') await openPlan(button.dataset.id);
@@ -502,9 +513,10 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       else if (action === 'reload-name-file') await nameEditor.reload();
       else if (action === 'delete-names') await deleteNameFile(button.dataset.id);
       else if (action === 'delete-chart' || action === 'delete-local') await deleteChartFile(button.dataset.id, action === 'delete-local');
+      else if (action === 'restore-local-trash' || action === 'restore-site-trash') await trash.restore(button);
       if (button.isConnected) button.disabled = false;
     }
-    catch (error) { if (!session) showLogin(error.message); else if (dialog.open) { dialog.querySelector('.sharing-error').textContent = error.message; button.disabled = false; } }
+    catch (error) { if (error.status === 401) showLogin(error.message); else if (dialog.open) { dialog.querySelector('.sharing-error').textContent = error.message; button.disabled = false; } }
   });
   async function start() {
     try {

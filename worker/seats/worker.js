@@ -1,6 +1,7 @@
 import { seatsSharedApply, seatsSharedPlan } from '../../js/seats/shared-model.js';
 import { seatsDescribeChanges, seatsRecordMetadata } from '../../js/seats/activity.js';
 import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
+import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
 
 const SEATS_SHARED_SESSION_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
@@ -80,7 +81,41 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true });
+    if (url.pathname === '/api/trash' && request.method === 'GET') {
+      const files = [];
+      for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
+        const records = await this.ctx.storage.list({ prefix });
+        for (const record of records.values()) if (seatsTrashAvailable(record)) files.push({ type, id: type === 'chart' ? record.plan.id : record.id,
+          name: type === 'chart' ? record.plan.name : record.name, deletedAt: record.deletedAt, deletedBy: record.deletedBy, expiresAt: seatsTrashExpiry(record) });
+      }
+      return seatsWorkerJson({ files: files.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt)) });
+    }
+    const restore = /^\/api\/(plans|name-lists)\/([A-Za-z0-9_-]{8,100})\/restore$/.exec(url.pathname);
+    if (restore && request.method === 'POST') {
+      try {
+        const body = await this.body(request);
+        if (typeof body.deletedAt !== 'string' || !Number.isFinite(Date.parse(body.deletedAt))) throw new Error('Reopen Trash before restoring this file.');
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const chart = restore[1] === 'plans', prefix = chart ? 'plan:' : 'names:', key = prefix + restore[2], record = await this.ctx.storage.get(key);
+          if (!record) return seatsWorkerJson({ error: 'That file was not found in Trash.' }, 404);
+          if (!record.deletedAt) return record.lastRestoredDeletion === body.deletedAt ? seatsWorkerJson(record) : seatsWorkerJson({ error: 'That file is already available. Refresh the saved list.' }, 409);
+          if (record.deletedAt !== body.deletedAt) return seatsWorkerJson({ error: 'This file was deleted again. Refresh Trash before restoring it.' }, 409);
+          if (!seatsTrashAvailable(record)) return seatsWorkerJson({ error: 'The 60-day recovery period for this file has ended.' }, 410);
+          const records = await this.ctx.storage.list({ prefix }), limit = chart ? 30 : 50;
+          if ([...records.values()].filter(value => !value.deletedAt).length >= limit) return seatsWorkerJson({ error: 'The saved folder is full. Move another file to Trash before restoring this one.' }, 409);
+          const now = new Date().toISOString(), next = { ...record, revision: (record.revision || 1) + 1, updatedAt: now, updatedBy: session.name, lastRestoredDeletion: record.deletedAt };
+          delete next.deletedAt; delete next.deletedBy;
+          if (chart) {
+            next.historyFromRevision ||= record.revision;
+            await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(restore[2], record.revision)]: seatsLegacyHistory(record) } : {}),
+              [seatsHistoryKey(restore[2], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Restored chart from Trash'] } });
+          } else await this.ctx.storage.put(key, next);
+          this.broadcast({ type: chart ? 'plans-changed' : 'name-lists-changed' });
+          return seatsWorkerJson(next);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
     if (url.pathname === '/api/name-lists' && request.method === 'GET') {
       const records = await this.ctx.storage.list({ prefix: 'names:' });
       return seatsWorkerJson({ files: [...records.values()].filter(record => !record.deletedAt).map(record => ({ id: record.id, name: record.name, count: record.names.length, createdAt: record.createdAt, createdBy: record.createdBy,
@@ -124,7 +159,7 @@ export class SeatsWorkspace {
         const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
         if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
         if (request.method === 'GET') return record.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(record);
-        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); this.broadcast({ type: 'name-lists-changed' }); }
+        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); await this.ctx.storage.setAlarm(Date.now() + SEATS_SHARED_SESSION_MS); this.broadcast({ type: 'name-lists-changed' }); }
         return seatsWorkerJson({ deleted: true });
       });
     }
@@ -175,6 +210,7 @@ export class SeatsWorkspace {
         if (!record.deletedAt) {
           const now = new Date().toISOString(), next = { ...record, ...seatsRecordMetadata(record), deletedAt: now, deletedBy: session.name, revision: record.revision + 1, updatedAt: now, updatedBy: session.name, historyFromRevision: record.historyFromRevision || record.revision };
           await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(match[1], record.revision)]: seatsLegacyHistory(record) } : {}), [seatsHistoryKey(match[1], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Deleted chart from the website'] } });
+          await this.ctx.storage.setAlarm(Date.now() + SEATS_SHARED_SESSION_MS);
           this.broadcast({ type: 'plan-deleted', id: match[1] }); this.broadcast({ type: 'plans-changed' });
         }
         return seatsWorkerJson({ deleted: true });
@@ -252,12 +288,29 @@ export class SeatsWorkspace {
   webSocketClose(socket) { clearTimeout(this.authTimers.get(socket)); this.authTimers.delete(socket); try { socket.close(); } catch { /* Already closed. */ } this.presence(); }
   webSocketError(socket) { try { socket.close(1011, 'Reconnect to shared plans.'); } catch { /* Already closed. */ } this.presence(); }
   async alarm() {
+    return this.ctx.blockConcurrencyWhile(async () => {
     const now = Date.now();
     for (const prefix of ['session:', 'attempt:']) {
       const records = await this.ctx.storage.list({ prefix });
       const expired = [...records].filter(([, value]) => (value.expires || value.until) <= now).map(([key]) => key);
       for (let index = 0; index < expired.length; index += 100) await this.ctx.storage.delete(expired.slice(index, index + 100));
     }
-    if ((await this.ctx.storage.list({ prefix: 'session:', limit: 1 })).size) await this.ctx.storage.setAlarm(now + SEATS_SHARED_SESSION_MS);
+    let pendingTrash = false;
+    for (const prefix of ['plan:', 'names:']) {
+      const records = await this.ctx.storage.list({ prefix });
+      for (const [key, record] of records) {
+        if (!record.deletedAt || record.purgedAt) continue;
+        const expiry = seatsTrashExpiry(record);
+        if (!expiry || Date.parse(expiry) > now) { pendingTrash = true; continue; }
+        // Keep the deletion marker so an old offline upload cannot recreate an expired file.
+        await this.ctx.storage.put(key, { deletedAt: record.deletedAt, deletedBy: record.deletedBy, purgedAt: new Date(now).toISOString() });
+        if (prefix === 'plan:') {
+          const history = await this.ctx.storage.list({ prefix: 'history:' + key.slice(prefix.length) + ':' }), keys = [...history.keys()];
+          for (let index = 0; index < keys.length; index += 100) await this.ctx.storage.delete(keys.slice(index, index + 100));
+        }
+      }
+    }
+    if (pendingTrash || (await this.ctx.storage.list({ prefix: 'session:', limit: 1 })).size) await this.ctx.storage.setAlarm(now + SEATS_SHARED_SESSION_MS);
+    });
   }
 }

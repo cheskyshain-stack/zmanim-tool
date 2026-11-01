@@ -44,5 +44,6 @@ export function seatsCreateRecords({ getState, getName, isShared, isEligible = (
     }
     if (changed) persist();
   }
-  return { sync, info: id => normalize(records.get(id)), restore: (id, record) => { if (record) records.set(id, normalize(record)); } };
+  return { sync, info: id => normalize(records.get(id)), restore: (id, record) => { if (record) records.set(id, normalize(record)); },
+    restored: (plan, record) => { records.set(plan.id, normalize(record)); observed.set(plan.id, seatsSharedPlan(plan)); append(plan.id, ['Restored chart from Trash']); persist(); } };
 }

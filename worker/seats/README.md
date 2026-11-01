@@ -97,6 +97,19 @@ local chart copy when the shared file is deleted. All mutations require the serv
 session and the existing allowed origin. API feature verification now includes
 sharedNameFiles and deleteFiles as well as changeHistory.
 
+Trash requires trash60Days in /api/info. GET /api/trash returns only metadata for
+deleted charts and name files within their 60-day recovery period. POST
+/api/plans/:id/restore and /api/name-lists/:id/restore take {deletedAt}, restore the
+same file ID and contents, retain creation dates, and record the restoring editor.
+The exact deletion timestamp makes retries idempotent without undoing a later
+deletion. Folder limits also apply to restoration. Old deletion markers with
+retained contents are recoverable until their original 60-day deadline.
+The daily Durable Object alarm removes expired chart/name payloads and chart
+history, but retains small deletion markers to block stale offline uploads.
+Restore enforces the deadline even before cleanup runs. Cleanup and restoration
+run under the same concurrency guard, so cleanup cannot erase a restored file.
+No new Durable Object binding, migration or storage namespace is needed.
+
 Editing name files also requires editNameFiles in /api/info. POST /api/name-lists/:id
 updates a file in place using its revision and a stable operationId. The server keeps
 creation metadata, records the latest editor and date, rejects stale revisions with
