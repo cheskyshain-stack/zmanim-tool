@@ -5,10 +5,10 @@ import { seatsSharedPlan, seatsSharedDiff, seatsSharedApply, seatsSharedReverse 
 
 test('two organizers can update different seats at the same table without losing either name', () => {
   const base=seatsSharedPlan(seatsCreatePlan()),a=structuredClone(base),b=structuredClone(base);
-  seatsWriteName(a,'B9',0,'First organizer');seatsWriteName(b,'B9',1,'Second organizer');
+  seatsWriteName(a,'B9',0,'First Organizer');seatsWriteName(b,'B9',1,'Second Organizer');
   const merged=seatsSharedApply(seatsSharedApply(base,seatsSharedDiff(base,a)),seatsSharedDiff(base,b));
-  assert.equal(merged.people.find(person=>person.id===merged.tables.find(table=>table.id==='B9').seats[0]).name,'First organizer');
-  assert.equal(merged.people.find(person=>person.id===merged.tables.find(table=>table.id==='B9').seats[1]).name,'Second organizer');
+  assert.equal(merged.people.find(person=>person.id===merged.tables.find(table=>table.id==='B9').seats[0]).name,'First Organizer');
+  assert.equal(merged.people.find(person=>person.id===merged.tables.find(table=>table.id==='B9').seats[1]).name,'Second Organizer');
   assert.deepEqual(seatsSharedApply(merged,seatsSharedDiff(base,a)),merged,'Retries are idempotent');
 });
 
@@ -22,10 +22,10 @@ test('concurrent edits to the same seat are rejected atomically', () => {
 
 test('undo changes only the originating organizer’s work and refuses to erase a newer edit', () => {
   const base=seatsSharedPlan(seatsCreatePlan()),a=structuredClone(base),b=structuredClone(base);
-  seatsWriteName(a,'A2',0,'My name');seatsWriteName(b,'C8',1,'Other name');
+  seatsWriteName(a,'A2',0,'My Name');seatsWriteName(b,'C8',1,'Other name');
   const mine=seatsSharedDiff(base,a),theirs=seatsSharedDiff(base,b),combined=seatsSharedApply(seatsSharedApply(base,mine),theirs);
   assert.deepEqual(seatsSharedApply(combined,seatsSharedReverse(mine)),b);
-  const newer=structuredClone(a);newer.people.find(person=>person.name==='My name').name='Updated by other organizer';
+  const newer=structuredClone(a);newer.people.find(person=>person.name==='My Name').name='Updated by other organizer';
   assert.throws(()=>seatsSharedApply(newer,seatsSharedReverse(mine)),/Another organizer changed/);
 });
 

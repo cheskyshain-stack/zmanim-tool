@@ -18,6 +18,7 @@ import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
 import { seatsSeatingRows, seatsSeatingCsv, seatsRosterRows, seatsRosterCsv } from './seats/roster.js';
 import { seatsCreateNavigation } from './seats/navigation.js';
+import { seatsFormatName } from './seats/name-format.js';
 
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
@@ -597,7 +598,7 @@ function seatsStart(root, auth) {
       const person = plan().people.find(entry => entry.id === button.dataset.editPerson);
       const name = window.prompt('Edit name. Leave blank to remove this person.', person.name);
       if (name === null) return;
-      change(() => { if (name.trim()) person.name = name.trim().slice(0, 160); else { plan().people = plan().people.filter(entry => entry.id !== person.id); seatsItems(plan()).forEach(table => { table.seats = table.seats.map(id => id === person.id ? null : id); }); } }, 'Name updated.'); return;
+      change(() => { const formatted = seatsFormatName(name); if (formatted.length > 160) throw new Error('Names must be 160 characters or shorter.'); if (formatted) person.name = formatted; else { plan().people = plan().people.filter(entry => entry.id !== person.id); seatsItems(plan()).forEach(table => { table.seats = table.seats.map(id => id === person.id ? null : id); }); } }, 'Name updated.'); return;
     }
     if (button?.hasAttribute('data-open-seat')) return openSeat(button.dataset.table, Number(button.dataset.openSeat));
     const seat = event.target.closest('.table-seat[data-seat]');

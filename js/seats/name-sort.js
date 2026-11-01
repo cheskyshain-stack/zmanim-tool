@@ -3,6 +3,7 @@ const seatsNameTitles = new Set(['rabbi', 'rav', 'r', 'reb', 'rebbetzin', 'mr', 
 const seatsNameSuffixes = new Set(['jr', 'sr', 'ii', 'iii', 'iv', 'שליטא', 'זצל', 'זל', 'זצוקל']);
 const seatsSurnameParticles = new Set(['van', 'von', 'de', 'del', 'della', 'di', 'du', 'da', 'der', 'den', 'la', 'le', 'ben', 'bar']);
 const seatsNameWord = value => value.normalize('NFKC').toLocaleLowerCase().replace(/[^\p{L}]/gu, '');
+export const seatsIsSurnameParticle = value => seatsSurnameParticles.has(seatsNameWord(value));
 
 function seatsNameParts(value) {
   const original = String(value ?? '').replace(/\s+/gu, ' ').trim();

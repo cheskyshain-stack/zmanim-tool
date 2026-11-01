@@ -61,6 +61,14 @@ a name into a separate seat for a child. Copying creates a separate person recor
 and keeps the original assignment. Choosing an already seated suggestion or list
 name adds a separate copy and keeps the original seat. Reopening and saving the
 same seat keeps its existing record. Each copy can be renamed independently.
+New and edited names automatically lose spaces before and after the name, reduce
+repeated spaces to one, and capitalize lowercase initials in each name part.
+For example, `  yosef   cohen  ` becomes `Yosef Cohen`. Mixed capitalization such
+as McDonald, existing uppercase initials, Hebrew text and lowercase surname
+particles such as van der are retained. The same formatting applies to manual
+lists, uploaded files and saved name-file edits. Opening an old chart does not
+silently change its people or assignments; formatting an entered name keeps its
+person ID and seat, and copies remain separate records.
 Enter saves; Tab saves and advances. Undo and Redo also support
 Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
 On desktop, Seats opens the chart at the full available width and keeps the list
