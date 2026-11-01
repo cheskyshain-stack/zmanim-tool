@@ -117,7 +117,6 @@ function seatsStart(root, auth) {
     seatNode: (tableId, index) => root.querySelector('.room-stage .table-seat[data-table="' + CSS.escape(tableId) + '"][data-seat="' + index + '"]'),
     onSelect: tableId => { selected = tableId; renderInPlace(); }, notify: alertMessage,
     canEdit: canEditSeat,
-    onActivity: value => sharing?.activity(value),
   });
 
   const zoomControls = seatsCreateZoom(root, {
@@ -235,7 +234,7 @@ function seatsStart(root, auth) {
     editor.close();
     sharing?.close();
     sharing?.leavePageLink();
-    screen = 'home'; render(); zoomControls.refresh(); sharing?.viewChanged();
+    screen = 'home'; render(); zoomControls.refresh();
     window.scrollTo({ top: 0, behavior: 'instant' });
     const heading = root.querySelector('h1');
     if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
@@ -243,12 +242,12 @@ function seatsStart(root, auth) {
   }
   function showSeatList() {
     if (editor.flush() === false) return;
-    editor.close(); screen = 'roster'; render(); sharing?.viewChanged();
+    editor.close(); screen = 'roster'; render();
     window.scrollTo({ top: 0, behavior: 'instant' });
     const heading = root.querySelector('h1'); heading.tabIndex = -1; heading.focus({ preventScroll: true });
   }
   function showChart() {
-    screen = 'editor'; render(); zoomControls.refresh(); sharing?.viewChanged();
+    screen = 'editor'; render(); zoomControls.refresh();
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   function setPrintPage(css) {
@@ -279,7 +278,7 @@ function seatsStart(root, auth) {
     screen = 'editor'; selected = 'A1'; selectedPerson = null;
     deletingNames = false; deleteSelection.clear(); search = ''; showAssigned = false;
     zoom = 0; wholeRoom = false; history = []; future = []; notice = '';
-    save(); render(); zoomControls.refresh(); sharing?.viewChanged();
+    save(); render(); zoomControls.refresh();
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   function copyChart(source, usedNames = []) {
@@ -296,7 +295,7 @@ function seatsStart(root, auth) {
     deletingNames = false; deleteSelection.clear(); search = ''; showAssigned = false;
     zoom = 0; wholeRoom = false; history = []; future = [];
     notice = 'Copy created. Changes here will not change the original chart.';
-    save(); render(); zoomControls.refresh(); sharing?.viewChanged();
+    save(); render(); zoomControls.refresh();
     window.scrollTo({ top: 0, behavior: 'instant' });
     return next.id;
   }
@@ -474,7 +473,6 @@ function seatsStart(root, auth) {
 
       <section id="seats-print" class="seats-print${current.paper === 'auto' ? ' auto-paper' : ''}"><header><h1 class="minyan-logo" aria-label="7:30 Minyan"><span class="minyan-logo-time">7:30</span> <span class="minyan-logo-name">Minyan</span></h1></header>${printRoom}</section>`;
     seatsPreparePrint(root.querySelector('#seats-print .room-diagram'), printGeometry);
-    sharing?.decorate(root);
     workspaceControls.refresh(); assignmentControls.refresh();
   }
   function dropName(data, target) {
@@ -728,7 +726,7 @@ function seatsStart(root, auth) {
   });
   sharing = seatsCreateSharing({
     onDialogChange: () => navigation?.sync(),
-    getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isViewingChart: () => screen !== 'home', isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
+    getState: () => state, getLocalPlans: savedPlans, canPublish: () => seatsHasContent(plan()), isBusy: () => Boolean(drag || pinching || printing), notify: alertMessage,
     activatePage, copyChart, restoreBackup: () => actions.restore(), newChart: () => actions['new-plan'](), initialName: auth.session.name, onSignInRequired: () => auth.lock(), onSignOut: () => auth.lock(), getRecord: id => records.info(id),
     pickNamesFile: () => root.querySelector('#names-file').click(),
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
@@ -774,7 +772,6 @@ function seatsStart(root, auth) {
       syncSaveStatus();
       const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Add names';
       const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
-      sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
     },
   });
@@ -789,7 +786,7 @@ function seatsStart(root, auth) {
       else {
         editor.close(); state.activeId = view.id; selectedPerson = null;
         screen = view.screen === 'roster' ? 'roster' : 'editor';
-        save(); render(); zoomControls.refresh(); sharing.viewChanged();
+        save(); render(); zoomControls.refresh();
         window.scrollTo({ top: 0, behavior: 'instant' });
       }
       if (['pages', 'names', 'history'].includes(view.dialog)) await sharing.open(view.dialog);
