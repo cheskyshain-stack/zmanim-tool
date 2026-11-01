@@ -2,7 +2,7 @@ import { candleZipLocation, candleTimeAtLocation } from '../candle-lighting-look
 import { dateFromSerial } from '../zmanim/solar.js';
 import { clock, meridiem, howFar } from '../upcoming.js';
 import { websiteNow } from '../website-clock.js';
-import { candleDeviceLocation, CANDLE_LOCATION_ROOT } from '../location-data.js';
+import { candleDeviceLocation } from '../location-data.js';
 
 /** Delegate from the stable homepage so minute-by-minute card replacements still work. */
 export function wireCandleLightingDialog(root, settings) {
@@ -65,8 +65,7 @@ export function wireCandleLightingDialog(root, settings) {
       </form>
       <button type="button" class="luach-candle-device">Use my location</button>
       <p id="luach-candle-status" class="luach-candle-status" role="status" aria-live="polite"></p>
-      <div class="luach-candle-result" hidden><p class="luach-candle-location"></p><p class="luach-candle-clock"></p><p class="luach-candle-zone"></p><p class="luach-candle-day" hidden></p><p class="luach-candle-countdown" role="timer"></p></div>
-      <p class="luach-candle-credit"><a href="${CANDLE_LOCATION_ROOT}/NOTICE.txt" target="_blank" rel="noopener noreferrer">Location data credits</a></p>`;
+      <div class="luach-candle-result" hidden><p class="luach-candle-location"></p><p class="luach-candle-clock"></p><p class="luach-candle-zone"></p><p class="luach-candle-day" hidden></p><p class="luach-candle-countdown" role="timer"></p></div>`;
     root.appendChild(dialog);
     const form = dialog.querySelector('form'), input = dialog.querySelector('input'), button = form.querySelector('button');
     const deviceButton = dialog.querySelector('.luach-candle-device');
