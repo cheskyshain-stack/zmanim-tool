@@ -1,3 +1,5 @@
+import { seatsFormatName } from './name-format.js';
+
 export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
 export const SEATS_BOUNDS = { left: 17, top: 70, right: 1183, bottom: 960 };
@@ -481,16 +483,17 @@ export function seatsSetCount(table, value, plan = null) {
 export function seatsWriteName(plan, tableId, index, text, { duplicate = false, personId = null } = {}) {
   const table = seatsItems(plan).find(entry => entry.id === tableId);
   if (!table || index < 0 || index >= (table.count ?? 0)) throw new Error('Choose a seat first.');
-  let name = String(text).replace(/\s+/g, ' ').trim();
+  let name = seatsFormatName(text);
   if (!name) { seatsAssign(plan, tableId, index, null); return null; }
   if (seatsSeatBlocked(plan, tableId, index)) throw new Error('This position is blocked by a pillar. Choose another seat.');
   if (name.length > 160) throw new Error('Names must be 160 characters or shorter.');
-  const key = value => value.normalize('NFC').toLocaleLowerCase();
+  const key = value => value.normalize('NFC').replace(/\s+/g, ' ').trim().toLocaleLowerCase();
   const assigned = seatsAssigned(plan);
   let person = personId ? plan.people.find(entry => entry.id === personId) : null;
   if (person && (duplicate || (assigned.has(person.id) && table.seats[index] !== person.id))) {
-    name = person.name; person = null; duplicate = true;
+    name = seatsFormatName(person.name); person = null; duplicate = true;
   }
+  if (name.length > 160) throw new Error('Names must be 160 characters or shorter.');
   if (!person && !duplicate) {
     const current = plan.people.find(entry => entry.id === table.seats[index]);
     person = (current && key(current.name) === key(name) ? current : null)
@@ -501,6 +504,9 @@ export function seatsWriteName(plan, tableId, index, text, { duplicate = false, 
     if (plan.people.length >= 2000) throw new Error('A plan can contain up to 2,000 people.');
     person = { id: seatsUid(), name }; plan.people.push(person);
   }
+  const formatted = seatsFormatName(person.name);
+  if (formatted.length > 160) throw new Error('Names must be 160 characters or shorter.');
+  person.name = formatted;
   seatsAssign(plan, tableId, index, person.id);
   return person;
 }
@@ -533,7 +539,7 @@ export function seatsAddNames(plan, names) {
   const existing = new Set(plan.people.map(person => key(person.name)));
   let added = 0, duplicates = 0;
   for (const raw of names) {
-    const name = String(raw).replace(/\s+/g, ' ').trim();
+    const name = seatsFormatName(raw);
     if (!name) continue;
     if (name.length > 160) throw new Error('Names must be 160 characters or shorter.');
     if (existing.has(key(name))) { duplicates++; continue; }
