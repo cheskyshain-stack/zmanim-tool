@@ -953,6 +953,19 @@ def write_sitemap():
     (ROOT / "robots.txt").write_text(robots, encoding="utf-8", newline="\n")
 
 
+def stamp_seats_build():
+    page = ROOT / "seats" / "index.html"
+    html = re.sub(r'<meta name="seats-build" content="[a-f0-9]+">\n?', "", page.read_text(encoding="utf-8"))
+    digest = hashlib.sha256(html.encode("utf-8"))
+    dependencies = [ROOT / "data" / "seats-sync.json", ROOT / "vendor" / "xlsx-0.20.3.min.js",
+                    ROOT / "assets" / "shul-240.jpg", *sorted((ROOT / "assets" / "fonts").glob("*.woff2"))]
+    for path in dependencies:
+        digest.update(str(path.relative_to(ROOT)).encode("utf-8") + b"\0" + path.read_bytes())
+    version = digest.hexdigest()[:16]
+    html = html.replace("</head>", f'<meta name="seats-build" content="{version}">\n</head>')
+    page.write_text(html, encoding="utf-8", newline="\n")
+
+
 def stamp_js_versions(page: Path, prefix: str, entry: str):
     """Give every JS module a content hash in its URL, via an import map.
 
@@ -1054,6 +1067,11 @@ def write_dist():
             if f.is_file():
                 put(f.relative_to(ROOT))
 
+    seats_build = re.search(r'<meta name="seats-build" content="([a-f0-9]{16})">', (ROOT / "seats" / "index.html").read_text(encoding="utf-8"))
+    if not seats_build:
+        raise RuntimeError("Seats build version was not stamped before publishing.")
+    (DIST_DIR / "seats" / "version.json").write_text(json.dumps({"version": seats_build.group(1)}) + "\n", encoding="utf-8")
+
     # Nothing of ours may reach dist with a comment still in it. Asked of the same
     # scanners that did the stripping rather than by searching for "/*": a substring search
     # reports every accept="image/*" and every data/*.json as a leak, which are strings the
@@ -1137,6 +1155,7 @@ def main():
     # Seats is a separate browser-local tool, with its own PIN and no public route.
     stamp_css_versions(ROOT / "seats" / "index.html", "../")
     stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
+    stamp_seats_build()
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain
