@@ -100,11 +100,11 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-roster-title h2{margin:0;font-size:24px}
 .seats-roster-title p{font-size:11px;color:var(--seats-muted);margin:3px 0 0}
 .seats-roster-table{width:100%;table-layout:fixed;border-collapse:collapse;font-size:14px}
-.seats-roster-table .roster-name{width:64%}.seats-roster-table .roster-table{width:24%}.seats-roster-table .roster-seat{width:12%}
+.seats-roster-table .roster-name{width:70%}.seats-roster-table .roster-table{width:30%}
 .seats-roster-table th,.seats-roster-table td{text-align:left;padding:8px;border-bottom:1px solid var(--seats-border);overflow-wrap:anywhere;vertical-align:top}
 .seats-roster-table th{font-size:12px;background:#f0f3f5}
 .seats-roster-table th:last-child,.seats-roster-table td:last-child{text-align:center}
-@media(max-width:700px){.seats-roster-controls h1{font-size:26px}.seats-roster-actions{margin-left:0}.seats-roster-actions button{min-height:44px}#seats-roster-print{padding:12px}.seats-roster-table th,.seats-roster-table td{padding:7px 4px}.seats-roster-table .roster-name{width:62%}.seats-roster-table .roster-table{width:24%}.seats-roster-table .roster-seat{width:14%}}
+@media(max-width:700px){.seats-roster-controls h1{font-size:26px}.seats-roster-actions{margin-left:0}.seats-roster-actions button{min-height:44px}#seats-roster-print{padding:12px}.seats-roster-table th,.seats-roster-table td{padding:7px 4px}.seats-roster-table .roster-name{width:70%}.seats-roster-table .roster-table{width:30%}}
 .chart-name-switch{display:inline-flex;align-items:center;gap:8px;min-height:36px;font-size:12px;cursor:pointer}
 .seats-app .chart-name-switch input{appearance:none;position:relative;width:32px;height:18px;min-height:18px;padding:0;margin:0;border:1px solid #9aa8b4;border-radius:12px;background:#dce1e7;flex-shrink:0;cursor:pointer}
 .chart-name-switch input::after{content:'';position:absolute;left:2px;top:2px;width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px #142b4633}
