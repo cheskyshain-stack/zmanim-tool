@@ -239,6 +239,18 @@ it from everyone's website folder. Deleting a name list keeps names already used
 on charts. A deleted chart stays available as a local copy on devices that had it
 open, including unsynced offline edits; reconnecting does not recreate the file.
 Device copies can be deleted separately.
+Saved charts and Name files have a Trash section at the bottom. Deleted website
+charts and name files can be restored by either signed-in organizer for 60 days.
+Rows show the deletion date, organizer and recovery deadline. Restore retains the
+file ID, contents and creation dates, and records who restored it. Existing device
+copies and unsynced edits stay independent. Website Trash requires trash60Days in
+the shared service; older services refuse new deletions until updated.
+Deleting a device chart first stores its complete chart and metadata in this
+browser's recovery storage. If that write fails, deletion stops. Restored local
+charts retain their creation dates and history. A live chart with the same ID is
+kept, and restoration uses a new ID. Device recovery lasts 60 days in this browser
+and is lost if its browser data is cleared. Files in Trash have a Restore button;
+there is no immediate permanent-delete control.
 Each accepted shared edit records the organizer, time and changed names, seats or
 settings in the server history. History is paginated and Undo adds its own entry.
 Older charts whose creation date was never recorded show Not recorded. Local

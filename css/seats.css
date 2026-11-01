@@ -250,6 +250,15 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .saved-pages-section{border-top:1px solid var(--seats-border);padding-top:14px;margin-top:17px}
 .saved-pages-section h3{margin:0;font-size:17px}
 .saved-pages-section>p{font-size:12px;color:var(--seats-muted);margin:5px 0}
+.seats-trash>summary{display:flex;align-items:center;gap:8px;font:600 17px Georgia,serif;cursor:pointer;min-height:44px}
+.seats-trash>summary::after{content:'›';margin-left:auto;font-family:Arial,sans-serif;transition:transform .15s}
+.seats-trash[open]>summary::after{transform:rotate(90deg)}
+.seats-trash>summary svg{width:22px;height:22px;flex-shrink:0}
+.seats-trash h4{font-size:13px;margin:14px 0 4px}
+.trash-file{padding:10px 8px;min-width:0;overflow-wrap:anywhere}
+.trash-file strong{display:block;font-size:13px}
+.trash-file small{display:block;font-size:11px;color:var(--seats-muted)}
+#trash-status{font-size:12px;color:#285d47}
 .saved-pages-dialog{max-width:760px}
 .saved-pages-heading{display:flex;align-items:center;gap:3px}
 .saved-pages-heading .page-folder-icon{width:29px;height:29px;color:#8c701e}

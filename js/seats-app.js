@@ -726,6 +726,14 @@ function seatsStart(root, auth) {
     useNames: (names, name) => { if (!change(() => { const result = seatsAddNames(plan(), names); notice = name + ': ' + result.added + ' names added; ' + result.duplicates + ' existing names skipped.'; })) throw new Error(notice); },
     keepDeletedCopy: (id, metadata) => { const existing = records.info(id); records.restore(id, { ...existing, ...metadata, history: [...existing.history, ...(metadata.history || [])] }); save(); renderInPlace(); },
     removeLocal: id => { rememberedShared.delete(id); change(() => { state.plans = state.plans.filter(plan => plan.id !== id); if (!state.plans.length) state.plans = [seatsCreatePlan(seatsDatedChartName())]; if (!state.plans.some(plan => plan.id === state.activeId)) state.activeId = state.plans[0].id; selectedPerson = null; selected = ''; }, 'Chart removed from this device.'); },
+    restoreLocal: file => {
+      if (savedPlans().length >= 30) throw new Error('There are already 30 charts on this device. Move another chart to Trash before restoring this one.');
+      const before = copy(state), restored = copy(file.plan);
+      if (state.plans.some(plan => plan.id === restored.id)) restored.id = seatsUid();
+      records.restored(restored, file.metadata); state.plans.push(restored);
+      if (!save()) { state = before; renderInPlace(); return false; }
+      renderInPlace(); return true;
+    },
     updatePlan: (id, incoming, activate = false) => {
       const focused = document.activeElement;
       const draft = root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
