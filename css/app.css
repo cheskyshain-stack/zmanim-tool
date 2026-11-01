@@ -5645,27 +5645,35 @@ button.reader-time:focus-visible { outline: 2px solid #b88f3a; outline-offset: 4
 /* The "new chart" pop-up: a native dialog, so Escape and the backdrop close it for free
    and nothing here has to track focus by hand. */
 .luach-announce {
-  position: relative; width: min(23rem, calc(100vw - 2.4rem));
-  border: none; border-radius: 16px; padding: 1.5rem 1.6rem 1.7rem;
-  background: var(--luach-cream); color: var(--luach-ink);
-  box-shadow: 0 18px 40px rgba(16,31,52,0.3);
+  position: relative; box-sizing: border-box; width: min(22rem,calc(100vw - 40px));
+  max-height: calc(100dvh - 32px); overflow: auto;
+  border: 1px solid #e4e4d1; border-radius: 18px; padding: 0;
+  background: #faf7f0; color: #142b46;
+  box-shadow: 0 24px 64px #0b203b55;
 }
-.luach-announce::backdrop { background: rgba(16,31,52,0.5); }
+.luach-announce::backdrop { background: #101f3473; }
+.luach-announce-header { position: relative; padding: 70px 24px 22px; border-radius: 17px 17px 0 0; background: linear-gradient(125deg,#102e49,#142b46); text-align: center; }
+.luach-announce-icon { position: absolute; top: 18px; left: 22px; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #d5aa37; color: #102b44; box-shadow: inset 0 1px 0 #ffe9a459; }
+.luach-announce-icon svg { width: 26px; height: 26px; }
 .luach-announce-close {
-  position: absolute; top: 0.5rem; right: 0.6rem;
-  background: none; border: none; font-size: 1.6rem; line-height: 1;
-  color: var(--luach-navy); opacity: 0.75; cursor: pointer; padding: 0.25rem;
+  position: absolute; top: 8px; right: 8px; z-index: 1; display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
+  background: #ffffff14; color: #e4eaf0; font: 400 25px/1 Arial,sans-serif; cursor: pointer;
 }
-.luach-announce-close:hover { opacity: 1; }
-.luach-announce-title { margin: 0 1.6rem 0.5rem 0; font-size: 1.2rem; font-weight: 800; color: var(--luach-navy); }
-.luach-announce-body { margin: 0 0 1.2rem; line-height: 1.5; }
+.luach-announce-close:hover { background: #ffffff24; }
+.luach-announce-close:focus-visible { outline: 2px solid #e0bd63; outline-offset: 2px; }
+.luach-announce-season { margin: 0 0 10px; color: #e0bd63; font: 700 13px/1.3 Georgia,serif; letter-spacing: 1.7px; text-transform: uppercase; }
+.luach-announce-title { margin: 0; padding-top: 10px; border-top: 1px solid #d9b9654d; color: #fffdf3; font: 700 clamp(27px,7.8vw,34px)/1.18 Georgia,serif; }
+.luach-announce-footer { padding: 16px 22px 18px; border-top: 1px solid #d7bc75; }
 .luach-announce-open {
-  display: flex; align-items: center; justify-content: center;
-  width: 100%; padding: 0.7rem 1rem; border-radius: 10px;
-  background: var(--luach-navy); color: var(--luach-cream); font-weight: 700;
-  text-decoration: none;
+  display: flex; align-items: center; justify-content: center; gap: 10px; box-sizing: border-box;
+  width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #dfb848; border-radius: 12px;
+  background: linear-gradient(105deg,#d7ae3b,#cda02e); color: #0c2237; font: 700 22px/1.15 Georgia,serif;
+  text-decoration: none; box-shadow: inset 0 1px 0 #ffe4a354;
 }
-.luach-announce-open:hover { background: var(--luach-navy-deep); }
+.luach-announce-open svg { flex: none; width: 16px; height: 16px; }
+.luach-announce-open:hover { background: #dfb84b; }
+.luach-announce-open:focus-visible { outline: 2px solid #142b46; outline-offset: 3px; }
 .luach-announce-open:active { transform: none; }
 
 /* The next-minyan badge shares the date line without shifting the centered date. */

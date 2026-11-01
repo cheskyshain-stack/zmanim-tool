@@ -758,18 +758,22 @@ function chartAnnouncement(published) {
     const start = Math.min(...spread.serials);
     const today = shulNow(websiteNow(), settings).serial;
     if (today > start + CHART_EARLY_DAYS) return null;
-    return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}` };
+    return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}`, season: spread.sheet.season };
   } catch {
     return null; // a chart that cannot be read must not take the home page down with it
   }
 }
 
-function chartAnnouncementHtml() {
-  return `<dialog class="luach-announce" aria-labelledby="luach-announce-title">
+function chartAnnouncementHtml(announcement) {
+  const season = announcement.season === 'choref' ? 'Winter Zmanim' : announcement.season === 'kayitz' ? 'Summer Zmanim' : 'Zmanim';
+  return `<dialog class="luach-announce no-print" aria-labelledby="luach-announce-season luach-announce-title">
     <button type="button" class="luach-announce-close" aria-label="Close">&times;</button>
-    <h2 id="luach-announce-title" class="luach-announce-title">New chart available</h2>
-    <p class="luach-announce-body">A new zmanim chart has been posted.</p>
-    <a class="luach-announce-open" href="/chart/">Open the chart</a>
+    <div class="luach-announce-header">
+      <span class="luach-announce-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 2 2 5-5"/></svg></span>
+      <p id="luach-announce-season" class="luach-announce-season">${escAttr(season)}</p>
+      <h2 id="luach-announce-title" class="luach-announce-title">New chart is up</h2>
+    </div>
+    <div class="luach-announce-footer"><a class="luach-announce-open" href="/chart/">View Chart<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a></div>
   </dialog>`;
 }
 
@@ -804,7 +808,7 @@ function renderHome(published) {
     // Marked before it is shown, not after it is dismissed: "the first time" means the
     // first time it is put on the screen, not the first time somebody closes it.
     markChartAnnounced(toAnnounce.id);
-    main.insertAdjacentHTML('beforeend', chartAnnouncementHtml());
+    main.insertAdjacentHTML('beforeend', chartAnnouncementHtml(toAnnounce));
     wireChartAnnouncement(main);
   }
 }
