@@ -913,6 +913,12 @@ Export/Import in Settings moves it between devices.
   overlaps, retained text, paired row alignment, navigation bounds and the divider
   at responsive widths.
   Longer descriptions may wrap and increase card height; do not clip them to 88px.
+- New-chart pop-ups use the approved navy-and-gold design: gold calendar badge,
+  Winter Zmanim or Summer Zmanim label from the announced chart, cream serif
+  "New chart is up" heading and a gold View Chart button on a cream footer.
+  Retain the native dialog, close button, Escape/backdrop dismissal, existing
+  announcement window and per-browser/per-part seen marker. Date previews do
+  not mark announcements seen. Keep notices off paper and the chart link working.
 - Donation payment methods use one tabbed panel, with Card · ACH selected initially
   and all five funds visible. DAF shows five matching full-width provider rows in this
   order: The Donors Fund, Pledger, OJC Fund, Matbia and iMaaser. Use their local original
