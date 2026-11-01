@@ -1015,8 +1015,22 @@ The candle-lighting half opens a ZIP-code lookup on tap or keyboard activation.
 Keep its ordinary visible design without a hint or extra label. The main card always
 retains the published shul location and time. ZIP results appear only in the dialog,
 for the clicked card's date, and never mutate settings, charts or the schedule API.
-Resolve five-digit U.S. ZIP locations through Hebcal's CORS-enabled Zmanim API,
-using only its location metadata, with quiet attribution inside the dialog.
+Resolve five-digit U.S. ZIP locations from the site's own
+`assets/location-data/v1/zips/` snapshot, including U.S. territories. Never call
+Hebcal or an outside geocoding API. Load only the requested two-digit prefix.
+The dialog also offers **Use my location**, which requests browser geolocation
+only after that button is pressed. Use its actual coordinates and the locally
+hosted exact time-zone boundaries, rather than the device's clock zone or a
+nearest-ZIP guess. Keep coordinates in memory, out of URLs, analytics and storage.
+Handle permission denial, unavailable coordinates, timeouts and stale callbacks.
+The local time-zone index covers the world, with 256KiB boundary chunks loaded
+only for points that need polygon checks. `vendor/location-decode-v1.js` decodes
+those boundaries. All location data and scripts are served by the site itself.
+Keep the quiet local data-credits link and bundled license notices.
+Rebuild the snapshot with `scripts/build-location-data.mjs`, downloaded GeoNames
+US/PR/GU/VI/AS/MP postal archives and pinned geo-tz 8.1.10, geobuf 4.0.0, pbf 4.0.1,
+Turf 7.2.0 and esbuild 0.25.12 build tools. The manifest records input and chunk
+hashes. A later data snapshot needs a new versioned path and decoder filename.
 Calculate the result with the shared candle-lighting formula at zero elevation,
 using the configured minutes-before-sunset setting and the location's actual IANA
 offset at sunset. Show the city, date, local time zone and a live countdown. Keep the

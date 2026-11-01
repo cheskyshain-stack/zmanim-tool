@@ -1,30 +1,16 @@
 import { dateFromSerial, calcJD, calcJDToJCent, sunDeclination } from './zmanim/solar.js';
 import { sunsetElev } from './zmanim/zmanim.js';
 import { candleLightingParts } from './sheets/common.js';
+import { localCandleZip } from './location-data.js';
 
 const candleZipLocations = new Map();
 
-/** Only the location is read from Hebcal. Times use this site's shared calculation. */
+/** Location metadata and the calculation both run on this site. */
 export async function candleZipLocation(zip, signal) {
   if (!/^\d{5}$/.test(zip)) throw new Error('Enter a five-digit U.S. ZIP code.');
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
   if (candleZipLocations.has(zip)) return candleZipLocations.get(zip);
-  const response = await fetch(`https://www.hebcal.com/zmanim?cfg=json&zip=${zip}`, {
-    signal, credentials: 'omit', referrerPolicy: 'no-referrer',
-  });
-  if (response.status === 400 || response.status === 404) throw new Error('That ZIP code was not found. Check it and try again.');
-  if (!response.ok) throw new Error('ZIP lookup is unavailable right now. Please try again.');
-  let found;
-  try { ({ location: found } = await response.json()); }
-  catch (error) { if (signal?.aborted) throw error; throw new Error('ZIP lookup is unavailable right now. Please try again.'); }
-  if (!found || found.zip !== zip || found.geo !== 'zip'
-      || typeof found.title !== 'string' || found.title.length > 160
-      || !Number.isFinite(found.latitude) || Math.abs(found.latitude) > 90
-      || !Number.isFinite(found.longitude) || Math.abs(found.longitude) > 180
-      || typeof found.tzid !== 'string') throw new Error('This ZIP code could not be located. Please try another.');
-  // Validate the returned IANA zone rather than falling back to the shul's zone.
-  try { new Intl.DateTimeFormat('en-US', { timeZone: found.tzid }).format(); }
-  catch { throw new Error('The time zone for this ZIP code could not be found.'); }
-  const location = { zip, title: found.title, latitude: found.latitude, longitude: found.longitude, timeZone: found.tzid };
+  const location = await localCandleZip(zip, signal);
   if (candleZipLocations.size >= 50) candleZipLocations.delete(candleZipLocations.keys().next().value);
   candleZipLocations.set(zip, location);
   return location;

@@ -47,11 +47,11 @@ test('DST changes, Arizona, Hawaii and Puerto Rico use the location date and zon
   assert.throws(() => candleTimeAtLocation(NaN, place('08701'), settings), /date is unavailable/);
 });
 
-test('location requests validate ZIPs, omit credentials, cache locations and ignore remote times', async t => {
+test('ZIP locations load only a local prefix, keep leading zeros and cache successful lookups', async t => {
   const calls = [];
   t.mock.method(globalThis, 'fetch', async (url, options) => {
     calls.push({ url, options });
-    return Response.json({ location: locations['08701'], times: { sunset: '1900-01-01T00:00:00Z' } });
+    return new Response(fs.readFileSync(new URL('../' + url.slice(1), import.meta.url)));
   });
   for (const invalid of ['', '8701', '08701-1234', 'abcde', '123456', '1234/']) await assert.rejects(candleZipLocation(invalid), /five-digit/);
   assert.equal(calls.length, 0);
@@ -62,23 +62,20 @@ test('location requests validate ZIPs, omit credentials, cache locations and ign
   assert.equal(await candleZipLocation('08701'), location);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].options.credentials, 'omit');
-  assert.equal(calls[0].options.referrerPolicy, 'no-referrer');
-  assert.equal(new URL(calls[0].url).searchParams.get('zip'), '08701');
+  assert.equal(calls[0].url, '/assets/location-data/v1/zips/08.json');
+  const aborted = new AbortController(); aborted.abort();
+  await assert.rejects(candleZipLocation('08701', aborted.signal), { name: 'AbortError' });
 });
 
-test('unknown ZIPs, service errors and malformed location responses do not return a time', async t => {
+test('missing ZIPs and failed local downloads never invent a location', async t => {
   let response;
   t.mock.method(globalThis, 'fetch', async () => response);
-  response = new Response('', { status: 404 });
-  await assert.rejects(candleZipLocation('00000'), /not found/);
-  response = new Response('', { status: 429 });
-  await assert.rejects(candleZipLocation('00000'), /unavailable/);
+  response = new Response('', { status: 503 });
+  await assert.rejects(candleZipLocation('00000'), /could not be loaded/);
   response = new Response('invalid JSON');
-  await assert.rejects(candleZipLocation('00000'), /unavailable/);
-  for (const changed of [{ zip: '90210' }, { latitude: 100 }, { longitude: '74' }, { geo: 'unknown' }, { title: null }]) {
-    response = Response.json({ location: { ...locations['10001'], ...changed } });
-    await assert.rejects(candleZipLocation('10001'), /could not be located/);
-  }
-  response = Response.json({ location: { ...locations['10001'], tzid: 'Invalid/Zone' } });
-  await assert.rejects(candleZipLocation('10001'), /time zone/);
+  await assert.rejects(candleZipLocation('00000'), /could not be loaded/);
+  response = Response.json({ version: 1, locations: {} });
+  await assert.rejects(candleZipLocation('00000'), /not found/);
+  response = Response.json({ version: 2, locations: {} });
+  await assert.rejects(candleZipLocation('10001'), /could not be loaded/);
 });
