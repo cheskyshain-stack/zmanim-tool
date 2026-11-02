@@ -992,16 +992,20 @@ function donateTabHtml(way, prefix) {
 /** Payment choices reveal one method, without replacing an entered payment form. */
 function wireDonateTabs(root) {
   const tabs = [...root.querySelectorAll('.luach-payment-tab')];
-  const select = (tab, focus = false) => keepPosition(root, () => {
-    for (const item of tabs) {
-      const active = item === tab;
-      item.setAttribute('aria-expanded', String(active));
-      root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
-    }
-    if (focus) tab.focus({ preventScroll: true });
-    if (tab.dataset.method === 'card' && !root.querySelector('.luach-frame')) root.querySelector('.luach-give-go').click();
-    fitDonationScrollRoom(root.closest('main'), root.querySelector('.luach-campaign-toggle'));
-  }, { focus: false });
+  const select = (tab, focus = false) => {
+    donationScrollCleanup?.();
+    keepPosition(root, () => {
+      for (const item of tabs) {
+        const active = item === tab;
+        item.setAttribute('aria-expanded', String(active));
+        root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
+      }
+      if (focus) tab.focus({ preventScroll: true });
+      if (tab.dataset.method === 'card' && !root.querySelector('.luach-frame')) root.querySelector('.luach-give-go').click();
+      fitDonationScrollRoom(root.closest('main'), root.querySelector('.luach-campaign-toggle'));
+    }, { focus: false });
+    revealDonationCampaign(root.querySelector('.luach-campaign-toggle'));
+  };
   for (const tab of tabs) {
     tab.addEventListener('click', () => select(tab));
     tab.addEventListener('keydown', event => {
@@ -1079,7 +1083,6 @@ function wireDonateCampaigns(root) {
           && !campaign.querySelector('.luach-frame')) campaign.querySelector('.luach-give-go').click();
         fitDonationScrollRoom(root, opening ? toggle : null);
       });
-      if (opening) revealDonationCampaign(toggle);
     });
   }
 }

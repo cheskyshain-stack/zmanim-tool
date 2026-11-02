@@ -49,10 +49,10 @@ Controls that update the current page must keep the clicked control in the same 
 position, preserve open panels, and restore keyboard focus. Use `ui/keep-position.js`
 around redraws and late chart fitting. Restore synchronously so a later manual scroll
 or navigation is never pulled back. New pages still open at the top; pressing an already
-active page button stays put. Donation forms open below their fund without scrolling
-away from the payment-method button, and rule editors open beside their row.
-Campaign selection deliberately scrolls its heading just below the public header in
-360ms; respect reduced motion and cancel on manual input or navigation.
+active page button stays put. Rule editors open beside their row.
+Donation campaigns expand in place. Only selecting a payment method deliberately
+scrolls that campaign's heading just below the public header in 360ms; respect reduced
+motion and cancel on manual input or navigation.
 `tests/button-scroll.cjs`
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
@@ -927,7 +927,8 @@ Export/Import in Settings moves it between devices.
   only for Neileich. Selecting a method reveals its information below the choices;
   do not load merchant frames before that selection. Keep entered forms when switching
   methods, and load only one campaign's merchant form at a time.
-  Scroll the opened campaign to 8px below the fixed public header in 360ms. Honor reduced
+  Campaign clicks reveal choices in place without scrolling. Only a payment-method
+  selection scrolls that campaign to 8px below the fixed public header in 360ms. Honor reduced
   motion, stop on manual scrolling or navigation, and add only the bottom scroll room
   needed to align the last campaign. `tests/donation-campaign-scroll.cjs` checks the
   animation duration, alignment, interruption and navigation cleanup.

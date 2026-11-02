@@ -144,17 +144,18 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('#rule-form-title').evaluate(el => el.previousElementSibling.dataset.id), 'scroll-test-1');
       await visit('/donate/');
       await page.locator('.luach-campaign-toggle').first().click();
-      await page.waitForTimeout(430); // Campaign selection deliberately reveals its payment choices.
-      await clickInPlace('#campaign-0-tab-shul', 'Donation DAF method');
+      await page.locator('#campaign-0-tab-shul').click();
+      await page.waitForTimeout(430); // Payment selection deliberately reveals the campaign at the top.
       await page.keyboard.press('Home');
       assert.equal(await page.locator('#campaign-0-tab-card').evaluate(el => document.activeElement === el), true, 'Keyboard method focus moves to Card');
       await page.frameLocator('.luach-frame').locator('#donor-name').fill('Test entry');
-      await clickInPlace('#campaign-0-tab-shul', 'Keep payment form while switching methods');
+      await page.locator('#campaign-0-tab-shul').click();
       await page.keyboard.press('Home');
       assert.equal(await page.frameLocator('.luach-frame').locator('#donor-name').inputValue(), 'Test entry');
       await page.getByRole('button', { name: 'Close the donation form' }).click();
       assert(await page.locator('.luach-give-go').first().evaluate(el => document.activeElement === el));
-      await clickInPlace('#campaign-0-tab-shul', 'Show DAF copy');
+      await page.locator('#campaign-0-tab-shul').click();
+      await page.waitForTimeout(430);
       await clickInPlace('#campaign-0-panel-shul .luach-copy-btn', 'Copy EIN with blocked clipboard');
       await visit('/texts/');
       await clickInPlace('.tx-copy', 'Copy message with blocked clipboard');
