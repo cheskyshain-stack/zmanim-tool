@@ -339,7 +339,7 @@ document.fonts.ready.then(updateFootDots);
 const DONATE = {
   name: 'Donate',
   heading: 'Donate',
-  thanks: 'Support our shul and community.',
+  thanks: 'Choose a campaign',
   legal: 'New Jersey 501(c)(3) nonprofit',
   deductible: 'Donations are tax deductible to the extent permitted by law.',
   ways: [

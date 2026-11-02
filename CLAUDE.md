@@ -923,6 +923,8 @@ Export/Import in Settings moves it between devices.
   announcement window and per-browser/per-part seen marker. Date previews do
   not mark announcements seen. Keep notices off paper and the chart link working.
 - Donations start with all five campaign names and all payment choices collapsed.
+  Use “Choose a campaign” in the existing subtitle line below Donate so the prompt
+  does not add another row or extra scrolling.
   Opening a campaign closes the others, reveals Card · ACH and DAF, and reveals Zelle
   only for Neileich. Selecting a method reveals its information below the choices;
   do not load merchant frames before that selection. Keep entered forms when switching
