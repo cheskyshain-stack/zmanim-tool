@@ -41,7 +41,11 @@ const server = http.createServer((req, res) => {
         top:node.getBoundingClientRect().top,cap:document.querySelector('.luach-bar').getBoundingClientRect().bottom,y:scrollY,
       }));
       await open();
+      const beforeCampaign = await page.evaluate(()=>scrollY);
       await page.locator('.luach-campaign-toggle').last().click();
+      await page.waitForTimeout(440);
+      assert.equal(await page.evaluate(()=>scrollY),beforeCampaign,'Campaign selection reveals options without scrolling');
+      await page.locator('.luach-campaign').last().locator('[data-method="shul"]').click();
       await page.waitForTimeout(440);
       const aligned=await alignment(), samples=await page.evaluate(()=>window.scrollSamples);
       assert(Math.abs(aligned.top-aligned.cap-8)<2,JSON.stringify(aligned));
@@ -49,14 +53,17 @@ const server = http.createServer((req, res) => {
       const duration=samples.at(-1).time-samples[0].time;
       assert(duration>=150 && duration<500, 'The reveal takes a short, visible time: '+duration);
       await page.locator('.luach-campaign-toggle').nth(1).evaluate(node=>node.click());
+      await page.locator('.luach-campaign').nth(1).locator('[data-method="shul"]').evaluate(node=>node.click());
       await page.waitForTimeout(60);
       await page.locator('.luach-campaign-toggle').nth(3).evaluate(node=>node.click());
+      await page.locator('.luach-campaign').nth(3).locator('[data-method="zelle"]').evaluate(node=>node.click());
       await page.waitForTimeout(440);
       assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"] .luach-account-title').innerText(),'Neileich');
       const replacement=await alignment();
       assert(Math.abs(replacement.top-replacement.cap-8)<2);
       await open();
       await page.locator('.luach-campaign-toggle').last().click();
+      await page.locator('.luach-campaign').last().locator('[data-method="shul"]').click();
       await page.waitForTimeout(70);
       await page.mouse.wheel(0,-80);
       await page.waitForTimeout(100);
@@ -66,6 +73,7 @@ const server = http.createServer((req, res) => {
       assert((await alignment()).top>80,'The interrupted reveal does not finish later');
       await open();
       await page.locator('.luach-campaign-toggle').last().click();
+      await page.locator('.luach-campaign').last().locator('[data-method="shul"]').click();
       await page.waitForTimeout(70);
       await page.locator('.luach-back').click();
       await page.locator('main.is-home').waitFor();

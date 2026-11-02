@@ -59,14 +59,18 @@ const server = http.createServer((req, res) => {
         const campaign = campaigns.nth(index), toggle = campaign.locator('.luach-campaign-toggle');
         const card = campaign.locator('[data-method="card"]'), daf = campaign.locator('[data-method="shul"]');
         const title = await campaign.locator('.luach-account-title').innerText();
+        await toggle.evaluate(node => node.scrollIntoView({block:'center',behavior:'instant'}));
+        const beforeTop = await toggle.evaluate(node => node.getBoundingClientRect().top);
         await toggle.click();
+        const afterTop = await toggle.evaluate(node => node.getBoundingClientRect().top);
+        if (index === 0) assert(Math.abs(afterTop - beforeTop) < 2, 'Opening a campaign keeps it in place: ' + JSON.stringify({width,title,beforeTop,afterTop}));
         assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 1);
         assert.equal(await page.locator('.luach-payment-tab:visible').count(), index === 3 ? 3 : 2);
         assert.equal(await campaign.locator('.luach-payment-panel:visible').count(), 0, 'Details wait for the payment-method click');
+        await card.click();
         const position = await toggle.evaluate(node => ({ top: node.getBoundingClientRect().top,
           cap: document.querySelector('.luach-bar').getBoundingClientRect().bottom }));
         assert(Math.abs(position.top - position.cap - 8) < 2, title + ' is aligned below the header: ' + JSON.stringify(position));
-        await card.click();
         const frame = page.frameLocator('.luach-frame');
         assert.equal(await page.locator('.luach-frame').count(), 1);
         assert.equal(await campaign.locator('iframe').getAttribute('src'), await campaign.locator('.luach-give-go').getAttribute('href'));
