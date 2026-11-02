@@ -67,9 +67,10 @@ const server = http.createServer((req, res) => {
         if (year === 5787) {
           assert(get('erev-yk-5787').includes('11:50m'));
           assert(get('erev-shmini-5787').includes('9:40d 11:05m'));
-          assert(get('rosh-chodesh-5787-10').includes('6:44m'));
+          assert(get('rosh-chodesh-5787-10').includes('6:43m'));
         }
         const chanukahWeeks = messages.filter(message => /^week-/.test(message.id) && /Shacharis \(.*Chanuka/.test(message.text));
+        assert(chanukahWeeks.every(message => !message.text.includes('Rosh Chodesh')), 'The weekly message does not repeat the separate Rosh Chodesh message');
         const expectedWeeks = await page.evaluate(async year => {
           const { buildChanukahPoster } = await import('/js/posters/chanukah.js');
           const { resolveSettings, DEFAULT_SETTINGS } = await import('/js/settings.js');

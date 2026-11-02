@@ -146,11 +146,10 @@ function wkMornings(shacharisCell, shabbosSerial, settings) {
     const names = days => days.map(day => DAY_NAMES[excelWeekday(day) - 1]).join(', ');
     const lines = [];
     if (ordinary.length) lines.push(`${WK_TEXT.shacharis} (${names(ordinary)}) ${wkRow(shacharisCell)}`);
-    for (const [roshChodesh, label] of [[false, 'Chanuka'], [true, 'Rosh Chodesh Teves - Chanuka']]) {
-      const days = chanukah.filter(day => Boolean(hasRoshChodesh(day, settings)) === roshChodesh);
-      if (!days.length) continue;
+    const days = chanukah.filter(day => !hasRoshChodesh(day, settings));
+    if (days.length) {
       const times = wkRow(chanukahScheduleLines(days, settings, { mergeAll: true }));
-      if (times) lines.push(`${WK_TEXT.shacharis} (${label}; ${names(days)}) ${times}`);
+      if (times) lines.push(`${WK_TEXT.shacharis} (Chanuka; ${names(days)}) ${times}`);
     }
     return lines;
   }
