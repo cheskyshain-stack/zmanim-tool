@@ -60,7 +60,7 @@ test('change descriptions name seats and renames and summarize bulk name imports
   const before = seatsCreateState().plans[0], after = structuredClone(before); after.name = 'Named chart';
   seatsWriteName(after, 'B9', 0, 'New Test Person');
   const details = seatsDescribeChanges(before, after, seatsSharedDiff(before, after)).join(' ');
-  assert.match(details, /Renamed chart/); assert.match(details, /Added 1 name/); assert.match(details, /B9, seat 1: Empty → New Test Person/);
+  assert.match(details, /Renamed chart/); assert.match(details, /Added 1 name/); assert.match(details, /B10, seat 1: Empty → New Test Person/);
 });
 
 test('shared name files normalize names independently of chart assignments and reject invalid files', () => {

@@ -1,4 +1,5 @@
 import { seatsFormatName } from './name-format.js';
+import { SEATS_DEFAULT_ROOM } from './default-room.js';
 
 export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
@@ -440,7 +441,7 @@ export function seatsUid() {
   return crypto.randomUUID();
 }
 
-export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
+export function seatsCreateOriginalPlan(name = SEATS_DEFAULT_NAME) {
   const tables = [];
   ['A', 'B', 'C', 'D'].forEach((column, col) => {
     const rows = col === 0 || col === 3 ? 8 : 9;
@@ -452,6 +453,14 @@ export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
   seatsRearLayout(plan);
   seatsSyncAisleTables(plan);
   return plan;
+}
+
+export function seatsCreatePlan(name = SEATS_DEFAULT_NAME) {
+  return { id: seatsUid(), name, layoutVersion: SEATS_LAYOUT_VERSION,
+    tables: SEATS_DEFAULT_ROOM.tables.map(table => ({ ...table, seats: Array(table.count).fill(null) })),
+    objects: SEATS_DEFAULT_ROOM.objects.map(object => ({ ...object,
+      ...(object.type === 'bimah' ? { id: seatsUid() } : {}), ...(object.type === 'rav' ? { seats: [null] } : {}) })),
+    people: [], paper: 'auto', monochrome: true };
 }
 
 export function seatsCreateState() {

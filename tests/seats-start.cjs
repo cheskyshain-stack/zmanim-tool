@@ -13,7 +13,7 @@ const server=http.createServer((request,response)=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true,args:['--no-sandbox']});
   try{
-    const {seatsCreateState,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState(),original=sample.plans[0];
+    const {seatsCreateOriginalPlan,seatsWriteName}=await import('../js/seats/model.js'),original=seatsCreateOriginalPlan(),sample={version:1,activeId:original.id,plans:[original]};
     original.name='Existing saved setup';original.tables[0].x=80;seatsWriteName(original,'A1',0,'Existing Assigned Person');
     for(const width of [1440,375]){
       const context=await browser.newContext({viewport:{width,height:900},isMobile:width===375,hasTouch:width===375}),page=await context.newPage(),errors=[];
@@ -48,7 +48,7 @@ const server=http.createServer((request,response)=>{
       const state=()=>page.evaluate(key=>JSON.parse(localStorage.getItem(key)),key),beforeEditing=await state();
       assert.equal(beforeEditing.plans.length,1);assert.deepEqual(beforeEditing.plans[0],original,'Opening a new empty draft keeps existing saved setups untouched');
       assert.match(await page.locator('#chart-name').inputValue(),/^Seating plan - /);
-      assert.equal(await page.locator('.room-stage .table-item').count(),34);assert.equal(await page.locator('.room-stage [data-item=A1]').getAttribute('transform'),'translate(25 78)','A new setup uses the original room layout');
+      assert.equal(await page.locator('.room-stage .table-item').count(),36);assert.equal(await page.locator('.room-stage [data-item=A1]').getAttribute('transform'),'translate(25 78)','A new setup uses the updated room layout');
       assert.equal(await page.locator('.room-stage .table-seat .seat-name').count(),0);
       await page.locator('#chart-name').fill('New seating setup');await page.locator('#chart-name').press('Enter');
       const created=await state(),next=created.plans.find(plan=>plan.id===created.activeId);

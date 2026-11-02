@@ -17,17 +17,26 @@ names can also be entered directly on seats. View saved charts opens all existin
 drafts remain available. Refreshing Seats
 returns to the same screen and chart. Even an untouched draft resumes
 without becoming a saved file. A fresh tab starts at home. Direct links to a shared chart still open that chart.
-The standard layout has columns of 8, 9,
-9, and 8 tables, with the extra middle tables at the back. Tables start with five
-seats, except A7, which has three, and C1, A8, B6 and C6,
-which have four. The room has 165 seats including the Rav's seat. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
+New charts use the current 36-table room, with nine tables in each column.
+A and D run from 1 to 9; B and C skip 7 and continue through 10. The added A7
+and D7 sit before the entrance walkway, with the existing front tables retained
+in front of them. A9 has three seats; A8, C1, C2, B6 and C6 have four. Other tables
+have five. The room has 172 usable seats including the Rav, with two chair
+positions blocked by pillars. Each new chart starts with no names or assignments.
+Existing saved charts retain their own geometry, names and assignments. The new
+default does not migrate or overwrite them. Both original and current untouched
+room drafts stay out of Saved charts. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
 Tables use 48 units per seat, about 12% wider than the original 43. Names use a
 shared font size chosen to fit most assigned seats, with only the longest names
 shrinking further. Names wrap between whole words; exceptionally long names
 still show the fit warning so their table can be enlarged before printing.
-Standard tables are 40 units high with 48 units between all ordinary rows. The
-standard A-D rows use the common grid, with names, counts and custom sizes retained.
+Standard tables are 40 units high. The middle columns and rear rows keep 48-unit
+gaps; the outside front rows use closer spacing to fit the added tables before
+the entrances. Names, counts and custom sizes in saved charts are retained.
+The current blank geometry is defined in `js/seats/default-room.js`, without
+people, assignments or saved-chart metadata. The original 34-table factory is
+retained for recognizing older empty drafts and verifying existing-room compatibility.
 Added tables keep their positions. The main walkway between rows 6 and 7 stays clear.
 Set counts individually or by column, then add people manually or import the first
 worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
@@ -110,7 +119,7 @@ the front wall, independently of table movement and resizing. Its wider 126-unit
 front leaves B1 farther left, halving the former 43-unit gap beside A1. The Rav's
 shtender keeps its size and clearance beside the Aron. Front tables leave
 room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
-when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between the five-seat B2 and C2 tables.
+when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between B2 and the four-seat C2, slightly farther back.
 B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
 leaving more space beside the amud and bimah.
 The middle columns sit closer together so the three main aisle gaps are equal
@@ -120,27 +129,29 @@ tables and chairs, while B5 and C5 keep their standard column alignment.
 Tables near the front and side walls have a small visual gap from the wall.
 The back-right tables share the same right edge. The central bimah is 20%
 narrower and shorter, keeping its center at the same position. The amud has a plain surface without a decorative symbol.
-A walkway separates rows 6 and 7, with row 7 meeting its back edge and an entrance in
-each side wall. These are open passages without door leaves or swings. Two doors
+The main walkway separates the front and rear sections, with the rear tables
+meeting its back edge and an entrance in each side wall. These are open passages without door leaves or swings. Two doors
 at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
 the back wall between and outside those doors, and continue along both side walls
-to just behind the A8/D8 chairs, with an 8-unit gap. Clear walkways run across the entire back and to the left
-of A7/A8 and D7/D8. A7/A8 align with the right edge of A6; D7 and D8 share the
+to just behind the A9/D9 chairs, with an 8-unit gap. Clear walkways run across the entire back and to the left
+of A8/A9 and D8/D9. A8/A9 align with the right edge of the front A tables; D8 and D9 share the
 right edge with the same small gap from the right wall as the front tables.
 Their chairs stay in front of the shortened side bookcase. The three back-wall cabinets are fixed
 against dragging, resizing, or removal, with wider clearances beside both doors.
-A very small fixed bookcase sits against the left wall beside A7, clear of its table and chairs.
-Two fixed pillars occupy the chair positions at B7 seat 2 and C7 seat 4. Those
+A very small fixed bookcase sits against the left wall beside A9, clear of its table and chairs.
+Two fixed pillars occupy the chair positions at B8 seat 2 and C8 seat 4. Those
 positions show Pillar and cannot receive a new assignment by typing, clicking,
 copying, dragging or the seat list. Tab and Shift+Tab skip them, and they do not
 count toward usable capacity. Existing names on an older blocked position remain
 visible, can be dragged out or cleared, and stay in reports and backups. Loading
 a chart never deletes those names. Front pillars placed before B4 and C4 align
-with the rear pair and leave all B4/C4 seats usable. Covered chair symbols are hidden.
+with the rear pair, touch the table outlines without overlapping them, and leave
+all B4/C4 seats usable. Covered chair symbols are hidden.
 Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
 print. Walkway guide lines are hidden too, and selection outlines are solid.
-The same gap separates table rows from front to back, with a wider entrance walkway
-between rows 6 and 7. Rows 7, 8 and 9 share the front rows’ spacing. The back walkway
+The outside front columns have closer row spacing to fit the added A7 and D7
+before the side entrances. The main entrance walkway stays in place. Rear tables
+retain their previous spacing. The back walkway
 is 48 units deep. Side bookcases stay attached to the walls behind the last outside tables.
 The separate Edit layout tab is removed. Table & room settings remain tucked under
 Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
