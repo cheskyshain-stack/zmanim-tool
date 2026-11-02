@@ -929,6 +929,12 @@ Export/Import in Settings moves it between devices.
   only for Neileich. Give the expanded campaign heading and its payment choices one
   continuous light background with a 3px gold line along the left of the active group.
   Use an overlay for that line so grouping adds no height or changes to content width.
+  Payment methods are visibly separate rounded white buttons with an outline and subtle
+  shadow. The selected method is navy with white text and icons. Retain the 44px touch
+  height and compact row so making the controls clearer adds no page height.
+  Campaigns visibly unfold their payment choices in 200ms. Honor reduced motion and
+  finish that opening effect before closing, switching campaigns, selecting a method
+  or navigating away. Leave no fixed height or overflow clipping when it finishes.
   Selecting a method reveals its information below the choices;
   do not load merchant frames before that selection. Keep entered forms when switching
   methods, and load only one campaign's merchant form at a time.

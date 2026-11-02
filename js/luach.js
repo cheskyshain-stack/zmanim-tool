@@ -994,6 +994,7 @@ function wireDonateTabs(root) {
   const tabs = [...root.querySelectorAll('.luach-payment-tab')];
   const select = (tab, focus = false) => {
     donationScrollCleanup?.();
+    donationOpeningCleanup?.();
     keepPosition(root, () => {
       for (const item of tabs) {
         const active = item === tab;
@@ -1024,6 +1025,25 @@ function wireDonateTabs(root) {
 }
 
 let donationScrollCleanup = null;
+let donationOpeningCleanup = null;
+
+/** Unfold the payment choices in place, keeping their final height automatic. */
+function animateDonationOpening(panel) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const height = panel.getBoundingClientRect().height;
+  panel.classList.add('is-opening');
+  const animation = panel.animate([
+    { height: '0px', opacity: 0 },
+    { height: `${height}px`, opacity: 1 },
+  ], { duration: 200, easing: 'cubic-bezier(.2,.7,.2,1)' });
+  const finish = () => {
+    animation.cancel();
+    panel.classList.remove('is-opening');
+    if (donationOpeningCleanup === finish) donationOpeningCleanup = null;
+  };
+  donationOpeningCleanup = finish;
+  animation.onfinish = finish;
+}
 
 function fitDonationScrollRoom(root, target) {
   root.style.removeProperty('--donation-scroll-room');
@@ -1072,6 +1092,7 @@ function wireDonateCampaigns(root) {
     const toggle = campaign.querySelector('.luach-campaign-toggle');
     toggle.addEventListener('click', () => {
       donationScrollCleanup?.();
+      donationOpeningCleanup?.();
       const opening = toggle.getAttribute('aria-expanded') !== 'true';
       keepPosition(root, () => {
         for (const item of campaigns) {
@@ -1083,6 +1104,7 @@ function wireDonateCampaigns(root) {
           && !campaign.querySelector('.luach-frame')) campaign.querySelector('.luach-give-go').click();
         fitDonationScrollRoom(root, opening ? toggle : null);
       });
+      if (opening) animateDonationOpening(campaign.querySelector('.luach-campaign-details'));
     });
   }
 }
@@ -1311,6 +1333,7 @@ function stampPage(where) {
 
 function route(published, { preserveWeekShowing = false } = {}) {
   donationScrollCleanup?.();
+  donationOpeningCleanup?.();
   candleDialogCleanup?.();
   candleDialogCleanup = null;
   const where = whereAmI();

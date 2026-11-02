@@ -62,6 +62,7 @@ const server = http.createServer((req, res) => {
         await toggle.evaluate(node => node.scrollIntoView({block:'center',behavior:'instant'}));
         const beforeTop = await toggle.evaluate(node => node.getBoundingClientRect().top);
         await toggle.click();
+        assert.equal(await campaign.locator('.luach-campaign-details').evaluate(node => node.getAnimations().length), 0, 'Reduced motion skips the opening animation');
         const afterTop = await toggle.evaluate(node => node.getBoundingClientRect().top);
         if (index === 0) assert(Math.abs(afterTop - beforeTop) < 2, 'Opening a campaign keeps it in place: ' + JSON.stringify({width,title,beforeTop,afterTop}));
         assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 1);
