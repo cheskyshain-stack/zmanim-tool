@@ -5873,12 +5873,13 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-give-thanks { margin:6px 0 0; text-align:left; font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
  .luach-payments { background:#fff; border:1px solid #e5e2da; border-radius:18px; overflow:hidden; }
  .luach-payment-tabs { display:grid; grid-template-columns:repeat(var(--payment-methods),minmax(0,1fr)); gap:5px; padding:7px; background:#f0eee7; border-bottom:1px solid #e5e2da; }
- .luach-payment-tab { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; margin:0; padding:7px 8px; color:#67717a; border:1px solid transparent; border-radius:10px; background:transparent; box-shadow:none; font:600 13px/1.6 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
+ .luach-payment-tab { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; margin:0; padding:9px 8px; color:#142b46; border:1px solid #cfc6b2; border-radius:10px; background:#fff; box-shadow:0 1px 2px #142b4612; font:600 13px/1.6 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
  .luach-payment-tab[aria-selected="true"] { background:#fff; border-color:#ddd5c2; color:#142b46; box-shadow:0 1px 3px #142b4610; }
- .luach-payment-tab[aria-expanded="true"] { background:#fff; border-color:#ddd5c2; color:#142b46; box-shadow:0 1px 3px #142b4610; }
- .luach-payment-tab:hover { color:#142b46; }
+ .luach-payment-tab[aria-expanded="true"] { background:#142b46; border-color:#142b46; color:#fff; box-shadow:0 1px 3px #142b4620; }
+ .luach-payment-tab:hover { border-color:#b39754; box-shadow:0 2px 4px #142b461c; }
  .luach-payment-icon { width:18px; height:18px; flex:none; }
  .luach-payment-icon.is-zelle { width:20px; height:20px; color:#6d1ed4; }
+ .luach-payment-tab[aria-expanded="true"] .luach-payment-icon.is-zelle { color:inherit; }
  .luach-payment-panel { min-height:356px; padding:19px 18px 12px; }
  .luach-payment-heading { margin:0; color:#142b46; font:700 22px/1.25 Georgia,serif; }
  .luach-payment-intro { margin:4px 0 0; color:#64707c; font:400 12px/1.6 Arial,sans-serif; }
@@ -5908,6 +5909,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-campaign-toggle .luach-fund-action { transition:transform .18s ease; }
  .luach-campaign-toggle[aria-expanded="true"] .luach-fund-action { transform:rotate(180deg); }
  .luach-campaign-toggle:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+ .luach-campaign-details.is-opening { overflow:hidden; }
  .luach-campaign-details .luach-payment-tabs { border-top:1px solid transparent; background:transparent; }
  .luach-campaign-details .luach-payment-panel { min-height:0; padding-bottom:20px; }
  .luach-campaign-details .luach-payment-panel.is-zelle { padding-block:24px; }

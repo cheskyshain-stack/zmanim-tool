@@ -41,10 +41,27 @@ const server = http.createServer((req, res) => {
         top:node.getBoundingClientRect().top,cap:document.querySelector('.luach-bar').getBoundingClientRect().bottom,y:scrollY,
       }));
       await open();
+      await page.locator('.luach-campaign-toggle').last().evaluate(toggle => {
+        toggle.addEventListener('click', () => {
+          const panel = toggle.closest('.luach-campaign').querySelector('.luach-campaign-details');
+          const started = performance.now();
+          window.campaignOpeningSamples = [];
+          const sample = () => {
+            window.campaignOpeningSamples.push({time:performance.now()-started,height:panel.getBoundingClientRect().height});
+            if (performance.now()-started < 320) requestAnimationFrame(sample);
+          };
+          requestAnimationFrame(sample);
+        }, {capture:true,once:true});
+      });
       const beforeCampaign = await page.evaluate(()=>scrollY);
       await page.locator('.luach-campaign-toggle').last().click();
       await page.waitForTimeout(440);
       assert.equal(await page.evaluate(()=>scrollY),beforeCampaign,'Campaign selection reveals options without scrolling');
+      const opening = await page.evaluate(()=>window.campaignOpeningSamples);
+      const fullHeight = opening.at(-1).height;
+      assert(opening.filter(sample=>sample.height>1 && sample.height<fullHeight-1).length>=3,'The campaign visibly unfolds over several frames');
+      assert(opening.every((sample,index)=>!index || sample.height>=opening[index-1].height-.5),'The opening grows smoothly');
+      assert.equal(await page.locator('.luach-campaign-details.is-opening').count(),0,'Opening cleanup removes clipping');
       await page.locator('.luach-campaign').last().locator('[data-method="shul"]').click();
       await page.waitForTimeout(440);
       const aligned=await alignment(), samples=await page.evaluate(()=>window.scrollSamples);
@@ -61,6 +78,13 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"] .luach-account-title').innerText(),'Neileich');
       const replacement=await alignment();
       assert(Math.abs(replacement.top-replacement.cap-8)<2);
+      await open();
+      await page.locator('.luach-campaign-toggle').last().click();
+      await page.waitForTimeout(40);
+      await page.locator('.luach-campaign-toggle').last().evaluate(node=>node.click());
+      await page.waitForTimeout(260);
+      assert.equal(await page.locator('.luach-campaign-details:visible').count(),0,'A quick close stays closed after the opening would finish');
+      assert.equal(await page.locator('.luach-campaign-details.is-opening').count(),0);
       await open();
       await page.locator('.luach-campaign-toggle').last().click();
       await page.locator('.luach-campaign').last().locator('[data-method="shul"]').click();
@@ -83,7 +107,7 @@ const server = http.createServer((req, res) => {
       await page.locator('.luach-campaign-toggle').first().waitFor();
       assert.equal(await page.locator('.luach-payment-tab:visible').count(),0);
       assert.equal(await page.locator('main').evaluate(node=>node.style.getPropertyValue('--donation-scroll-room')),'','Returning starts without an old scroll spacer');
-      results.push({width,duration,frames:samples.length,alignment:aligned,manualInterruption:true,replacement:true,navigation:true});
+      results.push({width,duration,frames:samples.length,openingFrames:opening.length,openingHeight:fullHeight,alignment:aligned,manualInterruption:true,replacement:true,navigation:true});
       await context.close();
     }
     assert.deepEqual(errors,[]);
