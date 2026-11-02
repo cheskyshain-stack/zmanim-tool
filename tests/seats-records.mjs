@@ -63,6 +63,21 @@ test('change descriptions name seats and renames and summarize bulk name imports
   assert.match(details, /Renamed chart/); assert.match(details, /Added 1 name/); assert.match(details, /B10, seat 1: Empty → New Test Person/);
 });
 
+test('local seat attribution survives other edits, history trimming and reloading', () => {
+  const { state, options } = setup(false), plan = state.plans[0]; let actor = 'Seat organizer';
+  const records = seatsCreateRecords({ ...options, fresh: false, getName: () => actor });
+  seatsWriteName(plan, 'A1', 0, 'Synthetic Person'); records.sync();
+  const assigned = records.info(plan.id).lastSeatAssignment;
+  assert.equal(assigned.by, actor); actor = 'Layout organizer';
+  for (let index = 0; index < 205; index++) { plan.name = 'Local chart ' + index; records.sync(); }
+  assert.equal(records.info(plan.id).updatedBy, actor);
+  assert.deepEqual(records.info(plan.id).lastSeatAssignment, assigned);
+  const reloaded = seatsCreateRecords({ ...options, fresh: false, getName: () => actor });
+  assert.deepEqual(reloaded.info(plan.id).lastSeatAssignment, assigned);
+  actor = 'Next seat organizer'; seatsWriteName(plan, 'A1', 1, 'Second Person'); reloaded.sync();
+  assert.equal(reloaded.info(plan.id).lastSeatAssignment.by, actor);
+});
+
 test('shared name files normalize names independently of chart assignments and reject invalid files', () => {
   const file=seatsNormalizeNameFile({ name:' Family list ', names:['Yosef Cohen','  Yosef   Cohen ','דוד כהן','1234'] });
   assert.deepEqual(file,{name:'Family list',names:['Yosef Cohen','דוד כהן']});

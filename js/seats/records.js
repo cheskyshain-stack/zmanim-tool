@@ -1,12 +1,15 @@
 import { seatsSharedDiff, seatsSharedPlan } from './shared-model.js';
 import { seatsDescribeChanges } from './activity.js';
+import { seatsLastSeatAssignment } from './seat-activity.js';
 
 const SEATS_RECORDS_KEY = 'lakewood-commons-seats-records-v1';
 const date = value => typeof value === 'string' && /^\d{4}-\d\d-\d\dT/.test(value) && Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
 const text = (value, max) => typeof value === 'string' ? value.slice(0, max) : null;
 function normalize(record = {}) {
-  return { createdAt: date(record?.createdAt), createdBy: text(record?.createdBy, 60), updatedAt: date(record?.updatedAt), updatedBy: text(record?.updatedBy, 60),
-    history: Array.isArray(record?.history) ? record.history.slice(-200).filter(entry => date(entry?.at)).map(entry => ({ id: text(entry.id, 100), at: date(entry.at), by: text(entry.by, 60) || 'This device', details: Array.isArray(entry.details) ? entry.details.slice(0, 31).map(detail => String(detail).slice(0, 400)) : [] })) : [] };
+  const history = Array.isArray(record?.history) ? record.history.slice(-200).filter(entry => date(entry?.at)).map(entry => ({ id: text(entry.id, 100), at: date(entry.at), by: text(entry.by, 60) || 'This device', details: Array.isArray(entry.details) ? entry.details.slice(0, 31).map(detail => String(detail).slice(0, 400)) : [] })) : [];
+  const saved = record?.lastSeatAssignment, recent = seatsLastSeatAssignment([...history].reverse());
+  const lastSeatAssignment = saved?.by && date(saved.at) && (!recent || Date.parse(saved.at) >= Date.parse(recent.at)) ? { by: text(saved.by, 60), at: date(saved.at) } : recent;
+  return { createdAt: date(record?.createdAt), createdBy: text(record?.createdBy, 60), updatedAt: date(record?.updatedAt), updatedBy: text(record?.updatedBy, 60), lastSeatAssignment, history };
 }
 
 export function seatsCreateRecords({ getState, getName, isShared, isEligible = () => true, notify, fresh }) {
@@ -25,6 +28,7 @@ export function seatsCreateRecords({ getState, getName, isShared, isEligible = (
     const now = new Date().toISOString(), by = getName() || 'This device', record = records.get(id) || normalize();
     if (created && !record.createdAt) { record.createdAt = now; record.createdBy = by; }
     record.updatedAt = now; record.updatedBy = by;
+    record.lastSeatAssignment = seatsLastSeatAssignment([{ at: now, by, details }]) || record.lastSeatAssignment;
     record.history.push({ id: crypto.randomUUID(), at: now, by, details }); record.history = record.history.slice(-200);
     records.set(id, record);
   }
