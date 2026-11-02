@@ -233,8 +233,8 @@ const giveIcon = (key, cls) =>
  *  than one way to give and more than one thing to give to, so it opens a page of them
  *  instead, and this list is that page. Adding a way, or filling one in, is a line here.
  *
- *  Payment methods share one panel, selected by the tabs above it. Card and ACH shows
- *  every fund immediately; DAF shows its providers and the EIN they search for.
+ *  The page starts with collapsed campaigns. Each campaign reveals only its accepted
+ *  payment methods; selecting one then reveals the form or recipient details below it.
  *  What is inside differs by way:
  *
  *  `accounts` is one or more payment pages, which is what the card and ACH way holds: the
@@ -245,12 +245,8 @@ const giveIcon = (key, cls) =>
  *  in a window with no address bar, and a payment page in there would have no URL and no
  *  padlock to check it by, so the frame carries the host name itself.
  *
- *  `funds` are what a payment page carries once it is reached, read off its own menus, so
- *  a donor can see whether what they want is behind a link without opening it and hunting.
- *  All of them are written out on one line and the line scrolls sideways where it does not
- *  fit, so the list is never folded and never has to be asked to open. No count is written
- *  anywhere either: a number saying how many there are would only be one more thing that
- *  could come to disagree with the names beside it.
+ *  `funds` records the designations available inside a merchant's form. `zelle` on an
+ *  account enables the confirmed Zelle recipient only for that campaign.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
  *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
@@ -380,6 +376,7 @@ const DONATE = {
         },
         {
           title: 'Neileich',
+          zelle: true,
           href: 'https://secure.cardknox.com/neileich',
           websiteHref: 'https://www.neileich.org/',
           websiteLabel: 'Visit Neileich\u2019s full website',
@@ -930,22 +927,36 @@ function renderChartPage(published) {
   renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
 }
 
-/** A named merchant page with its own inline form and external-link fallback. */
-function donateAccountHtml(acc) {
-  const website = acc.websiteHref
-    ? ` data-website-href="${escAttr(acc.websiteHref)}" data-website-label="${escAttr(acc.websiteLabel || 'Visit website')}"`
-    : '';
-  return `<div class="luach-give-account">
-    <a class="luach-fund-row luach-give-go" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">
+/** Campaigns come first; each owns its payment choices and recipient details. */
+function donateAccountHtml(acc, index) {
+  const prefix = `campaign-${index}`;
+  const card = DONATE.ways.find(way => way.icon === 'card');
+  const daf = DONATE.ways.find(way => way.providers);
+  const ways = [card, daf, ...(acc.zelle ? [DONATE.ways.find(way => way.icon === 'zelle')] : [])];
+  return `<div class="luach-give-account luach-campaign" data-campaign="${prefix}">
+    <h2 class="luach-campaign-heading"><button type="button" class="luach-fund-row luach-campaign-toggle" id="${prefix}-heading" aria-expanded="false" aria-controls="${prefix}-details">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
-      <span class="luach-fund-action" aria-hidden="true">&rarr;</span>
-    </a>
-    <div class="luach-give-frame" hidden></div>
+      <span class="luach-fund-action" aria-hidden="true">&#8964;</span>
+    </button></h2>
+    <div class="luach-campaign-details" id="${prefix}-details" role="region" aria-labelledby="${prefix}-heading" hidden>
+      <div class="luach-payment-tabs" role="group" aria-label="Payment method for ${escAttr(acc.title)}" style="--payment-methods:${ways.length}">
+          ${ways.map(way => donateTabHtml(way, prefix)).join('')}
+      </div>
+      ${ways.map(way => donateWayHtml(way, prefix, acc)).join('')}
+    </div>
   </div>`;
 }
 
+function donateCardHtml(acc) {
+  const website = acc.websiteHref
+    ? ` data-website-href="${escAttr(acc.websiteHref)}" data-website-label="${escAttr(acc.websiteLabel || 'Visit website')}"`
+    : '';
+  return `<a class="luach-give-go luach-reopen-form" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">Open secure card or bank form</a>
+    <div class="luach-give-frame" hidden></div>`;
+}
+
 /** One payment method, kept mounted so switching tabs preserves an entered form. */
-function donateWayHtml(way, index) {
+function donateWayHtml(way, prefix, account) {
   const copy = way.copy?.value
     ? `<div class="luach-copy">
         <span class="luach-copy-info">
@@ -956,38 +967,40 @@ function donateWayHtml(way, index) {
       </div>`
     : '';
   const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"><svg class="luach-daf-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>`).join('');
-  const accounts = (way.accounts || []).map(donateAccountHtml).join('');
-  const heading = accounts ? 'Choose a fund' : providers ? 'Choose a provider' : `Give with ${way.title}`;
-  const intro = way.how || way.blurb;
-  return `<div class="luach-payment-panel${way.icon === 'zelle' ? ' is-zelle' : ''}" role="tabpanel" id="luach-panel-${way.icon}" aria-labelledby="luach-tab-${way.icon}" tabindex="0"${index ? ' hidden' : ''}>
+  const card = way.icon === 'card';
+  const heading = providers ? 'Choose a provider' : `Give with ${way.title}`;
+  const intro = providers ? `${way.how} Designate your gift for ${account.title}.` : way.how || way.blurb;
+  return `<div class="luach-payment-panel${way.icon === 'zelle' ? ' is-zelle' : card ? ' is-card' : ''}" role="region" id="${prefix}-panel-${way.icon}" aria-labelledby="${prefix}-tab-${way.icon}" tabindex="-1" hidden>
+    ${card ? donateCardHtml(account) : `
     ${way.icon === 'zelle' ? `<span class="luach-zelle-roundel" aria-hidden="true">${giveIcon('zelle', 'luach-zelle-logo')}</span>` : ''}
     <h2 class="luach-payment-heading">${escAttr(heading)}</h2>
     <p class="luach-payment-intro">${escAttr(intro)}</p>
     ${way.recipient ? `<p class="luach-zelle-recipient">${escAttr(way.recipient)}</p>` : ''}
     ${copy}
     ${providers ? `<div class="luach-daf-providers">${providers}</div>` : ''}
-    ${accounts ? `<div class="luach-give-accounts">${accounts}</div>` : ''}
+    `}
   </div>`;
 }
 
-function donateTabHtml(way, index) {
+function donateTabHtml(way, prefix) {
   const mark = way.icon === 'card' || way.icon === 'zelle'
     ? giveIcon(way.icon, `luach-payment-icon${way.icon === 'zelle' ? ' is-zelle' : ''}`)
     : '';
-  return `<button type="button" class="luach-payment-tab" role="tab" id="luach-tab-${way.icon}" aria-selected="${!index}" aria-controls="luach-panel-${way.icon}" tabindex="${index ? -1 : 0}">${mark}${escAttr(way.title)}</button>`;
+  return `<button type="button" class="luach-payment-tab" data-method="${way.icon}" id="${prefix}-tab-${way.icon}" aria-expanded="false" aria-controls="${prefix}-panel-${way.icon}">${mark}${escAttr(way.title)}</button>`;
 }
 
-/** Standard tab keyboard navigation, without replacing live payment frames. */
+/** Payment choices reveal one method, without replacing an entered payment form. */
 function wireDonateTabs(root) {
   const tabs = [...root.querySelectorAll('.luach-payment-tab')];
   const select = (tab, focus = false) => keepPosition(root, () => {
     for (const item of tabs) {
       const active = item === tab;
-      item.setAttribute('aria-selected', String(active));
-      item.tabIndex = active ? 0 : -1;
+      item.setAttribute('aria-expanded', String(active));
       root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
     }
     if (focus) tab.focus({ preventScroll: true });
+    if (tab.dataset.method === 'card' && !root.querySelector('.luach-frame')) root.querySelector('.luach-give-go').click();
+    fitDonationScrollRoom(root.closest('main'), root.querySelector('.luach-campaign-toggle'));
   }, { focus: false });
   for (const tab of tabs) {
     tab.addEventListener('click', () => select(tab));
@@ -1002,6 +1015,71 @@ function wireDonateTabs(root) {
         event.preventDefault();
         select(tabs[next], true);
       }
+    });
+  }
+}
+
+let donationScrollCleanup = null;
+
+function fitDonationScrollRoom(root, target) {
+  root.style.removeProperty('--donation-scroll-room');
+  if (!target || target.getAttribute('aria-expanded') !== 'true') return;
+  const offset = document.querySelector('.luach-bar')?.getBoundingClientRect().bottom || 0;
+  const destination = Math.max(0, scrollY + target.getBoundingClientRect().top - offset - 8);
+  const needed = Math.max(0, destination - (document.scrollingElement.scrollHeight - innerHeight));
+  root.style.setProperty('--donation-scroll-room', `${Math.ceil(needed)}px`);
+}
+
+/** A short, cancellable reveal puts the campaign immediately below the fixed cap. */
+function revealDonationCampaign(target) {
+  donationScrollCleanup?.();
+  const offset = document.querySelector('.luach-bar')?.getBoundingClientRect().bottom || 0;
+  const destination = Math.max(0, scrollY + target.getBoundingClientRect().top - offset - 8);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.scrollTo({ top: destination, behavior: 'instant' });
+    return;
+  }
+  const from = scrollY, started = performance.now();
+  const controller = new AbortController();
+  let animation;
+  const finish = () => {
+    cancelAnimationFrame(animation);
+    controller.abort();
+    if (donationScrollCleanup === finish) donationScrollCleanup = null;
+  };
+  donationScrollCleanup = finish;
+  for (const event of ['wheel', 'touchmove', 'pointerdown', 'keydown', 'resize', 'pagehide']) {
+    window.addEventListener(event, finish, { capture: true, passive: true, signal: controller.signal });
+  }
+  const move = now => {
+    if (!target.isConnected) return finish();
+    const progress = Math.min(1, (now - started) / 360);
+    window.scrollTo({ top: from + (destination - from) * (1 - (1 - progress) ** 3), behavior: 'instant' });
+    if (progress < 1) animation = requestAnimationFrame(move);
+    else finish();
+  };
+  animation = requestAnimationFrame(move);
+}
+
+function wireDonateCampaigns(root) {
+  const campaigns = [...root.querySelectorAll('.luach-campaign')];
+  for (const campaign of campaigns) {
+    wireDonateTabs(campaign);
+    const toggle = campaign.querySelector('.luach-campaign-toggle');
+    toggle.addEventListener('click', () => {
+      donationScrollCleanup?.();
+      const opening = toggle.getAttribute('aria-expanded') !== 'true';
+      keepPosition(root, () => {
+        for (const item of campaigns) {
+          const active = item === campaign && opening;
+          item.querySelector('.luach-campaign-toggle').setAttribute('aria-expanded', String(active));
+          item.querySelector('.luach-campaign-details').hidden = !active;
+        }
+        if (opening && campaign.querySelector('[data-method="card"]').getAttribute('aria-expanded') === 'true'
+          && !campaign.querySelector('.luach-frame')) campaign.querySelector('.luach-give-go').click();
+        fitDonationScrollRoom(root, opening ? toggle : null);
+      });
+      if (opening) revealDonationCampaign(toggle);
     });
   }
 }
@@ -1153,8 +1231,9 @@ function wireDonateFrames(root) {
 
 function renderDonatePage(published) {
   stopNextUp();
+  main.style.removeProperty('--donation-scroll-room');
   const s = resolveSettings(published.settings);
-  const ways = DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value);
+  const campaigns = DONATE.ways.find(way => way.accounts).accounts;
   main.className = 'is-give';
   main.innerHTML = `${backBar('donate')}
     <div class="luach-home luach-give-page">
@@ -1162,19 +1241,16 @@ function renderDonatePage(published) {
         <h1 class="luach-give-heading">${escAttr(DONATE.heading)}</h1>
         <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
-      <section class="luach-payments" aria-label="Donation options">
-        <div class="luach-payment-tabs" role="tablist" aria-label="Payment method" style="--payment-methods:${ways.length}">
-          ${ways.map(donateTabHtml).join('')}
-        </div>
-        ${ways.map(donateWayHtml).join('')}
+      <section class="luach-payments luach-campaigns" aria-label="Donation campaigns">
+        ${campaigns.map(donateAccountHtml).join('')}
       </section>
       ${siteFooterHtml(s, `<div class="luach-give-legal">
         <p>${escAttr(DONATE.legal)} <span class="luach-give-ein">· EIN: <bdi>${SHUL_TAX_ID}</bdi></span></p>
         <p>${escAttr(DONATE.deductible)}</p>
       </div>`)}
     </div>`;
-  wireDonateTabs(main);
   wireDonateFrames(main);
+  wireDonateCampaigns(main);
   wireDonateCopy(main);
   openTheDoor();
 }
@@ -1231,6 +1307,7 @@ function stampPage(where) {
 }
 
 function route(published, { preserveWeekShowing = false } = {}) {
+  donationScrollCleanup?.();
   candleDialogCleanup?.();
   candleDialogCleanup = null;
   const where = whereAmI();

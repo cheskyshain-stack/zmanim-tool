@@ -5864,10 +5864,10 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-calculation-credit { margin:16px 0 0; font:400 12px/1.65 Arial,sans-serif; color:#64707c; }
  .luach-calculation-credit a { color:#576674; text-underline-offset:3px; }
  .is-home .luach-site-footer { max-width:560px; }
- body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:24px; }
- .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; margin:0 auto; text-align:left; }
+ body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:calc(24px + var(--donation-scroll-room,0px)); }
+ .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; min-height:calc(100dvh - 114px - var(--luach-safe-top,0px)); margin:0 auto; text-align:left; }
  .is-give .luach-give-page > * { flex-shrink:0; }
- .is-give .luach-give-page:has(.luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width:48rem; }
+ .is-give .luach-give-page:has(.luach-campaign-details:not([hidden]) .luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width:48rem; }
  .is-give .luach-give-head-block { margin:0 0 22px; }
  .is-give .luach-give-heading { margin:0; text-align:left; font:700 32px/1.2 Georgia,serif; letter-spacing:-.01em; }
  .is-give .luach-give-thanks { margin:6px 0 0; text-align:left; font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
@@ -5875,6 +5875,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-payment-tabs { display:grid; grid-template-columns:repeat(var(--payment-methods),minmax(0,1fr)); gap:5px; padding:7px; background:#f0eee7; border-bottom:1px solid #e5e2da; }
  .luach-payment-tab { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; margin:0; padding:7px 8px; color:#67717a; border:1px solid transparent; border-radius:10px; background:transparent; box-shadow:none; font:600 13px/1.6 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
  .luach-payment-tab[aria-selected="true"] { background:#fff; border-color:#ddd5c2; color:#142b46; box-shadow:0 1px 3px #142b4610; }
+ .luach-payment-tab[aria-expanded="true"] { background:#fff; border-color:#ddd5c2; color:#142b46; box-shadow:0 1px 3px #142b4610; }
  .luach-payment-tab:hover { color:#142b46; }
  .luach-payment-icon { width:18px; height:18px; flex:none; }
  .luach-payment-icon.is-zelle { width:20px; height:20px; color:#6d1ed4; }
@@ -5899,6 +5900,19 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-give .luach-daf-provider img[alt="iMaaser"] { --provider-logo-width:100px; }
  .luach-daf-arrow { flex:none; display:block; width:18px; height:18px; color:#987b3e; }
  .luach-give-accounts { margin-top:13px; }
+ .luach-campaigns { overflow-anchor:none; }
+ .luach-campaign-heading { margin:0; font:inherit; }
+ .is-give .luach-campaign-toggle.luach-fund-row { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:62px; margin:0; padding:18px 20px; border-radius:0; cursor:pointer; }
+ .luach-campaign-toggle .luach-fund-action { transition:transform .18s ease; }
+ .luach-campaign-toggle[aria-expanded="true"] .luach-fund-action { transform:rotate(180deg); }
+ .luach-campaign-toggle:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+ .luach-campaign-details .luach-payment-tabs { border-top:1px solid #eeeae1; }
+ .luach-campaign-details .luach-payment-panel { min-height:0; padding-bottom:20px; }
+ .luach-campaign-details .luach-payment-panel.is-zelle { padding-block:24px; }
+ .luach-campaign-details .luach-payment-panel.is-card { padding-top:10px; padding-bottom:0; }
+ .is-give .luach-reopen-form { display:flex; justify-content:center; width:100%; min-height:44px; margin:8px 0 18px; padding:10px; box-sizing:border-box; }
+ .luach-payment-panel:has(.luach-give-frame:not([hidden])) > .luach-reopen-form { display:none; }
+ @media (prefers-reduced-motion:reduce) { .luach-campaign-toggle .luach-fund-action { transition:none; } }
  .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #eeeae1; }
  .is-give .luach-give-account:first-child { border-top:0; }
  .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { width:calc(100% + 20px); min-height:51px; margin-inline:-10px; padding:12px 10px; gap:14px; border:0; border-radius:8px; background:transparent; box-shadow:none; text-align:left; }

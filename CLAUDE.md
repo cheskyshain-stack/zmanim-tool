@@ -50,7 +50,10 @@ position, preserve open panels, and restore keyboard focus. Use `ui/keep-positio
 around redraws and late chart fitting. Restore synchronously so a later manual scroll
 or navigation is never pulled back. New pages still open at the top; pressing an already
 active page button stays put. Donation forms open below their fund without scrolling
-away from the button, and rule editors open beside their row. `tests/button-scroll.cjs`
+away from the payment-method button, and rule editors open beside their row.
+Campaign selection deliberately scrolls its heading just below the public header in
+360ms; respect reduced motion and cancel on manual input or navigation.
+`tests/button-scroll.cjs`
 checks public and admin controls, copy fallbacks, and delayed statistics at phone and
 desktop widths.
 Adding a special-schedule page deliberately scrolls: smoothly reveal the inline
@@ -919,8 +922,16 @@ Export/Import in Settings moves it between devices.
   Retain the native dialog, close button, Escape/backdrop dismissal, existing
   announcement window and per-browser/per-part seen marker. Date previews do
   not mark announcements seen. Keep notices off paper and the chart link working.
-- Donation payment methods use one tabbed panel, with Card · ACH selected initially
-  and all five funds visible. DAF shows five matching full-width provider rows in this
+- Donations start with all five campaign names and all payment choices collapsed.
+  Opening a campaign closes the others, reveals Card · ACH and DAF, and reveals Zelle
+  only for Neileich. Selecting a method reveals its information below the choices;
+  do not load merchant frames before that selection. Keep entered forms when switching
+  methods, and load only one campaign's merchant form at a time.
+  Scroll the opened campaign to 8px below the fixed public header in 360ms. Honor reduced
+  motion, stop on manual scrolling or navigation, and add only the bottom scroll room
+  needed to align the last campaign. `tests/donation-campaign-scroll.cjs` checks the
+  animation duration, alignment, interruption and navigation cleanup.
+  DAF shows five matching full-width provider rows in this
   order: The Donors Fund, Pledger, OJC Fund, Matbia and iMaaser. Use their local original
   logos in compact 56px rows with 34px logo boxes, a gold arrow and quiet dividers. iMaaser links to
   `https://app.imaaser.org/donor/login`. DAF has the only Copy EIN button; clicking any
@@ -930,7 +941,7 @@ Export/Import in Settings moves it between devices.
   Keep the condensed nonprofit information and plain EIN inside the contact footer
   at the bottom. The footer follows expanded forms and uses spare height above it
   when the page is short. Switching methods preserves entered payment forms.
-  Zelle is available between Card · ACH and DAF, using its real brand mark in
+  Zelle is available only inside Neileich, after Card · ACH and DAF, using its real brand mark in
   `GIVE_ICONS`. The confirmed recipient is Bais Medrash of Lakewood Commons at
   `donations@neileich.org`. Show the recipient name, banking-app instructions and
   Copy email button. Keep the email selectable and let its copy row wrap on phones.
