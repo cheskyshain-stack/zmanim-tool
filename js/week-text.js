@@ -149,7 +149,8 @@ function wkMornings(shacharisCell, shabbosSerial, settings) {
     const days = chanukah.filter(day => !hasRoshChodesh(day, settings));
     if (days.length) {
       const times = wkRow(chanukahScheduleLines(days, settings, { mergeAll: true }));
-      if (times) lines.push(`${WK_TEXT.shacharis} (Chanuka; ${names(days)}) ${times}`);
+      const label = ordinary.length ? ` (Chanuka; ${names(days)})` : '';
+      if (times) lines.push(`${WK_TEXT.shacharis}${label} ${times}`);
     }
     return lines;
   }
@@ -205,9 +206,9 @@ export function weekText(shacharisCell, row, name, shabbosSerial, settings, afte
 
   const lines = [`${WK_TEXT.title} ${name}`.trim()];
   lines.push(...wkMornings(shacharisCell, shabbosSerial, settings));
-  if (mincha) lines.push(`${WK_TEXT.mincha} ${mincha}`);
   const sundayMincha = chanukahSundayMincha(shabbosSerial - 6, settings);
-  if (sundayMincha) lines.push(`Mincha (Sunday only): ${wkRow(sundayMincha.text())}`);
+  const sundayNote = sundayMincha ? `(Sunday: ${wkRow(sundayMincha.text())})` : '';
+  if (mincha || sundayNote) lines.push(`${WK_TEXT.mincha} ${[sundayNote, mincha].filter(Boolean).join(' ')}`);
   if (maariv) lines.push(`${WK_TEXT.maariv} ${maariv}`);
   if (afterYomKippurLine) lines.push(afterYomKippurLine);
   return lines.join('\n');

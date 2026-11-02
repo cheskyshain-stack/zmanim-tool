@@ -67,7 +67,8 @@ test('poster, chart note, daily schedule, weekly agenda, message and API share S
   assert.match(row.printOverrides.C, /12:30.*חנוכה יום א׳.*1:00[^\n]*\n.*1:15.*1:35.*1:50.*4:15/);
   assert(minyanimForDay(sunday, state, settings).some(event => event.name === 'מנחה' && event.mins === 750 && event.place === 'למטה'));
   assert(!minyanimForDay(sunday + 1, state, settings).some(event => event.name === 'מנחה' && event.mins === 750));
-  assert.match(weekText(WEEKDAY_SHACHARIS, row, "P' Miketz - Chanuka", shabbos, settings), /Mincha \(Sunday only\): 12:30d/);
+  const message = weekText(WEEKDAY_SHACHARIS, row, "P' Miketz - Chanuka", shabbos, settings);
+  assert.match(message, /\nMincha: \(Sunday: 12:30d\) 1:00d, 1:15d, 1:35d, 1:50m, 4:15d\nMariv:/);
   const agenda = weeklyAgenda(weeklyReaderData(shabbos, index, state, settings), shabbos, state, settings, now);
   const events = agenda.sections.flatMap(section => section.events);
   assert.equal(events.filter(event => event.serial === sunday && event.name === 'מנחה' && event.mins === 750 && !event.auxiliary).length, 1);

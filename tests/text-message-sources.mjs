@@ -117,14 +117,16 @@ test('Chanukah weekly messages keep ordinary and Chanukah mornings without repea
     for (const anchor of anchors) {
       const days = chanukahDaysThroughFriday(anchor, settings);
       const text = weekText(WEEKDAY_SHACHARIS, buildWeekdayRow({ serial: anchor }, settings), 'Test', anchor, settings);
-      assert(text.includes('Chanuka'), 'Every covered week names the changed schedule');
       if (days.length < 6) { partial++; assert(text.includes('Shacharis (')); }
       assert.doesNotMatch(text, /Rosh Chodesh/, 'Rosh Chodesh has its own message');
       const group = days.filter(day => !hasRoshChodesh(day, settings));
-      const line = text.split('\n').find(line => line.startsWith('Shacharis (Chanuka;'));
+      const prefix = days.length < 6 ? 'Shacharis (Chanuka;' : 'Shacharis ';
+      const line = text.split('\n').find(line => line.startsWith(prefix));
       assert(line, `The regular Chanukah days have a line in ${year}`);
-      assert.equal(line.slice(line.indexOf(') ') + 2), list(erevTimes(chanukahScheduleLines(group, settings, { mergeAll: true }))));
-      if (group.some(day => excelWeekday(day) === 6)) { friday++; assert(line.includes('Friday')); }
+      const times = list(erevTimes(chanukahScheduleLines(group, settings, { mergeAll: true })));
+      if (days.length === 6) assert.equal(line, 'Shacharis ' + times, 'Full Chanukah weeks omit the redundant label');
+      else assert.equal(line.slice(line.indexOf(') ') + 2), times);
+      if (group.some(day => excelWeekday(day) === 6)) { friday++; if (days.length < 6) assert(line.includes('Friday')); }
     }
   }
   assert(partial > 50 && friday >= 40);

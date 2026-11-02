@@ -69,7 +69,7 @@ const server = http.createServer((req, res) => {
           assert(get('erev-shmini-5787').includes('9:40d 11:05m'));
           assert(get('rosh-chodesh-5787-10').includes('6:43m'));
         }
-        const chanukahWeeks = messages.filter(message => /^week-/.test(message.id) && /Shacharis \(.*Chanuka/.test(message.text));
+        const chanukahWeeks = messages.filter(message => /^week-/.test(message.id) && /Week of .*Chanuka|Shacharis \(Chanuka;/.test(message.text));
         assert(chanukahWeeks.every(message => !message.text.includes('Rosh Chodesh')), 'The weekly message does not repeat the separate Rosh Chodesh message');
         const expectedWeeks = await page.evaluate(async year => {
           const { buildChanukahPoster } = await import('/js/posters/chanukah.js');
@@ -79,7 +79,7 @@ const server = http.createServer((req, res) => {
         }, year);
         assert.equal(chanukahWeeks.length, expectedWeeks, 'Every Chanukah weekday week has a message in ' + year);
         if (expectedWeeks > 1) assert(chanukahWeeks.some(message => /Shacharis \((?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday)/.test(message.text)), 'A partial week retains its ordinary mornings');
-        assert(messages.some(message => message.text.includes('Mincha (Sunday only): 12:30d')));
+        assert(messages.some(message => message.text.includes('Mincha: (Sunday: 12:30d) ')));
         assert(await page.locator('.tx-body').evaluateAll(boxes => boxes.every(box => box.clientHeight + 2 >= box.scrollHeight)), 'Every editable message fits its textarea');
         checks.push({ width, year, messages: messages.length, chanukahWeeks: chanukahWeeks.length });
         if (output) fs.writeFileSync(path.join(output, `${width}-${year}-messages.json`), JSON.stringify(messages, null, 2));

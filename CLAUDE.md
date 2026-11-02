@@ -1095,6 +1095,10 @@ Rosh Chodesh messages read `buildRoshChodeshShacharisPoster` rows and dates:
 omit Shabbos-only months, keep only the weekday portion of mixed dates, and use
 the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
 morning group through Friday, including ordinary mornings in partial weeks.
+When all weekday mornings fall during Chanukah, write just Shacharis and its times;
+retain day labels only when distinguishing ordinary mornings in a partial week.
+Put the extra Sunday Mincha inline before the regular times: `Mincha: (Sunday: 12:30d) ...`,
+using the shared calculated Sunday time rather than a fixed minute.
 Keep Rosh Chodesh mornings only in their separate message, including during Chanukah;
 do not repeat that group in the weekly Chanukah message. The Chanukah chart panel and messages use the
 complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
