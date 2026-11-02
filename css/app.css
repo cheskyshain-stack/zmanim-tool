@@ -5901,12 +5901,14 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-daf-arrow { flex:none; display:block; width:18px; height:18px; color:#987b3e; }
  .luach-give-accounts { margin-top:13px; }
  .luach-campaigns { overflow-anchor:none; }
+ .luach-campaign:has(.luach-campaign-toggle[aria-expanded="true"]) { position:relative; background:#f5f3ed; }
+ .luach-campaign:has(.luach-campaign-toggle[aria-expanded="true"])::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:#b39754; pointer-events:none; z-index:1; }
  .luach-campaign-heading { margin:0; font:inherit; }
  .is-give .luach-campaign-toggle.luach-fund-row { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:62px; margin:0; padding:18px 20px; border-radius:0; cursor:pointer; }
  .luach-campaign-toggle .luach-fund-action { transition:transform .18s ease; }
  .luach-campaign-toggle[aria-expanded="true"] .luach-fund-action { transform:rotate(180deg); }
  .luach-campaign-toggle:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
- .luach-campaign-details .luach-payment-tabs { border-top:1px solid #eeeae1; }
+ .luach-campaign-details .luach-payment-tabs { border-top:1px solid transparent; background:transparent; }
  .luach-campaign-details .luach-payment-panel { min-height:0; padding-bottom:20px; }
  .luach-campaign-details .luach-payment-panel.is-zelle { padding-block:24px; }
  .luach-campaign-details .luach-payment-panel.is-card { padding-top:10px; padding-bottom:0; }
