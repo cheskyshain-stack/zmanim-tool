@@ -344,8 +344,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print .adaptive-print .vertical-lettering{transform:scaleY(var(--seats-print-correction))}
   #seats-print>header{display:flex;align-items:start;justify-content:space-between;gap:.2in;flex:0 0 .35in;padding:0;min-height:0}
   #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
-  #seats-print .minyan-logo{display:inline-flex;align-items:center;gap:.08in;line-height:1;white-space:nowrap}
-  #seats-print .minyan-logo-name{font-size:9pt;letter-spacing:.12em;text-transform:uppercase;padding-left:.08in;border-left:1pt solid currentColor}
+  #seats-print .minyan-logo{display:inline-flex;align-items:baseline;gap:.07in;line-height:1;white-space:nowrap}
+  #seats-print .minyan-logo-name{font:inherit}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-item{cursor:default}
   #seats-print .shtender-surface,#seats-print .amud-surface{vector-effect:non-scaling-stroke}
