@@ -6,6 +6,7 @@ import { seatsNormalizeNameFile } from './name-files.js';
 import { seatsCreateNameEditor } from './name-editor.js';
 import { seatsChartName } from './chart-names.js';
 import { seatsCreateTrash } from './trash-ui.js';
+import { seatsCreateSeatActivity } from './seat-activity.js';
 
 export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
@@ -19,6 +20,12 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
+  const seatActivity = seatsCreateSeatActivity({ request, onChange: id => {
+    changed();
+    if (dialog.open && dialogMode === 'pages') keepPosition(dialog, () => {
+      for (const node of dialog.querySelectorAll('[data-seat-assignment="' + CSS.escape(id) + '"]')) node.innerHTML = seatAssignmentText(seatActivity.read(id));
+    });
+  } });
   const trash = seatsCreateTrash({ dialog, request, restoreLocal, notify, getName: () => session?.name || profile,
     connected: () => Boolean(endpoint && session), refreshLists: () => dialogMode === 'pages' ? refreshSitePages() : dialogMode === 'names' ? refreshNameFiles() : null });
   const nameEditor = seatsCreateNameEditor({ dialog, request, notify,
@@ -148,7 +155,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   function detachDeleted(remoteId) {
     const entry = entryForRemote(remoteId); if (!entry) return;
     entries.delete(entry.localId); persist();
-    const metadata = seatsRecordMetadata(entry.base), localHistory = [];
+    const metadata = { ...seatsRecordMetadata(entry.base), lastSeatAssignment: seatActivity.read(remoteId)?.assignment || null }, localHistory = [];
     let previous = entry.base.plan;
     for (const operation of entry.queue) {
       const next = seatsSharedApply(previous, operation.changes);
@@ -195,6 +202,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       visible = base.plan;
     }
     entry.base = base; entry.observed = visible; entry.ready = true;
+    seatActivity.load(entry.remoteId, base.revision);
     persist();
     if (oldLocal && JSON.stringify(clean(oldLocal, entry.remoteId)) !== JSON.stringify(visible)) updatePlan(entry.localId, clean(visible, entry.localId));
     transmit(entry); changed();
@@ -287,7 +295,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   function peersHere() { const id = entries.get(current()?.id)?.remoteId; return id ? peers.filter(peer => peer.clientId !== clientId && peer.planId === id) : []; }
   function markup() {
     const entry = entries.get(current()?.id); if (!entry) return '';
-    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span>${entry.base.updatedBy ? `<span class="sharing-audit">Last edited by ${escText(entry.base.updatedBy)} · ${escText(formatDate(entry.base.updatedAt))}</span>` : ''}`;
+    return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span><span class="sharing-audit">${seatAssignmentText(seatActivity.read(entry.remoteId), true)}</span>`;
   }
   function decorate(root) {
     root.querySelectorAll('.is-remote').forEach(node => node.classList.remove('is-remote'));
@@ -324,19 +332,26 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     showDialog(`<h2 id="sharing-title">${title}</h2><p>Enter your name so the chart history can show who made each change.${entryPin ? '' : ' Use the same Seats PIN.'}</p><form id="sharing-login"><label for="sharing-name">Your name</label><input id="sharing-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="given-name" required>${pinField}<p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions"><button type="button" data-sharing="close">Cancel</button><button class="primary" type="submit">${intent === 'save' ? 'Save chart' : 'Sign in'}</button></div></form>`);
   }
   function formatDate(value) { return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded'; }
-  function chartMetadata(id) { const entry = entries.get(id); return entry ? seatsRecordMetadata(entry.base) : getRecord(id); }
+  function chartMetadata(id) { const entry = entries.get(id); return entry ? { ...seatsRecordMetadata(entry.base), lastSeatAssignment: seatActivity.read(entry.remoteId)?.assignment || null } : getRecord(id); }
   function dateDetails(record) {
     return `<span>Created: ${escText(formatDate(record.createdAt))}</span><span>Last edited: ${escText(formatDate(record.updatedAt))}</span>${record.updatedBy ? `<span>Edited by: ${escText(record.updatedBy)}</span>` : ''}`;
   }
-  function chartListDates(record) {
+  function seatAssignmentText(record, withDate = false) {
+    if (!record) return '';
+    if (record?.assignment) return `Last seat assigned by <bdi>${escText(record.assignment.by)}</bdi>${withDate ? ' · ' + escText(formatDate(record.assignment.at)) : ''}`;
+    return record?.status === 'loading' ? 'Last seat assigned: Checking…' : record?.status === 'error' ? 'Last seat assignment unavailable' : 'Last seat assigned: Not recorded';
+  }
+  function chartListDates(record, showEditor = true) {
     const date = value => value && Number.isFinite(Date.parse(value))
       ? `<time datetime="${escAttr(value)}" title="${escAttr(formatDate(value))}">${escText(new Date(value).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }))}</time>` : 'Not recorded';
-    return `<span>Created: ${date(record.createdAt)}</span><span>Last edited: ${date(record.updatedAt)}${record.updatedBy ? ` · ${escText(record.updatedBy)}` : ''}</span>`;
+    return `<span>Created: ${date(record.createdAt)}</span><span>Last edited: ${date(record.updatedAt)}${showEditor && record.updatedBy ? ` · ${escText(record.updatedBy)}` : ''}</span>`;
   }
   function pageCard(plan, site = false) {
     const metadata = site ? seatsRecordMetadata(plan) : chartMetadata(plan.id);
     const name = seatsChartName(plan.name, metadata);
-    return `<li class="sharing-plan saved-chart-row ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${chartListDates(metadata)}</small></button><div class="saved-chart-actions"><button type="button" aria-label="Copy chart" data-sharing="${site ? 'copy-chart' : 'copy-local'}" data-id="${escAttr(plan.id)}">Copy</button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div></li>`;
+    const remoteId = site ? plan.id : entries.get(plan.id)?.remoteId;
+    const assignment = remoteId ? seatActivity.read(remoteId) : { status: 'ready', assignment: metadata.lastSeatAssignment };
+    return `<li class="sharing-plan saved-chart-row ${site ? 'sharing-site-plan' : 'sharing-local-plan'}"><button type="button" class="saved-page-card" data-sharing="${site ? 'open' : 'local'}" data-id="${escAttr(plan.id)}" aria-label="Open ${escAttr(name)}"><strong><bdi>${escText(name)}</bdi></strong><small class="saved-page-dates">${chartListDates(metadata, false)}<span${remoteId ? ` data-seat-assignment="${escAttr(remoteId)}"` : ''}>${seatAssignmentText(assignment)}</span></small></button><div class="saved-chart-actions"><button type="button" aria-label="Copy chart" data-sharing="${site ? 'copy-chart' : 'copy-local'}" data-id="${escAttr(plan.id)}">Copy</button><button type="button" class="saved-file-delete danger" data-sharing="${site ? 'delete-chart' : 'delete-local'}" data-id="${escAttr(plan.id)}">Delete</button></div></li>`;
   }
   function devicePages(siteIds = new Set()) {
     return getLocalPlans().filter(plan => !siteIds.has(entries.get(plan.id)?.remoteId))
@@ -365,6 +380,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
       const result = await request('/api/plans');
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
       sitePlans = result.plans;
+      for (const plan of sitePlans) seatActivity.load(plan.id, plan.revision);
       updatePlanLists(result.plans.length ? result.plans.map(plan => pageCard(plan, true)).join('') : '<li>No charts saved on the website yet. Add names or customize a chart, then press Save to put it here.</li>', new Set(result.plans.map(plan => plan.id)));
     } catch (error) {
       if (!dialog.open || dialogMode !== 'pages' || generation !== listRequest) return;
@@ -510,7 +526,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
       if ([...entries.values()].some(entry => entry.queue.length) && !window.confirm('Some changes are waiting to sync. Sign out and keep them on this device?')) return;
-      session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); dialog.close(); changed(); onSignOut?.(); return;
+      session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); socket?.close(); seatActivity.clear(); dialog.close(); changed(); onSignOut?.(); return;
     }
     button.disabled = true;
     const errorNode = dialog.querySelector('.sharing-error'), trashStatus = dialog.querySelector('#trash-status');
@@ -564,7 +580,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     close: () => { openRequest++; nameEditor.cancel(); clearPageLink(); dialog.close(); },
     get dialogMode() { return dialog.open ? dialogMode === 'edit-names' ? 'names' : dialogMode : null; },
     start, open, localChanged, label, markup, decorate, canEdit, editStatus, uploadNameFile, leavePageLink: clearPageLink,
-    metadata: id => entries.has(id) ? seatsRecordMetadata(entries.get(id).base) : null,
+    metadata: id => entries.has(id) ? chartMetadata(id) : null,
     get editorName() { return session?.name || profile; },
     get saving() { return publishing; },
     get updating() { return publishing || copyingChart || uploadingNames || [...entries.values()].some(entry => entry.queue.length); },

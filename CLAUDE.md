@@ -1399,6 +1399,15 @@ was that it does not really have to be hidden. So do not raise it again, and do 
 
 ## Seats chart scrolling
 
+The chart status box and Saved charts rows show the organizer who last assigned
+a name to a seat. Later renames, room edits, name-list imports, restores and
+opening a chart must not replace that attribution. Keep the normal creation and
+last-edit dates in the saved list and the full edit history separately.
+Use the existing paginated history API so this works with the deployed service.
+Never substitute its generic updatedBy field when seat history is unknown.
+`tests/seats-seat-activity.mjs`, `tests/seats-records.mjs` and the sharing browser
+checks cover attribution, older pages of history and later edits by another actor.
+
 The full-width Seats chart grows down the website page on desktop. Scroll the page
 to reach its back rows at the same readable size. Do not restore a viewport-height
 chart box with its own vertical scrollbar. The names sidebar may stay sticky and

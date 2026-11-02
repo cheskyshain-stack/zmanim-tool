@@ -780,7 +780,7 @@ function seatsStart(root, auth, updates) {
       if (links !== sharingLinks) { history = []; future = []; sharingLinks = links; }
       syncSaveStatus();
       const nameFiles = root.querySelector('.people-upload'); if (nameFiles && !importing) nameFiles.textContent = sharing?.nameFilesLabel || 'Add names';
-      const status = root.querySelector('#seats-sharing-status'); if (status) status.innerHTML = sharing?.markup() || '';
+      const status = root.querySelector('#seats-sharing-status'); if (status) keepPosition(root, () => { status.innerHTML = sharing?.markup() || ''; });
       sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
     },
