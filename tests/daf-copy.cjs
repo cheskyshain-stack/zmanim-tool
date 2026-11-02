@@ -37,176 +37,143 @@ const server = http.createServer((req, res) => {
         return route.abort();
       });
       const page = await context.newPage();
+      page.setDefaultTimeout(10000);
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(origin + '/donate/?count=off&donation_check=' + Date.now());
-      const card = page.getByRole('tab', { name: 'Card · ACH', exact: true });
-      const zelle = page.getByRole('tab', { name: 'Zelle', exact: true });
-      const daf = page.getByRole('tab', { name: 'DAF', exact: true });
-      await card.waitFor();
+      const campaigns = page.locator('.luach-campaign');
+      await campaigns.first().waitFor();
       await page.evaluate(() => document.fonts.ready);
-      const copy = page.locator('#luach-panel-shul .luach-copy-btn');
-      const measure = () => page.evaluate(() => ({
-        paymentHeight: document.querySelector('.luach-payments').getBoundingClientRect().height,
-        footerTop: document.querySelector('.luach-site-footer').getBoundingClientRect().top + scrollY,
-        footerGap: document.documentElement.scrollHeight - document.querySelector('.luach-site-footer').getBoundingClientRect().bottom - scrollY,
-        documentHeight: document.documentElement.scrollHeight,
-        overflow: document.documentElement.scrollWidth > innerWidth,
-      }));
-      assert.equal(await card.getAttribute('aria-selected'), 'true');
-      assert.equal(await page.getByRole('tabpanel').count(), 1);
-      assert.equal(await page.getByRole('tab').count(), 3);
-      assert.equal(await page.locator('.luach-give-account').count(), 5);
-      assert(await copy.isHidden());
-      assert.equal(await page.locator('.luach-site-footer button').count(), 0);
-      assert.equal(await page.locator('.luach-payment-icon.is-zelle').count(), 1);
-      assert.match(await page.locator('.luach-give-legal').innerText(), /New Jersey 501\(c\)\(3\) nonprofit · EIN: 26-4527675/);
-      const cardLayout = await measure();
-      assert(!cardLayout.overflow);
-      assert(Math.abs(cardLayout.footerGap - 24) < 2);
-      if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'donation-live-design-card.png'), fullPage: true });
-      await zelle.click();
-      const zellePanel = page.getByRole('tabpanel');
-      const zelleCopy = zellePanel.getByRole('button', { name: 'Copy email', exact: true });
-      assert.equal(await zelle.getAttribute('aria-selected'), 'true');
-      assert.equal(await zellePanel.count(), 1);
-      assert.equal(await zellePanel.locator('.luach-zelle-recipient').innerText(), 'Bais Medrash of Lakewood Commons');
-      assert.equal(await zellePanel.locator('.luach-copy-value').innerText(), 'donations@neileich.org');
-      assert.match(await zellePanel.innerText(), /Send through Zelle in your banking app/);
-      assert((await zelleCopy.boundingBox()).height >= 44);
-      assert(!(await measure()).overflow);
-      assert(await zellePanel.locator('.luach-copy-value').evaluate(node => {
-        const text = document.createRange(); text.selectNodeContents(node);
-        const bounds = node.closest('.luach-copy').getBoundingClientRect();
-        return [...text.getClientRects()].every(rect => rect.left >= bounds.left && rect.right <= bounds.right);
-      }));
-      await page.evaluate(() => {
-        window.zelleWrites = [];
-        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.zelleWrites.push(text) } });
-      });
-      await zelleCopy.click();
-      assert.deepEqual(await page.evaluate(() => window.zelleWrites), ['donations@neileich.org']);
-      if (process.env.ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, `donation-zelle-${width}.png`), fullPage: true });
-      await daf.click();
-      assert.equal(await page.getByRole('tabpanel').count(), 1);
-      assert.equal(await daf.getAttribute('aria-selected'), 'true');
-      assert(await copy.isVisible());
-      assert.equal(await copy.innerText(), 'Copy EIN');
-      assert((await copy.boundingBox()).height >= 44);
-      const providers = page.locator('.luach-daf-provider');
-      assert.equal(await providers.count(), 5);
-      assert.deepEqual(await providers.locator('img').evaluateAll(images => images.map(img => img.alt)),
-        ['The Donors Fund', 'Pledger', 'OJC Fund', 'Matbia', 'iMaaser']);
-      assert.equal(await page.getByRole('link', { name: 'iMaaser', exact: true }).getAttribute('href'), 'https://app.imaaser.org/donor/login');
-      assert.equal(await providers.locator('svg[aria-hidden="true"]').count(), 5);
-      await page.waitForFunction(() => [...document.querySelectorAll('.luach-daf-provider img')].every(img => img.complete && img.naturalWidth > 0));
-      for (const link of await providers.all()) {
-        assert.equal(await link.getAttribute('target'), '_blank');
-        assert.equal(await link.getAttribute('data-tax-id'), '26-4527675');
-      }
-      const rows = await providers.evaluateAll(links => links.map(link => {
-        const row = link.getBoundingClientRect(), logo = link.querySelector('img').getBoundingClientRect();
-        const arrow = link.querySelector('svg').getBoundingClientRect();
-        return { left: row.left, top: row.top, width: row.width, height: row.height,
-          contentsFit: logo.left >= row.left && logo.right <= arrow.left - 16 && arrow.right <= row.right };
-      }));
-      assert(rows.every(row => row.height >= 44 && row.height <= 57 && Math.abs(row.width - rows[0].width) < 1 && row.contentsFit));
-      assert(rows.every((row, index) => !index || row.top >= rows[index - 1].top + rows[index - 1].height));
-      const dafLayout = await measure();
-      assert(!dafLayout.overflow);
-      assert(dafLayout.paymentHeight > cardLayout.paymentHeight, 'The five-row provider list has room for every choice');
-      assert(dafLayout.footerTop >= cardLayout.footerTop, 'The footer follows the complete provider list');
-      assert(Math.abs(dafLayout.footerGap - 24) < 2);
-      if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'donation-live-design-daf.png'), fullPage: true });
+      assert.deepEqual(await campaigns.locator('.luach-account-title').allTextContents(),
+        ['Bais Medrash', 'Ravs Fund', 'Eiruv / Building Fund', 'Neileich', 'Keren Zichron Zechariah']);
+      assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 0);
+      assert.equal(await page.locator('.luach-payment-tab:visible').count(), 0, 'Payment choices start collapsed');
+      assert.equal(await page.locator('.luach-frame').count(), 0, 'No merchant forms load before a method is selected');
+      assert.equal(await page.locator('[data-method="zelle"]').count(), 1);
+      if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'campaigns-collapsed.png'), fullPage: true });
       await page.evaluate(() => {
         window.copyWrites = [];
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.copyWrites.push(text) } });
       });
-      await page.getByRole('link', { name: 'iMaaser', exact: true }).evaluate(link => link.addEventListener('click', event => event.preventDefault(), { once: true }));
-      await page.getByRole('link', { name: 'iMaaser', exact: true }).click();
-      await page.waitForFunction(() => window.copyWrites.length === 1);
-      await copy.click();
-      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Copied');
-      await copy.click();
-      await page.evaluate(async () => {
-        for (const link of document.querySelectorAll('.luach-daf-provider')) {
-          link.addEventListener('click', event => event.preventDefault(), { once: true });
-          link.click();
-          await new Promise(resolve => setTimeout(resolve, 0));
-        }
-      });
-      assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675']);
-      await daf.focus();
-      await page.keyboard.press('ArrowLeft');
-      assert.equal(await zelle.getAttribute('aria-selected'), 'true');
-      await page.keyboard.press('ArrowLeft');
-      assert.equal(await card.getAttribute('aria-selected'), 'true');
-      assert(await copy.isHidden());
-      await page.keyboard.press('End');
-      assert.equal(await daf.getAttribute('aria-selected'), 'true');
-      await page.keyboard.press('Home');
-      assert.equal(await card.getAttribute('aria-selected'), 'true');
-      assert.equal(await card.evaluate(tab => document.activeElement === tab), true);
-
-      if (width === 375) {
-        const accounts = page.locator('.luach-give-account');
-        for (let index = 0; index < 5; index++) {
-          const account = accounts.nth(index), go = account.locator('.luach-give-go');
-          const href = await go.getAttribute('href');
-          const name = await account.locator('.luach-account-title').innerText();
-          await go.click();
-          assert.equal(await page.locator('.luach-frame').count(), 1);
-          assert.equal(await account.locator('iframe').getAttribute('src'), href);
-          assert.equal(await account.locator('iframe').getAttribute('title'), name + ' donation form');
-          assert.equal(await account.locator('iframe').getAttribute('allow'), 'payment');
-          assert.match(await account.locator('.luach-frame-where').innerText(), /secure\.cardknox\.com/);
-          assert.equal(await account.locator('.luach-frame-help a').getAttribute('href'), href);
-          if (name === 'Neileich') assert.equal(await account.locator('.luach-frame-website').getAttribute('href'), 'https://www.neileich.org/');
-          const frame = page.frameLocator('.luach-frame');
-          await frame.locator('#donor-name').fill('Preserved entry');
-          await page.evaluate(() => window.savedDonationFrame = document.querySelector('.luach-frame'));
-          await daf.click();
-          assert.equal(await copy.isVisible(), true);
-          assert.equal(await page.locator('.luach-frame').isHidden(), true);
-          assert.equal((await measure()).paymentHeight, dafLayout.paymentHeight);
-          await page.setViewportSize({ width: 812, height: 375 });
-          await card.click();
-          assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved entry');
-          assert(await page.evaluate(() => window.savedDonationFrame === document.querySelector('.luach-frame')));
-          await page.setViewportSize({ width, height });
-          assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved entry');
-          assert(!(await measure()).overflow);
-          await account.getByRole('button', { name: 'Close the donation form' }).click();
-          assert.equal(await page.locator('.luach-frame').count(), 0);
-          assert.equal(await go.getAttribute('aria-expanded'), 'false');
-          assert.equal(await go.evaluate(link => document.activeElement === link), true);
-        }
-        // Opening a different fund removes the previous form instead of keeping two live.
-        await accounts.nth(0).locator('.luach-give-go').click();
-        await accounts.nth(1).locator('.luach-give-go').click();
+      const layouts = [];
+      for (let index = 0; index < 5; index++) {
+        const campaign = campaigns.nth(index), toggle = campaign.locator('.luach-campaign-toggle');
+        const card = campaign.locator('[data-method="card"]'), daf = campaign.locator('[data-method="shul"]');
+        const title = await campaign.locator('.luach-account-title').innerText();
+        await toggle.click();
+        assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 1);
+        assert.equal(await page.locator('.luach-payment-tab:visible').count(), index === 3 ? 3 : 2);
+        assert.equal(await campaign.locator('.luach-payment-panel:visible').count(), 0, 'Details wait for the payment-method click');
+        const position = await toggle.evaluate(node => ({ top: node.getBoundingClientRect().top,
+          cap: document.querySelector('.luach-bar').getBoundingClientRect().bottom }));
+        assert(Math.abs(position.top - position.cap - 8) < 2, title + ' is aligned below the header: ' + JSON.stringify(position));
+        await card.click();
+        const frame = page.frameLocator('.luach-frame');
         assert.equal(await page.locator('.luach-frame').count(), 1);
-        assert.equal(await accounts.nth(0).locator('.luach-give-go').getAttribute('aria-expanded'), 'false');
-        await accounts.nth(1).getByRole('button', { name: 'Close the donation form' }).click();
+        assert.equal(await campaign.locator('iframe').getAttribute('src'), await campaign.locator('.luach-give-go').getAttribute('href'));
+        assert.equal(await campaign.locator('iframe').getAttribute('title'), title + ' donation form');
+        assert.equal(await campaign.locator('iframe').getAttribute('allow'), 'payment');
+        if (index === 3) assert.equal(await campaign.locator('.luach-frame-website').getAttribute('href'), 'https://www.neileich.org/');
+        assert.match(await campaign.locator('.luach-frame-where').innerText(), /secure\.cardknox\.com/);
+        await frame.locator('#donor-name').fill('Preserved ' + title);
+        await campaign.locator('iframe').evaluate(node => window.savedDonationFrame = node);
+        await daf.click();
+        const dafPanel = campaign.locator('.luach-payment-panel:not([hidden])');
+        assert.equal(await dafPanel.count(), 1);
+        assert.match(await dafPanel.innerText(), new RegExp('Designate your gift for ' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+        const providers = dafPanel.locator('.luach-daf-provider');
+        assert.deepEqual(await providers.locator('img').evaluateAll(images => images.map(img => img.alt)),
+          ['The Donors Fund', 'Pledger', 'OJC Fund', 'Matbia', 'iMaaser']);
+        await page.waitForFunction(id => [...document.getElementById(id).querySelectorAll('.luach-daf-provider img')].every(img => img.complete && img.naturalWidth > 0), await dafPanel.getAttribute('id'));
+        const rows = await providers.evaluateAll(links => links.map(link => {
+          const row = link.getBoundingClientRect(), logo = link.querySelector('img').getBoundingClientRect(), arrow = link.querySelector('svg').getBoundingClientRect();
+          return { height:row.height, fits:logo.left >= row.left && logo.right <= arrow.left - 16 && arrow.right <= row.right };
+        }));
+        assert(rows.every(row => row.height >= 44 && row.height <= 57 && row.fits));
+        for (const provider of await providers.all()) {
+          assert.equal(await provider.getAttribute('target'), '_blank');
+          assert.equal(await provider.getAttribute('data-tax-id'), '26-4527675');
+        }
+        const provider = providers.last();
+        assert.equal(await provider.getAttribute('href'), 'https://app.imaaser.org/donor/login');
+        await provider.evaluate(link => link.addEventListener('click', event => event.preventDefault(), {once:true}));
+        await provider.click();
+        const einCopy = dafPanel.locator('.luach-copy-btn');
+        assert.equal(await einCopy.innerText(), 'Copy EIN');
+        await einCopy.click();
+        await page.waitForFunction(id => document.getElementById(id).querySelector('.luach-copy-btn').textContent === 'Copied', await dafPanel.getAttribute('id'));
+        assert((await einCopy.boundingBox()).height >= 44);
+        if (index === 3) {
+          const zelle = campaign.locator('[data-method="zelle"]');
+          await zelle.click();
+          const panel = campaign.locator('.luach-payment-panel.is-zelle');
+          assert(await panel.isVisible());
+          assert.equal(await panel.locator('.luach-zelle-recipient').innerText(), 'Bais Medrash of Lakewood Commons');
+          assert.equal(await panel.locator('.luach-copy-value').innerText(), 'donations@neileich.org');
+          const copy = panel.locator('.luach-copy-btn');
+          assert.equal(await copy.innerText(), 'Copy email');
+          await copy.click();
+          assert((await copy.boundingBox()).height >= 44);
+          assert(await panel.locator('.luach-copy-value').evaluate(node => {
+            const text = document.createRange(); text.selectNodeContents(node);
+            const bounds = node.closest('.luach-copy').getBoundingClientRect();
+            return [...text.getClientRects()].every(rect => rect.left >= bounds.left && rect.right <= bounds.right);
+          }));
+          if (process.env.ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.ARTIFACT_DIR, `neileich-zelle-${width}.png`),fullPage:true});
+        }
+        await card.click();
+        assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved ' + title);
+        assert(await campaign.locator('iframe').evaluate(node => node === window.savedDonationFrame));
+        if (width === 375) {
+          await page.setViewportSize({width:812,height:375});
+          assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved ' + title);
+          await page.setViewportSize({width,height});
+          assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved ' + title);
+        }
+        await card.focus();
+        await page.keyboard.press('ArrowRight');
+        assert.equal(await daf.getAttribute('aria-expanded'), 'true');
+        await page.keyboard.press('Home');
+        assert.equal(await card.getAttribute('aria-expanded'), 'true');
+        assert(await card.evaluate(node => node === document.activeElement));
+        await campaign.getByRole('button', {name:'Close the donation form'}).click();
+        assert.equal(await page.locator('.luach-frame').count(), 0);
+        assert(await campaign.locator('.luach-give-go').evaluate(node => node === document.activeElement));
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+        layouts.push({title, position, methods:index === 3 ? 3 : 2});
       }
-
+      assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675','donations@neileich.org']);
       await page.reload();
-      await card.waitFor();
-      assert.equal(await card.getAttribute('aria-selected'), 'true');
-      assert(await copy.isHidden());
-      await daf.click();
+      await campaigns.first().waitFor();
+      assert.equal(await page.locator('.luach-payment-tab:visible').count(),0);
+      await campaigns.first().locator('.luach-campaign-toggle').click();
+      await campaigns.first().locator('[data-method="shul"]').click();
+      const copy = campaigns.first().locator('.luach-copy-btn').filter({hasText:'Copy EIN'});
       await page.evaluate(() => {
-        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async () => { throw Error('blocked'); } } });
+        Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async()=>{throw Error('blocked');}}});
         document.execCommand = () => false;
       });
       await copy.click();
-      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Try again');
+      const retry = campaigns.first().getByRole('button',{name:'Try again',exact:true});
+      await retry.waitFor();
       await page.evaluate(() => {
-        window.retryWrites = [];
-        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.retryWrites.push(text) } });
+        window.retryWrites=[];
+        Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>window.retryWrites.push(text)}});
       });
-      await copy.click();
-      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Copied');
-      assert.deepEqual(await page.evaluate(() => window.retryWrites), ['26-4527675']);
-      results.push({ width, height, cardLayout, dafLayout, clipboard: 'once, retry verified', keyboard: 'passed', forms: width === 375 ? 'all five, rotation and method switching preserve entry' : 'not repeated' });
+      await retry.click();
+      await campaigns.first().getByRole('button',{name:'Copied',exact:true}).waitFor();
+      assert.deepEqual(await page.evaluate(()=>window.retryWrites),['26-4527675']);
+      if (process.env.ARTIFACT_DIR && width === 375) {
+        await page.reload();
+        await campaigns.first().waitFor();
+        const neileich = campaigns.nth(3);
+        await neileich.locator('.luach-campaign-toggle').click();
+        await page.screenshot({path:path.join(process.env.ARTIFACT_DIR,'neileich-payment-choices.png')});
+        await neileich.locator('[data-method="zelle"]').click();
+        const top = await neileich.locator('.luach-campaign-toggle').evaluate(node => node.getBoundingClientRect().top);
+        assert(Math.abs(top - 72) < 2);
+        await page.screenshot({path:path.join(process.env.ARTIFACT_DIR,'neileich-zelle-screen.png')});
+      }
+      results.push({width,height,layouts,clipboard:'EIN once, Zelle and retry verified',forms:'all five, method switching retains entries'});
       await context.close();
     }
     assert.deepEqual(errors, []);
