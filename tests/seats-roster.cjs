@@ -32,8 +32,9 @@ print(json.dumps({'pages':len(doc),'printedNames':len(names),'fullNamesRetained'
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
   const {seatsCreateState,seatsWriteName,seatsAddNames,seatsSeatBlocked}=await import('../js/seats/model.js'),{seatsParseDelimited}=await import('../js/seats/import.js');
   const sample=seatsCreateState(),plan=sample.plans[0];plan.name='SyntheticRosterTitle'.repeat(4);plan.paper='tabloid';
+  const capacity=[...plan.tables,...plan.objects.filter(o=>o.type==='rav')].reduce((sum,t)=>sum+t.count,0);
   let index=0;
-  for(const table of [...plan.tables,...plan.objects.filter(o=>o.type==='rav')])for(let seat=0;seat<table.count;seat++){const name='Person '+String(++index).padStart(3,'0')+' Family'+String(166-index).padStart(3,'0');if(seatsSeatBlocked(plan,table.id,seat)){const person={id:crypto.randomUUID(),name};plan.people.push(person);table.seats[seat]=person.id;}else seatsWriteName(plan,table.id,seat,name,{duplicate:true});}
+  for(const table of [...plan.tables,...plan.objects.filter(o=>o.type==='rav')])for(let seat=0;seat<table.count;seat++){const name='Person '+String(++index).padStart(3,'0')+' Family'+String(capacity+1-index).padStart(3,'0');if(seatsSeatBlocked(plan,table.id,seat)){const person={id:crypto.randomUUID(),name};plan.people.push(person);table.seats[seat]=person.id;}else seatsWriteName(plan,table.id,seat,name,{duplicate:true});}
   const a1=plan.tables.find(t=>t.id==='A1'),first=plan.people.find(p=>p.id===a1.seats[0]);plan.people.find(p=>p.id===a1.seats[1]).name=first.name;plan.people.find(p=>p.id===a1.seats[2]).name=first.name;plan.people.find(p=>p.id===plan.tables.find(t=>t.id==='A2').seats[0]).name=first.name;
   plan.people.find(p=>p.id===a1.seats[3]).name='Z'.repeat(130);plan.tables.find(t=>t.id==='A2').label='Side table';seatsAddNames(plan,['Never Seated Person']);
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
@@ -53,8 +54,8 @@ print(json.dumps({'pages':len(doc),'printedNames':len(names),'fullNamesRetained'
       await page.getByRole('heading',{name:'Alphabetical seat list',exact:true}).waitFor();assert.ok((await page.locator('.seats-roster-table tbody').textContent()).includes('New Pending Person'),'Opening the list flushes unfinished seat typing');
       const raw=()=>page.evaluate(key=>localStorage.getItem(key),key),before=await raw();
       const rows=()=>page.locator('.seats-roster-table tbody tr').evaluateAll(rows=>rows.map(row=>[...row.cells].map(cell=>cell.textContent)));
-      assert.equal((await rows()).length,162);assert.equal((await rows()).filter(row=>row[0]===first.name).length,1);assert.deepEqual((await rows()).find(row=>row[0]===first.name),[first.name,'A1, Side table']);assert.deepEqual(await page.locator('.seats-roster-table th').allTextContents(),['Name','Table']);assert.ok((await rows()).every(row=>row.length===2));assert.ok(!(await rows()).some(row=>row[0]==='Never Seated Person'));
-      await page.locator('#roster-sort').selectOption('last');assert.deepEqual((await rows())[0],['Person 165 Family001','Rav']);
+      assert.equal((await rows()).length,capacity-3);assert.equal((await rows()).filter(row=>row[0]===first.name).length,1);assert.deepEqual((await rows()).find(row=>row[0]===first.name),[first.name,'A1, Side table']);assert.deepEqual(await page.locator('.seats-roster-table th').allTextContents(),['Name','Table']);assert.ok((await rows()).every(row=>row.length===2));assert.ok(!(await rows()).some(row=>row[0]==='Never Seated Person'));
+      await page.locator('#roster-sort').selectOption('last');assert.deepEqual((await rows())[0],['Person '+String(capacity).padStart(3,'0')+' Family001','Rav']);
       await page.locator('#roster-sort').selectOption('first');assert.equal((await rows())[0][0],'New Pending Person');assert.equal(await raw(),before,'The report and sort controls do not edit the chart');
       await page.screenshot({path:path.join(output,'roster-'+width+'.png')});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'The list and long chart titles must fit the viewport');

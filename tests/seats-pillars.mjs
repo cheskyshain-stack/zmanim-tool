@@ -6,6 +6,7 @@ const blocked = plan => plan.tables.flatMap(table => table.seats.flatMap((_, ind
 test('front pillars align with the rear pair and do not block a seat or move existing names', () => {
   const state = seatsCreateState(), plan = state.plans[0];
   seatsWriteName(plan, 'B4', 1, 'Front Pillar Test'); seatsWriteName(plan, 'C4', 3, 'Other Front Pillar Test');
+  plan.objects = plan.objects.filter(object => !object.id.startsWith('front-pillar-'));
   const before = structuredClone(plan), additions = seatsFrontPillars(plan);
   assert.equal(additions.length, 2); plan.objects.push(...additions);
   assert.deepEqual(plan.tables, before.tables); assert.deepEqual(plan.people, before.people);
@@ -16,7 +17,7 @@ test('front pillars align with the rear pair and do not block a seat or move exi
     assert.deepEqual([front.width, front.height], [20,20]); assert.ok(seatsIsFixed(front)); assert.equal(seatsUsableCount(plan, table), table.count);
   }
   assert.deepEqual(seatsFrontPillars(plan), []); assert.deepEqual(seatsNormalizeState(state), state);
-  assert.equal(seatsItems(plan).reduce((count, table) => count + seatsUsableCount(plan, table), 0), 163);
+  assert.equal(seatsItems(plan).reduce((count, table) => count + seatsUsableCount(plan, table), 0), 172);
 });
 test('blocked positions reject typing, copies and assignments before changing any names or original seats', () => {
   const plan = seatsCreateState().plans[0], person = seatsWriteName(plan, 'A1', 0, 'Keep Original Assignment'), before = structuredClone(plan);

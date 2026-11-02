@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateState, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront, seatsRemovePeople, seatsNeedsUpgrade, seatsIsFixed } from '../js/seats/model.js';
+import { seatsCreateOriginalPlan, seatsSetCount, seatsAssign, seatsAddNames, seatsAssigned, seatsNormalizeState, seatsUpgradePlan, seatsWriteName, seatsItems, seatsFront, seatsRemovePeople, seatsNeedsUpgrade, seatsIsFixed } from '../js/seats/model.js';
 import { seatsParseDelimited, seatsNamesFromRows, seatsCsvCell } from '../js/seats/import.js';
+
+const seatsCreateState = () => { const plan = seatsCreateOriginalPlan(); return { version: 1, activeId: plan.id, plans: [plan] }; };
 
 const rowTop = row => row >= 7 ? 648 + (row - 7) * 88 : 78 + (row - 1) * 88;
 
@@ -14,7 +16,7 @@ test('automatic paper fitting is saved while existing fixed paper preferences ar
   }
 });
 
-test('34-table starting layout has the extra middle tables at the back and the specified four-seat and three-seat tables', () => {
+test('the original 34-table layout has the extra middle tables at the back and the specified four-seat and three-seat tables', () => {
   const state = seatsCreateState(), plan = state.plans[0];
   assert.equal(plan.tables.length, 34);
   assert.deepEqual(['A','B','C','D'].map(col => plan.tables.filter(table => table.column === col).length), [8,9,9,8]);

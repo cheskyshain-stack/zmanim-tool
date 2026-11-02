@@ -1,4 +1,4 @@
-import { seatsCreatePlan } from './model.js';
+import { seatsCreatePlan, seatsCreateOriginalPlan } from './model.js';
 import { seatsIsRoomChartName } from './chart-names.js';
 
 const seatsContentIgnored = new Set(['id', 'name', 'people', 'layoutVersion', 'paper', 'monochrome']);
@@ -39,6 +39,6 @@ function seatsContentEqual(a, b) {
 export function seatsHasContent(plan) {
   if (!plan || typeof plan !== 'object') return false;
   if (!seatsIsAutomaticChartName(plan.name) || plan.people?.length) return true;
-  if (!seatsContentBaseline) seatsContentBaseline = seatsContentShape(seatsCreatePlan());
-  return !seatsContentEqual(seatsContentShape(plan), seatsContentBaseline);
+  if (!seatsContentBaseline) seatsContentBaseline = [seatsCreatePlan(), seatsCreateOriginalPlan()].map(seatsContentShape);
+  return !seatsContentBaseline.some(baseline => seatsContentEqual(seatsContentShape(plan), baseline));
 }

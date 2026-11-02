@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreatePlan, seatsUpgradePlan } from '../js/seats/model.js';
+import { seatsCreatePlan, seatsCreateOriginalPlan, seatsUpgradePlan } from '../js/seats/model.js';
 import { seatsHasContent, seatsIsAutomaticChartName } from '../js/seats/content.js';
 
 const copy = value => structuredClone(value);
@@ -34,7 +34,7 @@ test('fresh canonical layouts stay empty despite factory IDs, ordering and print
 });
 
 test('the latest room update keeps older untouched charts empty', () => {
-  const plan=seatsCreatePlan();
+  const plan=seatsCreateOriginalPlan();
   plan.objects=plan.objects.filter(object=>object.id!=='rear-case-a7');
   for(const table of plan.tables.filter(table=>['D7','D8'].includes(table.id)))table.x=1151-table.width;
   for(const table of plan.tables.filter(table=>['B2','C2'].includes(table.id))){table.count=4;table.seats=[null,null,null,null];table.width=192;if(table.id==='C2')table.x+=48;}
@@ -45,7 +45,7 @@ test('the latest room update keeps older untouched charts empty', () => {
 });
 
 test('moving the previous front pair away from the doorway does not create a saved empty chart', () => {
-  const plan=seatsCreatePlan();plan.tables.find(table=>table.id==='C1').x=735;plan.tables.find(table=>table.id==='D1').x=935;
+  const plan=seatsCreateOriginalPlan();plan.tables.find(table=>table.id==='C1').x=735;plan.tables.find(table=>table.id==='D1').x=935;
   plan.objects.find(object=>object.type==='rav').x=669.5;
   assert.equal(seatsUpgradePlan(plan),0);assert.equal(seatsHasContent(plan),false);
 });

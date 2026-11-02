@@ -16,7 +16,7 @@ test('concurrent edits to the same seat are rejected atomically', () => {
   const base=seatsSharedPlan(seatsCreatePlan()),a=structuredClone(base),b=structuredClone(base);
   seatsWriteName(a,'B9',0,'Keep this name');seatsWriteName(b,'B9',0,'Conflicting name');
   const confirmed=seatsSharedApply(base,seatsSharedDiff(base,a)),before=structuredClone(confirmed);
-  assert.throws(()=>seatsSharedApply(confirmed,seatsSharedDiff(base,b)),/Another organizer changed B9, seat 1/);
+  assert.throws(()=>seatsSharedApply(confirmed,seatsSharedDiff(base,b)),/Another organizer changed B10, seat 1/);
   assert.deepEqual(confirmed,before);
 });
 

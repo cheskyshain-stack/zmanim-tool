@@ -31,7 +31,7 @@ print(json.dumps({'pages':1,'namesRetained':True,'blockedLabels':2}))
   const response=await page.goto(origin+'/seats/?count=off');if(remote){const imports=html=>JSON.parse(html.match(/<script type="importmap">([^<]+)<\/script>/)[1]).imports;assert.equal(imports(await response.text())['/js/seats/model.js'],imports(fs.readFileSync(path.join(root,'seats/index.html'),'utf8'))['/js/seats/model.js']);}
   await page.locator('#seats-name').fill('Synthetic Pillar Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   const raw=()=>page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1')),seat=(id,index)=>page.locator('.room-stage [data-table="'+id+'"][data-seat="'+index+'"]');
-  const before=await raw();assert.equal(await page.locator('.room-stage .blocked-seat').count(),2);assert.match(await page.locator('.canvas-heading p').textContent(),/163 seats/);
+  const before=await raw();assert.equal(await page.locator('.room-stage .blocked-seat').count(),2);assert.match(await page.locator('.canvas-heading p').textContent(),/172 seats/);
   for(const [id,index]of [['B7',1],['C7',3]]){
    const cell=seat(id,index);assert.equal(await cell.getAttribute('aria-disabled'),'true');assert.equal(await cell.getAttribute('tabindex'),'-1');assert.equal(await cell.locator('.chair-marker').count(),0);assert.equal(await cell.locator('.blocked-seat-label').textContent(),'Pillar');
    await cell.click({force:true});assert.ok(await page.locator('.seat-editor').isHidden());
@@ -45,8 +45,8 @@ print(json.dumps({'pages':1,'namesRetained':True,'blockedLabels':2}))
   await page.evaluate(()=>{document.querySelector('#people-extra-tools').open=true;document.querySelector('#seat-list').open=true;});await page.locator('#selected-item').selectOption('B7');
   const disabled=page.locator('#seat-list [data-open-seat="1"]');assert.ok(await disabled.isDisabled());assert.match(await disabled.textContent(),/Pillar/);assert.ok(await page.locator('#seat-list [data-open-seat="2"]').isEnabled());
   await page.evaluate(()=>{document.querySelector('#people-extra-tools').open=false;});
-  await seat('B7',0).click();await page.locator('#seat-name-input').fill('Tab Test Person');await page.locator('#seat-name-input').press('Tab');assert.match(await page.locator('.seat-editor h2').textContent(),/B7.*Seat 3/);
-  await page.locator('#seat-name-input').press('Shift+Tab');assert.match(await page.locator('.seat-editor h2').textContent(),/B7.*Seat 1/);await page.locator('[data-editor=close]').click();
+  await seat('B7',0).click();await page.locator('#seat-name-input').fill('Tab Test Person');await page.locator('#seat-name-input').press('Tab');assert.match(await page.locator('.seat-editor h2').textContent(),/B8.*Seat 3/);
+  await page.locator('#seat-name-input').press('Shift+Tab');assert.match(await page.locator('.seat-editor h2').textContent(),/B8.*Seat 1/);await page.locator('[data-editor=close]').click();
   const afterTab=await raw();
   if(width===1440){
    await page.locator('#chart-view').selectOption('whole');await page.locator('.person-name').filter({hasText:'Waiting Drag Person'}).dragTo(seat('B7',1),{force:true});assert.equal(await raw(),afterTab,'Dragging to a pillar cannot assign a name');

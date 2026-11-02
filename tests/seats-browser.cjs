@@ -20,6 +20,8 @@ const server = http.createServer((req,res) => {
   const browser = await chromium.launch({headless:true, executablePath:process.env.CHROME_BIN || '/usr/bin/chromium', args:['--no-sandbox']});
   try {
     const context = await browser.newContext({viewport:{width:1440,height:1050}, acceptDownloads:true});
+    const { seatsCreateOriginalPlan } = await import('../js/seats/model.js'), original = seatsCreateOriginalPlan('Browser seating chart');
+    await context.addInitScript(({key,original})=>{if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({version:1,activeId:original.id,plans:[original]}));},{key:storageKey,original});
     const page = await context.newPage(), errors = [], badResponses = [], posts = [];
     page.on('pageerror', error => errors.push(error.message));
     page.on('response', response => {if(response.status() >= 400) badResponses.push(response.url());});
@@ -33,9 +35,8 @@ const server = http.createServer((req,res) => {
     await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('1111'); await page.getByRole('button', {name:'Open Seats'}).click();
     await page.getByText('That PIN did not match. Try again.').waitFor();
     await page.locator('#seats-name').fill('Synthetic Organizer');await page.locator('#seats-pin').fill('4444'); await page.getByRole('button', {name:'Open Seats'}).click();
-    await createChart(page);
+    await openDevice(page,original.id);
     await page.locator('.room-stage .table-item').first().waitFor();
-    assert.match(await page.locator('#chart-name').inputValue(),/^Seating plan - /);
     await page.locator('#chart-name').fill('Browser seating chart');await page.locator('#chart-name').press('Enter');
     const openRoom = () => page.evaluate(() => { document.querySelector('#people-extra-tools').open=true; document.querySelector('#room-settings').open=true; });
     const closeRoom = () => page.evaluate(() => { document.querySelector('#room-settings').open=false; document.querySelector('#people-extra-tools').open=false; });
@@ -317,7 +318,7 @@ const server = http.createServer((req,res) => {
     await page.locator('#plan-files summary').click();
     let downloading=page.waitForEvent('download'); await page.getByRole('button',{name:'Download backup',exact:true}).click();
     const backup=await downloading; const backupPath=path.join(output,'backup.json'); await backup.saveAs(backupPath);
-    const backupData=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.ok(backupData.chartRecords[originalPlan].createdAt);assert.ok(backupData.chartRecords[originalPlan].updatedAt);
+    const backupData=JSON.parse(fs.readFileSync(backupPath,'utf8'));assert.equal(backupData.chartRecords[originalPlan].createdAt,null,'Loading an older saved chart does not invent a creation date');assert.ok(backupData.chartRecords[originalPlan].updatedAt);
     await openSaved(page);await page.getByRole('button',{name:'New chart',exact:true}).click();
     await page.locator('#chart-name').fill('Yomim Noraim');await page.locator('#chart-name').press('Enter');
     assert.equal((await state()).plans.length,2); assert.equal((await state()).plans[1].people.length,0);
@@ -534,7 +535,7 @@ const server = http.createServer((req,res) => {
     assert.equal(await touchPage.locator('.room-stage').evaluate(node=>node.clientWidth),pinchWidth);
     await touch.close();
     assert.deepEqual(posts,[]); assert.deepEqual(errors,[]); assert.deepEqual(badResponses,[]);
-    console.log('PASS: PIN, exact 34-table layout, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, direct typing, suggestions, copy/paste, undo/redo, migration, wheel/touch scrolling, button/pinch zoom, print margins, undistorted text, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
+    console.log('PASS: PIN, preserved original 34-table chart, counts, CSV/Excel/text imports, assignments, persistence, room objects, pointer/keyboard movement, direct typing, suggestions, copy/paste, undo/redo, migration, wheel/touch scrolling, button/pinch zoom, print margins, undistorted text, backups, mobile, admin link, and actual Letter/Tabloid PDFs.');
     console.log('Artifacts: '+output);
   } finally {await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});
