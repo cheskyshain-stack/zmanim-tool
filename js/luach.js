@@ -389,11 +389,10 @@ const DONATE = {
     },
     {
       title: 'Zelle',
-      blurb: 'Give quickly and securely with Zelle.',
+      how: 'Send through Zelle in your banking app.',
       icon: 'zelle',
-      // Blank until the address is confirmed. One invented to fill the space would send
-      // somebody's money somewhere, and that is not a thing to guess at.
-      copy: { label: '', value: '' },
+      recipient: 'Bais Medrash of Lakewood Commons',
+      copy: { label: '', value: 'donations@neileich.org', buttonLabel: 'Copy email' },
     },
     {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
@@ -964,6 +963,7 @@ function donateWayHtml(way, index) {
     ${way.icon === 'zelle' ? `<span class="luach-zelle-roundel" aria-hidden="true">${giveIcon('zelle', 'luach-zelle-logo')}</span>` : ''}
     <h2 class="luach-payment-heading">${escAttr(heading)}</h2>
     <p class="luach-payment-intro">${escAttr(intro)}</p>
+    ${way.recipient ? `<p class="luach-zelle-recipient">${escAttr(way.recipient)}</p>` : ''}
     ${copy}
     ${providers ? `<div class="luach-daf-providers">${providers}</div>` : ''}
     ${accounts ? `<div class="luach-give-accounts">${accounts}</div>` : ''}

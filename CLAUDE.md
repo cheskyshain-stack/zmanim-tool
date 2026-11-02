@@ -930,7 +930,10 @@ Export/Import in Settings moves it between devices.
   Keep the condensed nonprofit information and plain EIN inside the contact footer
   at the bottom. The footer follows expanded forms and uses spare height above it
   when the page is short. Switching methods preserves entered payment forms.
-  Zelle already has its real brand mark in `GIVE_ICONS`; hide its option until recipient details are confirmed.
+  Zelle is available between Card · ACH and DAF, using its real brand mark in
+  `GIVE_ICONS`. The confirmed recipient is Bais Medrash of Lakewood Commons at
+  `donations@neileich.org`. Show the recipient name, banking-app instructions and
+  Copy email button. Keep the email selectable and let its copy row wrap on phones.
 - `main:not(.is-sheet-view)` is capped at 62rem and left aligned against the sidebar.
   This is deliberate and was asked for twice: the point is not dragging the mouse from
   one edge of the screen to the other. **Do not centre it.** Centring was tried and

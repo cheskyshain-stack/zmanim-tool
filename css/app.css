@@ -5911,7 +5911,10 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-payment-panel.is-zelle { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
  .luach-zelle-roundel { display:flex; align-items:center; justify-content:center; width:70px; height:70px; margin-bottom:15px; border-radius:50%; background:#6d1ed4; color:#fff; }
  .luach-zelle-logo { width:43px; height:43px; }
- .luach-payment-panel.is-zelle .luach-copy { align-self:stretch; }
+ .luach-zelle-recipient { margin:16px 0 0; color:#142b46; font:600 15px/1.5 Arial,sans-serif; }
+ .luach-payment-panel.is-zelle .luach-copy { align-self:stretch; justify-content:center; }
+ .luach-payment-panel.is-zelle .luach-copy-info { justify-content:center; max-width:100%; }
+ .luach-payment-panel.is-zelle .luach-copy-btn { margin:0; }
  /* Keep the contact and nonprofit details together, after forms and spare height. */
  .is-give .luach-site-footer { max-width:none; margin-top:auto; padding-top:17px; border-top:0; }
  .is-give .luach-site-footer::before { content:""; display:block; height:1px; margin:9px 0 17px; background:#e5e2da; }

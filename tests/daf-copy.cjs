@@ -40,10 +40,11 @@ const server = http.createServer((req, res) => {
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(origin + '/donate/?count=off&donation_check=' + Date.now());
       const card = page.getByRole('tab', { name: 'Card · ACH', exact: true });
+      const zelle = page.getByRole('tab', { name: 'Zelle', exact: true });
       const daf = page.getByRole('tab', { name: 'DAF', exact: true });
       await card.waitFor();
       await page.evaluate(() => document.fonts.ready);
-      const copy = page.locator('.luach-copy-btn');
+      const copy = page.locator('#luach-panel-shul .luach-copy-btn');
       const measure = () => page.evaluate(() => ({
         paymentHeight: document.querySelector('.luach-payments').getBoundingClientRect().height,
         footerTop: document.querySelector('.luach-site-footer').getBoundingClientRect().top + scrollY,
@@ -53,16 +54,38 @@ const server = http.createServer((req, res) => {
       }));
       assert.equal(await card.getAttribute('aria-selected'), 'true');
       assert.equal(await page.getByRole('tabpanel').count(), 1);
-      assert.equal(await page.getByRole('tab').count(), 2);
+      assert.equal(await page.getByRole('tab').count(), 3);
       assert.equal(await page.locator('.luach-give-account').count(), 5);
       assert(await copy.isHidden());
       assert.equal(await page.locator('.luach-site-footer button').count(), 0);
-      assert.equal(await page.locator('.luach-payment-icon.is-zelle').count(), 0);
+      assert.equal(await page.locator('.luach-payment-icon.is-zelle').count(), 1);
       assert.match(await page.locator('.luach-give-legal').innerText(), /New Jersey 501\(c\)\(3\) nonprofit · EIN: 26-4527675/);
       const cardLayout = await measure();
       assert(!cardLayout.overflow);
       assert(Math.abs(cardLayout.footerGap - 24) < 2);
       if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'donation-live-design-card.png'), fullPage: true });
+      await zelle.click();
+      const zellePanel = page.getByRole('tabpanel');
+      const zelleCopy = zellePanel.getByRole('button', { name: 'Copy email', exact: true });
+      assert.equal(await zelle.getAttribute('aria-selected'), 'true');
+      assert.equal(await zellePanel.count(), 1);
+      assert.equal(await zellePanel.locator('.luach-zelle-recipient').innerText(), 'Bais Medrash of Lakewood Commons');
+      assert.equal(await zellePanel.locator('.luach-copy-value').innerText(), 'donations@neileich.org');
+      assert.match(await zellePanel.innerText(), /Send through Zelle in your banking app/);
+      assert((await zelleCopy.boundingBox()).height >= 44);
+      assert(!(await measure()).overflow);
+      assert(await zellePanel.locator('.luach-copy-value').evaluate(node => {
+        const text = document.createRange(); text.selectNodeContents(node);
+        const bounds = node.closest('.luach-copy').getBoundingClientRect();
+        return [...text.getClientRects()].every(rect => rect.left >= bounds.left && rect.right <= bounds.right);
+      }));
+      await page.evaluate(() => {
+        window.zelleWrites = [];
+        Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.zelleWrites.push(text) } });
+      });
+      await zelleCopy.click();
+      assert.deepEqual(await page.evaluate(() => window.zelleWrites), ['donations@neileich.org']);
+      if (process.env.ARTIFACT_DIR) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, `donation-zelle-${width}.png`), fullPage: true });
       await daf.click();
       assert.equal(await page.getByRole('tabpanel').count(), 1);
       assert.equal(await daf.getAttribute('aria-selected'), 'true');
@@ -102,7 +125,7 @@ const server = http.createServer((req, res) => {
       await page.getByRole('link', { name: 'iMaaser', exact: true }).click();
       await page.waitForFunction(() => window.copyWrites.length === 1);
       await copy.click();
-      await page.waitForFunction(() => document.querySelector('.luach-copy-btn').textContent === 'Copied');
+      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Copied');
       await copy.click();
       await page.evaluate(async () => {
         for (const link of document.querySelectorAll('.luach-daf-provider')) {
@@ -113,6 +136,8 @@ const server = http.createServer((req, res) => {
       });
       assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675']);
       await daf.focus();
+      await page.keyboard.press('ArrowLeft');
+      assert.equal(await zelle.getAttribute('aria-selected'), 'true');
       await page.keyboard.press('ArrowLeft');
       assert.equal(await card.getAttribute('aria-selected'), 'true');
       assert(await copy.isHidden());
@@ -173,13 +198,13 @@ const server = http.createServer((req, res) => {
         document.execCommand = () => false;
       });
       await copy.click();
-      await page.waitForFunction(() => document.querySelector('.luach-copy-btn').textContent === 'Try again');
+      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Try again');
       await page.evaluate(() => {
         window.retryWrites = [];
         Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async text => window.retryWrites.push(text) } });
       });
       await copy.click();
-      await page.waitForFunction(() => document.querySelector('.luach-copy-btn').textContent === 'Copied');
+      await page.waitForFunction(() => document.querySelector('#luach-panel-shul .luach-copy-btn').textContent === 'Copied');
       assert.deepEqual(await page.evaluate(() => window.retryWrites), ['26-4527675']);
       results.push({ width, height, cardLayout, dafLayout, clipboard: 'once, retry verified', keyboard: 'passed', forms: width === 375 ? 'all five, rotation and method switching preserve entry' : 'not repeated' });
       await context.close();
