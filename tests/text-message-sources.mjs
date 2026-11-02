@@ -108,7 +108,7 @@ test('Rosh Chodesh and Chanukah chart panels quote the same posted morning acros
   }
 });
 
-test('all Chanukah weeks include their actual mornings, including Rosh Chodesh and Friday', () => {
+test('Chanukah weekly messages keep ordinary and Chanukah mornings without repeating Rosh Chodesh', () => {
   let partial = 0, friday = 0;
   for (let year = 5784; year <= 5834; year++) {
     const start = dateFromHebrew(25, 9, year);
@@ -119,17 +119,15 @@ test('all Chanukah weeks include their actual mornings, including Rosh Chodesh a
       const text = weekText(WEEKDAY_SHACHARIS, buildWeekdayRow({ serial: anchor }, settings), 'Test', anchor, settings);
       assert(text.includes('Chanuka'), 'Every covered week names the changed schedule');
       if (days.length < 6) { partial++; assert(text.includes('Shacharis (')); }
-      for (const rc of [false, true]) {
-        const group = days.filter(day => Boolean(hasRoshChodesh(day, settings)) === rc);
-        if (!group.length) continue;
-        const line = text.split('\n').find(line => line.startsWith('Shacharis (') && line.includes(rc ? 'Rosh Chodesh Teves - Chanuka;' : '(Chanuka;'));
-        assert(line, `The ${rc ? 'Rosh Chodesh' : 'regular'} days have a line in ${year}`);
-        assert.equal(line.slice(line.indexOf(') ') + 2), list(erevTimes(chanukahScheduleLines(group, settings, { mergeAll: true }))));
-        if (group.some(day => excelWeekday(day) === 6)) { friday++; assert(line.includes('Friday')); }
-      }
+      assert.doesNotMatch(text, /Rosh Chodesh/, 'Rosh Chodesh has its own message');
+      const group = days.filter(day => !hasRoshChodesh(day, settings));
+      const line = text.split('\n').find(line => line.startsWith('Shacharis (Chanuka;'));
+      assert(line, `The regular Chanukah days have a line in ${year}`);
+      assert.equal(line.slice(line.indexOf(') ') + 2), list(erevTimes(chanukahScheduleLines(group, settings, { mergeAll: true }))));
+      if (group.some(day => excelWeekday(day) === 6)) { friday++; assert(line.includes('Friday')); }
     }
   }
-  assert(partial > 50 && friday > 40);
+  assert(partial > 50 && friday >= 40);
 });
 
 test('weekly and Erev Shabbos messages honor edited chart cells and the effective season', () => {

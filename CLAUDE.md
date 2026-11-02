@@ -1094,8 +1094,9 @@ When several saved weekday charts cover a week, the newest `createdAt` wins.
 Rosh Chodesh messages read `buildRoshChodeshShacharisPoster` rows and dates:
 omit Shabbos-only months, keep only the weekday portion of mixed dates, and use
 the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
-morning group through Friday, including ordinary mornings in partial weeks and
-the separate Rosh Chodesh group. The Chanukah chart panel and messages use the
+morning group through Friday, including ordinary mornings in partial weeks.
+Keep Rosh Chodesh mornings only in their separate message, including during Chanukah;
+do not repeat that group in the weekly Chanukah message. The Chanukah chart panel and messages use the
 complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
 with its averaging/floor rule for ordinary Chanukah days. Both first rows use the
 same full-period average when all weekday candidates are pushed by netz; otherwise
