@@ -1,19 +1,22 @@
 Enable 60-day Trash recovery for Seats using the existing Cloudflare login
 
-The website interface is being published by the web chat. Please deploy only the
-tested shared-service update. Do not publish, rebuild or roll back the website.
+The website interface is already live, but website Delete is blocked until this
+shared-service update is deployed. Please deploy only the tested service update.
+Do not publish, rebuild or roll back the website.
 
 Repository: https://github.com/cheskyshain-stack/zmanim-tool
-Tested application commit: a837a878910897f99917ec6d640585a426dd6235
+Tested application commit: 99e6edb456e51f5a89e1d5faa4bedd0441dfcc2a
 Worker: zmanim-seats
 Cloudflare account: 04b085d9f19ac1ba6d333e0006fc94c1
 Configuration: worker/seats/wrangler.jsonc
 Existing endpoint: https://zmanim-seats.cheskyshain.workers.dev
 
 Why Desktop is needed:
-The web environment has no Cloudflare login. GitHub service-only run
-https://github.com/cheskyshain-stack/zmanim-tool/actions/runs/41277827248
-passed all 72 tests, then failed because CLOUDFLARE_API_TOKEN is missing.
+Checked again November 2, 2026: /api/info has no trash60Days capability, and
+/api/trash returns 404. The web environment has no Cloudflare login.
+GitHub service-only run
+https://github.com/cheskyshain-stack/zmanim-tool/actions/runs/41542596082
+passed all 73 tests, then failed because CLOUDFLARE_API_TOKEN is missing.
 Use the Cloudflare login already available on this computer. Do not ask the user
 to paste a token into chat or commit a credential.
 
@@ -41,12 +44,15 @@ What this update does:
   Device chart Trash and restore work independently of this deployment.
 
 Validation already completed:
-72 unit tests, including exact retention boundaries, legacy deleted records,
+73 unit tests, including exact retention boundaries, legacy deleted records,
 idempotent restore, stale requests, original IDs/dates/assignments, history,
 folder limits, expiry cleanup and stale-upload protection.
 Real Chromium and local Workerd checks at phone/desktop widths cover restoring
 from another organizer's device, reload, name files, storage-full protection,
 the old-service gate, existing sharing, navigation and start screens.
+Live website checks on November 2 at 375px and 1440px also verified device-only
+Delete, recovery after reload, and Restore using synthetic browser-local charts.
+Those checks made no production chart or name-file changes.
 
 After deployment, verify read-only against production:
 - Send Origin: https://baismedrashoflakewoodcommons.org on all service requests.
