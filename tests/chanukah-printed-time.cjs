@@ -37,7 +37,7 @@ const server=http.createServer((req,res)=>{
    const messages=await page.locator('textarea[aria-label*="Rosh Chodesh"]').evaluateAll(nodes=>nodes.map(node=>node.value));
    assert(messages.length>0);assert(messages.every(message=>message.includes('6:43m')&&!message.includes('6:44m')),'Rosh Chodesh text messages agree');
    const weekMessages=await page.locator('textarea[aria-label^="Week"]').evaluateAll(nodes=>nodes.map(node=>node.value));
-   assert(weekMessages.some(message=>message.includes('Shacharis (Chanuka; Sunday, Monday, Tuesday, Wednesday) 6:50m')),'The weekly text retains the ordinary Chanukah mornings');
+   assert(weekMessages.some(message=>message.includes('\nShacharis 6:50m, 7:10en, 7:25d, 8:00m, 8:20en, 8:40d\n')),'The weekly text retains the ordinary Chanukah mornings without a redundant label');
    assert(weekMessages.every(message=>!message.includes('Rosh Chodesh')&&!message.includes('6:43m')),'Rosh Chodesh times are only in their separate message');
    await page.goto(origin+'/chart/');await page.locator('.shacharis-panel').first().waitFor();
    const publicPanel=page.locator('.shacharis-panel .chanukah-highlight').filter({hasText:/ר["״]ח|ראש חודש/});
