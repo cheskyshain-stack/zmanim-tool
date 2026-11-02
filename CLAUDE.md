@@ -926,7 +926,10 @@ Export/Import in Settings moves it between devices.
   Use “Choose a campaign” in the existing subtitle line below Donate so the prompt
   does not add another row or extra scrolling.
   Opening a campaign closes the others, reveals Card · ACH and DAF, and reveals Zelle
-  only for Neileich. Selecting a method reveals its information below the choices;
+  only for Neileich. Give the expanded campaign heading and its payment choices one
+  continuous light background with a 3px gold line along the left of the active group.
+  Use an overlay for that line so grouping adds no height or changes to content width.
+  Selecting a method reveals its information below the choices;
   do not load merchant frames before that selection. Keep entered forms when switching
   methods, and load only one campaign's merchant form at a time.
   Campaign clicks reveal choices in place without scrolling. Only a payment-method
