@@ -16,6 +16,7 @@ assert len(doc)==2, ('The unique-name fixture should print on two pages',len(doc
 text=''.join(''.join(page.get_text().split()) for page in doc)
 assert 'ARONKODESH' not in text, 'The room chart must not be printed with the list'
 assert 'SyntheticRosterTitle' not in text, 'The saved chart title stays off printed lists'
+assert 'Seatednames' not in text and 'Sortedby' not in text, 'The top-right list heading, sort description and count stay off printed lists'
 for name,count in counts.items():
  assert text.count(''.join(name.split()))==count, ('Missing or duplicated printed name',name,count)
 for page in doc:
