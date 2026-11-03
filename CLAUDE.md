@@ -1408,11 +1408,15 @@ and uses the prominent navy style; Create new chart is the secondary white actio
 The Saved charts folder keeps compact list rows with matching navy and gold
 styling. Its close button stays visible at the top while scrolling long folders.
 
-Room design is a device-only display switch. With Color selected it follows the
-user's room photos: dark walnut tables and shelves, charcoal upholstered chairs,
-burgundy cloth with gold trim on the Aron Kodesh and bimah, and a quiet tiled floor.
-Keep raised table edges, soft furniture shadows and inward-facing dark books with
-red spine labels. Use light lettering on the dark furniture for readable names.
+Room design is a device-only display switch. With Color selected it uses light
+tables with dark names and subtle wood edges. Keep wood and burgundy as small
+accents drawn from the room photos, not a dark brown fill across the tables.
+The Aron Kodesh has paneled sides, a cornice, gold curtain trim and a centered
+crown. The bimah has a light glass center, a burgundy cloth border and gold fringe.
+Shelves have molded cornices and plinths around inward-facing dark books with
+red spine labels. Keep the floor light with 2:1 rectangular tiles; center one tile
+on both axes of SEATS_BOUNDS so the cuts at opposite walls match. Artwork stays
+inside existing fixture footprints, with soft furniture shadows.
 Names and empty seats share one continuous table background. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
