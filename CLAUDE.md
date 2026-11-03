@@ -1408,8 +1408,11 @@ and uses the prominent navy style; Create new chart is the secondary white actio
 The Saved charts folder keeps compact list rows with matching navy and gold
 styling. Its close button stays visible at the top while scrolling long folders.
 
-Room design is a device-only display switch. With Color selected it uses navy,
-light wood, raised table edges, soft furniture shadows and inward-facing books.
+Room design is a device-only display switch. With Color selected it follows the
+user's room photos: dark walnut tables and shelves, charcoal upholstered chairs,
+burgundy cloth with gold trim on the Aron Kodesh and bimah, and a quiet tiled floor.
+Keep raised table edges, soft furniture shadows and inward-facing dark books with
+red spine labels. Use light lettering on the dark furniture for readable names.
 Names and empty seats share one continuous table background. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
