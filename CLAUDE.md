@@ -1431,10 +1431,7 @@ seat names. The approved straight-on amud retains its current size and follows
 the covered lectern visible in front of the Aron. Saved footprints stay unchanged.
 Shelves have molded cornices and plinths around inward-facing dark books with
 red, blue, green and off-white spine labels, grouped like the sets in the photos.
-Bookcase bodies, frames, cornices, plinths and stiles use the rich walnut color
-and realistic grain from assets/seats/bookcase-walnut-v1.png. This wood finish
-belongs on the bookcases; retain the existing light table surfaces. The texture
-ships offline and printing waits for it to load.
+Keep the existing light bookcase frames and pale shelf interiors.
 The open front and lower spine labels face the room; the cabinet back faces the
 wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
 actual book bases and labels, not just the shelf's direction attribute.
