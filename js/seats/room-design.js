@@ -1,11 +1,16 @@
 import { SEATS_BOUNDS } from './model.js';
 
+const SEATS_FLOOR_TEXTURE = '/assets/seats/light-marble-floor-v1.png';
+
 // Artwork only. Saved room geometry, seat hit areas and names stay independent.
 export function seatsRoomDesignPaint(id) {
   const gradient = (name, stops) => `<linearGradient id="${id}-${name}" x1="0" y1="0" x2="0" y2="1">${stops.map(([offset, color]) => `<stop offset="${offset}" stop-color="${color}"/>`).join('')}</linearGradient>`;
   const tileWidth = 144, tileHeight = 72;
-  const tileX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right - tileWidth) / 2;
-  const tileY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom - tileHeight) / 2;
+  // One larger stone swatch spans nine tiles, with its repeat seams on grout lines.
+  const floorWidth = tileWidth * 3, floorHeight = tileHeight * 3;
+  const floorX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right - floorWidth) / 2;
+  const floorY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom - floorHeight) / 2;
+  const joints = Array.from({ length: 4 }, (_, index) => `<path d="M${index * tileWidth} 0 V${floorHeight}"/><path d="M0 ${index * tileHeight} H${floorWidth}"/>`).join('');
   return {
     defs: gradient('wood-tone', [['0%', '#fffefa'], ['45%', '#faf7ef'], ['100%', '#eee9de']])
       + `<pattern id="${id}-wood" width="180" height="40" patternUnits="userSpaceOnUse"><rect width="180" height="40" fill="url(#${id}-wood-tone)"/><path d="M0 8 Q45 6 90 9 T180 8 M0 20 Q65 17 120 21 T180 20 M0 33 Q60 31 110 34 T180 33" fill="none" stroke="#ad967b" stroke-width=".5" opacity=".09"/></pattern>`
@@ -13,7 +18,7 @@ export function seatsRoomDesignPaint(id) {
       + gradient('chair', [['0%', '#d0d2cf'], ['60%', '#a7aaa8'], ['100%', '#858a89']])
       + gradient('cabinet', [['0%', '#a58b71'], ['100%', '#715a47']])
       + gradient('shelf', [['0%', '#f3efe6'], ['100%', '#e7dfd1']])
-      + `<pattern id="${id}-floor" x="${tileX}" y="${tileY}" width="${tileWidth}" height="${tileHeight}" viewBox="0 0 ${tileWidth} ${tileHeight}" patternUnits="userSpaceOnUse"><rect width="144" height="72" fill="#f7f7f3"/><path d="M0 72 V0 H144" fill="none" stroke="#dcdcd4" stroke-width=".7"/><path d="M8 64 Q32 48 58 52 T130 17 M32 70 Q58 55 87 61 T140 36" fill="none" stroke="#e4e4dc" stroke-width=".65" opacity=".45"/></pattern>`
+      + `<pattern id="${id}-floor" x="${floorX}" y="${floorY}" width="${floorWidth}" height="${floorHeight}" viewBox="0 0 ${floorWidth} ${floorHeight}" patternUnits="userSpaceOnUse"><rect width="${floorWidth}" height="${floorHeight}" fill="#fafaf7"/><image class="design-floor-texture" href="${SEATS_FLOOR_TEXTURE}" width="${floorWidth}" height="${floorHeight}" preserveAspectRatio="xMidYMid meet" opacity=".5"/><g class="floor-tile-joints" fill="none" stroke="#dcdcd6" stroke-width=".7">${joints}</g></pattern>`
       + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`,
     style: ['wood', 'edge', 'chair', 'cabinet', 'shelf', 'floor', 'shadow'].map(name => `--room-${name}:url(#${id}-${name})`).join(';'),
   };
@@ -37,7 +42,7 @@ const SEATS_FIXTURE_CROPS = {
 let seatsFixtureClipCount = 0;
 
 export async function seatsWaitForFixturePictures() {
-  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE, SEATS_AMUD_PICTURE, SEATS_BIMAH_PICTURE].map(src => {
+  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE, SEATS_AMUD_PICTURE, SEATS_BIMAH_PICTURE, SEATS_FLOOR_TEXTURE].map(src => {
     const picture = new Image();
     picture.src = src;
     return picture.decode();

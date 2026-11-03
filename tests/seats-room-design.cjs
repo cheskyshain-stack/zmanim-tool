@@ -1,7 +1,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-room-design-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
-for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png','bimah-square-photo-v1.png','bimah-two-panel-photo-v2.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same fixture artwork must ship with the offline copy');
+for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png','bimah-square-photo-v1.png','bimah-two-panel-photo-v2.png','light-marble-floor-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same room artwork must ship with the offline copy');
 const server=http.createServer((req,res)=>{
   if(req.url.split('?')[0]==='/data/seats-sync.json'){res.setHeader('Content-Type','application/json');return res.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(root+path.sep)){res.statusCode=403;return res.end();}
@@ -18,6 +18,9 @@ assert all(name in text for name in ['DesignTest','BookcaseExample','RavTest'])
 if len(sys.argv)>3 and sys.argv[3]=='1':
  assert len(p.get_image_info())>=4, 'All three realistic fixtures and the round crown tip must be embedded in the native PDF'
  margin=36 if sys.argv[2]=='tabloid' else 25.2
+ floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2)/916)
+ stone=p.get_pixmap(matrix=fitz.Matrix(3,3),clip=floor,alpha=False).samples
+ assert len({stone[i:i+3] for i in range(0,len(stone),3)})>48, 'The open walkway must retain natural marble variation in the native PDF'
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples
  header_ink=sum(1 for y in range(round(margin*2),round((margin+25.2)*2)) for x in range(round(w*.43*2),round(w*.57*2)) if max(pixels[(y*pix.width+x)*3:(y*pix.width+x)*3+3])<205)
@@ -54,8 +57,17 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     assert.equal(await page.locator('#seats-print .room-diagram').getAttribute('viewBox'),printView,'The Aron picture must not enlarge the view and shrink the rest of the printed chart');
     assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
     assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
+    assert.equal(await page.locator('.room-stage .design-floor-texture').count(),monochrome?0:1,'Black and white keeps its plain floor');
     let screenAronHeight=0;
     if(!monochrome){
+      for(const scope of ['.room-stage','#seats-print']){
+        await page.emulateMedia({media:scope==='#seats-print'?'print':'screen'});
+        const marble=page.locator(scope+' .design-floor-texture');assert.equal(await marble.count(),1);
+        const image=await marble.evaluate(async node=>{const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();return [new URL(picture.src).pathname,picture.naturalWidth,picture.naturalHeight];});assert.deepEqual(image,['/assets/seats/light-marble-floor-v1.png',1774,887],'The floor uses realistic stone artwork');
+        const grid=await marble.evaluate(node=>{const pattern=node.parentElement,paths=[...pattern.querySelectorAll('.floor-tile-joints path')],boxes=paths.map(path=>path.getBBox()),xs=boxes.filter(b=>b.width===0).map(b=>b.x).sort((a,b)=>a-b),ys=boxes.filter(b=>b.height===0).map(b=>b.y).sort((a,b)=>a-b);return {tile:[xs[1]-xs[0],ys[1]-ys[0]],center:[+pattern.getAttribute('x')+(xs[1]+xs[2])/2,+pattern.getAttribute('y')+(ys[1]+ys[2])/2],curves:paths.some(path=>/[CQSTA]/i.test(path.getAttribute('d')))};});
+        assert.deepEqual(grid.tile,[144,72]);assert.deepEqual(grid.center,[600,515],'A rectangular tile stays centered in the room');assert.equal(grid.curves,false,'Only physical grout joints are drawn, with no artificial marble-vein curves');
+      }
+      await page.emulateMedia({media:null});
       assert.equal(await page.locator('.realistic-fixture text').count(),0,'Recognizable fixture pictures do not need visible captions');
       screenAronHeight=await page.locator('.room-stage .design-aron .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
       const amudHeight=await page.locator('.room-stage .design-amud .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
@@ -144,7 +156,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
   plan.monochrome=false;
   await slow.addInitScript(sample=>{localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));localStorage.setItem('lakewood-commons-seats-room-design','1');window.printCalls=0;window.print=()=>window.printCalls++;},sample);
-  await slow.route('**/bimah-two-panel-photo-v2.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
+  await slow.route('**/light-marble-floor-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
   await slowPage.goto(origin+'/seats/?count=off');await slowPage.locator('#seats-name').fill('Synthetic Print Organizer');await slowPage.locator('#seats-pin').fill('4444');await slowPage.getByRole('button',{name:'Open Seats',exact:true}).click();await slowPage.getByRole('button',{name:'View saved charts',exact:true}).click();await slowPage.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   await picturesRequested;await slowPage.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await slowPage.evaluate(()=>window.printCalls),0,'Printing must wait while the artwork is loading');
   releasePictures();await slowPage.waitForFunction(()=>window.printCalls===1);await slow.close();

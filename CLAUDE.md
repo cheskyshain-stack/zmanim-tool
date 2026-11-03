@@ -1434,9 +1434,13 @@ red, blue, green and off-white spine labels, grouped like the sets in the photos
 The open front and lower spine labels face the room; the cabinet back faces the
 wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
 actual book bases and labels, not just the shelf's direction attribute.
-Keep the floor light with 2:1 rectangular tiles; center one tile
-on both axes of SEATS_BOUNDS so the cuts at opposite walls match. Saved fixture
-footprints and hit areas stay unchanged; the tall Aron picture uses the clear
+Keep the floor light with the realistic gray-and-cream stone texture in
+assets/seats/light-marble-floor-v1.png. Do not restore drawn marble-vein curves.
+The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles, with
+only fine straight grout joints. Center one tile on both axes of SEATS_BOUNDS
+so the cuts at opposite walls match. The texture ships offline and printing
+waits for it to load. Saved fixture footprints and hit areas stay unchanged;
+the tall Aron picture uses the clear
 front margin above the wall. Printing keeps the normal chart view and full room
 scale. Let the tall Aron overflow upward into the existing empty center header,
 clear of the top-left minyan logo; do not reserve extra room height or shrink it.
