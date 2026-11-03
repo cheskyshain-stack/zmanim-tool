@@ -19,18 +19,19 @@ export function seatsRoomDesignPaint(id) {
   };
 }
 
-// One transparent source sheet, clipped per object without stretching its picture.
+// Transparent fixture pictures, clipped per object without stretching their proportions.
 const SEATS_FIXTURE_ATLAS = '/assets/seats/room-fixtures-photo-v1.png';
 const SEATS_CROWN_PICTURE = '/assets/seats/aron-crown-round-v1.png';
+const SEATS_AMUD_PICTURE = '/assets/seats/amud-front-photo-v1.png';
 const SEATS_FIXTURE_CROPS = {
   aron: [55, 0, 672, 696],
   bimah: [788, 173, 872, 516],
-  amud: [1722, 122, 376, 570],
+  amud: [33, 17, 925, 1548],
 };
 let seatsFixtureClipCount = 0;
 
 export async function seatsWaitForFixturePictures() {
-  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE].map(src => {
+  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE, SEATS_AMUD_PICTURE].map(src => {
     const picture = new Image();
     picture.src = src;
     return picture.decode();
@@ -39,9 +40,10 @@ export async function seatsWaitForFixturePictures() {
 
 function seatsFixturePicture(kind, center, top, width, height, printScale) {
   const crop = SEATS_FIXTURE_CROPS[kind], clip = 'seats-fixture-clip-' + ++seatsFixtureClipCount;
+  const [source, imageWidth, imageHeight] = kind === 'amud' ? [SEATS_AMUD_PICTURE, 990, 1589] : [SEATS_FIXTURE_ATLAS, 2172, 724];
   // Replace only the small crown finial with a round bead. Keep the original artwork everywhere else.
   const crown = kind === 'aron' ? `<defs><clipPath id="${clip}-crown" clipPathUnits="userSpaceOnUse"><rect x="386" y="280" width="24" height="27"/></clipPath></defs><g class="fixture-crown-correction" clip-path="url(#${clip}-crown)"><image href="${SEATS_CROWN_PICTURE}" x="340" y="270" width="115" height="110" preserveAspectRatio="none"/></g>` : '';
-  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${SEATS_FIXTURE_ATLAS}" width="2172" height="724" clip-path="url(#${clip})"/>${crown}</svg></g></g></g></g>`;
+  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${source}" width="${imageWidth}" height="${imageHeight}" clip-path="url(#${clip})"/>${crown}</svg></g></g></g></g>`;
 }
 
 export function seatsAronDesign(aron, printScale = 1, frontTop = 15) {
@@ -56,11 +58,12 @@ export function seatsTableDesign(table) {
 }
 
 export function seatsBimahDesign(x, y, width, height, printScale = 1) {
-  return seatsFixturePicture('bimah', x + width / 2, y, width * printScale, height, printScale);
+  const size = 1.1;
+  return seatsFixturePicture('bimah', x + width / 2, y - height * (size - 1) / 2, width * printScale * size, height * size, printScale);
 }
 
 export function seatsAmudDesign(x, y, width, height, printScale = 1) {
-  const size = 1.1;
+  const size = 1.21;
   return seatsFixturePicture('amud', x + width / 2, y - height * (size - 1) / 2, width * printScale * size, height * size, printScale);
 }
 

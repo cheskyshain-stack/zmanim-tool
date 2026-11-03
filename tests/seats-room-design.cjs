@@ -1,7 +1,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-room-design-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
-for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same fixture artwork must ship with the offline copy');
+for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same fixture artwork must ship with the offline copy');
 const server=http.createServer((req,res)=>{
   if(req.url.split('?')[0]==='/data/seats-sync.json'){res.setHeader('Content-Type','application/json');return res.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(root+path.sep)){res.statusCode=403;return res.end();}
@@ -58,7 +58,11 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       assert.equal(await page.locator('.realistic-fixture text').count(),0,'Recognizable fixture pictures do not need visible captions');
       screenAronHeight=await page.locator('.room-stage .design-aron .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
       const amudHeight=await page.locator('.room-stage .design-amud .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
-      assert.ok(amudHeight>=plan.objects.find(object=>object.type==='amud').height*.95,'The amud picture uses its available height instead of reserving caption space');
+      assert.ok(Math.abs(amudHeight/plan.objects.find(object=>object.type==='amud').height-1.21)<.01,'The amud illustration is ten percent larger than its previous 1.1 scale');
+      const bimahWidth=await page.locator('.room-stage .design-bimah .fixture-picture').evaluate(node=>node.viewBox.baseVal.width*node.getScreenCTM().a/node.closest('.room-art').getScreenCTM().a);
+      const bimah=plan.objects.find(object=>object.type==='bimah');assert.ok(Math.abs(bimahWidth/Math.min(bimah.width,bimah.height)-1.1)<.01,'The bimah illustration is ten percent larger');
+      const amudImage=await page.locator('.room-stage .design-amud .fixture-picture > image').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(amudImage,['/assets/seats/amud-front-photo-v1.png',990,1589],'The amud uses the straight-on illustration');
+      assert.ok(await page.locator('.room-stage .fixture-picture').evaluateAll(nodes=>nodes.every(node=>{const v=node.viewBox.baseVal,m=node.getScreenCTM(),p=new DOMPoint(v.x,v.y).matrixTransform(m),q=new DOMPoint(v.x+v.width,v.y+v.height).matrixTransform(m);return [...document.querySelectorAll('.room-stage .table-seat .seat-area')].every(seat=>{const s=seat.getBoundingClientRect();return q.x<=s.left||p.x>=s.right||q.y<=s.top||p.y>=s.bottom;});})),'Enlarged fixture pictures must remain clear of seat names');
       assert.equal(await page.locator('.room-stage .fixture-picture > image').count(),3);
       assert.equal(await page.locator('#seats-print .fixture-picture > image').count(),3);
       for(const scope of ['.room-stage','#seats-print'])assert.equal(await page.locator(scope+' .fixture-crown-correction image').count(),1,'Only the Aron crown tip receives the artwork correction');
@@ -135,7 +139,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
   plan.monochrome=false;
   await slow.addInitScript(sample=>{localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));localStorage.setItem('lakewood-commons-seats-room-design','1');window.printCalls=0;window.print=()=>window.printCalls++;},sample);
-  await slow.route('**/aron-crown-round-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
+  await slow.route('**/amud-front-photo-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
   await slowPage.goto(origin+'/seats/?count=off');await slowPage.locator('#seats-name').fill('Synthetic Print Organizer');await slowPage.locator('#seats-pin').fill('4444');await slowPage.getByRole('button',{name:'Open Seats',exact:true}).click();await slowPage.getByRole('button',{name:'View saved charts',exact:true}).click();await slowPage.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   await picturesRequested;await slowPage.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await slowPage.evaluate(()=>window.printCalls),0,'Printing must wait while the artwork is loading');
   releasePictures();await slowPage.waitForFunction(()=>window.printCalls===1);await slow.close();

@@ -1417,14 +1417,17 @@ storage keys so another tab cannot overwrite other charts' choices.
 With Color selected it uses light
 tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
-Aron Kodesh, bimah and amud use transparent photo-based illustrations from the
-user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. Keep
+Aron Kodesh and bimah use transparent photo-based illustrations from the
+user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. The amud
+uses assets/seats/amud-front-photo-v1.png, a straight-on view with level front
+edges and no visible side panel, matching the other fixtures. Keep
 natural image proportions, with no people or invented inscriptions. The crown's
 top is a plain round gold bead, using the small clipped correction from
 assets/seats/aron-crown-round-v1.png; do not restore the cross-like finial.
 Omit visible Aron Kodesh, bimah and amud captions in this illustrated mode; retain
-their saved object names and accessible labels. Use the full amud footprint for its picture.
-The amud follows the covered lectern visible in front of the Aron.
+their saved object names and accessible labels. Both the bimah and amud artwork
+are slightly enlarged around their existing centers, without changing their
+saved footprints. The amud follows the covered lectern visible in front of the Aron.
 Shelves have molded cornices and plinths around inward-facing dark books with
 red, blue, green and off-white spine labels, grouped like the sets in the photos.
 The open front and lower spine labels face the room; the cabinet back faces the
