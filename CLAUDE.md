@@ -1408,7 +1408,13 @@ and uses the prominent navy style; Create new chart is the secondary white actio
 The Saved charts folder keeps compact list rows with matching navy and gold
 styling. Its close button stays visible at the top while scrolling long folders.
 
-Room design is a device-only display switch. With Color selected it uses light
+Room design is a display switch remembered separately for each chart on this
+device, outside shared chart data. New charts start with it off. Resolve the
+choice from the active chart on every render and print, including folder opens,
+Back/Forward and reloads. Migrate the old device-wide flag only to the previously
+active chart, once; never use it as a fallback for other charts. Keep independent
+storage keys so another tab cannot overwrite other charts' choices.
+With Color selected it uses light
 tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
 Aron Kodesh, bimah and amud use transparent photo-based illustrations from the
@@ -1429,6 +1435,7 @@ Names and empty seats share one continuous table background. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
 display preference. Keep separate SVG paint IDs for screen and print.
+`tests/seats-room-design-choice.mjs` checks isolation, migration and storage failure.
 `tests/seats-room-design.cjs` checks both styles, phone/desktop, native PDFs,
 contained books, uniform seat backgrounds and unchanged chart data.
 
