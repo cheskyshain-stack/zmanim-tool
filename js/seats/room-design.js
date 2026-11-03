@@ -55,7 +55,8 @@ export function seatsBimahDesign(x, y, width, height, printScale = 1) {
 }
 
 export function seatsAmudDesign(x, y, width, height, printScale = 1) {
-  return seatsFixturePicture('amud', x + width / 2, y, width * printScale, height, printScale);
+  const size = 1.1;
+  return seatsFixturePicture('amud', x + width / 2, y - height * (size - 1) / 2, width * printScale * size, height * size, printScale);
 }
 
 export function seatsChairDesign(center, top) {
