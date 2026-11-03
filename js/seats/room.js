@@ -10,7 +10,8 @@ export function seatsRoomFeatures(plan, designed = false) {
   const aRight = a.length ? Math.min(...a.map(table => table.x)) : 103;
   const dRight = d.length ? Math.min(...d.map(table => table.x)) : 1030;
   const dLeft = plan.tables.find(table => table.id === 'D6')?.x ?? 968;
-  const aronPanel = designed ? `<rect class="design-aron-panel" x="${aron.x + 7}" y="${aron.y + 4}" width="${Math.max(1, aron.width - 14)}" height="${Math.max(1, aron.height - 8)}"/><path class="design-aron-trim" d="M${aron.x + 4} ${aron.y + 2} V${aron.y + aron.height - 2} M${aron.x + aron.width - 4} ${aron.y + 2} V${aron.y + aron.height - 2}"/>` : '';
+  const panelWidth = Math.max(1, aron.width - 14), swagWidth = panelWidth / 3;
+  const aronPanel = designed ? `<rect class="design-aron-panel" x="${aron.x + 7}" y="${aron.y + 4}" width="${panelWidth}" height="${Math.max(1, aron.height - 8)}"/><path class="design-aron-trim" d="M${aron.x + 4} ${aron.y + 2} V${aron.y + aron.height - 2} M${aron.x + aron.width - 4} ${aron.y + 2} V${aron.y + aron.height - 2}"/><path class="design-aron-swag" d="M${aron.x + 7} ${aron.y + 5} q${swagWidth / 2} 9 ${swagWidth} 0 q${swagWidth / 2} 9 ${swagWidth} 0 q${swagWidth / 2} 9 ${swagWidth} 0"/>` : '';
   const side = (id, left, right) => right - left < 24 ? '' : `<g class="walkway rear-side-walkway" data-walkway="${id}"><path d="M${left} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y} M${right} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y}"/></g>`;
   return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${door.top} M1183 ${door.bottom} V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
     <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/>${aronPanel}<text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text></g>
@@ -24,7 +25,7 @@ export function seatsRoomFeatures(plan, designed = false) {
     <g class="room-door closed-door" data-door="back-right" data-kind="closed" aria-label="Back right door"><path class="door-gap" d="M909 960 H959"/><path class="door-leaf" d="M909 960 H959 M909 956 V964 M959 956 V964"/></g>`;
 }
 
-function seatsBookcaseDesign(object) {
+function seatsBookcaseDesign(object, colored) {
   const vertical = object.height > object.width, inset = 2;
   const width = vertical ? object.height : object.width, height = vertical ? object.width : object.height;
   const centerX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right) / 2, centerY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom) / 2;
@@ -55,13 +56,14 @@ function seatsBookcaseDesign(object) {
         const bookWidth = slot * (.68 + ((seed + index) % 3) * .06), bookLeft = bookX + slot * .08, bookTop = bottom - bookHeight;
         art.push(`<rect class="book-volume book-tone-${(seed + index) % 4}" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
         if ((seed + index) % 3 === 0) art.push(`<path class="book-band" d="M${n(bookLeft)} ${n(bookTop + bookHeight * .22)} h${n(bookWidth)} M${n(bookLeft)} ${n(bookTop + bookHeight * .33)} h${n(bookWidth)}"/>`);
+        if (colored) art.push(`<path class="book-label-strip" d="M${n(bookLeft)} ${n(bottom - h * .12)} h${n(bookWidth)}"/>`);
       }
     }
   }
   return `<g class="cabinet-design" data-facing="${facing}"${transform ? ` transform="${transform}"` : ''} aria-hidden="true">${art.join('')}</g>`;
 }
 
-export function seatsCabinetArt(object, drawName, designed = false) {
+export function seatsCabinetArt(object, drawName, designed = false, colored = false) {
   const vertical = object.height > object.width;
   const length = vertical ? object.height : object.width, depth = vertical ? object.width : object.height;
   const spines = Array.from({ length: Math.max(0, Math.floor((length - 8) / 12)) }, (_, index) => {
@@ -69,7 +71,7 @@ export function seatsCabinetArt(object, drawName, designed = false) {
     return vertical ? `<path d="M4 ${coordinate} h${object.width - 8}" class="shelf-line"/>`
       : `<path d="M${coordinate} 4 v${object.height - 8}" class="shelf-line"/>`;
   }).join('');
-  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface${designed ? ' cabinet-designed-surface' : ''}"/>${designed ? seatsBookcaseDesign(object) : spines}`;
+  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface${designed ? ' cabinet-designed-surface' : ''}"/>${designed ? seatsBookcaseDesign(object, colored) : spines}`;
   if (object.id.startsWith('rear-case-')) return surface;
   const labelWidth = Math.min(length - 6, Math.max(60, object.label.length * 5.5));
   return `${surface}<g transform="translate(${object.width / 2} ${object.height / 2})${vertical ? ' rotate(-90)' : ''}"><rect class="cabinet-label-bg" x="${-labelWidth / 2}" y="${-(depth - 6) / 2}" width="${labelWidth}" height="${depth - 6}"/>
