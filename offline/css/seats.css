@@ -25,21 +25,32 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-header-label{font-size:12px;color:#dae2eb;white-space:nowrap}
 #seats-app{max-width:1620px;padding:22px 24px 0;margin:0 auto;min-width:0}
 .seats-loading{padding:40px 0}
-.seats-start{width:min(100%,840px);margin:clamp(30px,8vh,80px) auto 70px}
-.seats-start-heading{display:flex;align-items:start;justify-content:space-between;gap:16px;margin-bottom:28px}
+.seats-start{width:min(100%,720px);margin:clamp(30px,7vh,64px) auto 60px}
+.seats-start-heading{display:flex;align-items:start;justify-content:space-between;gap:20px;margin-bottom:28px}
 .seats-start-heading>div{flex:1;min-width:0}
-.seats-start-heading p{color:var(--seats-muted);font-size:15px;line-height:1.6;margin:12px 0 0}
-.seats-start .seats-start-logout{flex-shrink:0;white-space:nowrap;min-height:44px;background:transparent;border-color:transparent;text-decoration:underline;text-underline-offset:3px;font-size:12px;padding:8px}
-.seats-start-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.seats-start .seats-start-card{display:flex;flex-direction:column;align-items:start;position:relative;min-width:0;min-height:220px;padding:28px;text-align:left;background:#fff;border:1px solid var(--seats-border);border-radius:10px;box-shadow:0 2px 5px #142b4605;line-height:1.4}
-.seats-start .seats-start-card:hover{background:#fff;border-color:#7b93a9;box-shadow:0 3px 12px #142b460b}
-.seats-start-icon{display:flex;align-items:center;justify-content:center;width:56px;height:56px;margin-bottom:20px;background:#f6f2e8;color:#80682d;border-radius:9px;flex-shrink:0}
-.seats-start-icon svg{width:38px;height:38px}
-.seats-start-card-copy{display:flex;flex-direction:column;gap:8px;max-width:100%;padding-right:15px}
-.seats-start-card-copy strong{font:600 23px Georgia,'David Libre',serif;color:var(--seats-navy)}
+.seats-start .seats-start-heading h1{font-size:46px;letter-spacing:-1px;margin:4px 0 10px}
+.seats-start-kicker{color:#816931;font-size:10px;font-weight:700;letter-spacing:1.8px;line-height:1.4;margin:0}
+.seats-start-intro{color:var(--seats-muted);font-size:15px;line-height:1.6;margin:0}
+.seats-start .seats-start-logout{display:inline-flex;align-items:center;justify-content:center;gap:7px;flex-shrink:0;white-space:nowrap;min-height:44px;margin-top:19px;background:#fff;border:1px solid #dce0e4;border-radius:8px;font-size:12px;font-weight:500;padding:9px 12px;color:#526477}
+.seats-start-logout svg{width:16px;height:16px}
+.seats-start .seats-start-logout:hover{background:#f3f0e8;border-color:#bca976;color:var(--seats-navy)}
+.seats-start-options{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.seats-start .seats-start-card{display:flex;align-items:center;gap:20px;min-width:0;min-height:118px;padding:24px;text-align:left;background:#fff;border:1px solid #dce0e4;border-radius:13px;box-shadow:0 3px 12px #142b4605;line-height:1.4;transition:background-color .15s,border-color .15s,box-shadow .15s}
+.seats-start .seats-start-card:hover{background:#fffdf8;border-color:#b9a878;box-shadow:0 4px 16px #142b460b}
+.seats-start-icon{display:flex;align-items:center;justify-content:center;width:54px;height:54px;background:#f6f1e5;color:#8b7136;border:1px solid #eee6d2;border-radius:12px;flex-shrink:0}
+.seats-start-icon svg{width:32px;height:32px}
+.seats-start-card-copy{display:flex;flex-direction:column;flex:1;min-width:0;gap:5px}
+.seats-start-card-copy strong{font:600 23px Georgia,'David Libre',serif;color:var(--seats-navy);line-height:1.25}
 .seats-start-card-copy>span{font-size:13px;font-weight:400;color:var(--seats-muted);line-height:1.6}
-.seats-start-arrow{width:18px;height:18px;position:absolute;right:22px;top:32px;color:#718397}
-@media(max-width:700px){.seats-start{margin:24px auto 40px}.seats-start-heading{margin-bottom:21px;gap:8px}.seats-start-heading p{font-size:13px;margin-top:10px}.seats-start .title-line{gap:10px;flex-wrap:wrap}.seats-start-options{grid-template-columns:minmax(0,1fr);gap:12px}.seats-start .seats-start-card{min-height:154px;padding:22px;flex-direction:row;align-items:center;gap:17px}.seats-start-icon{width:48px;height:48px;margin:0}.seats-start-icon svg{width:34px;height:34px}.seats-start-card-copy{gap:6px;padding-right:3px}.seats-start-card-copy strong{font-size:22px}.seats-start-card-copy>span{font-size:12px}.seats-start-arrow{width:15px;height:15px;right:14px;top:16px}.seats-start-heading h1{font-size:31px}}
+.seats-start-arrow{width:19px;height:19px;color:#9c8a5c;flex-shrink:0}
+.seats-start .seats-start-create{background:linear-gradient(115deg,#142b46,#24465f);border-color:#19364f;box-shadow:0 6px 18px #142b4614}
+.seats-start .seats-start-create:hover{background:linear-gradient(115deg,#1c3854,#2c5069);border-color:#24465f;box-shadow:0 7px 20px #142b461c}
+.seats-start-create .seats-start-icon{background:#ffffff0d;border-color:#ffffff20;color:#e5cf98}
+.seats-start-create .seats-start-card-copy strong{color:#fff}
+.seats-start-create .seats-start-card-copy>span{color:#d5dfe7}
+.seats-start-create .seats-start-arrow{color:#e5cf98}
+@media(prefers-reduced-motion:reduce){.seats-start .seats-start-card{transition:none}}
+@media(max-width:700px){.seats-start{margin:22px auto 40px}.seats-start-heading{margin-bottom:24px;gap:12px}.seats-start .seats-start-heading h1{font-size:36px;margin:5px 0 9px}.seats-start-kicker{font-size:9px;letter-spacing:1.5px}.seats-start-intro{font-size:13px}.seats-start .seats-start-logout{margin-top:14px;padding:8px 9px;font-size:12px}.seats-start-options{gap:12px}.seats-start .seats-start-card{min-height:108px;padding:18px;gap:13px;border-radius:12px}.seats-start-icon{width:44px;height:44px;border-radius:10px}.seats-start-icon svg{width:28px;height:28px}.seats-start-card-copy{gap:4px}.seats-start-card-copy strong{font-size:20px}.seats-start-card-copy>span{font-size:12px;line-height:1.5}.seats-start-arrow{width:16px;height:16px}}
 .seats-top{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:20px}
 .title-line{display:flex;align-items:center;gap:14px}
 .tool-badge{font-size:9px;letter-spacing:1.2px;border:1px solid var(--seats-gold);color:#86691f;padding:4px 7px;border-radius:3px;font-weight:700}
