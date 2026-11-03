@@ -31,6 +31,11 @@ const server=http.createServer((request,response)=>{
       await page.setViewportSize(viewport);
       await page.evaluate(()=>scrollTo(0,0));
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+      const sidebar=await page.locator('.seats-panel').evaluate(node=>({height:node.getBoundingClientRect().height,scroll:node.scrollHeight>node.clientHeight+1,addVisible:node.querySelector('.people-upload').getBoundingClientRect().bottom<=node.getBoundingClientRect().bottom}));
+      assert.equal(sidebar.scroll,false,'A short People panel must not need an internal scrollbar: '+JSON.stringify(sidebar));assert.ok(sidebar.addVisible,'Add names is visible without scrolling the short panel');
+      await page.locator('#people-search').fill('No matching synthetic person');
+      assert.equal(await page.locator('.seats-panel').evaluate(node=>node.scrollHeight>node.clientHeight+1),false,'An empty search must not add a panel scrollbar');
+      await page.locator('#people-search').fill('');
       const size=await page.locator('.room-scroll').evaluate(scroll=>{
         const a=scroll.querySelector('[data-item=A3] .table-surface').getBoundingClientRect(),d=scroll.querySelector('[data-item=D3] .table-surface').getBoundingClientRect();
         const chart=scroll.querySelector('.room-diagram').getBoundingClientRect();
@@ -130,6 +135,12 @@ const server=http.createServer((request,response)=>{
       assert.match(text,/Yosef Cohen/);assert.match(text,/Draft Person/);assert.doesNotMatch(text,/Drag names|Upload names|Add names/);
       await page.emulateMedia({media:'screen'});
     }
+    const manyNames=Array.from({length:200},(_,index)=>'Synthetic '+String.fromCharCode(65+Math.floor(index/26))+String.fromCharCode(65+index%26));
+    await page.locator('#names-file').setInputFiles({name:'many-names.csv',mimeType:'text/csv',buffer:Buffer.from('Name\n'+manyNames.join('\n'))});
+    await page.getByText('200 names added; 0 duplicates skipped.').waitFor();
+    assert.ok(await page.locator('.people-list').evaluate(node=>node.scrollHeight>node.clientHeight+1),'A genuinely long name list still scrolls');
+    assert.equal(await page.locator('.seats-panel').evaluate(node=>node.scrollHeight>node.clientHeight+1),false,'The long list does not add a second outer panel scrollbar');
+    assert.ok((await page.locator('.seats-panel').boundingBox()).height<=768-24+1,'A long list uses the available viewport height');
     await page.setViewportSize({width:375,height:850});
     await page.waitForFunction(()=>document.querySelectorAll('[data-person][draggable="true"]').length===0);
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));

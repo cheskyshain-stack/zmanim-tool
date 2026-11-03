@@ -345,7 +345,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   .seats-people-mode .plan-line{margin-top:0}
   .seats-people-mode .seats-controls{margin-bottom:8px}
   .seats-people-mode .print-paper-hint{margin:0 0 8px}
-  .seats-people-mode .seats-panel{position:sticky;top:12px;display:flex;flex-direction:column;min-height:0;height:var(--seats-sidebar-height,calc(100dvh - 255px));max-height:calc(100dvh - 24px);overflow:auto;padding:14px}
+  .seats-people-mode .seats-panel{position:sticky;top:12px;display:flex;flex-direction:column;min-height:0;height:auto;max-height:calc(100dvh - 24px);overflow:auto;padding:14px}
   .seats-people-mode .seats-panel>*{flex-shrink:0}
   .seats-people-mode .people-summary{margin:5px 0;padding:4px 8px;font-size:11px}
   .seats-people-mode .seats-panel .check-label{margin:7px 0}

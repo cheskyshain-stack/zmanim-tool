@@ -1411,7 +1411,10 @@ contained books, uniform seat backgrounds and unchanged chart data.
 The chart status box and Saved charts rows show the organizer who last assigned
 a name to a seat. Later renames, room edits, name-list imports, restores and
 opening a chart must not replace that attribution. Keep the normal creation and
-last-edit dates in the saved list and the full edit history separately.
+last-edit dates in the saved list. Chart change history displays only added seat
+assignments with their organizer and timestamp, including only seat lines within
+mixed edits. Skip history pages containing only unrelated edits automatically.
+Keep the complete underlying audit records intact for recovery and backups.
 Use the existing paginated history API so this works with the deployed service.
 Never substitute its generic updatedBy field when seat history is unknown.
 `tests/seats-seat-activity.mjs`, `tests/seats-records.mjs` and the sharing browser
@@ -1419,8 +1422,11 @@ checks cover attribution, older pages of history and later edits by another acto
 
 The full-width Seats chart grows down the website page on desktop. Scroll the page
 to reach its back rows at the same readable size. Do not restore a viewport-height
-chart box with its own vertical scrollbar. The names sidebar may stay sticky and
-scroll independently. Horizontal chart panning still contains zoomed charts, and
+chart box with its own vertical scrollbar. The names sidebar stays sticky and
+uses its natural content height, capped by the full viewport. Do not size it from
+its initial page offset, which leaves a short scrolling box after page scrolling.
+Short or empty lists show their controls without an inner scrollbar. Long name
+lists may scroll independently. Horizontal chart panning still contains zoomed charts, and
 Whole chart remains an optional small overview. Seat dragging near the visible
 chart edge scrolls the page. `tests/seats-desktop.cjs` checks page wheel scrolling,
 back-row reachability, retained chart width, drag autoscroll and actual print PDFs.
