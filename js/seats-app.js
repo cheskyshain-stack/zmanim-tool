@@ -7,7 +7,7 @@ import { seatsEditorIcon } from './seats/editor-icons.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
 import { seatsCreateWorkspace } from './seats/workspace.js';
-import { SEATS_PRINT_VIEW, seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
+import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
 import { seatsCreateEditor } from './seats/editor.js';
 import { seatsReadNames } from './seats/import.js';
 import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
@@ -327,8 +327,8 @@ function seatsStart(root, auth, updates) {
     return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
   }
   function diagram(interactive = true) {
-    const current = plan(), geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
-    const colorDesign = roomDesign && !current.monochrome;
+    const current = plan(), colorDesign = roomDesign && !current.monochrome;
+    const geometry = seatsPrintGeometry(current.paper, colorDesign), printScale = interactive ? 1 : geometry.xScale;
     const paint = colorDesign ? seatsRoomDesignPaint('room-design-' + (interactive ? 'screen' : 'print')) : null;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
@@ -366,19 +366,19 @@ function seatsStart(root, auth, updates) {
       else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
       else if (['pillar', 'bimah'].includes(object.type)) {
         const side = Math.min(object.width, object.height), width = side / printScale, top = (object.height - side) / 2;
-        const realistic = colorDesign && object.type === 'bimah', caption = realistic ? 14 : side;
-        art = `<rect x="${svgNumber((object.width - width) / 2)}" y="${svgNumber(top)}" width="${svgNumber(width)}" height="${svgNumber(side)}" class="object-surface square-surface${seatsIsFixed(object) ? ' chair-pillar' : ''}" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>${realistic ? seatsBimahDesign((object.width - width) / 2, top, width, side, printScale) : ''}${seatsIsFixed(object) ? '' : wideName(object.label, object.width / 2, top + side - caption, width, caption, object.label, realistic ? 9 : 13)}`;
+        const realistic = colorDesign && object.type === 'bimah';
+        art = `<rect x="${svgNumber((object.width - width) / 2)}" y="${svgNumber(top)}" width="${svgNumber(width)}" height="${svgNumber(side)}" class="object-surface square-surface${seatsIsFixed(object) ? ' chair-pillar' : ''}" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>${realistic ? seatsBimahDesign((object.width - width) / 2, top, width, side, printScale) : ''}${seatsIsFixed(object) || realistic ? '' : wideName(object.label, object.width / 2, top, width, side, object.label)}`;
       }
       else if (object.type === 'amud') {
-        const width = object.width / printScale, caption = colorDesign ? 14 : object.height;
-        art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${colorDesign ? seatsAmudDesign((object.width - width) / 2, 0, width, object.height, printScale) : ''}${wideName(object.label, object.width / 2, object.height - caption, width, caption, object.label, colorDesign ? 8 : 13)}`;
+        const width = object.width / printScale;
+        art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${colorDesign ? seatsAmudDesign((object.width - width) / 2, 0, width, object.height, printScale) : wideName(object.label, object.width / 2, 0, width, object.height, object.label)}`;
       }
       else art = `${object.type === 'label' ? '' : `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>`}${wideName(object.label, object.width / 2, 0, object.width, object.height, object.label)}`;
       return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object${['bimah', 'amud'].includes(object.type) ? ' room-landmark' : ''}${colorDesign && ['bimah', 'amud'].includes(object.type) ? ' realistic-fixture' : ''}${object.type === 'rav' ? ' rav-station' : seatsIsFixed(object) ? ' fixed-fixture' : ' drag-handle'}${interactive && selected === object.id ? ' selected' : ''}">${art}</g>`;
     }).join('');
     return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${roomDesign ? ' room-design' : ''}${colorDesign ? ' room-design-color' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern>${paint?.defs || ''}</defs>
-      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale, interactive ? 15 : SEATS_PRINT_VIEW.y)}${objects}${tables}</g>
+      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale, interactive ? 15 : geometry.viewTop)}${objects}${tables}</g>
     </svg>`;
   }
   function tableOptions() {
@@ -465,7 +465,7 @@ function seatsStart(root, auth, updates) {
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + seatsUsableCount(current, table), 0);
     const room = diagram();
-    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
+    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper, roomDesign && !current.monochrome);
     document.title = 'Seats | ' + current.name;
     document.body.classList.add('seats-people-mode');
     document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');

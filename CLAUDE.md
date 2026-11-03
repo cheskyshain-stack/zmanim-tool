@@ -1413,14 +1413,18 @@ tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
 Aron Kodesh, bimah and amud use transparent photo-based illustrations from the
 user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. Keep
-natural image proportions and selectable captions, with no people or invented
-inscriptions. The amud follows the covered lectern visible in front of the Aron.
+natural image proportions, with no people or invented inscriptions. Omit visible
+Aron Kodesh, bimah and amud captions in this illustrated mode; retain their saved
+object names and accessible labels. Use the full amud footprint for its picture.
+The amud follows the covered lectern visible in front of the Aron.
 Shelves have molded cornices and plinths around inward-facing dark books with
 red spine labels. Keep the floor light with 2:1 rectangular tiles; center one tile
 on both axes of SEATS_BOUNDS so the cuts at opposite walls match. Saved fixture
 footprints and hit areas stay unchanged; the tall Aron picture uses the clear
-front margin above the wall. Keep artwork clear of seat names and preserve its
-proportions on fixed-size and auto-fit printouts. The asset must ship offline too.
+front margin above the wall. Illustrated print geometry starts at the same front
+edge as the screen, so the Aron does not shrink separately to fit a cropped view.
+Keep artwork clear of seat names and preserve its proportions on fixed-size and
+auto-fit printouts. The asset must ship offline too.
 Names and empty seats share one continuous table background. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
