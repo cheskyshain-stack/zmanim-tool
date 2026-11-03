@@ -31,10 +31,11 @@ function seatsBookcaseDesign(object, colored) {
   const centerX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right) / 2, centerY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom) / 2;
   const facing = vertical ? object.x + object.width / 2 < centerX ? 'east' : 'west'
     : object.y + object.height / 2 < centerY ? 'south' : 'north';
-  // Draw one horizontal run, then turn its books toward the room's interior.
-  const transform = facing === 'east' ? `translate(${object.width} 0) rotate(90)`
-    : facing === 'west' ? `translate(0 ${object.height}) rotate(-90)`
-      : facing === 'south' ? `translate(${object.width} ${object.height}) rotate(180)` : '';
+  // The books rest at the bottom of this elevation, so its open front points along +y.
+  const transform = facing === 'east' ? `translate(0 ${object.height}) rotate(-90)`
+    : facing === 'west' ? `translate(${object.width} 0) rotate(90)`
+      : facing === 'north' ? `translate(${object.width} ${object.height}) rotate(180)` : '';
+  const labelTones = ['red', 'red', 'blue', 'green', 'cream'];
   const columns = Math.max(1, Math.round(width / (height * 1.8)));
   const bayWidth = (width - inset * 2) / columns, bayHeight = height - inset * 2;
   const n = value => Math.round(value * 100) / 100;
@@ -58,7 +59,10 @@ function seatsBookcaseDesign(object, colored) {
         const bookWidth = slot * (.68 + ((seed + index) % 3) * .06), bookLeft = bookX + slot * .08, bookTop = bottom - bookHeight;
         art.push(`<rect class="book-volume book-tone-${(seed + index) % 4}" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
         if ((seed + index) % 3 === 0) art.push(`<path class="book-band" d="M${n(bookLeft)} ${n(bookTop + bookHeight * .22)} h${n(bookWidth)} M${n(bookLeft)} ${n(bookTop + bookHeight * .33)} h${n(bookWidth)}"/>`);
-        if (colored) art.push(`<path class="book-label-strip" d="M${n(bookLeft)} ${n(bottom - h * .12)} h${n(bookWidth)}"/>`);
+        if (colored) {
+          const labelTone = labelTones[(seed + Math.floor(index / 3)) % labelTones.length];
+          art.push(`<path class="book-label-strip book-label-${labelTone}" d="M${n(bookLeft)} ${n(bottom - h * .12)} h${n(bookWidth)}"/>`);
+        }
       }
     }
   }

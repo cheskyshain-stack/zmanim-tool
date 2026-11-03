@@ -73,13 +73,25 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       assert.match(seatFills[0],/transparent|rgba\(0, 0, 0, 0\)/);
       for(const [scope,id]of [['.room-stage','screen'],['#seats-print','print']])assert.ok(await page.locator(scope+' .table-surface').evaluateAll((nodes,id)=>nodes.every(node=>{const fill=getComputedStyle(node).fill,filter=getComputedStyle(node).filter;return fill.includes('#room-design-'+id+'-wood')&&filter.includes('#room-design-'+id+'-shadow');}),id),'Each drawing uses its own wood and shadow definitions');
       const printFills=await page.locator('#seats-print .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);assert.deepEqual(printFills,seatFills);
+      const labelColors=async scope=>page.locator(scope+' .book-label-strip').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).stroke))].sort());
+      const colors=await labelColors('.room-stage');assert.equal(colors.length,4,'Book sets use the red, blue, green and off-white tape seen in the room photos');assert.deepEqual(await labelColors('#seats-print'),colors,'Printed books keep the same varied tape colors');
     }
     const directions={'rear-case-left':'north','rear-case-center':'north','rear-case-right':'north','rear-case-side-left':'east','rear-case-side-right':'west','rear-case-a7':'east'};
     for(const [id,direction]of Object.entries(directions)){
       const artwork=page.locator('.room-stage [data-item="'+id+'"] .cabinet-design');assert.equal(await artwork.getAttribute('data-facing'),direction);
-      const vector=await artwork.evaluate(group=>{const m=group.parentElement.getCTM().inverse().multiply(group.getCTM());return {x:-m.c,y:-m.d};});
+      const vector=await artwork.evaluate(group=>{const m=group.parentElement.getCTM().inverse().multiply(group.getCTM());return {x:m.c,y:m.d};});
       const expected={north:[0,-1],east:[1,0],west:[-1,0]}[direction];assert.ok(Math.abs(vector.x-expected[0])<.001&&Math.abs(vector.y-expected[1])<.001,'The drawn books face into the room at '+id);
-      assert.equal(await page.locator('#seats-print .room-object').filter({has:page.locator('.cabinet-design[data-facing="'+direction+'"]')}).count()>0,true);
+      for(const scope of ['.room-stage','#seats-print']){
+        await page.emulateMedia({media:scope==='#seats-print'?'print':'screen'});
+        assert.ok(await page.locator(scope+' .cabinet-design').nth(cabinets.findIndex(cabinet=>cabinet.id===id)).evaluate((group,expected)=>{
+        const object=group.parentElement,surface=object.querySelector('.object-surface'),cx=Number(surface.getAttribute('width'))/2,cy=Number(surface.getAttribute('height'))/2,toObject=object.getCTM().inverse();
+        const books=[...group.querySelectorAll('.book-volume')].filter(book=>{const b=book.getBBox();return b.height>b.width*1.5;});
+        const fronts=books.map(book=>{const b=book.getBBox();return new DOMPoint(b.x+b.width/2,b.y+b.height).matrixTransform(toObject.multiply(book.getCTM()));});
+        for(const label of group.querySelectorAll('.book-label-strip')){const b=label.getBBox();fronts.push(new DOMPoint(b.x+b.width/2,b.y).matrixTransform(toObject.multiply(label.getCTM())));}
+        return books.length>0&&fronts.every(point=>(point.x-cx)*expected[0]+(point.y-cy)*expected[1]>0);
+        },expected),'Actual book bases and tape must be on the room side in '+scope+' at '+id);
+      }
+      await page.emulateMedia({media:null});
     }
     await page.screenshot({path:path.join(output,'design-'+variant+'.png'),fullPage:true});
     if(!monochrome)await page.locator('.room-stage .room-diagram').screenshot({path:path.join(output,'room-'+variant+'.png')});
