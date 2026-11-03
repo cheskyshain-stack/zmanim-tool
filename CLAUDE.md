@@ -1413,6 +1413,12 @@ storage keys so another tab cannot overwrite other charts' choices.
 With Color selected it uses light
 tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
+Tables have a pale ivory, realistic fine-grain surface from
+assets/seats/light-tabletop-v1.png. Keep the texture subtle and the tables light,
+with at least 4.5:1 contrast for names and empty-seat numbers. The grain spans
+the entire tabletop with no separate name backgrounds. Retain the existing
+table edges, outlines and shadows. The texture ships offline and printing waits
+for it to load. Bookcases keep their previous light appearance.
 Aron Kodesh uses a transparent photo-based illustration from the
 user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. The bimah
 uses assets/seats/bimah-two-panel-photo-v2.png, with two equal front sections,
