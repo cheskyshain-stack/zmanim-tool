@@ -1,20 +1,20 @@
 import { escAttr, escText } from '../util.js';
 import { seatsFront, SEATS_BOUNDS, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGHT_DOOR } from './model.js';
+import { seatsAronDesign } from './room-design.js';
 
 export function seatsRoomFeatures(plan, designed = false) {
   const cross = SEATS_CROSS_WALKWAY;
   const door = SEATS_FRONT_RIGHT_DOOR;
-  const { aron } = seatsFront(plan), font = Math.min(15, (aron.width - 8) / 4.5);
+  const { aron } = seatsFront(plan), font = designed ? 10 : Math.min(15, (aron.width - 8) / 4.5);
   const a = plan.tables.filter(table => ['A7', 'A8'].includes(table.id));
   const d = plan.tables.filter(table => ['D7', 'D8'].includes(table.id));
   const aRight = a.length ? Math.min(...a.map(table => table.x)) : 103;
   const dRight = d.length ? Math.min(...d.map(table => table.x)) : 1030;
   const dLeft = plan.tables.find(table => table.id === 'D6')?.x ?? 968;
-  const panelWidth = Math.max(1, aron.width - 14), swagWidth = panelWidth / 3;
-  const aronPanel = designed ? `<rect class="design-aron-panel" x="${aron.x + 7}" y="${aron.y + 4}" width="${panelWidth}" height="${Math.max(1, aron.height - 8)}"/><path class="design-aron-trim" d="M${aron.x + 4} ${aron.y + 2} V${aron.y + aron.height - 2} M${aron.x + aron.width - 4} ${aron.y + 2} V${aron.y + aron.height - 2}"/><path class="design-aron-swag" d="M${aron.x + 7} ${aron.y + 5} q${swagWidth / 2} 9 ${swagWidth} 0 q${swagWidth / 2} 9 ${swagWidth} 0 q${swagWidth / 2} 9 ${swagWidth} 0"/>` : '';
+  const aronPanel = designed ? seatsAronDesign(aron) : '';
   const side = (id, left, right) => right - left < 24 ? '' : `<g class="walkway rear-side-walkway" data-walkway="${id}"><path d="M${left} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y} M${right} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y}"/></g>`;
   return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${door.top} M1183 ${door.bottom} V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
-    <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/>${aronPanel}<text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text></g>
+    <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/>${aronPanel}<text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="${designed ? aron.y + 32 : 90}">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="${designed ? aron.y + 42 : 108}">KODESH</tspan></text></g>
     <g class="walkway" data-walkway="cross" aria-label="Walkway between rows 6 and 7"><path d="M18 ${cross.top} H1182 M18 ${cross.bottom} H1182"/></g>
     <g class="room-opening" data-door="left-entrance" data-kind="open" aria-label="Left entrance"></g>
     <g class="room-opening" data-door="right-entrance" data-kind="open" aria-label="Right entrance"></g>
@@ -39,10 +39,12 @@ function seatsBookcaseDesign(object, colored) {
   const bayWidth = (width - inset * 2) / columns, bayHeight = height - inset * 2;
   const n = value => Math.round(value * 100) / 100;
   const art = [`<rect class="cabinet-frame" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}"/>`];
+  if (colored) art.push(`<rect class="cabinet-cornice" x="1.2" y="1.2" width="${width - 2.4}" height="1.6"/><path class="cabinet-molding" d="M2 4 H${width - 2}"/><rect class="cabinet-plinth" x="1.2" y="${height - 2.8}" width="${width - 2.4}" height="1.6"/>`);
   for (let column = 0; column < columns; column++) {
-    const left = inset + column * bayWidth, top = inset, seed = column;
+    const left = inset + column * bayWidth, top = colored ? 4 : inset, seed = column;
     if (column) art.push(`<path class="cabinet-frame" d="M${n(left)} ${inset} V${height - inset}"/>`);
-    const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = bayHeight - 2.2;
+    if (column && colored) art.push(`<rect class="cabinet-stile" x="${n(left - 1)}" y="3" width="2" height="${height - 6}"/>`);
+    const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = (colored ? height - top * 2 : bayHeight) - 2.2;
     const count = Math.max(3, Math.min(7, Math.floor(w / (h * .24 + 1.2)))), slot = w / count;
     for (let index = 0; index < count; index++) {
       const bookX = x + index * slot, bookHeight = h * (.72 + ((seed + index * 2) % 5) * .055), bottom = y + h;
