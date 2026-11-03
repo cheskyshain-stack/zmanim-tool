@@ -2753,7 +2753,7 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 }
 /* Give the open form enough room for the provider's desktop tabs. On phones the
    form reaches the card edges, instead of losing another two padding widths. */
-.luach-give-page:has(.luach-campaign-details:not([hidden]) .luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width: 48rem; }
+.luach-give-page:has(.luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width: 48rem; }
 @media (max-width: 34rem) {
   .luach-give-frame { margin-inline: -0.95rem; border-inline: 0; border-radius: 0; }
 }
@@ -6003,10 +6003,6 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-payment-panel { padding:22px 24px 15px; min-height:367px; }
  .is-give .luach-fund-row { min-height:52px; }
  .is-give .luach-site-footer::before { margin-top:15px; }
-}
-
-@media screen and (min-width:64rem) {
- .is-give .luach-give-page:has(.luach-campaign-details:not([hidden]) .luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width:60rem; }
 }
 
 @media screen {
