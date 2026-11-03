@@ -1403,6 +1403,9 @@ was that it does not really have to be hidden. So do not raise it again, and do 
 
 ## Seats chart scrolling
 
+Seats home prioritizes updating existing charts. View saved charts comes first
+and uses the prominent navy style; Create new chart is the secondary white action.
+
 Room design is a device-only display switch. With Color selected it uses navy,
 light wood, raised table edges, soft furniture shadows and inward-facing books.
 Names and empty seats share one continuous table background. Black & white keeps
