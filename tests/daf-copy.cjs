@@ -24,7 +24,7 @@ const server = http.createServer((req, res) => {
     : { channel: 'chrome', headless: true });
   const results = [], errors = [];
   try {
-    for (const [width, height] of [[320, 568], [375, 812], [412, 915], [1440, 900]]) {
+    for (const [width, height] of [[320, 568], [375, 812], [412, 915], [960, 900], [1024, 900], [1440, 900]]) {
       const context = await browser.newContext({ viewport: { width, height }, reducedMotion: 'reduce', isMobile: width < 760 });
       await context.addInitScript(() => {
         try { localStorage.setItem('zmanim-nocount', '1'); } catch {}
@@ -48,6 +48,7 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 0);
       assert.equal(await page.locator('.luach-payment-tab:visible').count(), 0, 'Payment choices start collapsed');
       assert.equal(await page.locator('.luach-frame').count(), 0, 'No merchant forms load before a method is selected');
+      assert((await page.locator('.luach-give-page').boundingBox()).width <= 624, 'The campaign list stays compact');
       assert.equal(await page.locator('[data-method="zelle"]').count(), 1);
       if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'campaigns-collapsed.png'), fullPage: true });
       await page.evaluate(() => {
@@ -68,12 +69,15 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 1);
         assert.equal(await page.locator('.luach-payment-tab:visible').count(), index === 3 ? 3 : 2);
         assert.equal(await campaign.locator('.luach-payment-panel:visible').count(), 0, 'Details wait for the payment-method click');
+        assert((await page.locator('.luach-give-page').boundingBox()).width <= 624, 'A retained hidden form does not widen the next campaign');
         await card.click();
         const position = await toggle.evaluate(node => ({ top: node.getBoundingClientRect().top,
           cap: document.querySelector('.luach-bar').getBoundingClientRect().bottom }));
         assert(Math.abs(position.top - position.cap - 8) < 2, title + ' is aligned below the header: ' + JSON.stringify(position));
         const frame = page.frameLocator('.luach-frame');
         assert.equal(await page.locator('.luach-frame').count(), 1);
+        if (width >= 1024) assert((await campaign.locator('iframe').boundingBox()).width >= 900, 'Desktop forms have room for the complete provider layout');
+        else if (width >= 760) assert((await page.locator('.luach-give-page').boundingBox()).width <= 768, 'Narrow desktop windows keep the compact responsive layout');
         assert.equal(await campaign.locator('iframe').getAttribute('src'), await campaign.locator('.luach-give-go').getAttribute('href'));
         assert.equal(await campaign.locator('iframe').getAttribute('title'), title + ' donation form');
         assert.equal(await campaign.locator('iframe').getAttribute('allow'), 'payment');
@@ -82,6 +86,7 @@ const server = http.createServer((req, res) => {
         await frame.locator('#donor-name').fill('Preserved ' + title);
         await campaign.locator('iframe').evaluate(node => window.savedDonationFrame = node);
         await daf.click();
+        assert((await page.locator('.luach-give-page').boundingBox()).width <= 624, 'DAF stays compact even with an entered card form retained');
         const dafPanel = campaign.locator('.luach-payment-panel:not([hidden])');
         assert.equal(await dafPanel.count(), 1);
         assert.match(await dafPanel.innerText(), new RegExp('Designate your gift for ' + title.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
@@ -147,6 +152,19 @@ const server = http.createServer((req, res) => {
         layouts.push({title, position, methods:index === 3 ? 3 : 2});
       }
       assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675','donations@neileich.org']);
+      if (width >= 1024) {
+        const first = campaigns.first();
+        await campaigns.nth(1).locator('.luach-campaign-toggle').click();
+        await campaigns.nth(1).locator('[data-method="shul"]').click();
+        await first.locator('.luach-campaign-toggle').click();
+        await first.locator('[data-method="card"]').click();
+        await page.frameLocator('.luach-frame').locator('#donor-name').fill('Retained while choosing a campaign');
+        await campaigns.nth(1).locator('.luach-campaign-toggle').click();
+        assert.equal(await page.locator('.luach-frame').count(), 1, 'Keep the entered form while another campaign is opened');
+        assert((await page.locator('.luach-give-page').boundingBox()).width <= 624, 'A hidden campaign form must not keep the page wide');
+        await first.locator('.luach-campaign-toggle').click();
+        assert.equal(await page.frameLocator('.luach-frame').locator('#donor-name').inputValue(), 'Retained while choosing a campaign');
+      }
       await page.reload();
       await campaigns.first().waitFor();
       assert.equal(await page.locator('.luach-payment-tab:visible').count(),0);
