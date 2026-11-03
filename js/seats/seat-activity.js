@@ -1,12 +1,20 @@
 // The deployed history API records seat assignments in its change descriptions.
 // Reading that history keeps this display compatible with the existing service.
+export function seatsAddedSeatDetails(details = []) {
+  return Array.isArray(details) ? details.filter(detail => {
+    const seat = typeof detail === 'string' && /^.+, seat [1-9]\d*: .+ → (.+)$/.exec(detail);
+    return seat && seat[1] !== 'Empty';
+  }) : [];
+}
+
+export function seatsAssignmentHistory(entries = []) {
+  return entries.map(entry => ({ ...entry, details: seatsAddedSeatDetails(entry.details) })).filter(entry => entry.details.length);
+}
+
 export function seatsLastSeatAssignment(entries = []) {
   for (const entry of entries) {
     if (!entry.by || !Number.isFinite(Date.parse(entry.at))) continue;
-    if (entry.details?.some(detail => {
-      const seat = /^.+, seat [1-9]\d*: .+ → (.+)$/.exec(detail);
-      return seat && seat[1] !== 'Empty';
-    })) return { by: entry.by, at: entry.at };
+    if (seatsAddedSeatDetails(entry.details).length) return { by: entry.by, at: entry.at };
   }
   return null;
 }

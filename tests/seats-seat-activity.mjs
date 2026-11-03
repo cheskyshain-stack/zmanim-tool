@@ -1,9 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateSeatActivity, seatsLastSeatAssignment } from '../js/seats/seat-activity.js';
+import { seatsAssignmentHistory, seatsCreateSeatActivity, seatsLastSeatAssignment } from '../js/seats/seat-activity.js';
 
 const assignment = (revision, by = 'Seat organizer') => ({ revision, by, at: '2026-11-02T12:00:00.000Z', details: ['A1, seat 1: Empty → Synthetic Person'] });
 const edit = revision => ({ revision, by: 'Layout organizer', at: '2026-11-02T13:00:00.000Z', details: ['Changed room layout'] });
+
+test('assignment history keeps only added seats within mixed edits and preserves the original audit records', () => {
+  const rows = [edit(5), { ...assignment(4), details: ['Added 2 names', 'Changed A1', 'A1, seat 1: Empty → Synthetic Person', 'A2, seat 2: Other Person → Empty', 'Rav, seat 1: Earlier Person → New Person'] }, { ...edit(3), details: ['A1, seat 1: Synthetic Person → Empty'] }];
+  const original = structuredClone(rows);
+  assert.deepEqual(seatsAssignmentHistory(rows), [{ ...assignment(4), details: ['A1, seat 1: Empty → Synthetic Person', 'Rav, seat 1: Earlier Person → New Person'] }]);
+  assert.deepEqual(rows, original);
+  assert.deepEqual(seatsAssignmentHistory([{ ...edit(2), details: null }]), []);
+});
 
 test('only assigning an occupied seat changes the displayed organizer', () => {
   const seat = assignment(2);

@@ -6,7 +6,7 @@ import { seatsNormalizeNameFile } from './name-files.js';
 import { seatsCreateNameEditor } from './name-editor.js';
 import { seatsChartName } from './chart-names.js';
 import { seatsCreateTrash } from './trash-ui.js';
-import { seatsCreateSeatActivity } from './seat-activity.js';
+import { seatsAssignmentHistory, seatsCreateSeatActivity } from './seat-activity.js';
 
 export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
@@ -333,9 +333,6 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function formatDate(value) { return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString() : 'Not recorded'; }
   function chartMetadata(id) { const entry = entries.get(id); return entry ? { ...seatsRecordMetadata(entry.base), lastSeatAssignment: seatActivity.read(entry.remoteId)?.assignment || null } : getRecord(id); }
-  function dateDetails(record) {
-    return `<span>Created: ${escText(formatDate(record.createdAt))}</span><span>Last edited: ${escText(formatDate(record.updatedAt))}</span>${record.updatedBy ? `<span>Edited by: ${escText(record.updatedBy)}</span>` : ''}`;
-  }
   function seatAssignmentText(record, withDate = false) {
     if (!record) return '';
     if (record?.assignment) return `Last seat assigned by <bdi>${escText(record.assignment.by)}</bdi>${withDate ? ' · ' + escText(formatDate(record.assignment.at)) : ''}`;
@@ -392,21 +389,34 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function showHistory() {
     dialogMode = 'history';
-    showDialog(`<h2 id="sharing-title">Chart change history</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p><div class="chart-date-details">${dateDetails(chartMetadata(current().id))}</div><p>See who changed this chart, when, and what they changed.</p><p class="sharing-error" role="alert"></p><ol id="chart-history-list" class="change-history"></ol><p id="chart-history-message" role="status">Loading changes…</p><button type="button" data-sharing="history-load" hidden>Load earlier changes</button><div class="dialog-actions"><button type="button" data-sharing="history-refresh">Refresh history</button><button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<h2 id="sharing-title">Chart change history</h2><p class="sharing-page-name"><bdi>${escText(current().name)}</bdi></p><p>See who assigned names to seats and when.</p><p class="sharing-error" role="alert"></p><ol id="chart-history-list" class="change-history"></ol><p id="chart-history-message" role="status">Loading seat assignments…</p><button type="button" data-sharing="history-load" hidden>Load earlier assignments</button><div class="dialog-actions"><button type="button" data-sharing="history-refresh">Refresh history</button><button type="button" data-sharing="close">Close</button></div>`);
     loadHistory();
   }
-  async function loadHistory(before = null) {
+  async function loadHistory(before = null, refresh = false) {
     const generation = ++historyRequest, id = current().id, entry = entries.get(id), load = dialog.querySelector('[data-sharing=history-load]');
-    const top = load.getBoundingClientRect().top; load.disabled = true;
+    load.disabled = true;
+    dialog.querySelector('.sharing-error').textContent = '';
     try {
-      const result = entry ? await request('/api/plans/' + encodeURIComponent(entry.remoteId) + '/history' + (before ? '?before=' + before : ''))
-        : { entries: [...getRecord(id).history].reverse(), nextBefore: null };
-      if (!dialog.open || dialogMode !== 'history' || id !== current().id || generation !== historyRequest) return;
+      let cursor = before, result;
+      do {
+        result = entry ? await request('/api/plans/' + encodeURIComponent(entry.remoteId) + '/history' + (cursor ? '?before=' + cursor : ''))
+          : { entries: [...getRecord(id).history].reverse(), nextBefore: null };
+        if (!dialog.open || dialogMode !== 'history' || id !== current().id || generation !== historyRequest) return;
+        result = { ...result, entries: seatsAssignmentHistory(result.entries) };
+        if (result.entries.length || result.nextBefore === null || !entry) break;
+        if (!Number.isSafeInteger(result.nextBefore) || result.nextBefore < 1 || cursor !== null && result.nextBefore >= cursor) throw new Error('The earlier seat assignments could not be loaded. Refresh history and try again.');
+        cursor = result.nextBefore;
+      } while (true);
       const list = dialog.querySelector('#chart-history-list');
-      if (before) list.insertAdjacentHTML('beforeend', historyRows(result.entries)); else list.innerHTML = historyRows(result.entries);
-      dialog.querySelector('#chart-history-message').textContent = !result.entries.length && !before ? 'No changes have been recorded for this chart yet.' : entry ? '' : 'Local history keeps the 200 most recent changes on this device.';
-      load.hidden = !result.nextBefore; load.dataset.before = result.nextBefore || ''; load.disabled = false;
-      if (before && !load.hidden) { dialog.scrollTop += load.getBoundingClientRect().top - top; load.focus({ preventScroll: true }); }
+      const anchor = before ? load : dialog.querySelector('[data-sharing=history-refresh]'), bounds = anchor.getBoundingClientRect();
+      const pinned = (before !== null || refresh) && bounds.height > 0 && bounds.top >= 0 && bounds.bottom <= innerHeight;
+      keepPosition(dialog, () => {
+        if (before) list.insertAdjacentHTML('beforeend', historyRows(result.entries)); else list.innerHTML = historyRows(result.entries);
+        dialog.querySelector('#chart-history-message').textContent = !list.children.length ? 'No seat assignments have been recorded for this chart yet.' : '';
+        load.hidden = !result.nextBefore; load.dataset.before = result.nextBefore || ''; load.disabled = false;
+        if (pinned && !anchor.hidden) dialog.scrollTop += anchor.getBoundingClientRect().top - bounds.top;
+        if (before !== null && [document.body, dialog].includes(document.activeElement)) (load.hidden ? dialog.querySelector('[data-sharing=history-refresh]') : load).focus({ preventScroll: true });
+      });
     } catch (error) {
       if (!dialog.open || dialogMode !== 'history' || generation !== historyRequest) return;
       if (!session && entry) { showLogin(error.message); return; }
@@ -521,7 +531,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (action === 'retry-names') { drainNameUploads(); return; }
     if (action === 'cancel-name-upload') { const file = nameUploads.find(file => file.id === button.dataset.id); if (file && window.confirm('Delete “' + file.name + '” from name files? Names on charts will stay.')) { file.remove = true; persistNameUploads(); renderPendingNames(); drainNameUploads(); } return; }
     if (action === 'history-load') { loadHistory(button.dataset.before); return; }
-    if (action === 'history-refresh') { showHistory(); return; }
+    if (action === 'history-refresh') { loadHistory(null, true); return; }
     if (action === 'local') { if (activatePage(button.dataset.id) !== false) dialog.close(); return; }
     if (action === 'restore') { dialog.close(); restoreBackup(); return; }
     if (action === 'signout') {
