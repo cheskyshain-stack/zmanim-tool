@@ -1427,10 +1427,12 @@ Shelves have molded cornices and plinths around inward-facing dark books with
 red spine labels. Keep the floor light with 2:1 rectangular tiles; center one tile
 on both axes of SEATS_BOUNDS so the cuts at opposite walls match. Saved fixture
 footprints and hit areas stay unchanged; the tall Aron picture uses the clear
-front margin above the wall. Illustrated print geometry starts at the same front
-edge as the screen, so the Aron does not shrink separately to fit a cropped view.
-Keep artwork clear of seat names and preserve its proportions on fixed-size and
-auto-fit printouts. The asset must ship offline too.
+front margin above the wall. Printing keeps the normal chart view and full room
+scale. Let the tall Aron overflow upward into the existing empty center header,
+clear of the top-left minyan logo; do not reserve extra room height or shrink it.
+Keep the whole picture inside the printable page, clear of seat names, and
+preserve its proportions on fixed-size and auto-fit printouts. The asset must
+ship offline too.
 Names and empty seats share one continuous table background. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this

@@ -1,10 +1,9 @@
 export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 916 };
 
-export function seatsPrintGeometry(paper, realisticFixtures = false) {
+export function seatsPrintGeometry(paper) {
   const tabloid = paper === 'tabloid', width = tabloid ? 17 : 11, height = tabloid ? 11 : 8.5;
   const margin = tabloid ? 0.5 : 0.35, header = 0.35, contentWidth = width - margin * 2, contentHeight = height - margin * 2;
-  const viewTop = realisticFixtures ? 15 : SEATS_PRINT_VIEW.y;
-  const viewHeight = SEATS_PRINT_VIEW.height + SEATS_PRINT_VIEW.y - viewTop;
+  const viewTop = SEATS_PRINT_VIEW.y, viewHeight = SEATS_PRINT_VIEW.height;
   const xScale = viewHeight * contentWidth / (contentHeight - header) / SEATS_PRINT_VIEW.width;
   return { auto: paper === 'auto', width, height, margin, header, contentWidth, contentHeight, xScale, viewTop,
     viewBox: [SEATS_PRINT_VIEW.x * xScale, viewTop, SEATS_PRINT_VIEW.width * xScale, viewHeight].join(' ') };
