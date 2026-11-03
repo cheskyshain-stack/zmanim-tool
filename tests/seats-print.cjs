@@ -105,7 +105,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         const dimensions=info.match(/Page size:\s+([\d.]+) x ([\d.]+) pts/).slice(1).map(Number),expected=({Letter:[792,612],Tabloid:[1224,792],Legal:[1008,612],A4:[841.89,595.28],A5:[595.28,419.53]})[format];
         assert.ok(dimensions.every((dimension,index)=>Math.abs(dimension-expected[index])<1.1),label+' '+dimensions);
         for(const [, ,name] of edgeNames)assert.ok(text.includes(name),name+' is missing in '+label);
-        for(const column of ['A','B','C','D'])for(let row=1;row<=(['A','D'].includes(column)?8:9);row++)assert.match(text,new RegExp('\\b'+column+row+'\\b'),label);
+        for(const table of sample.plans[0].tables)assert.match(text,new RegExp('\\b'+table.label+'\\b'),label);
         const imageBase=path.join(output,label),bbox=path.join(output,label+'.html');
         execFileSync('pdftoppm',['-scale-to','1600','-singlefile','-png',pdf,imageBase]);execFileSync('pdftotext',['-bbox',pdf,bbox]);
         const safe=testCase.margin ? .7 : testCase.paper==='tabloid'&&!testCase.nativeLetter ? .45 : .3;

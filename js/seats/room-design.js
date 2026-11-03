@@ -36,7 +36,7 @@ export async function seatsWaitForFixturePictures() {
 
 function seatsFixturePicture(kind, center, top, width, height, printScale) {
   const crop = SEATS_FIXTURE_CROPS[kind], clip = 'seats-fixture-clip-' + ++seatsFixtureClipCount;
-  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMax meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${SEATS_FIXTURE_ATLAS}" width="2172" height="724" clip-path="url(#${clip})"/></svg></g></g></g></g>`;
+  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${SEATS_FIXTURE_ATLAS}" width="2172" height="724" clip-path="url(#${clip})"/></svg></g></g></g></g>`;
 }
 
 export function seatsAronDesign(aron, printScale = 1, frontTop = 15) {
@@ -51,11 +51,11 @@ export function seatsTableDesign(table) {
 }
 
 export function seatsBimahDesign(x, y, width, height, printScale = 1) {
-  return seatsFixturePicture('bimah', x + width / 2, y, width * printScale, height - 16, printScale);
+  return seatsFixturePicture('bimah', x + width / 2, y, width * printScale, height, printScale);
 }
 
 export function seatsAmudDesign(x, y, width, height, printScale = 1) {
-  return seatsFixturePicture('amud', x + width / 2, y, width * printScale, height - 16, printScale);
+  return seatsFixturePicture('amud', x + width / 2, y, width * printScale, height, printScale);
 }
 
 export function seatsChairDesign(center, top) {

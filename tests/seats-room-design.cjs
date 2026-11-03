@@ -47,7 +47,12 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     assert.equal(await page.locator('.room-stage .cabinet-design').count(),cabinets.length);assert.equal(await page.locator('#seats-print .cabinet-design').count(),cabinets.length);assert.ok(await page.locator('.room-stage .leaning-book').count()>0);assert.equal(await raw(),before);assert.deepEqual(await geometry(),positions);
     assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
     assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
+    let screenAronHeight=0;
     if(!monochrome){
+      assert.equal(await page.locator('.realistic-fixture text').count(),0,'Recognizable fixture pictures do not need visible captions');
+      screenAronHeight=await page.locator('.room-stage .design-aron .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
+      const amudHeight=await page.locator('.room-stage .design-amud .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
+      assert.ok(amudHeight>=plan.objects.find(object=>object.type==='amud').height*.95,'The amud picture uses its available height instead of reserving caption space');
       assert.equal(await page.locator('.room-stage .fixture-picture image').count(),3);
       assert.equal(await page.locator('#seats-print .fixture-picture image').count(),3);
       const picture=await page.locator('.room-stage .fixture-picture image').first().evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [image.naturalWidth,image.naturalHeight];});
@@ -75,8 +80,9 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       await page.locator('#paper-size').selectOption(paper);
       if(!monochrome){
         await page.emulateMedia({media:'print'});
-        const pictures=await page.locator('#seats-print .fixture-picture').evaluateAll(nodes=>nodes.map(node=>{const box=node.viewBox.baseVal,m=node.getScreenCTM(),center=new DOMPoint(box.x+box.width/2,box.y+box.height/2).matrixTransform(m),expected=new DOMPoint(600,0).matrixTransform(node.closest('.room-art').getScreenCTM());return {offset:center.x-expected.x,ratio:Math.hypot(m.a,m.b)/Math.hypot(m.c,m.d)};}));
+        const pictures=await page.locator('#seats-print .fixture-picture').evaluateAll(nodes=>nodes.map(node=>{const box=node.viewBox.baseVal,m=node.getScreenCTM(),scene=node.closest('.room-art').getScreenCTM(),center=new DOMPoint(box.x+box.width/2,box.y+box.height/2).matrixTransform(m),expected=new DOMPoint(600,0).matrixTransform(scene);return {aron:Boolean(node.closest('.design-aron')),height:box.height*m.d/scene.d,offset:center.x-expected.x,ratio:Math.hypot(m.a,m.b)/Math.hypot(m.c,m.d)};}));
         assert.ok(pictures.every(picture=>Math.abs(picture.offset)<.1&&Math.abs(picture.ratio-1)<.01),'Every picture must retain its center and natural proportions on paper');
+        assert.ok(pictures.find(picture=>picture.aron).height>=screenAronHeight-.01,'The Aron Kodesh must not get an extra size reduction when printing');
         await page.emulateMedia({media:null});
       }
       const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper,monochrome?'0':'1'],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});
