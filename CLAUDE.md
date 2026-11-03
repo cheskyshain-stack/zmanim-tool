@@ -975,11 +975,7 @@ Export/Import in Settings moves it between devices.
   beside the weekday. Read these labels from the existing calendar helpers in English;
   keep section keys, grouping, and minyan calculations independent of the labels. Use
   the same labels in notices for days whose full schedule has not been supplied.
-- Open donation forms get a 60rem page cap on desktop viewports of at least 64rem,
-  leaving about 908px for the actual payment page after the surrounding borders and
-  padding. All five provider forms use their full two-column layout at this width.
-  Smaller views retain the 48rem cap and reach the card edges on phones. Keep the
-  campaign list and DAF/Zelle views compact; hidden forms must not widen the page. Give the
+- Open donation forms get a 48rem page cap and reach the card edges on phones. Give the
   cross-origin form at least a 360px internal viewport and scale it to the available
   width, keeping the visible height and vertical scrolling. Resize the existing frame
   on rotation so entered fields survive, and disconnect its observer when it closes.
