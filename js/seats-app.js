@@ -3,6 +3,7 @@ import { keepPosition } from './ui/keep-position.js';
 import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsSeatBlocked, seatsUsableCount, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsRoomDesignPaint, seatsTableDesign, seatsBimahDesign, seatsAmudDesign, seatsChairDesign, seatsWaitForFixturePictures } from './seats/room-design.js';
+import { seatsCreateRoomDesignChoice } from './seats/room-design-choice.js';
 import { seatsEditorIcon } from './seats/editor-icons.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
@@ -26,7 +27,6 @@ import { seatsCreateUpdates } from './seats/updates.js';
 const SEATS_NAME_SORT_KEY = 'lakewood-commons-seats-name-sort';
 const SEATS_SHORT_NAMES_KEY = 'lakewood-commons-seats-short-names';
 const SEATS_RESERVED_PRINT_KEY = 'lakewood-commons-seats-print-reserved';
-const SEATS_ROOM_DESIGN_KEY = 'lakewood-commons-seats-room-design';
 const SEATS_VIEW_KEY = 'lakewood-commons-seats-view-v1';
 
 async function seatsEntry() {
@@ -50,16 +50,16 @@ function seatsStart(root, auth, updates) {
   let nameOrder = 'first';
   let shortNames = false;
   let reservedPrint = false;
-  let roomDesign = false;
+  let legacyDesignChartId = null;
   try { if (localStorage.getItem(SEATS_NAME_SORT_KEY) === 'last') nameOrder = 'last'; } catch { /* Keep the default when preferences cannot be saved. */ }
   try { shortNames = localStorage.getItem(SEATS_SHORT_NAMES_KEY) === '1'; } catch { /* Full names are the default. */ }
   try { reservedPrint = localStorage.getItem(SEATS_RESERVED_PRINT_KEY) === '1'; } catch { /* Print names unless this device chose otherwise. */ }
-  try { roomDesign = localStorage.getItem(SEATS_ROOM_DESIGN_KEY) === '1'; } catch { /* Room details can still be previewed for this visit. */ }
   const measure = document.createElement('canvas').getContext('2d');
   try {
     storedRaw = localStorage.getItem(SEATS_STORAGE_KEY);
     if (storedRaw) {
       state = seatsNormalizeState(JSON.parse(storedRaw));
+      legacyDesignChartId = state.activeId;
       if (state.plans.some(seatsNeedsUpgrade)) {
         try { if (!localStorage.getItem(SEATS_STORAGE_KEY + '-before-room-' + SEATS_ROOM_UPDATE)) localStorage.setItem(SEATS_STORAGE_KEY + '-before-room-' + SEATS_ROOM_UPDATE, storedRaw); } catch { /* keep the original until the next save */ }
         let released = 0;
@@ -119,6 +119,9 @@ function seatsStart(root, auth, updates) {
       }
     }
   } catch { /* Invalid view preferences do not affect saved charts. */ }
+  if (['editor', 'roster'].includes(screen)) legacyDesignChartId = plan().id;
+  const roomDesignChoice = seatsCreateRoomDesignChoice({ legacyChartId: state.plans.some(current => current.id === legacyDesignChartId) ? legacyDesignChartId : null });
+  const roomDesign = () => roomDesignChoice.get(plan().id);
 
   const editor = seatsCreateEditor({
     getPlan: plan, commit: change,
@@ -327,7 +330,7 @@ function seatsStart(root, auth, updates) {
     return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
   }
   function diagram(interactive = true) {
-    const current = plan(), colorDesign = roomDesign && !current.monochrome;
+    const current = plan(), designed = roomDesign(), colorDesign = designed && !current.monochrome;
     const geometry = seatsPrintGeometry(current.paper, colorDesign), printScale = interactive ? 1 : geometry.xScale;
     const paint = colorDesign ? seatsRoomDesignPaint('room-design-' + (interactive ? 'screen' : 'print')) : null;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
@@ -362,7 +365,7 @@ function seatsStart(root, auth, updates) {
     const objects = current.objects.map(object => {
       const attributes = interactive ? `id="room-item-${attr(object.id)}" data-item="${attr(object.id)}" role="button" tabindex="0" aria-label="${attr(object.label)}"` : '';
       let art;
-      if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName, roomDesign, colorDesign);
+      if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName, designed, colorDesign);
       else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
       else if (['pillar', 'bimah'].includes(object.type)) {
         const side = Math.min(object.width, object.height), width = side / printScale, top = (object.height - side) / 2;
@@ -376,7 +379,7 @@ function seatsStart(root, auth, updates) {
       else art = `${object.type === 'label' ? '' : `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>`}${wideName(object.label, object.width / 2, 0, object.width, object.height, object.label)}`;
       return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object${['bimah', 'amud'].includes(object.type) ? ' room-landmark' : ''}${colorDesign && ['bimah', 'amud'].includes(object.type) ? ' realistic-fixture' : ''}${object.type === 'rav' ? ' rav-station' : seatsIsFixed(object) ? ' fixed-fixture' : ' drag-handle'}${interactive && selected === object.id ? ' selected' : ''}">${art}</g>`;
     }).join('');
-    return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${roomDesign ? ' room-design' : ''}${colorDesign ? ' room-design-color' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
+    return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${designed ? ' room-design' : ''}${colorDesign ? ' room-design-color' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern>${paint?.defs || ''}</defs>
       <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale, interactive ? 15 : geometry.viewTop)}${objects}${tables}</g>
     </svg>`;
@@ -465,7 +468,7 @@ function seatsStart(root, auth, updates) {
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + seatsUsableCount(current, table), 0);
     const room = diagram();
-    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper, roomDesign && !current.monochrome);
+    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper, roomDesign() && !current.monochrome);
     document.title = 'Seats | ' + current.name;
     document.body.classList.add('seats-people-mode');
     document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');
@@ -486,7 +489,7 @@ function seatsStart(root, auth, updates) {
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
       <div class="seats-workspace seats-editor-workspace no-print"><aside class="seats-panel seats-editor-people">${peoplePanel()}<details id="people-extra-tools"><summary>More tools</summary>${peopleManualTools()}<details id="room-settings"><summary>Table &amp; room settings</summary>${layoutPanel()}</details><div class="upload-area"><p class="field-note">Excel, CSV, or text. ${sharing?.linked(current.id) ? 'Names are shared with the other organizers.' : 'Names stay on this device until you save this page to the site.'}</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>New charts use the current 36-table room layout. A9 has 3 seats. A8, C1, C2, B6, and C6 have 4 seats. Other tables start with 5 seats. B and C skip table 7. Pillars block B8 seat 2 and C8 seat 4. C1 and D1 have a small gap between them. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Choosing an existing name adds it to this seat and keeps its other seats. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Use Delete beside a name to remove one person. Delete names lets you select several people or delete the whole list, including seated people. Undo restores deleted names and seats.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Saved charts opens the folder of charts on the website and this device. Download a backup to keep a spare copy.</p>${sharing?.enabled ? '<p>Save puts the current chart on the website. Later changes save automatically. Anyone signed in can open it from Saved charts and edit it. Both people see each other’s changes. Undo keeps the other organizer’s work.</p>' : ''}<p>Printer paper (auto fit) fills the printable width and height of the paper selected in your printer dialog. Use Landscape and turn off browser headers and footers. For a fixed-size PDF, choose Letter or 11 × 17 and select Save as PDF. Match that size in the printer dialog, including Android’s paper-size picker.</p></details></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p></div><div class="canvas-toolbar"><div class="canvas-buttons"><button type="button" data-action="undo" ${(sharing?.linked(current.id) ? sharing.canUndo() : history.length) ? '' : 'disabled'} aria-label="Undo" title="Undo">${seatsEditorIcon('undo')}</button><button type="button" data-action="redo" ${(sharing?.linked(current.id) ? sharing.canRedo() : future.length) ? '' : 'disabled'} aria-label="Redo" title="Redo">${seatsEditorIcon('redo')}</button><label class="chart-view-label"><span class="sr-only">Chart view</span><select id="chart-view"><option value="width" ${!zoom && !wholeRoom ? 'selected' : ''}>Full width</option><option value="whole" ${wholeRoom ? 'selected' : ''}>Whole chart</option><option value="actual" ${zoom === 1200 ? 'selected' : ''}>100%</option><option value="custom" hidden ${zoom && zoom !== 1200 ? 'selected' : ''}>${zoom ? Math.round(zoom / 1200 * 100) + '%' : 'Zoomed'}</option></select></label><output id="seats-zoom-level" class="sr-only" aria-label="Chart zoom">${zoom ? Math.round(zoom / 1200 * 100) + '%' : wholeRoom ? 'Whole chart' : 'Fit width'}</output><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div>
-        <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" aria-label="Initials + last name" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="reserved-print" type="checkbox" role="switch" aria-label="Reserved instead of names" ${reservedPrint ? 'checked' : ''} aria-describedby="reserved-print-help"><span>Reserved</span></label><span id="reserved-print-help" class="sr-only">Show Reserved on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="room-design" type="checkbox" role="switch" ${roomDesign ? 'checked' : ''} aria-describedby="room-design-help"><span>Room design</span></label><span id="room-design-help" class="sr-only">Show illustrated bookcases and room design details on the chart and printouts. Choose Color for light tables, centered rectangular tiles and detailed room fixtures with wood, burgundy and gold accents.</span></div></div>
+        <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" aria-label="Initials + last name" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="reserved-print" type="checkbox" role="switch" aria-label="Reserved instead of names" ${reservedPrint ? 'checked' : ''} aria-describedby="reserved-print-help"><span>Reserved</span></label><span id="reserved-print-help" class="sr-only">Show Reserved on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="room-design" type="checkbox" role="switch" ${roomDesign() ? 'checked' : ''} aria-describedby="room-design-help"><span>Room design</span></label><span id="room-design-help" class="sr-only">Show illustrated bookcases and room design details on the chart and printouts. This choice is remembered for this chart on this device. Choose Color for light tables, centered rectangular tiles and detailed room fixtures with wood, burgundy and gold accents.</span></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
         <div class="room-scroll"><div class="room-stage${zoom ? ' is-zoomed' : ''}${wholeRoom ? ' fits-room' : ''}" ${zoom ? `style="width:${zoom}px"` : ''}>${room}</div></div>
@@ -586,7 +589,7 @@ function seatsStart(root, auth, updates) {
       preparingPrint = true;
       const currentId = plan().id, currentScreen = screen;
       try {
-        if (screen === 'editor' && roomDesign && !plan().monochrome) await seatsWaitForFixturePictures();
+        if (screen === 'editor' && roomDesign() && !plan().monochrome) await seatsWaitForFixturePictures();
         if (screen === currentScreen && plan().id === currentId) window.print();
       } catch { alertMessage('Room pictures could not load. Check your connection and try printing again.'); }
       finally { preparingPrint = false; }
@@ -647,7 +650,7 @@ function seatsStart(root, auth, updates) {
   root.addEventListener('change', async event => {
     const control = event.target, id = control.id;
     if (id === 'reserved-print') { reservedPrint = control.checked; try { localStorage.setItem(SEATS_RESERVED_PRINT_KEY, reservedPrint ? '1' : '0'); } catch { /* Keep the print choice for this visit. */ } renderInPlace(); return; }
-    if (id === 'room-design') { roomDesign = control.checked; try { localStorage.setItem(SEATS_ROOM_DESIGN_KEY, roomDesign ? '1' : '0'); } catch { /* Keep the preview choice for this visit. */ } renderInPlace(); return; }
+    if (id === 'room-design') { roomDesignChoice.set(plan().id, control.checked); renderInPlace(); return; }
     if (id === 'short-names') { shortNames = control.checked; try { localStorage.setItem(SEATS_SHORT_NAMES_KEY, shortNames ? '1' : '0'); } catch { /* Keep the choice for this visit when storage is unavailable. */ } renderInPlace(); return; }
     if (id === 'people-sort' || id === 'roster-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }

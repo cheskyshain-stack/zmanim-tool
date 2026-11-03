@@ -27,7 +27,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
 `;
 (async()=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
-  const {seatsCreateState,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState(),plan=sample.plans[0];plan.name='Synthetic room design';plan.paper='letter';plan.monochrome=true;
+  const {seatsCreateState,seatsCreatePlan,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState(),plan=sample.plans[0];plan.name='Synthetic room design';plan.paper='letter';plan.monochrome=true;
   seatsWriteName(plan,'A1',0,'Design Test');seatsWriteName(plan,'B2',2,'Bookcase Example');seatsWriteName(plan,'rav-seat',0,'Rav Test');
   const cabinets=plan.objects.filter(object=>object.type==='cabinet');
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
@@ -87,11 +87,31 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       }
       const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper,monochrome?'0':'1'],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});
     }
-    const afterPaper=await raw();await page.reload();await page.locator('.room-stage').waitFor();assert.ok(await toggle.isChecked());assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-room-design')),'1');assert.equal(await raw(),afterPaper);
+    const afterPaper=await raw();await page.reload();await page.locator('.room-stage').waitFor();assert.ok(await toggle.isChecked());assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-room-design')),null,'Toggling one chart must not write a device-wide choice');assert.equal(await raw(),afterPaper);
     await toggle.uncheck();assert.equal(await page.locator('.cabinet-design').count(),0);assert.deepEqual(await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML)),oldArt,'Switching off restores the original room drawing');assert.equal(await raw(),afterPaper);
     await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();const saved=await raw();await toggle.check();assert.equal(await raw(),saved,'The switch does not save an empty chart');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
   }}
+  for(const width of [375,1440]){
+    const a=JSON.parse(JSON.stringify(plan)),b=seatsCreatePlan('Independent chart B');seatsWriteName(b,'A1',0,'Separate Person');
+    const seed={version:1,activeId:a.id,plans:[a,b]},context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[];
+    await context.addInitScript(seed=>{if(!localStorage.getItem('lakewood-commons-seats-v1'))localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(seed));},seed);page.on('pageerror',error=>errors.push(error.message));
+    if(remote)await context.route('**://static.cloudflareinsights.com/**',r=>r.abort());
+    await page.goto(origin+'/seats/?count=off');await page.locator('#seats-name').fill('Synthetic Chart Choice Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'View saved charts',exact:true}).click();
+    const toggle=page.getByRole('switch',{name:'Room design',exact:true});
+    const open=async id=>{if(!await page.locator('.sharing-dialog[open]').count())await page.getByRole('button',{name:'Saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+id+'"]').click();await page.locator('#chart-name').waitFor();};
+    await open(a.id);await toggle.check();await open(b.id);assert.equal(await toggle.isChecked(),false,'Chart A must not enable Room design on chart B');
+    await toggle.check();await toggle.uncheck();await open(a.id);assert.equal(await toggle.isChecked(),true,'Chart B must not disable Room design on chart A');
+    await page.reload();await page.locator('#chart-name').waitFor();assert.equal(await toggle.isChecked(),true,'Chart A keeps its choice after reload');
+    await open(b.id);await page.reload();await page.locator('#chart-name').waitFor();assert.equal(await toggle.isChecked(),false,'Chart B keeps its different choice after reload');
+    await page.goBack();await page.getByRole('button',{name:'View saved charts',exact:true}).waitFor();await page.goForward();await page.locator('#chart-name').waitFor();assert.equal(await toggle.isChecked(),false,'Browser navigation restores the destination chart choice');
+    await open(a.id);assert.equal(await toggle.isChecked(),true);await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();assert.equal(await toggle.isChecked(),false,'New charts do not inherit another chart choice');
+    const raw=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));await toggle.check();assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1')),raw,'A new draft display choice must not save a chart');
+    await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();assert.equal(await toggle.isChecked(),false,'A second new draft remains independent');
+    await open(b.id);assert.equal(await toggle.isChecked(),false);await open(a.id);assert.equal(await toggle.isChecked(),true);
+    const reopened=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')));assert.deepEqual(reopened.plans.find(p=>p.id===a.id),a);assert.deepEqual(reopened.plans.find(p=>p.id===b.id),b);assert.deepEqual(errors,[]);await context.close();
+    console.log('PASS '+width+'px: Room design choices are independent across saved charts, reload, Back/Forward and new drafts, with chart data unchanged.');
+  }
   const slow=await browser.newContext({viewport:{width:1440,height:1000}}),slowPage=await slow.newPage();
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
   plan.monochrome=false;
