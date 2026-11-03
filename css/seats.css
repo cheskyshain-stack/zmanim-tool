@@ -200,6 +200,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-design-color .design-room-floor{fill:var(--room-floor);pointer-events:none}
 .room-design-color .room-boundary{fill:none;stroke:#9ca29e;stroke-width:3;stroke-linejoin:round}
 .room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .cabinet-designed-surface{fill:var(--room-wood);stroke:#8b9699;stroke-width:1.3}
+.room-design-color .table-surface{fill:var(--room-tabletop)}
 .room-design-color .room-object>.object-surface.cabinet-designed-surface{fill:var(--room-wood)}
 .room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .chair-marker,.room-design-color .rav-chair{filter:var(--room-shadow)}
 .room-design-color .design-table-edge{fill:var(--room-edge);stroke:#a18c74;stroke-width:.7;pointer-events:none}

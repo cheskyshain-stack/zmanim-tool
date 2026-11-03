@@ -1,7 +1,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-room-design-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
-for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png','bimah-square-photo-v1.png','bimah-two-panel-photo-v2.png','light-marble-floor-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same room artwork must ship with the offline copy');
+for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png','bimah-square-photo-v1.png','bimah-two-panel-photo-v2.png','light-marble-floor-v1.png','light-tabletop-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same room artwork must ship with the offline copy');
 const server=http.createServer((req,res)=>{
   if(req.url.split('?')[0]==='/data/seats-sync.json'){res.setHeader('Content-Type','application/json');return res.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(root+path.sep)){res.statusCode=403;return res.end();}
@@ -58,8 +58,17 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
     assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
     assert.equal(await page.locator('.room-stage .design-floor-texture').count(),monochrome?0:1,'Black and white keeps its plain floor');
+    assert.equal(await page.locator('.room-stage .design-table-texture').count(),monochrome?0:1,'Black and white keeps its plain tables');
+    assert.equal(await page.locator('.design-cabinet-texture').count(),0,'Bookcases keep their restored light appearance');
     let screenAronHeight=0;
     if(!monochrome){
+      for(const scope of ['.room-stage','#seats-print']){
+        const material=await page.locator(scope+' .design-table-texture').evaluate(async node=>{const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();return [new URL(picture.src).pathname,picture.naturalWidth,picture.naturalHeight];});assert.deepEqual(material,['/assets/seats/light-tabletop-v1.png',2172,724],'Tables use a pale photographic wood texture');
+      }
+      const contrast=await page.locator('.room-stage .design-table-texture').evaluate(async node=>{
+        const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();const canvas=document.createElement('canvas');canvas.width=picture.naturalWidth;canvas.height=picture.naturalHeight;const ctx=canvas.getContext('2d');ctx.fillStyle=node.parentElement.querySelector('rect').getAttribute('fill');ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalAlpha=Number(node.getAttribute('opacity'));ctx.drawImage(picture,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height).data,minimum=[255,255,255];for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)minimum[c]=Math.min(minimum[c],data[i+c]);
+        const luminance=rgb=>rgb.reduce((sum,value,index)=>{const v=value/255;return sum+(v<=.04045?v/12.92:((v+.055)/1.055)**2.4)*[.2126,.7152,.0722][index];},0);return ['.seat-name','.empty-seat'].map(selector=>{const ink=getComputedStyle(document.querySelector('.room-stage .table-seat '+selector)).fill.match(/[\d.]+/g).slice(0,3).map(Number);return (luminance(minimum)+.05)/(luminance(ink)+.05);});
+      });assert.ok(contrast.every(value=>value>=4.5),'Names and empty-seat numbers remain readable over the darkest grain');
       for(const scope of ['.room-stage','#seats-print']){
         await page.emulateMedia({media:scope==='#seats-print'?'print':'screen'});
         const marble=page.locator(scope+' .design-floor-texture');assert.equal(await marble.count(),1);
@@ -89,7 +98,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       const seatFills=await page.locator('.room-stage .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);
       assert.equal(seatFills.length,1,'Names and empty seats must share the same table background');
       assert.match(seatFills[0],/transparent|rgba\(0, 0, 0, 0\)/);
-      for(const [scope,id]of [['.room-stage','screen'],['#seats-print','print']])assert.ok(await page.locator(scope+' .table-surface').evaluateAll((nodes,id)=>nodes.every(node=>{const fill=getComputedStyle(node).fill,filter=getComputedStyle(node).filter;return fill.includes('#room-design-'+id+'-wood')&&filter.includes('#room-design-'+id+'-shadow');}),id),'Each drawing uses its own wood and shadow definitions');
+      for(const [scope,id]of [['.room-stage','screen'],['#seats-print','print']])assert.ok(await page.locator(scope+' .table-surface').evaluateAll((nodes,id)=>nodes.every(node=>{const fill=getComputedStyle(node).fill,filter=getComputedStyle(node).filter;return fill.includes('#room-design-'+id+'-tabletop')&&filter.includes('#room-design-'+id+'-shadow');}),id),'Each drawing uses its own light tabletop material and shadow definitions');
       const printFills=await page.locator('#seats-print .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);assert.deepEqual(printFills,seatFills);
       const labelColors=async scope=>page.locator(scope+' .book-label-strip').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).stroke))].sort());
       const colors=await labelColors('.room-stage');assert.equal(colors.length,4,'Book sets use the red, blue, green and off-white tape seen in the room photos');assert.deepEqual(await labelColors('#seats-print'),colors,'Printed books keep the same varied tape colors');
@@ -156,7 +165,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
   plan.monochrome=false;
   await slow.addInitScript(sample=>{localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));localStorage.setItem('lakewood-commons-seats-room-design','1');window.printCalls=0;window.print=()=>window.printCalls++;},sample);
-  await slow.route('**/light-marble-floor-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
+  await slow.route('**/light-tabletop-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
   await slowPage.goto(origin+'/seats/?count=off');await slowPage.locator('#seats-name').fill('Synthetic Print Organizer');await slowPage.locator('#seats-pin').fill('4444');await slowPage.getByRole('button',{name:'Open Seats',exact:true}).click();await slowPage.getByRole('button',{name:'View saved charts',exact:true}).click();await slowPage.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   await picturesRequested;await slowPage.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await slowPage.evaluate(()=>window.printCalls),0,'Printing must wait while the artwork is loading');
   releasePictures();await slowPage.waitForFunction(()=>window.printCalls===1);await slow.close();
