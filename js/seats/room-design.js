@@ -13,26 +13,35 @@ export function seatsRoomDesignPaint(id) {
       + gradient('chair', [['0%', '#d0d2cf'], ['60%', '#a7aaa8'], ['100%', '#858a89']])
       + gradient('cabinet', [['0%', '#a58b71'], ['100%', '#715a47']])
       + gradient('shelf', [['0%', '#f3efe6'], ['100%', '#e7dfd1']])
-      + gradient('fabric', [['0%', '#64283d'], ['50%', '#4d1e30'], ['100%', '#391624']])
       + `<pattern id="${id}-floor" x="${tileX}" y="${tileY}" width="${tileWidth}" height="${tileHeight}" viewBox="0 0 ${tileWidth} ${tileHeight}" patternUnits="userSpaceOnUse"><rect width="144" height="72" fill="#f7f7f3"/><path d="M0 72 V0 H144" fill="none" stroke="#dcdcd4" stroke-width=".7"/><path d="M8 64 Q32 48 58 52 T130 17 M32 70 Q58 55 87 61 T140 36" fill="none" stroke="#e4e4dc" stroke-width=".65" opacity=".45"/></pattern>`
       + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`,
-    style: ['wood', 'edge', 'chair', 'cabinet', 'shelf', 'fabric', 'floor', 'shadow'].map(name => `--room-${name}:url(#${id}-${name})`).join(';'),
+    style: ['wood', 'edge', 'chair', 'cabinet', 'shelf', 'floor', 'shadow'].map(name => `--room-${name}:url(#${id}-${name})`).join(';'),
   };
 }
 
-export function seatsAronDesign({ x, y, width, height }) {
-  const center = x + width / 2, curtainX = x + 14, curtainWidth = width - 28, swag = curtainWidth / 3;
-  return `<g class="design-aron-detail" aria-hidden="true">
-    <rect class="design-aron-wood" x="${x + 1}" y="${y + 1}" width="${width - 2}" height="4"/>
-    <rect class="design-aron-wood" x="${x + 2}" y="${y + 6}" width="10" height="${height - 9}"/>
-    <rect class="design-aron-wood" x="${x + width - 12}" y="${y + 6}" width="10" height="${height - 9}"/>
-    <path class="design-aron-panel-lines" d="M${x + 2} ${y + 18} h10 m-10 12 h10 M${x + width - 12} ${y + 18} h10 m-10 12 h10"/>
-    <rect class="design-aron-panel" x="${curtainX}" y="${y + 7}" width="${curtainWidth}" height="${height - 11}"/>
-    <path class="design-aron-fold" d="M${curtainX + 6} ${y + 9} v${height - 15} M${curtainX + curtainWidth - 6} ${y + 9} v${height - 15}"/>
-    <path class="design-aron-trim" d="M${x + 13} ${y + 6} V${y + height - 3} M${x + width - 13} ${y + 6} V${y + height - 3} M${x + 2} ${y + 5} H${x + width - 2}"/>
-    <path class="design-aron-swag" d="M${curtainX} ${y + 8} q${swag / 2} 6 ${swag} 0 q${swag / 2} 6 ${swag} 0 q${swag / 2} 6 ${swag} 0"/>
-    <path class="design-aron-crown" d="M${center - 6} ${y + 15} l3 3 3-4 3 4 3-3-1 7 h-10 Z M${center - 5} ${y + 24} h10"/>
-  </g>`;
+// One transparent source sheet, clipped per object without stretching its picture.
+const SEATS_FIXTURE_ATLAS = '/assets/seats/room-fixtures-photo-v1.png';
+const SEATS_FIXTURE_CROPS = {
+  aron: [55, 0, 672, 696],
+  bimah: [788, 173, 872, 516],
+  amud: [1722, 122, 376, 570],
+};
+let seatsFixtureClipCount = 0;
+
+export async function seatsWaitForFixturePictures() {
+  const picture = new Image();
+  picture.src = SEATS_FIXTURE_ATLAS;
+  await picture.decode();
+}
+
+function seatsFixturePicture(kind, center, top, width, height, printScale) {
+  const crop = SEATS_FIXTURE_CROPS[kind], clip = 'seats-fixture-clip-' + ++seatsFixtureClipCount;
+  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMax meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${SEATS_FIXTURE_ATLAS}" width="2172" height="724" clip-path="url(#${clip})"/></svg></g></g></g></g>`;
+}
+
+export function seatsAronDesign(aron, printScale = 1, frontTop = 15) {
+  const height = Math.min(100, aron.y + aron.height - frontTop - 2);
+  return seatsFixturePicture('aron', aron.x + aron.width / 2, aron.y + aron.height - height, aron.width, height, printScale);
 }
 
 export function seatsTableDesign(table) {
@@ -41,9 +50,12 @@ export function seatsTableDesign(table) {
     <path class="design-table-highlight" d="M2 ${height + .5} H${Math.max(2, table.width - 2)}" aria-hidden="true"/>`;
 }
 
-export function seatsBimahDesign(x, y, width, height) {
-  const fringe = Array.from({ length: 22 }, (_, index) => `M${4 + index * 3} 65 v4`).join(' ');
-  return `<g class="design-bimah" aria-hidden="true"><g transform="translate(${x} ${y}) scale(${width / 72} ${height / 72})"><rect class="design-fabric" x="3" y="3" width="66" height="66" rx="1"/><path class="design-fabric-fold" d="M5 6 V63 M67 6 V63"/><rect class="design-bimah-glass" x="10" y="10" width="52" height="52" rx="1"/><path class="design-bimah-book" d="M36 17 q-4-3-8-1 v6 q4-2 8 1 q4-3 8-1 v-6 q-4-2-8 1 v6"/><path class="design-gold-trim" d="M3 65 H69 ${fringe}"/></g></g>`;
+export function seatsBimahDesign(x, y, width, height, printScale = 1) {
+  return seatsFixturePicture('bimah', x + width / 2, y, width * printScale, height - 16, printScale);
+}
+
+export function seatsAmudDesign(x, y, width, height, printScale = 1) {
+  return seatsFixturePicture('amud', x + width / 2, y, width * printScale, height - 16, printScale);
 }
 
 export function seatsChairDesign(center, top) {
