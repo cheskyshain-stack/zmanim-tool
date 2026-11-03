@@ -17,6 +17,11 @@ text=''.join(p.get_text().split())
 assert all(name in text for name in ['DesignTest','BookcaseExample','RavTest'])
 if len(sys.argv)>3 and sys.argv[3]=='1':
  assert len(p.get_image_info())>=3, 'All three realistic fixtures must be embedded in the native PDF'
+ margin=36 if sys.argv[2]=='tabloid' else 25.2
+ pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
+ pixels=pix.samples
+ header_ink=sum(1 for y in range(round(margin*2),round((margin+25.2)*2)) for x in range(round(w*.43*2),round(w*.57*2)) if max(pixels[(y*pix.width+x)*3:(y*pix.width+x)*3+3])<205)
+ assert header_ink>30, 'The Aron must use the empty center header instead of shrinking the room'
 for drawing in p.get_drawings():
  r=drawing['rect'];assert r.x0>=0 and r.y0>=0 and r.x1<=w+.1 and r.y1<=h+.1, ('Clipped drawing',r)
 for block in p.get_text('dict')['blocks']:
@@ -41,10 +46,11 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     await page.locator('#seats-name').fill('Synthetic Design Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
     const toggle=page.getByRole('switch',{name:'Room design',exact:true}),raw=()=>page.evaluate(key=>localStorage.getItem(key),key);
     const geometry=()=>page.locator('.room-stage .room-item').evaluateAll(nodes=>nodes.map(node=>[node.getAttribute('data-item'),node.getAttribute('transform'),...node.querySelectorAll(':scope>.table-surface,:scope>.object-surface')].map(value=>typeof value==='string'?value:[value.getAttribute('width'),value.getAttribute('height')])));
-    assert.equal(await toggle.isChecked(),false);assert.equal(await page.locator('.cabinet-design').count(),0);const before=await raw(),positions=await geometry(),oldArt=await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML));
+    assert.equal(await toggle.isChecked(),false);assert.equal(await page.locator('.cabinet-design').count(),0);const before=await raw(),positions=await geometry(),oldArt=await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML)),printView=await page.locator('#seats-print .room-diagram').getAttribute('viewBox');
     const off=path.join(output,'off-'+variant+'.pdf');await page.pdf({path:off,preferCSSPageSize:true,printBackground:true});const offInfo=JSON.parse(execFileSync('python',['-c',inspectPdf,off,'letter'],{encoding:'utf8'}));
     await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;await toggle.check();assert.equal(await page.evaluate(()=>document.activeElement.id),'room-design');assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1,'The switch stays in place');
     assert.equal(await page.locator('.room-stage .cabinet-design').count(),cabinets.length);assert.equal(await page.locator('#seats-print .cabinet-design').count(),cabinets.length);assert.ok(await page.locator('.room-stage .leaning-book').count()>0);assert.equal(await raw(),before);assert.deepEqual(await geometry(),positions);
+    assert.equal(await page.locator('#seats-print .room-diagram').getAttribute('viewBox'),printView,'The Aron picture must not enlarge the view and shrink the rest of the printed chart');
     assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
     assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
     let screenAronHeight=0;

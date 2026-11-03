@@ -331,7 +331,7 @@ function seatsStart(root, auth, updates) {
   }
   function diagram(interactive = true) {
     const current = plan(), designed = roomDesign(), colorDesign = designed && !current.monochrome;
-    const geometry = seatsPrintGeometry(current.paper, colorDesign), printScale = interactive ? 1 : geometry.xScale;
+    const geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
     const paint = colorDesign ? seatsRoomDesignPaint('room-design-' + (interactive ? 'screen' : 'print')) : null;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
@@ -381,7 +381,7 @@ function seatsStart(root, auth, updates) {
     }).join('');
     return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${designed ? ' room-design' : ''}${colorDesign ? ' room-design-color' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern>${paint?.defs || ''}</defs>
-      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale, interactive ? 15 : geometry.viewTop)}${objects}${tables}</g>
+      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale)}${objects}${tables}</g>
     </svg>`;
   }
   function tableOptions() {
@@ -468,7 +468,7 @@ function seatsStart(root, auth, updates) {
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + seatsUsableCount(current, table), 0);
     const room = diagram();
-    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper, roomDesign() && !current.monochrome);
+    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
     document.title = 'Seats | ' + current.name;
     document.body.classList.add('seats-people-mode');
     document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');

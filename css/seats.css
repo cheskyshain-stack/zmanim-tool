@@ -513,6 +513,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print .minyan-logo{display:inline-flex;align-items:baseline;gap:.07in;line-height:1;white-space:nowrap}
   #seats-print .minyan-logo-name{font:inherit}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
+  #seats-print .room-diagram.room-design-color{overflow:visible}
   #seats-print .room-item{cursor:default}
   #seats-print .shtender-surface,#seats-print .amud-surface{vector-effect:non-scaling-stroke}
   #seats-print .table-seat:hover .seat-area{fill:transparent}
