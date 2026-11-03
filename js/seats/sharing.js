@@ -319,6 +319,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function showDialog(contents) {
     dialog.classList.toggle('saved-pages-dialog', ['pages', 'names', 'edit-names'].includes(dialogMode));
+    dialog.classList.toggle('saved-charts-dialog', dialogMode === 'pages');
     dialog.innerHTML = contents;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
@@ -368,7 +369,16 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     dialogMode = 'pages';
     listRequest++;
     const loading = !initialized || Boolean(endpoint && session);
-    showDialog(`<h2 id="sharing-title" class="saved-pages-heading"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</h2><p class="sharing-page-name">7:30 minyan</p><button type="button" data-sharing="new">New chart</button><p>Open a saved setup, or copy one to make changes while keeping the original. Website charts save changes automatically.</p><section class="saved-pages-section"><h3>On the website</h3><p>Available on other devices and to both organizers.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${!initialized ? '<li>Loading saved charts…</li>' : endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section><section class="saved-pages-section"><h3>On this device</h3><ul id="sharing-device-plans" class="saved-charts-list" aria-busy="${loading}">${loading ? '<li>Loading saved charts…</li>' : devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section>${trash.markup()}<p class="sharing-error" role="alert">${escText(error)}</p><div class="dialog-actions">${session ? '<button type="button" data-sharing="signout">Log out</button>' : ''}<button type="button" data-sharing="close">Close</button></div>`);
+    showDialog(`<header class="saved-charts-header">
+      <span class="saved-charts-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg></span>
+      <div class="saved-charts-title"><p>7:30 minyan</p><h2 id="sharing-title">Saved charts</h2></div>
+      <button type="button" class="saved-charts-close" data-sharing="close" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true" focusable="false"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header><div class="saved-charts-body">
+      <div class="saved-charts-tools"><p>Open to edit, or copy to keep the original. Website charts save automatically.</p><button type="button" class="saved-charts-new" data-sharing="new"><span aria-hidden="true">+</span> New chart</button></div>
+      <section class="saved-pages-section"><h3>On the website</h3><p>Shared with everyone signed in.</p><ul id="sharing-plans" class="saved-charts-list" aria-live="polite">${!initialized ? '<li>Loading saved charts…</li>' : endpoint ? session ? '<li>Loading saved charts…</li>' : '<li>Sign in to see charts saved on the website. <button type="button" class="primary" data-sharing="signin">Sign in to open saved charts</button></li>' : '<li>Connect to the site to see pages saved online. You can open device pages below.</li>'}</ul></section>
+      <section class="saved-pages-section"><h3>On this device</h3><p>Saved in this browser.</p><ul id="sharing-device-plans" class="saved-charts-list" aria-busy="${loading}">${loading ? '<li>Loading saved charts…</li>' : devicePages()}</ul><button type="button" class="text-button" data-sharing="restore">Restore a downloaded backup</button></section>
+      ${trash.markup()}<p class="sharing-error" role="alert">${escText(error)}</p>
+    </div>${session ? '<div class="dialog-actions saved-charts-footer"><button type="button" data-sharing="signout">Log out</button></div>' : ''}`);
     if (endpoint && session) refreshSitePages();
   }
   async function refreshSitePages() {
