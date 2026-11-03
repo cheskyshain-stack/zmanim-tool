@@ -5,10 +5,10 @@ const seatsStartLogout = '<svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 
 export function seatsStartMarkup() {
   return `<section class="seats-start no-print" aria-labelledby="seats-start-title">
-    <header class="seats-start-heading"><div><p class="seats-start-kicker">SEATING PLANNER</p><h1 id="seats-start-title">Seats</h1><p class="seats-start-intro">Create a chart or open a saved setup.</p></div><button type="button" class="seats-start-logout" data-action="logout">${seatsStartLogout}<span>Log out</span></button></header>
+    <header class="seats-start-heading"><div><p class="seats-start-kicker">SEATING PLANNER</p><h1 id="seats-start-title">Seats</h1><p class="seats-start-intro">Open a saved chart or create a new one.</p></div><button type="button" class="seats-start-logout" data-action="logout">${seatsStartLogout}<span>Log out</span></button></header>
     <div class="seats-start-options">
-      <button type="button" class="seats-start-card seats-start-create" data-action="start-create" aria-label="Create new chart" aria-describedby="seats-start-create-help"><span class="seats-start-icon">${seatsStartChart}</span><span class="seats-start-card-copy"><strong>Create new chart</strong><span id="seats-start-create-help">Start with an empty chart.</span></span>${seatsStartArrow}</button>
-      <button type="button" class="seats-start-card" data-action="start-saved" aria-label="View saved charts" aria-describedby="seats-start-saved-help"><span class="seats-start-icon">${seatsStartFolder}</span><span class="seats-start-card-copy"><strong>View saved charts</strong><span id="seats-start-saved-help">Open or copy a saved setup.</span></span>${seatsStartArrow}</button>
+      <button type="button" class="seats-start-card seats-start-primary" data-action="start-saved" aria-label="View saved charts" aria-describedby="seats-start-saved-help"><span class="seats-start-icon">${seatsStartFolder}</span><span class="seats-start-card-copy"><strong>View saved charts</strong><span id="seats-start-saved-help">Continue editing a saved chart.</span></span>${seatsStartArrow}</button>
+      <button type="button" class="seats-start-card" data-action="start-create" aria-label="Create new chart" aria-describedby="seats-start-create-help"><span class="seats-start-icon">${seatsStartChart}</span><span class="seats-start-card-copy"><strong>Create new chart</strong><span id="seats-start-create-help">Start with an empty chart.</span></span>${seatsStartArrow}</button>
     </div>
   </section>`;
 }

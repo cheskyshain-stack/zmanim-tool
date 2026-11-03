@@ -43,12 +43,12 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-start-card-copy strong{font:600 23px Georgia,'David Libre',serif;color:var(--seats-navy);line-height:1.25}
 .seats-start-card-copy>span{font-size:13px;font-weight:400;color:var(--seats-muted);line-height:1.6}
 .seats-start-arrow{width:19px;height:19px;color:#9c8a5c;flex-shrink:0}
-.seats-start .seats-start-create{background:linear-gradient(115deg,#142b46,#24465f);border-color:#19364f;box-shadow:0 6px 18px #142b4614}
-.seats-start .seats-start-create:hover{background:linear-gradient(115deg,#1c3854,#2c5069);border-color:#24465f;box-shadow:0 7px 20px #142b461c}
-.seats-start-create .seats-start-icon{background:#ffffff0d;border-color:#ffffff20;color:#e5cf98}
-.seats-start-create .seats-start-card-copy strong{color:#fff}
-.seats-start-create .seats-start-card-copy>span{color:#d5dfe7}
-.seats-start-create .seats-start-arrow{color:#e5cf98}
+.seats-start .seats-start-primary{background:linear-gradient(115deg,#142b46,#24465f);border-color:#19364f;box-shadow:0 6px 18px #142b4614}
+.seats-start .seats-start-primary:hover{background:linear-gradient(115deg,#1c3854,#2c5069);border-color:#24465f;box-shadow:0 7px 20px #142b461c}
+.seats-start-primary .seats-start-icon{background:#ffffff0d;border-color:#ffffff20;color:#e5cf98}
+.seats-start-primary .seats-start-card-copy strong{color:#fff}
+.seats-start-primary .seats-start-card-copy>span{color:#d5dfe7}
+.seats-start-primary .seats-start-arrow{color:#e5cf98}
 @media(prefers-reduced-motion:reduce){.seats-start .seats-start-card{transition:none}}
 @media(max-width:700px){.seats-start{margin:22px auto 40px}.seats-start-heading{margin-bottom:24px;gap:12px}.seats-start .seats-start-heading h1{font-size:36px;margin:5px 0 9px}.seats-start-kicker{font-size:9px;letter-spacing:1.5px}.seats-start-intro{font-size:13px}.seats-start .seats-start-logout{margin-top:14px;padding:8px 9px;font-size:12px}.seats-start-options{gap:12px}.seats-start .seats-start-card{min-height:108px;padding:18px;gap:13px;border-radius:12px}.seats-start-icon{width:44px;height:44px;border-radius:10px}.seats-start-icon svg{width:28px;height:28px}.seats-start-card-copy{gap:4px}.seats-start-card-copy strong{font-size:20px}.seats-start-card-copy>span{font-size:12px;line-height:1.5}.seats-start-arrow{width:16px;height:16px}}
 .seats-top{display:flex;justify-content:space-between;gap:15px;align-items:center;margin-bottom:20px}
