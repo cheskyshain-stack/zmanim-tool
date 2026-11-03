@@ -84,9 +84,12 @@ const server=http.createServer((request,response)=>{
     assert.equal(await page.locator('.seat-editor:visible').count(),0);
     async function moveSeat(from,to,copy=false){
       const a=await from.boundingBox(),b=await to.boundingBox();if(copy)await page.keyboard.down('Control');
+      const pageBefore=await page.evaluate(()=>scrollY),viewportHeight=page.viewportSize().height;
+      const awayFromPageEdges=[a,b].every(rect=>rect.y+rect.height/2>60&&rect.y+rect.height/2<viewportHeight-60);
       await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();
       await page.mouse.move(b.x+b.width/2,b.y+b.height/2,{steps:15});await page.mouse.up();
       if(copy)await page.keyboard.up('Control');
+      if(awayFromPageEdges)assert.ok(Math.abs(await page.evaluate(()=>scrollY)-pageBefore)<1,'Dragging between visible seats must not scroll the page from an interior diagram edge');
     }
     await page.locator('#show-assigned').check();
     const beforeListCopy=await state();

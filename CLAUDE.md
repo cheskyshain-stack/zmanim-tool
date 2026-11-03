@@ -1436,9 +1436,15 @@ uses its natural content height, capped by the full viewport. Do not size it fro
 its initial page offset, which leaves a short scrolling box after page scrolling.
 Short or empty lists show their controls without an inner scrollbar. Long name
 lists may scroll independently. Horizontal chart panning still contains zoomed charts, and
-Whole chart remains an optional small overview. Seat dragging near the visible
-chart edge scrolls the page. `tests/seats-desktop.cjs` checks page wheel scrolling,
+Whole chart remains an optional small overview. Seat dragging near the viewport's
+top or bottom scrolls the page. A diagram edge in the middle of the viewport must
+not move the page during a seat drag. `tests/seats-desktop.cjs` checks page wheel scrolling,
 back-row reachability, retained chart width, drag autoscroll and actual print PDFs.
+The editor uses the same navy and gold style as Seats home and Saved charts, with
+an editable chart name, inline saved status, grouped print and chart controls, and
+a natural-height People panel. Keep Save available for linked charts as well as
+drafts. Display switches retain their full accessible names; their shorter visible
+labels do not change stored names, room geometry, assignments or printed content.
 The bimah and every pillar draw square artwork centered within their saved
 footprints, without migrating positions or changing assignments. Like the Rav's
 shtender and amud, their print surfaces undo the chart's horizontal paper-fitting
