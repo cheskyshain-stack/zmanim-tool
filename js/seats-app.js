@@ -2,12 +2,12 @@ import { escAttr, escText } from './util.js';
 import { keepPosition } from './ui/keep-position.js';
 import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsSeatBlocked, seatsUsableCount, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
-import { seatsRoomDesignPaint, seatsTableDesign, seatsBimahDesign, seatsChairDesign } from './seats/room-design.js';
+import { seatsRoomDesignPaint, seatsTableDesign, seatsBimahDesign, seatsAmudDesign, seatsChairDesign, seatsWaitForFixturePictures } from './seats/room-design.js';
 import { seatsEditorIcon } from './seats/editor-icons.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
 import { seatsCreateWorkspace } from './seats/workspace.js';
-import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
+import { SEATS_PRINT_VIEW, seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
 import { seatsCreateEditor } from './seats/editor.js';
 import { seatsReadNames } from './seats/import.js';
 import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
@@ -39,7 +39,7 @@ async function seatsEntry() {
 }
 
 function seatsStart(root, auth, updates) {
-  let state = seatsCreateState(), storageError = '', notice = '', selected = 'A1';
+  let state = seatsCreateState(), storageError = '', notice = '', selected = 'A1', preparingPrint = false;
   let selectedPerson = null, search = '', showAssigned = false, zoom = 0, wholeRoom = false, history = [], future = [], importing = false;
   let readingNames = 0;
   let deletingNames = false, deleteSelection = new Set();
@@ -366,18 +366,19 @@ function seatsStart(root, auth, updates) {
       else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
       else if (['pillar', 'bimah'].includes(object.type)) {
         const side = Math.min(object.width, object.height), width = side / printScale, top = (object.height - side) / 2;
-        art = `<rect x="${svgNumber((object.width - width) / 2)}" y="${svgNumber(top)}" width="${svgNumber(width)}" height="${svgNumber(side)}" class="object-surface square-surface${seatsIsFixed(object) ? ' chair-pillar' : ''}" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>${colorDesign && object.type === 'bimah' ? seatsBimahDesign((object.width - width) / 2, top, width, side) : ''}${seatsIsFixed(object) ? '' : wideName(object.label, object.width / 2, top, width, side, object.label)}`;
+        const realistic = colorDesign && object.type === 'bimah', caption = realistic ? 14 : side;
+        art = `<rect x="${svgNumber((object.width - width) / 2)}" y="${svgNumber(top)}" width="${svgNumber(width)}" height="${svgNumber(side)}" class="object-surface square-surface${seatsIsFixed(object) ? ' chair-pillar' : ''}" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>${realistic ? seatsBimahDesign((object.width - width) / 2, top, width, side, printScale) : ''}${seatsIsFixed(object) ? '' : wideName(object.label, object.width / 2, top + side - caption, width, caption, object.label, realistic ? 9 : 13)}`;
       }
       else if (object.type === 'amud') {
-        const width = object.width / printScale;
-        art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${wideName(object.label, object.width / 2, 0, width, object.height, object.label)}`;
+        const width = object.width / printScale, caption = colorDesign ? 14 : object.height;
+        art = `<rect x="${(object.width - width) / 2}" width="${width}" height="${object.height}" class="object-surface amud-surface"/>${colorDesign ? seatsAmudDesign((object.width - width) / 2, 0, width, object.height, printScale) : ''}${wideName(object.label, object.width / 2, object.height - caption, width, caption, object.label, colorDesign ? 8 : 13)}`;
       }
       else art = `${object.type === 'label' ? '' : `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface" ${object.type === 'pillar' ? `fill="url(#pillar-${interactive ? 'screen' : 'print'})"` : ''}/>`}${wideName(object.label, object.width / 2, 0, object.width, object.height, object.label)}`;
-      return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object${['bimah', 'amud'].includes(object.type) ? ' room-landmark' : ''}${object.type === 'rav' ? ' rav-station' : seatsIsFixed(object) ? ' fixed-fixture' : ' drag-handle'}${interactive && selected === object.id ? ' selected' : ''}">${art}</g>`;
+      return `<g ${attributes} transform="translate(${object.x} ${object.y})" class="room-item room-object${['bimah', 'amud'].includes(object.type) ? ' room-landmark' : ''}${colorDesign && ['bimah', 'amud'].includes(object.type) ? ' realistic-fixture' : ''}${object.type === 'rav' ? ' rav-station' : seatsIsFixed(object) ? ' fixed-fixture' : ' drag-handle'}${interactive && selected === object.id ? ' selected' : ''}">${art}</g>`;
     }).join('');
     return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${roomDesign ? ' room-design' : ''}${colorDesign ? ' room-design-color' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern>${paint?.defs || ''}</defs>
-      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign)}${objects}${tables}</g>
+      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${colorDesign ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, colorDesign, printScale, interactive ? 15 : SEATS_PRINT_VIEW.y)}${objects}${tables}</g>
     </svg>`;
   }
   function tableOptions() {
@@ -579,7 +580,17 @@ function seatsStart(root, auth, updates) {
     'zoom-actual': () => zoomControls.actual(),
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
-    print: () => { if (editor.flush() === false) return; if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.'); window.print(); },
+    print: async () => {
+      if (preparingPrint || editor.flush() === false) return;
+      if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.');
+      preparingPrint = true;
+      const currentId = plan().id, currentScreen = screen;
+      try {
+        if (screen === 'editor' && roomDesign && !plan().monochrome) await seatsWaitForFixturePictures();
+        if (screen === currentScreen && plan().id === currentId) window.print();
+      } catch { alertMessage('Room pictures could not load. Check your connection and try printing again.'); }
+      finally { preparingPrint = false; }
+    },
     'seat-list': showSeatList,
     'back-to-chart': showChart,
     'download-seated-list': () => download('seated-names.csv', seatsRosterCsv(seatsRosterRows(plan(), nameOrder)), 'text/csv;charset=utf-8'),
