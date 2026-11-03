@@ -219,7 +219,11 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-design-color .cabinet-design .book-tone-2{fill:#292b30}
 .room-design-color .cabinet-design .book-tone-3{fill:#46312e}
 .room-design-color .cabinet-design .book-band{stroke:#c5ad79;stroke-width:.5}
-.room-design-color .cabinet-design .book-label-strip{display:inline;fill:none;stroke:#d65b6d;stroke-width:1.1}
+.room-design-color .cabinet-design .book-label-strip{display:inline;fill:none;stroke-width:1.1}
+.room-design-color .cabinet-design .book-label-red{stroke:#bd4745}
+.room-design-color .cabinet-design .book-label-blue{stroke:#4382b5}
+.room-design-color .cabinet-design .book-label-green{stroke:#57916c}
+.room-design-color .cabinet-design .book-label-cream{stroke:#ddd8c7}
 .design-realistic-fixture{pointer-events:none}
 .room-design-color .realistic-fixture>.object-surface,.room-design-color .realistic-fixture>.aron{opacity:0;filter:none}
 .room-design-color .realistic-fixture.selected>.object-surface,.room-design-color .realistic-fixture:focus-visible>.object-surface{opacity:1;fill:transparent;stroke:#2a67a0;stroke-width:2}

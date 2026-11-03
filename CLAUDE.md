@@ -1426,7 +1426,11 @@ Omit visible Aron Kodesh, bimah and amud captions in this illustrated mode; reta
 their saved object names and accessible labels. Use the full amud footprint for its picture.
 The amud follows the covered lectern visible in front of the Aron.
 Shelves have molded cornices and plinths around inward-facing dark books with
-red spine labels. Keep the floor light with 2:1 rectangular tiles; center one tile
+red, blue, green and off-white spine labels, grouped like the sets in the photos.
+The open front and lower spine labels face the room; the cabinet back faces the
+wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
+actual book bases and labels, not just the shelf's direction attribute.
+Keep the floor light with 2:1 rectangular tiles; center one tile
 on both axes of SEATS_BOUNDS so the cuts at opposite walls match. Saved fixture
 footprints and hit areas stay unchanged; the tall Aron picture uses the clear
 front margin above the wall. Printing keeps the normal chart view and full room
