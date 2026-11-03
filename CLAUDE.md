@@ -1399,6 +1399,15 @@ was that it does not really have to be hidden. So do not raise it again, and do 
 
 ## Seats chart scrolling
 
+Room design is a device-only display switch. With Color selected it uses navy,
+light wood, raised table edges, soft furniture shadows and inward-facing books.
+Names and empty seats share one continuous table background. Black & white keeps
+the illustrated line drawing. Turning the switch off restores the original art.
+Do not change chart geometry, names, assignments or saved-chart dates for this
+display preference. Keep separate SVG paint IDs for screen and print.
+`tests/seats-room-design.cjs` checks both styles, phone/desktop, native PDFs,
+contained books, uniform seat backgrounds and unchanged chart data.
+
 The chart status box and Saved charts rows show the organizer who last assigned
 a name to a seat. Later renames, room edits, name-list imports, restores and
 opening a chart must not replace that attribution. Keep the normal creation and

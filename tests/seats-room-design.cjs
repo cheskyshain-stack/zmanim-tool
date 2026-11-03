@@ -28,7 +28,8 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
   seatsWriteName(plan,'A1',0,'Design Test');seatsWriteName(plan,'B2',2,'Bookcase Example');seatsWriteName(plan,'rav-seat',0,'Rav Test');
   const cabinets=plan.objects.filter(object=>object.type==='cabinet');
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
-  try{for(const width of [375,1440]){
+  try{for(const monochrome of [true,false]){plan.monochrome=monochrome;for(const width of [375,1440]){
+    const variant=(monochrome?'mono':'color')+'-'+width;
     const context=await browser.newContext({viewport:{width,height:1000}}),page=await context.newPage(),errors=[],writes=[],patches=[];
     await context.addInitScript(sample=>{if(!localStorage.getItem('lakewood-commons-seats-v1'))localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));},sample);
     if(remote)await context.route('**://static.cloudflareinsights.com/**',r=>r.abort());
@@ -38,10 +39,20 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     const toggle=page.getByRole('switch',{name:'Room design',exact:true}),raw=()=>page.evaluate(key=>localStorage.getItem(key),key);
     const geometry=()=>page.locator('.room-stage .room-item').evaluateAll(nodes=>nodes.map(node=>[node.getAttribute('data-item'),node.getAttribute('transform'),...node.querySelectorAll(':scope>.table-surface,:scope>.object-surface')].map(value=>typeof value==='string'?value:[value.getAttribute('width'),value.getAttribute('height')])));
     assert.equal(await toggle.isChecked(),false);assert.equal(await page.locator('.cabinet-design').count(),0);const before=await raw(),positions=await geometry(),oldArt=await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML));
-    const off=path.join(output,'off-'+width+'.pdf');await page.pdf({path:off,preferCSSPageSize:true,printBackground:true});const offInfo=JSON.parse(execFileSync('python',['-c',inspectPdf,off,'letter'],{encoding:'utf8'}));
+    const off=path.join(output,'off-'+variant+'.pdf');await page.pdf({path:off,preferCSSPageSize:true,printBackground:true});const offInfo=JSON.parse(execFileSync('python',['-c',inspectPdf,off,'letter'],{encoding:'utf8'}));
     await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;await toggle.check();assert.equal(await page.evaluate(()=>document.activeElement.id),'room-design');assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1,'The switch stays in place');
     assert.equal(await page.locator('.room-stage .cabinet-design').count(),cabinets.length);assert.equal(await page.locator('#seats-print .cabinet-design').count(),cabinets.length);assert.ok(await page.locator('.room-stage .leaning-book').count()>0);assert.equal(await raw(),before);assert.deepEqual(await geometry(),positions);
-    assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll(groups=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height'));return getComputedStyle(surface).fill==='rgb(255, 255, 255)'&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});})),'Every book and shelf fits inside its existing cabinet');
+    assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
+    assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
+    if(!monochrome){
+      assert.equal(await page.locator('.room-stage .design-table-edge').count(),plan.tables.length);
+      assert.equal(await page.locator('#seats-print .design-table-edge').count(),plan.tables.length);
+      const seatFills=await page.locator('.room-stage .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);
+      assert.equal(seatFills.length,1,'Names and empty seats must share the same table background');
+      assert.match(seatFills[0],/transparent|rgba\(0, 0, 0, 0\)/);
+      for(const [scope,id]of [['.room-stage','screen'],['#seats-print','print']])assert.ok(await page.locator(scope+' .table-surface').evaluateAll((nodes,id)=>nodes.every(node=>{const fill=getComputedStyle(node).fill,filter=getComputedStyle(node).filter;return fill.includes('#room-design-'+id+'-wood')&&filter.includes('#room-design-'+id+'-shadow');}),id),'Each drawing uses its own wood and shadow definitions');
+      const printFills=await page.locator('#seats-print .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);assert.deepEqual(printFills,seatFills);
+    }
     const directions={'rear-case-left':'north','rear-case-center':'north','rear-case-right':'north','rear-case-side-left':'east','rear-case-side-right':'west','rear-case-a7':'east'};
     for(const [id,direction]of Object.entries(directions)){
       const artwork=page.locator('.room-stage [data-item="'+id+'"] .cabinet-design');assert.equal(await artwork.getAttribute('data-facing'),direction);
@@ -49,13 +60,14 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       const expected={north:[0,-1],east:[1,0],west:[-1,0]}[direction];assert.ok(Math.abs(vector.x-expected[0])<.001&&Math.abs(vector.y-expected[1])<.001,'The drawn books face into the room at '+id);
       assert.equal(await page.locator('#seats-print .room-object').filter({has:page.locator('.cabinet-design[data-facing="'+direction+'"]')}).count()>0,true);
     }
-    await page.screenshot({path:path.join(output,'design-'+width+'.png'),fullPage:true});
-    for(const paper of ['auto','letter','tabloid']){await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'design-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,...info});}
+    await page.screenshot({path:path.join(output,'design-'+variant+'.png'),fullPage:true});
+    if(!monochrome)await page.locator('.room-stage .room-diagram').screenshot({path:path.join(output,'room-'+variant+'.png')});
+    for(const paper of ['auto','letter','tabloid']){await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});}
     const afterPaper=await raw();await page.reload();await page.locator('.room-stage').waitFor();assert.ok(await toggle.isChecked());assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-room-design')),'1');assert.equal(await raw(),afterPaper);
     await toggle.uncheck();assert.equal(await page.locator('.cabinet-design').count(),0);assert.deepEqual(await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML)),oldArt,'Switching off restores the original room drawing');assert.equal(await raw(),afterPaper);
     await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();const saved=await raw();await toggle.check();assert.equal(await raw(),saved,'The switch does not save an empty chart');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
-  }
-  console.log('PASS: optional bookcase design on phone/desktop and Letter/Tabloid PDFs, contained artwork, stable positions/focus, original drawing restored, persistent preference and unchanged chart data.');console.log('Artifacts: '+output);
+  }}
+  console.log('PASS: optional room design in color and black/white on phone/desktop and Letter/Tabloid PDFs, uniform name backgrounds, contained artwork, stable positions/focus, original drawing restored, persistent preference and unchanged chart data.');console.log('Artifacts: '+output);
   }finally{await browser.close();if(!remote)server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

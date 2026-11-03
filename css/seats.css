@@ -184,6 +184,28 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
 .shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
+.room-diagram.room-design-color{color:#18364e;--seat-fill:transparent}
+.room-design-color .room-boundary{stroke:#27475e;stroke-width:4;stroke-linejoin:round}
+.room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .cabinet-designed-surface{fill:var(--room-wood);stroke:#23435a;stroke-width:1.6}
+.room-design-color .room-object>.object-surface.cabinet-designed-surface{fill:var(--room-wood)}
+.room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .chair-marker,.room-design-color .rav-chair{filter:var(--room-shadow)}
+.room-design-color .design-table-edge{fill:var(--room-edge);stroke:#23435a;stroke-width:1;pointer-events:none}
+.room-design-color .design-table-highlight{fill:none;stroke:#faeacb;stroke-width:.65;pointer-events:none}
+.room-design-color .table-seat.assigned .seat-area{fill:transparent}
+.room-design-color .table-seat .seat-name,.room-design-color .room-landmark .seat-name{fill:#17344c}
+.room-design-color .table-seat .empty-seat{fill:#58636b}
+.room-design-color .chair-marker,.room-design-color .rav-chair{fill:var(--room-chair);stroke:#38576d;stroke-width:1.1}
+.room-design-color .cabinet-design{stroke:#d3b282;stroke-width:.65;fill:none}
+.room-design-color .cabinet-design .cabinet-frame:first-child{fill:var(--room-navy);stroke:#e5c18b;stroke-width:1.2}
+.room-design-color .cabinet-design .book-volume{stroke:#17344c;stroke-width:.45}
+.room-design-color .cabinet-design .book-tone-0{fill:#e6d0a6}
+.room-design-color .cabinet-design .book-tone-1{fill:#628194}
+.room-design-color .cabinet-design .book-tone-2{fill:#f4ebd6}
+.room-design-color .cabinet-design .book-tone-3{fill:#b89861}
+.room-design-color .cabinet-design .book-band{stroke:#f3e0b8;stroke-width:.5}
+.room-design-color .design-aron-panel{fill:var(--room-navy);stroke:#b58f57;stroke-width:1;pointer-events:none}
+.room-design-color .design-aron-trim{fill:none;stroke:#fff0cd;stroke-width:1;pointer-events:none}
+.room-design-color .aron-label{fill:#f9e7be}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
 .storage-warning,.fit-warning{padding:12px 15px;border:1px solid #d7b881;border-radius:5px;background:#fff8e9;font-size:12px;margin-bottom:12px;color:#6f4c17}

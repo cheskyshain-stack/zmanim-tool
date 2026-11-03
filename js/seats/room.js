@@ -1,7 +1,7 @@
 import { escAttr, escText } from '../util.js';
 import { seatsFront, SEATS_BOUNDS, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGHT_DOOR } from './model.js';
 
-export function seatsRoomFeatures(plan) {
+export function seatsRoomFeatures(plan, designed = false) {
   const cross = SEATS_CROSS_WALKWAY;
   const door = SEATS_FRONT_RIGHT_DOOR;
   const { aron } = seatsFront(plan), font = Math.min(15, (aron.width - 8) / 4.5);
@@ -10,9 +10,10 @@ export function seatsRoomFeatures(plan) {
   const aRight = a.length ? Math.min(...a.map(table => table.x)) : 103;
   const dRight = d.length ? Math.min(...d.map(table => table.x)) : 1030;
   const dLeft = plan.tables.find(table => table.id === 'D6')?.x ?? 968;
+  const aronPanel = designed ? `<rect class="design-aron-panel" x="${aron.x + 7}" y="${aron.y + 4}" width="${Math.max(1, aron.width - 14)}" height="${Math.max(1, aron.height - 8)}"/><path class="design-aron-trim" d="M${aron.x + 4} ${aron.y + 2} V${aron.y + aron.height - 2} M${aron.x + aron.width - 4} ${aron.y + 2} V${aron.y + aron.height - 2}"/>` : '';
   const side = (id, left, right) => right - left < 24 ? '' : `<g class="walkway rear-side-walkway" data-walkway="${id}"><path d="M${left} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y} M${right} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y}"/></g>`;
   return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${door.top} M1183 ${door.bottom} V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
-    <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/><text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text></g>
+    <g class="aron-kodesh" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/>${aronPanel}<text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text></g>
     <g class="walkway" data-walkway="cross" aria-label="Walkway between rows 6 and 7"><path d="M18 ${cross.top} H1182 M18 ${cross.bottom} H1182"/></g>
     <g class="room-opening" data-door="left-entrance" data-kind="open" aria-label="Left entrance"></g>
     <g class="room-opening" data-door="right-entrance" data-kind="open" aria-label="Right entrance"></g>
@@ -46,13 +47,13 @@ function seatsBookcaseDesign(object) {
       const bookX = x + index * slot, bookHeight = h * (.72 + ((seed + index * 2) % 5) * .055), bottom = y + h;
       if (index === count - 2 && seed % 3 === 0) {
         const stack = bookHeight / 3;
-        for (let volume = 0; volume < 3; volume++) art.push(`<rect class="book-volume" x="${n(bookX + slot * .08)}" y="${n(bottom - bookHeight + volume * stack)}" width="${n(slot * .84)}" height="${n(stack - .45)}"/>`);
+        for (let volume = 0; volume < 3; volume++) art.push(`<rect class="book-volume book-tone-${(seed + index + volume) % 4}" x="${n(bookX + slot * .08)}" y="${n(bottom - bookHeight + volume * stack)}" width="${n(slot * .84)}" height="${n(stack - .45)}"/>`);
       } else if (index === count - 1 && seed % 2 === 0) {
         const lean = slot * .24, bookWidth = slot * .58, bookLeft = bookX + slot * (seed % 4 ? .34 : .1), shift = seed % 4 ? -lean : lean;
-        art.push(`<path class="book-volume leaning-book" d="M${n(bookLeft)} ${n(bottom)} L${n(bookLeft + shift)} ${n(bottom - bookHeight)} H${n(bookLeft + shift + bookWidth)} L${n(bookLeft + bookWidth)} ${n(bottom)} Z"/>`);
+        art.push(`<path class="book-volume leaning-book book-tone-${(seed + index) % 4}" d="M${n(bookLeft)} ${n(bottom)} L${n(bookLeft + shift)} ${n(bottom - bookHeight)} H${n(bookLeft + shift + bookWidth)} L${n(bookLeft + bookWidth)} ${n(bottom)} Z"/>`);
       } else {
         const bookWidth = slot * (.68 + ((seed + index) % 3) * .06), bookLeft = bookX + slot * .08, bookTop = bottom - bookHeight;
-        art.push(`<rect class="book-volume" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
+        art.push(`<rect class="book-volume book-tone-${(seed + index) % 4}" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
         if ((seed + index) % 3 === 0) art.push(`<path class="book-band" d="M${n(bookLeft)} ${n(bookTop + bookHeight * .22)} h${n(bookWidth)} M${n(bookLeft)} ${n(bookTop + bookHeight * .33)} h${n(bookWidth)}"/>`);
       }
     }
