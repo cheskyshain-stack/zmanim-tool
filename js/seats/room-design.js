@@ -1,6 +1,7 @@
 import { SEATS_BOUNDS } from './model.js';
 
 const SEATS_FLOOR_TEXTURE = '/assets/seats/light-marble-floor-v1.png';
+const SEATS_CABINET_TEXTURE = '/assets/seats/bookcase-walnut-v1.png';
 
 // Artwork only. Saved room geometry, seat hit areas and names stay independent.
 export function seatsRoomDesignPaint(id) {
@@ -16,7 +17,7 @@ export function seatsRoomDesignPaint(id) {
       + `<pattern id="${id}-wood" width="180" height="40" patternUnits="userSpaceOnUse"><rect width="180" height="40" fill="url(#${id}-wood-tone)"/><path d="M0 8 Q45 6 90 9 T180 8 M0 20 Q65 17 120 21 T180 20 M0 33 Q60 31 110 34 T180 33" fill="none" stroke="#ad967b" stroke-width=".5" opacity=".09"/></pattern>`
       + gradient('edge', [['0%', '#c9b49a'], ['100%', '#ab9479']])
       + gradient('chair', [['0%', '#d0d2cf'], ['60%', '#a7aaa8'], ['100%', '#858a89']])
-      + gradient('cabinet', [['0%', '#a58b71'], ['100%', '#715a47']])
+      + `<pattern id="${id}-cabinet" width="180" height="40" viewBox="0 0 180 40" patternUnits="userSpaceOnUse"><rect width="180" height="40" fill="#895b3c"/><image class="design-cabinet-texture" href="${SEATS_CABINET_TEXTURE}" width="180" height="40" preserveAspectRatio="xMidYMid slice"/></pattern>`
       + gradient('shelf', [['0%', '#f3efe6'], ['100%', '#e7dfd1']])
       + `<pattern id="${id}-floor" x="${floorX}" y="${floorY}" width="${floorWidth}" height="${floorHeight}" viewBox="0 0 ${floorWidth} ${floorHeight}" patternUnits="userSpaceOnUse"><rect width="${floorWidth}" height="${floorHeight}" fill="#fafaf7"/><image class="design-floor-texture" href="${SEATS_FLOOR_TEXTURE}" width="${floorWidth}" height="${floorHeight}" preserveAspectRatio="xMidYMid meet" opacity=".5"/><g class="floor-tile-joints" fill="none" stroke="#dcdcd6" stroke-width=".7">${joints}</g></pattern>`
       + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`,
@@ -42,7 +43,7 @@ const SEATS_FIXTURE_CROPS = {
 let seatsFixtureClipCount = 0;
 
 export async function seatsWaitForFixturePictures() {
-  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE, SEATS_AMUD_PICTURE, SEATS_BIMAH_PICTURE, SEATS_FLOOR_TEXTURE].map(src => {
+  await Promise.all([SEATS_FIXTURE_ATLAS, SEATS_CROWN_PICTURE, SEATS_AMUD_PICTURE, SEATS_BIMAH_PICTURE, SEATS_FLOOR_TEXTURE, SEATS_CABINET_TEXTURE].map(src => {
     const picture = new Image();
     picture.src = src;
     return picture.decode();
