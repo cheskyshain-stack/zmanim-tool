@@ -1,7 +1,7 @@
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-room-design-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
-for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same fixture artwork must ship with the offline copy');
+for(const file of ['room-fixtures-photo-v1.png','aron-crown-round-v1.png','amud-front-photo-v1.png','bimah-square-photo-v1.png'])assert.ok(fs.readFileSync(path.join(root,'assets/seats',file)).equals(fs.readFileSync(path.resolve(__dirname,'../offline/assets/seats',file))),'The same fixture artwork must ship with the offline copy');
 const server=http.createServer((req,res)=>{
   if(req.url.split('?')[0]==='/data/seats-sync.json'){res.setHeader('Content-Type','application/json');return res.end('{"endpoint":""}');}
   let file=path.resolve(root,'.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(root+path.sep)){res.statusCode=403;return res.end();}
@@ -46,6 +46,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     await page.locator('#seats-name').fill('Synthetic Design Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
     const toggle=page.getByRole('switch',{name:'Room design',exact:true}),raw=()=>page.evaluate(key=>localStorage.getItem(key),key);
     const geometry=()=>page.locator('.room-stage .room-item').evaluateAll(nodes=>nodes.map(node=>[node.getAttribute('data-item'),node.getAttribute('transform'),...node.querySelectorAll(':scope>.table-surface,:scope>.object-surface')].map(value=>typeof value==='string'?value:[value.getAttribute('width'),value.getAttribute('height')])));
+    const fixturesClearOfNames=scope=>page.locator(scope+' .fixture-picture').evaluateAll((nodes,scope)=>nodes.every(node=>{const v=node.viewBox.baseVal,m=node.getScreenCTM(),p=new DOMPoint(v.x,v.y).matrixTransform(m),q=new DOMPoint(v.x+v.width,v.y+v.height).matrixTransform(m);return [...document.querySelectorAll(scope+' .table-seat .seat-area')].every(seat=>{const s=seat.getBoundingClientRect();return q.x<=s.left||p.x>=s.right||q.y<=s.top||p.y>=s.bottom;});}),scope);
     assert.equal(await toggle.isChecked(),false);assert.equal(await page.locator('.cabinet-design').count(),0);const before=await raw(),positions=await geometry(),oldArt=await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML)),printView=await page.locator('#seats-print .room-diagram').getAttribute('viewBox');
     const off=path.join(output,'off-'+variant+'.pdf');await page.pdf({path:off,preferCSSPageSize:true,printBackground:true});const offInfo=JSON.parse(execFileSync('python',['-c',inspectPdf,off,'letter'],{encoding:'utf8'}));
     await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;await toggle.check();assert.equal(await page.evaluate(()=>document.activeElement.id),'room-design');assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1,'The switch stays in place');
@@ -59,10 +60,11 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       screenAronHeight=await page.locator('.room-stage .design-aron .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
       const amudHeight=await page.locator('.room-stage .design-amud .fixture-picture').evaluate(node=>node.viewBox.baseVal.height*node.getScreenCTM().d/node.closest('.room-art').getScreenCTM().d);
       assert.ok(Math.abs(amudHeight/plan.objects.find(object=>object.type==='amud').height-1.21)<.01,'The amud illustration is ten percent larger than its previous 1.1 scale');
-      const bimahWidth=await page.locator('.room-stage .design-bimah .fixture-picture').evaluate(node=>node.viewBox.baseVal.width*node.getScreenCTM().a/node.closest('.room-art').getScreenCTM().a);
-      const bimah=plan.objects.find(object=>object.type==='bimah');assert.ok(Math.abs(bimahWidth/Math.min(bimah.width,bimah.height)-1.1)<.01,'The bimah illustration is ten percent larger');
+      const bimahSize=await page.locator('.room-stage .design-bimah .fixture-picture').evaluate(node=>{const v=node.viewBox.baseVal,m=node.getScreenCTM(),scene=node.closest('.room-art').getScreenCTM();return {width:v.width*m.a/scene.a,height:v.height*m.d/scene.d};});
+      const bimah=plan.objects.find(object=>object.type==='bimah');assert.ok(Math.abs(bimahSize.width/(Math.min(bimah.width,bimah.height)*1.1)-.75)<.001,'The bimah is 25% narrower than the previous wide illustration');assert.ok(bimahSize.height>=bimah.height*.8&&bimahSize.height<=bimah.height,'The bimah keeps substantial height without stretching sideways');assert.ok(bimahSize.width/bimahSize.height>=.9&&bimahSize.width/bimahSize.height<=1.2,'The bimah silhouette is nearly square, like the original photo');
+      const bimahImage=await page.locator('.room-stage .design-bimah .fixture-picture > image').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(bimahImage,['/assets/seats/bimah-square-photo-v1.png',1297,1212],'The bimah uses the more square illustration');
       const amudImage=await page.locator('.room-stage .design-amud .fixture-picture > image').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(amudImage,['/assets/seats/amud-front-photo-v1.png',990,1589],'The amud uses the straight-on illustration');
-      assert.ok(await page.locator('.room-stage .fixture-picture').evaluateAll(nodes=>nodes.every(node=>{const v=node.viewBox.baseVal,m=node.getScreenCTM(),p=new DOMPoint(v.x,v.y).matrixTransform(m),q=new DOMPoint(v.x+v.width,v.y+v.height).matrixTransform(m);return [...document.querySelectorAll('.room-stage .table-seat .seat-area')].every(seat=>{const s=seat.getBoundingClientRect();return q.x<=s.left||p.x>=s.right||q.y<=s.top||p.y>=s.bottom;});})),'Enlarged fixture pictures must remain clear of seat names');
+      assert.ok(await fixturesClearOfNames('.room-stage'),'Enlarged fixture pictures must remain clear of seat names');
       assert.equal(await page.locator('.room-stage .fixture-picture > image').count(),3);
       assert.equal(await page.locator('#seats-print .fixture-picture > image').count(),3);
       for(const scope of ['.room-stage','#seats-print'])assert.equal(await page.locator(scope+' .fixture-crown-correction image').count(),1,'Only the Aron crown tip receives the artwork correction');
@@ -102,11 +104,14 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     for(const paper of ['auto','letter','tabloid']){
       await page.locator('#paper-size').selectOption(paper);
       if(!monochrome){
+        const screenViewport=page.viewportSize();await page.setViewportSize(paper==='tabloid'?{width:1536,height:960}:{width:989,height:749});
         await page.emulateMedia({media:'print'});
+        assert.ok(await fixturesClearOfNames('#seats-print'),'The enlarged bimah stays clear of every seat name on '+paper+' paper');
         const pictures=await page.locator('#seats-print .fixture-picture').evaluateAll(nodes=>nodes.map(node=>{const box=node.viewBox.baseVal,m=node.getScreenCTM(),scene=node.closest('.room-art').getScreenCTM(),center=new DOMPoint(box.x+box.width/2,box.y+box.height/2).matrixTransform(m),expected=new DOMPoint(600,0).matrixTransform(scene);return {aron:Boolean(node.closest('.design-aron')),height:box.height*m.d/scene.d,offset:center.x-expected.x,ratio:Math.hypot(m.a,m.b)/Math.hypot(m.c,m.d)};}));
         assert.ok(pictures.every(picture=>Math.abs(picture.offset)<.1&&Math.abs(picture.ratio-1)<.01),'Every picture must retain its center and natural proportions on paper');
         assert.ok(pictures.find(picture=>picture.aron).height>=screenAronHeight-.01,'The Aron Kodesh must not get an extra size reduction when printing');
         await page.emulateMedia({media:null});
+        await page.setViewportSize(screenViewport);
       }
       const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper,monochrome?'0':'1'],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});
     }
@@ -139,7 +144,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
   plan.monochrome=false;
   await slow.addInitScript(sample=>{localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));localStorage.setItem('lakewood-commons-seats-room-design','1');window.printCalls=0;window.print=()=>window.printCalls++;},sample);
-  await slow.route('**/amud-front-photo-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
+  await slow.route('**/bimah-square-photo-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
   await slowPage.goto(origin+'/seats/?count=off');await slowPage.locator('#seats-name').fill('Synthetic Print Organizer');await slowPage.locator('#seats-pin').fill('4444');await slowPage.getByRole('button',{name:'Open Seats',exact:true}).click();await slowPage.getByRole('button',{name:'View saved charts',exact:true}).click();await slowPage.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   await picturesRequested;await slowPage.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await slowPage.evaluate(()=>window.printCalls),0,'Printing must wait while the artwork is loading');
   releasePictures();await slowPage.waitForFunction(()=>window.printCalls===1);await slow.close();
