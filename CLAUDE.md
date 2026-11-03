@@ -1415,9 +1415,10 @@ tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
 Aron Kodesh uses a transparent photo-based illustration from the
 user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. The bimah
-uses assets/seats/bimah-square-photo-v1.png, with two equal front sections and
-the compact, nearly square silhouette of the original room photo. Its picture
-is 25% narrower than the previous wide illustration; preserve its natural
+uses assets/seats/bimah-two-panel-photo-v2.png, with two equal front sections,
+a lower rectangular silhouette, and clean clear glass without reflected ceiling
+lights or cloudy glare. Its picture is 25% narrower than the original wide
+three-section illustration; preserve its natural
 proportions and center. The amud uses assets/seats/amud-front-photo-v1.png,
 a straight-on view with level front edges and no visible side panel, matching
 the other fixtures. Keep

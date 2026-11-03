@@ -23,15 +23,15 @@ export function seatsRoomDesignPaint(id) {
 const SEATS_FIXTURE_ATLAS = '/assets/seats/room-fixtures-photo-v1.png';
 const SEATS_CROWN_PICTURE = '/assets/seats/aron-crown-round-v1.png';
 const SEATS_AMUD_PICTURE = '/assets/seats/amud-front-photo-v1.png';
-const SEATS_BIMAH_PICTURE = '/assets/seats/bimah-square-photo-v1.png';
+const SEATS_BIMAH_PICTURE = '/assets/seats/bimah-two-panel-photo-v2.png';
 const SEATS_FIXTURE_IMAGES = {
   aron: [SEATS_FIXTURE_ATLAS, 2172, 724],
-  bimah: [SEATS_BIMAH_PICTURE, 1297, 1212],
+  bimah: [SEATS_BIMAH_PICTURE, 1419, 1108],
   amud: [SEATS_AMUD_PICTURE, 990, 1589],
 };
 const SEATS_FIXTURE_CROPS = {
   aron: [55, 0, 672, 696],
-  bimah: [95, 16, 1108, 1168],
+  bimah: [20, 143, 1382, 882],
   amud: [33, 17, 925, 1548],
 };
 let seatsFixtureClipCount = 0;
