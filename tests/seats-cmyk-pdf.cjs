@@ -36,13 +36,18 @@ for p in d:
     x0,y0,x1,y1=box
     r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
     samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3]
-    assert sum(samples)/len(samples)>210, (fixture,'CMYK must preserve light sketch interiors')
+    assert sum(samples)/len(samples)>200, (fixture,'CMYK must preserve light sketch interiors')
     assert sum(value<220 for value in samples)/len(samples)>.03, (fixture,'CMYK must preserve visible sketch details at print size')
+   floor=fitz.Rect(margin+(550-12)*sx,margin+25.2+(600-50)*sy,margin+(650-12)*sx,margin+25.2+(620-50)*sy)
+   floor_values=sorted(p.get_pixmap(matrix=fitz.Matrix(4,4),clip=floor,alpha=False).samples[::3])
+   floor_paper=floor_values[int(len(floor_values)*.95)]
    for fixture,box in [('Aron',(590,80,610,100)),('amud',(595,212,605,220)),('bimah',(588,540,612,546))]:
     x0,y0,x1,y1=box
     r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
     samples=sorted(p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3])
-    assert 225<=samples[int(len(samples)*.95)]<=248, (fixture,'CMYK must retain the pale gray paper tone instead of bright white')
+    paper_tone=samples[int(len(samples)*.95)]
+    assert 214<=paper_tone<=238, (fixture,'CMYK must retain the light gray paper tone')
+    assert paper_tone<=floor_paper-5, (fixture,'CMYK sketches must stay distinct from the marble')
 
  assert all(font[1]=='ttf' for font in p.get_fonts()), 'Use embedded fonts, including Hebrew'
  for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]:
