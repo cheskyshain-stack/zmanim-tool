@@ -14,7 +14,7 @@ page=fitz.open(sys.argv[1]);assert len(page)==1, 'Room design must fit on one pa
 p=page[0];w,h=(792,612) if sys.argv[2]=='letter' else (1224,792)
 assert abs(p.rect.width-w)<.1 and abs(p.rect.height-h)<.1
 text=''.join(p.get_text().split())
-assert all(name in text for name in ['DesignTest','BookcaseExample','RavTest'])
+assert all(name in text for name in ['DesignTest','BookcaseExample','Rav'])
 if len(sys.argv)>3 and sys.argv[3]=='1':
  assert len(p.get_image_info())>=(3 if len(sys.argv)>4 and sys.argv[4]=='1' else 4), 'All three fixture pictures must be embedded in the native PDF'
  margin=36 if sys.argv[2]=='tabloid' else 25.2
@@ -92,10 +92,11 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       for(const scope of ['.room-stage','#seats-print']){
         const material=await page.locator(scope+' .design-table-texture').evaluate(async node=>{const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();return [new URL(picture.src).pathname,picture.naturalWidth,picture.naturalHeight];});assert.deepEqual(material,['/assets/seats/light-tabletop-v1.png',2172,724],'Tables use a pale photographic wood texture');
       }
+      await page.locator('#open-seats').check();
       const contrast=await page.locator('.room-stage .design-table-texture').evaluate(async node=>{
         const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();const canvas=document.createElement('canvas');canvas.width=picture.naturalWidth;canvas.height=picture.naturalHeight;const ctx=canvas.getContext('2d');ctx.fillStyle=node.parentElement.querySelector('rect').getAttribute('fill');ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalAlpha=Number(node.getAttribute('opacity'));ctx.filter=getComputedStyle(node).filter;ctx.drawImage(picture,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height).data,minimum=[255,255,255];for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)minimum[c]=Math.min(minimum[c],data[i+c]);
         const luminance=rgb=>rgb.reduce((sum,value,index)=>{const v=value/255;return sum+(v<=.04045?v/12.92:((v+.055)/1.055)**2.4)*[.2126,.7152,.0722][index];},0);return ['.seat-name','.empty-seat'].map(selector=>{const ink=getComputedStyle(document.querySelector('.room-stage .table-seat '+selector)).fill.match(/[\d.]+/g).slice(0,3).map(Number);return (luminance(minimum)+.05)/(luminance(ink)+.05);});
-      });assert.ok(contrast.every(value=>value>=4.5),'Names and empty-seat numbers remain readable over the darkest grain');
+      });assert.ok(contrast.every(value=>value>=4.5),'Names and Open labels remain readable over the darkest grain');
       for(const scope of ['.room-stage','#seats-print']){
         await page.emulateMedia({media:scope==='#seats-print'?'print':'screen'});
         const marble=page.locator(scope+' .design-floor-texture');assert.equal(await marble.count(),1);

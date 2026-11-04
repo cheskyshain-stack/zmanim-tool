@@ -1,4 +1,4 @@
-import { escAttr, escText } from '../util.js';
+import { escText } from '../util.js';
 import { seatsFront, SEATS_BOUNDS, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, SEATS_FRONT_RIGHT_DOOR } from './model.js';
 import { seatsAronDesign } from './room-design.js';
 
@@ -82,17 +82,16 @@ export function seatsCabinetArt(object, drawName, designed = false) {
     ${drawName(object.label, 0, -depth / 2, length - 6, depth, object.label, 10)}</g>`;
 }
 
-export function seatsRavArt(object, people, drawName, interactive, printScale = 1) {
-  const name = people.get(object.seats[0]), center = object.width / 2;
+export function seatsRavArt(object, printScale = 1) {
+  const center = object.width / 2;
   const size = Math.min(object.width - 2, object.height - 30), width = size / printScale;
   const top = 30, nameHeight = size - 4;
-  const attributes = interactive ? `id="seat-${escAttr(object.id)}-0" data-seat="0" data-table="${escAttr(object.id)}" role="button" tabindex="0" aria-label="${escAttr(object.label + ': ' + (name || 'empty'))}"` : '';
   return `<rect class="station-frame" width="${object.width}" height="${object.height}"/>
     <g class="drag-handle"><rect x="0" y="-18" width="${object.width}" height="16" fill="transparent"/></g>
-    <g class="table-seat rav-seat${name ? ' assigned' : ''}" ${attributes} data-facing="south">
+    <g class="table-seat rav-seat" role="img" aria-label="Rav" data-facing="south">
       <path class="rav-chair" d="M${center - 10} 3 h20 M${center - 8} 7 h16 v10 h-16 z M${center - 5} 17 v5 m10 0 v-5"/>
       <rect class="shtender-surface" x="${center - width / 2}" y="${top}" width="${width}" height="${size}"/>
       <rect class="seat-area" x="${center - width / 2 + 2}" y="${top + 2}" width="${Math.max(1, width - 4)}" height="${nameHeight}"/>
-      ${name ? drawName(name, center, top + 2, width - 4, nameHeight, object.label, 11) : `<text class="table-label rav-label" x="${center}" y="${top + 2 + nameHeight / 2 + 4}" text-anchor="middle">${escText(object.label)}</text>`}
+      <text class="table-label rav-label" x="${center}" y="${top + 2 + nameHeight / 2 + 4}" text-anchor="middle">Rav</text>
     </g>`;
 }

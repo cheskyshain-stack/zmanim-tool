@@ -45,6 +45,9 @@ and D7 sit before the entrance walkway, with the existing front tables retained
 in front of them. A9 has three seats; A8, C1, C2, B6 and C6 have four. Other tables
 have five. The room has 172 usable seats including the Rav, with two chair
 positions blocked by pillars. Each new chart starts with no names or assignments.
+Seat numbers are hidden on the chart and printouts. **Open seats** adds **Open**
+to empty, available seats and is remembered for each chart on this device. The
+Rav label is fixed and cannot be assigned a different name from the editor.
 Existing saved charts retain their own geometry, names and assignments. The new
 default does not migrate or overwrite them. Both original and current untouched
 room drafts stay out of Saved charts. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using

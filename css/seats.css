@@ -193,6 +193,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .rear-side-walkway text{font-size:10px;letter-spacing:1px}
 .station-frame{fill:none;stroke:none}
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
+.table-seat.rav-seat{cursor:default}
 .shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
 .room-diagram.monochrome.room-design image{filter:grayscale(1)}
