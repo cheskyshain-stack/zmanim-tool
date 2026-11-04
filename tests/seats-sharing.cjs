@@ -407,6 +407,13 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.equal(await historyPage.locator('#chart-history-list>li').count(),2);assert.deepEqual(historyPages,[null,'150','100'],'Load earlier skips unrelated pages without duplicate rows');
     assert.doesNotMatch(await historyPage.locator('#chart-history-list').textContent(),/Renamed|Changed A1|Added 1 name|Other Person/);assert.ok(await historyPage.getByRole('button',{name:'Load earlier assignments',exact:true}).isHidden());
     await historyContext.close();
+    // The note fields travel with the same shared chart and its independent copies.
+    for (const page of [a,b]) { await openSaved(page);await page.locator('.sharing-site-plan .saved-page-card[data-id="'+remoteId+'"]').click();await page.locator('#chart-print-notes summary').click(); }
+    await a.locator('#print-header').fill('Shared revised draft');await a.locator('#print-header').press('Tab');
+    await b.waitForFunction(()=>document.querySelector('#print-header')?.value==='Shared revised draft');
+    await b.locator('#print-footer').fill('Speak to the Gabbaim for a seat.');await b.locator('#print-footer').press('Tab');
+    await a.waitForFunction(()=>document.querySelector('#print-footer')?.value==='Speak to the Gabbaim for a seat.');
+    await a.waitForFunction(()=>document.querySelector('.saved-label')?.textContent==='Saved to website');
     const large=await a.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')).plans[0]);
     large.people=[...large.people,...Array.from({length:1990},(_,index)=>({id:'synthetic-person-'+index,name:'Synthetic Imported Person '+index+' '+('X'.repeat(115))}))].slice(0,2000);
     const stored=await api('/api/plans',{method:'POST',headers:{Authorization:'Bearer '+login.token},body:JSON.stringify({id:crypto.randomUUID(),plan:{...large,name:'Large import QA'}})});

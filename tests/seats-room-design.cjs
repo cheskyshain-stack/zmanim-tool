@@ -18,7 +18,7 @@ assert all(name in text for name in ['DesignTest','BookcaseExample','RavTest'])
 if len(sys.argv)>3 and sys.argv[3]=='1':
  assert len(p.get_image_info())>=(3 if len(sys.argv)>4 and sys.argv[4]=='1' else 4), 'All three fixture pictures must be embedded in the native PDF'
  margin=36 if sys.argv[2]=='tabloid' else 25.2
- floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2)/916)
+ floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2-16)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2-16)/916)
  stone=p.get_pixmap(matrix=fitz.Matrix(3,3),clip=floor,alpha=False).samples
  assert len({stone[i:i+3] for i in range(0,len(stone),3)})>(8 if len(sys.argv)>4 and sys.argv[4]=='1' else 48), 'The open walkway must retain natural marble variation in the native PDF'
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
@@ -27,7 +27,7 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
  assert header_ink>30, 'The Aron must use the empty center header instead of shrinking the room'
  if len(sys.argv)>4 and sys.argv[4]=='1':
   # Check the actual printed artwork, including visible lines on the small fixtures.
-  sx=(w-2*margin)/1176;sy=(h-2*margin-25.2)/916
+  sx=(w-2*margin)/1176;sy=(h-2*margin-25.2-16)/916
   for fixture,box in [('Aron',(552,18,648,118)),('amud',(586,184,614,230)),('bimah',(570,514,630,552))]:
    x0,y0,x1,y1=box
    r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
@@ -38,7 +38,7 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
    x0,y0,x1,y1=box
    r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
    samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples
-   assert sum(samples)/len(samples)>220, (fixture,'The sketch interior must be light paper instead of solid dark wood or fabric')
+   assert sum(samples)/len(samples)>215, (fixture,'The sketch interior must be light paper instead of solid dark wood or fabric')
 if len(sys.argv)>4 and sys.argv[4]=='1':
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples

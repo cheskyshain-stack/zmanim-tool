@@ -8,7 +8,7 @@ export function seatsDescribeChanges(before, after, changes) {
   for (const change of changes) {
     if (change.group === 'plan') {
       if (change.key === 'name') details.push('Renamed chart from “' + change.before + '” to “' + change.after + '”');
-      else if (['paper', 'monochrome'].includes(change.key)) layout.add('print settings');
+      else if (['paper', 'monochrome', 'printHeader', 'printFooter'].includes(change.key)) layout.add('print settings');
       else layout.add('room layout');
     } else if (change.group === 'people') {
       if (change.key === 'name') details.push('Changed name from “' + change.before + '” to “' + change.after + '”');

@@ -101,6 +101,12 @@ local chart copy when the shared file is deleted. All mutations require the serv
 session and the existing allowed origin. API feature verification now includes
 sharedNameFiles and deleteFiles as well as changeHistory.
 
+Chart header and footer wording require printNotes in /api/info. The optional
+printHeader and printFooter fields accept 80 and 240 characters respectively,
+including empty strings to hide the note. They use the existing field-level
+conflict checks and remain separate from seat assignment history. Missing fields
+are retained as missing for older charts; the client supplies the starting text.
+
 Trash requires trash60Days in /api/info. GET /api/trash returns only metadata for
 deleted charts and name files within their 60-day recovery period. POST
 /api/plans/:id/restore and /api/name-lists/:id/restore take {deletedAt}, restore the

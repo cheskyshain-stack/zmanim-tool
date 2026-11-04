@@ -31,7 +31,7 @@ for p in d:
   assert all(0<line['width']<=.51 and min(line['color'])>.82 for line in lines), 'Tile joints must stay fine and light, without a strong grid'
   if mono:
    margin=36 if paper=='tabloid' else 25.2;w,h=expected
-   sx=(w-2*margin)/1176;sy=(h-2*margin-25.2)/916
+   sx=(w-2*margin)/1176;sy=(h-2*margin-25.2-16)/916
    for fixture,box in [('Aron',(552,18,648,118)),('amud',(586,184,614,230)),('bimah',(570,514,630,552))]:
     x0,y0,x1,y1=box
     r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
@@ -57,6 +57,7 @@ for p in d:
  rgb=p.get_pixmap(matrix=fitz.Matrix(1,1),alpha=False).samples
  assert min(rgb[:3])>245,'Paper must be white, not inverted CMYK'
  if not roster:
+  assert 'FirstDraft' in names and 'AnyonewhowouldlikeaseatshouldspeaktotheGabbaim.' in names, 'The editable chart header and footer must stay searchable in CMYK'
   # A light room floor must stay light after color conversion.
   pix=p.get_pixmap(matrix=fitz.Matrix(1,1),clip=fitz.Rect(p.rect.width*.43,p.rect.height*.58,p.rect.width*.57,p.rect.height*.62),alpha=False)
   assert sum(pix.samples)/len(pix.samples)>200,'Floor must stay light'

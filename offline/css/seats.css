@@ -404,6 +404,16 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .saved-charts-footer [data-sharing=signout]{min-height:44px;padding:6px 2px;font-size:11px;font-weight:400;color:#617284;border-color:transparent;background:transparent}
 @media(max-width:700px){.saved-charts-header{padding:19px 18px;gap:11px}.saved-charts-icon{width:39px;height:39px;border-radius:10px}.saved-charts-icon svg{width:25px;height:25px}.saved-charts-title h2{font-size:24px}.saved-charts-title p{font-size:9px;letter-spacing:1px}.saved-charts-body{padding:18px 17px 8px}.saved-charts-tools{gap:12px;margin-bottom:19px}.saved-charts-tools p{font-size:11px;line-height:1.55}.saved-charts-tools .saved-charts-new{font-size:11px;padding:9px 10px;gap:5px}.saved-charts-dialog .saved-charts-list .saved-chart-row{gap:10px;padding:10px 12px}.saved-charts-dialog .saved-charts-list .saved-chart-actions{flex-direction:column;gap:4px}.saved-charts-dialog .saved-charts-list .saved-chart-actions button{min-width:52px}.saved-charts-dialog .saved-charts-footer{padding:7px 18px 10px}}
 .seats-print{display:none}
+.chart-print-notes{width:100%;margin-top:12px;padding:11px 14px;border:1px solid var(--seats-border);border-radius:9px;background:#fff}
+.chart-print-notes>summary{cursor:pointer;font-size:12px;font-weight:600}
+.print-note-fields{display:grid;grid-template-columns:1fr 1.6fr;gap:12px;margin-top:12px}
+.print-note-fields label{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--seats-muted)}
+.print-note-fields input,.print-note-fields textarea{width:100%;min-width:0;padding:9px 10px;font-size:14px;color:var(--seats-navy);resize:vertical}
+.chart-print-notes>p{margin:8px 0 0;font-size:11px;color:var(--seats-muted)}
+.chart-note-preview{padding:8px 16px;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+.chart-header-preview{text-align:right;font-weight:600}
+.chart-footer-preview{text-align:center;color:var(--seats-muted);border-top:1px solid #edf0f2}
+@media(max-width:700px){.print-note-fields{grid-template-columns:1fr}.print-note-fields input,.print-note-fields textarea{font-size:16px}}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
 @media(max-width:1050px){.seats-controls{align-items:start;flex-wrap:wrap}.print-settings{margin-left:auto}.seats-workspace{grid-template-columns:240px minmax(0,1fr)}.seats-panel{padding:14px}.canvas-heading p{flex-basis:100%;order:3}.seats-header{padding:7px 18px}.seats-brand{font-size:16px}}
 @media(max-width:700px){#seats-app{padding:16px 12px 0}.seats-header{padding:7px 12px;min-height:54px}.seats-brand{font-size:13px;gap:8px}.seats-brand img{width:32px;height:32px}.seats-header-label{display:none}.seats-top{align-items:start;gap:10px;flex-wrap:wrap;margin-bottom:12px}.seats-app h1{font-size:34px}.tool-badge{font-size:8px;padding:3px 5px;letter-spacing:.8px}.plan-line select{max-width:190px;font-size:13px}.saved-label{flex-basis:100%}.top-actions{gap:5px;justify-content:flex-end;flex:1}.top-actions button{font-size:11px;padding:7px 9px}.top-actions [data-action=save]{display:none}.seats-controls{gap:10px;margin-bottom:12px}.print-settings{gap:8px;width:100%;justify-content:space-between}.print-settings label{display:block;font-size:10px;min-width:0;flex:1}.print-settings select{font-size:11px;margin-top:3px;width:100%;padding-right:15px}.seats-workspace{display:flex;flex-direction:column}.seats-panel{position:static;max-height:none;width:100%;order:2;padding:16px}.seats-canvas{width:100%;order:1}.canvas-heading{padding:12px;gap:8px}.canvas-heading h2{font-size:18px}.canvas-buttons{margin-left:auto}.canvas-heading p{font-size:10px}.setup-hint{margin:0 12px 8px;font-size:10px}.canvas-foot{padding:8px 12px;font-size:9px;gap:5px}.seats-panel h2{font-size:20px}.seats-panel input,.seats-panel select,.seats-panel textarea{font-size:16px}.seats-panel button{min-height:40px}.tool-grid{grid-template-columns:1fr 1fr}.tool-grid button{font-size:12px}.seats-panel label{font-size:12px}.seats-lock{margin-top:6vh}.people-list{max-height:360px}.person-name bdi{font-size:14px}.seats-notice{font-size:12px}}
@@ -510,7 +520,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-app{margin:0!important;padding:0!important;max-width:none!important;width:auto!important;min-height:0!important}
   #seats-print{display:flex!important;flex-direction:column;width:min(var(--seats-page-width),100vw);height:min(var(--seats-page-height),calc(100vh - 1px));break-inside:avoid;break-after:avoid;overflow:hidden;background:#fff;color:#000}
   /* Anchor auto fit to the printable page, which can differ from Android's viewport. */
-  #seats-print.auto-paper{position:fixed;inset:0;width:auto;height:auto;container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in) / 100cqw)}
+  #seats-print.auto-paper{position:fixed;inset:0;width:auto;height:auto;container-type:size;--seats-print-correction:calc(var(--seats-print-aspect) * (100cqh - .35in - var(--seats-print-footer,0in)) / 100cqw)}
   #seats-print .adaptive-print .print-lettering,#seats-print .adaptive-print .shtender-surface,#seats-print .adaptive-print .amud-surface,#seats-print .adaptive-print .square-surface,#seats-print .adaptive-print .rav-seat .seat-area{transform-box:fill-box;transform-origin:center;transform:scaleX(var(--seats-print-correction))}
   #seats-print .adaptive-print .fixture-paper-correction{transform-box:view-box;transform-origin:0 0;transform:scaleX(var(--seats-print-correction))}
   #seats-print .adaptive-print .vertical-lettering{transform:scaleY(var(--seats-print-correction))}
@@ -518,6 +528,9 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print h1{font:600 17pt Georgia,'David Libre',serif;margin:0;color:#000}
   #seats-print .minyan-logo{display:inline-flex;align-items:baseline;gap:.07in;line-height:1;white-space:nowrap}
   #seats-print .minyan-logo-name{font:inherit}
+  #seats-print .chart-print-header{width:30%;text-align:right;font:bold var(--seats-header-font,10pt)/11pt Arial,sans-serif}
+  #seats-print .chart-print-header span,#seats-print .chart-print-footer span{display:block}
+  #seats-print>.chart-print-footer{flex:0 0 var(--seats-print-footer);padding-top:5pt;text-align:center;font:9pt/11pt Arial,sans-serif;color:#000}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
   #seats-print .room-diagram.room-design{overflow:visible}
   #seats-print .room-item{cursor:default}
