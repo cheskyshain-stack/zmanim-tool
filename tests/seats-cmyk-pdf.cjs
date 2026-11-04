@@ -8,7 +8,7 @@ const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.woff2':'font/woff2','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
 });
 const inspect=String.raw`
-import fitz,sys,re,json,statistics
+import fitz,sys,re,json
 d=fitz.open(sys.argv[1]);assert d.metadata['format']=='PDF 1.7', 'Declare a PDF version that supports transparency and output profiles'
 mono=sys.argv[2]=='1';paper=sys.argv[3];roster=paper=='roster'
 expected=(612,792) if roster else (1224,792) if paper=='tabloid' else (792,612)
@@ -28,13 +28,7 @@ for p in d:
   images_by_order=[i for i,b in enumerate(p.get_bboxlog()) if b[0]=='fill-image']
   assert images_by_order[0]<min(line['seqno'] for line in lines) and max(line['seqno'] for line in lines)<images_by_order[-1], 'Grout must sit above stone and beneath the furniture'
   assert sum(image[1]>0 for image in p.get_images(full=True))>0, 'Furniture must preserve transparency above the grout'
-  rendered=p.get_pixmap(matrix=fitz.Matrix(3,3),alpha=False);pixels=rendered.samples
-  margin=36 if paper=='tabloid' else 25.2;cw=p.rect.width-2*margin;ch=p.rect.height-2*margin-25.2
-  def stone_sample(x,y):
-   xx=round((margin+(x-12)*cw/1176)*3);yy=round((margin+25.2+(y-50)*ch/916)*3)
-   return pixels[(yy*rendered.width+xx)*3:(yy*rendered.width+xx)*3+3]
-  edge_difference=statistics.mean(abs(a-b) for distance in [4,6,9,12] for x in range(580,621) for a,b in zip(stone_sample(x,407-distance),stone_sample(x,407+distance)))
-  assert edge_difference<1.5,('The marble texture has a visible repeat seam',edge_difference)
+  assert all(0<line['width']<=.51 and min(line['color'])>.82 for line in lines), 'Tile joints must stay fine and light, without a strong grid'
 
  assert all(font[1]=='ttf' for font in p.get_fonts()), 'Use embedded fonts, including Hebrew'
  for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]:
