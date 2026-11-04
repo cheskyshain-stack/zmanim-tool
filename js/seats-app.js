@@ -384,7 +384,7 @@ function seatsStart(root, auth, updates) {
     }).join('');
     return `<svg class="room-diagram${current.monochrome ? ' monochrome' : ''}${designed ? ' room-design' : ''}"${paint ? ` style="${paint.style}"` : ''} viewBox="${interactive ? `0 15 ${SEATS_ROOM.width} ${SEATS_ROOM.height - 15}` : geometry.viewBox}" xmlns="http://www.w3.org/2000/svg" ${interactive ? 'role="group" aria-label="Shul seating layout"' : 'aria-label="Printable seating layout"'}>
       <defs><pattern id="pillar-${interactive ? 'screen' : 'print'}" width="6" height="6" patternUnits="userSpaceOnUse"><path d="M-1 1 l2 -2 M0 6 l6 -6 M5 7 l2 -2" stroke="currentColor" stroke-width="0.7"/></pattern>${paint?.defs || ''}</defs>
-      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${designed ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>` : ''}${seatsRoomFeatures(current, designed, printScale)}${objects}${tables}</g>
+      <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${designed ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>${paint.grid}` : ''}${seatsRoomFeatures(current, designed, printScale)}${objects}${tables}</g>
     </svg>`;
   }
   function tableOptions() {
