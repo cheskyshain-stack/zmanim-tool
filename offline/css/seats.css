@@ -196,6 +196,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
 .room-diagram.monochrome.room-design image{filter:grayscale(1)}
+.room-diagram.monochrome.room-design .fixture-sketch image{filter:none}
 .room-diagram.room-design{color:var(--room-ink)}
 .room-design .design-room-floor{fill:var(--room-floor);pointer-events:none}
 .room-design .floor-tile-joints{fill:none;stroke:var(--room-grout);stroke-width:.5;pointer-events:none}
