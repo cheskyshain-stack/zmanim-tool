@@ -1454,7 +1454,10 @@ clear of the top-left minyan logo; do not reserve extra room height or shrink it
 Keep the whole picture inside the printable page, clear of seat names, and
 preserve its proportions on fixed-size and auto-fit printouts. The asset must
 ship offline too.
-Names and empty seats share one continuous table background. Black & white keeps
+Names and empty seats share one continuous table background in every chart style,
+with Room design on or off. Keep seat fills transparent for assigned names,
+hover, editing, drop targets and remote reservations; use outlines for those
+interaction states so names never recolor the tabletop. Black & white keeps
 the illustrated line drawing. Turning the switch off restores the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
 display preference. Keep separate SVG paint IDs for screen and print.
