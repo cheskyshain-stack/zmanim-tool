@@ -20,11 +20,16 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
  margin=36 if sys.argv[2]=='tabloid' else 25.2
  floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2)/916)
  stone=p.get_pixmap(matrix=fitz.Matrix(3,3),clip=floor,alpha=False).samples
- assert len({stone[i:i+3] for i in range(0,len(stone),3)})>48, 'The open walkway must retain natural marble variation in the native PDF'
+ assert len({stone[i:i+3] for i in range(0,len(stone),3)})>(8 if len(sys.argv)>4 and sys.argv[4]=='1' else 48), 'The open walkway must retain natural marble variation in the native PDF'
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples
  header_ink=sum(1 for y in range(round(margin*2),round((margin+25.2)*2)) for x in range(round(w*.43*2),round(w*.57*2)) if max(pixels[(y*pix.width+x)*3:(y*pix.width+x)*3+3])<205)
  assert header_ink>30, 'The Aron must use the empty center header instead of shrinking the room'
+if len(sys.argv)>4 and sys.argv[4]=='1':
+ pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
+ pixels=pix.samples
+ colored=sum(1 for i in range(0,len(pixels),3) if max(pixels[i:i+3])-min(pixels[i:i+3])>2)
+ assert colored==0, ('Black and white must contain only neutral grays, including all photo artwork',colored)
 for drawing in p.get_drawings():
  r=drawing['rect'];assert r.x0>=0 and r.y0>=0 and r.x1<=w+.1 and r.y1<=h+.1, ('Clipped drawing',r)
 for block in p.get_text('dict')['blocks']:
@@ -51,7 +56,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     const uniformSeatBackgrounds=async()=>{for(const scope of ['.room-stage','#seats-print']){const fills=await page.locator(scope+' .table-seat .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);assert.ok(fills.length>0&&fills.every(fill=>/^(transparent|rgba\(0, 0, 0, 0\))$/.test(fill)),'Named and empty seats must show the same tabletop in '+scope);}};
     const checkSeatStates=async()=>{
       const saved=await raw(),seat=page.locator('#seat-A1-0');await seat.hover();await uniformSeatBackgrounds();await seat.click();await page.locator('.seat-editor:not([hidden]) #seat-name-input').waitFor();assert.equal(await page.locator('#seat-name-input').inputValue(),'Design Test');assert.ok(await seat.evaluate(node=>node.classList.contains('is-active')));await uniformSeatBackgrounds();await page.getByRole('button',{name:'Close seat editor',exact:true}).click();
-      for(const state of ['name-drop-target','is-remote']){await seat.evaluate((node,state)=>node.classList.add(state),state);await uniformSeatBackgrounds();const outline=await seat.locator('.seat-area').evaluate(node=>({stroke:getComputedStyle(node).stroke,width:parseFloat(getComputedStyle(node).strokeWidth)}));assert.ok(outline.stroke!=='none'&&outline.width>0,'Drop and reservation states retain visible outlines');await seat.evaluate((node,state)=>node.classList.remove(state),state);}
+      for(const state of ['name-drop-target','is-remote']){const style=await seat.evaluate((node,state)=>{node.classList.add(state);const paint=getComputedStyle(node.querySelector('.seat-area')),style={fill:paint.fill,stroke:paint.stroke,width:parseFloat(paint.strokeWidth)};node.classList.remove(state);return style;},state);assert.match(style.fill,/^(transparent|rgba\(0, 0, 0, 0\))$/);assert.ok(style.stroke!=='none'&&style.width>0,'Drop and reservation states retain visible outlines');}
       await page.mouse.move(0,0);assert.equal(await raw(),saved,'Checking seat backgrounds must not change names or assignments');
     };
     const geometry=()=>page.locator('.room-stage .room-item').evaluateAll(nodes=>nodes.map(node=>[node.getAttribute('data-item'),node.getAttribute('transform'),...node.querySelectorAll(':scope>.table-surface,:scope>.object-surface')].map(value=>typeof value==='string'?value:[value.getAttribute('width'),value.getAttribute('height')])));
@@ -63,18 +68,18 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     await checkSeatStates();
     assert.equal(await page.locator('.room-stage .cabinet-design').count(),cabinets.length);assert.equal(await page.locator('#seats-print .cabinet-design').count(),cabinets.length);assert.ok(await page.locator('.room-stage .leaning-book').count()>0);assert.equal(await raw(),before);assert.deepEqual(await geometry(),positions);
     assert.equal(await page.locator('#seats-print .room-diagram').getAttribute('viewBox'),printView,'The Aron picture must not enlarge the view and shrink the rest of the printed chart');
-    assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll((groups,monochrome)=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return (monochrome?fill==='rgb(255, 255, 255)':fill.includes('#room-design-screen-wood'))&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});}),monochrome),'Every book and shelf fits inside its existing cabinet');
-    assert.equal(await page.locator('.room-stage .room-design-color').count(),monochrome?0:1);
-    assert.equal(await page.locator('.room-stage .design-floor-texture').count(),monochrome?0:1,'Black and white keeps its plain floor');
-    assert.equal(await page.locator('.room-stage .design-table-texture').count(),monochrome?0:1,'Black and white keeps its plain tables');
+    assert.ok(await page.locator('.room-stage .cabinet-design').evaluateAll(groups=>groups.every(group=>{const surface=group.parentElement.querySelector('.object-surface'),width=Number(surface.getAttribute('width')),height=Number(surface.getAttribute('height')),fill=getComputedStyle(surface).fill;return fill.includes('#room-design-screen-wood')&&[...group.querySelectorAll('rect,path')].every(node=>{const b=node.getBBox(),matrix=group.parentElement.getCTM().inverse().multiply(node.getCTM());return [[b.x,b.y],[b.x+b.width,b.y],[b.x,b.y+b.height],[b.x+b.width,b.y+b.height]].every(([x,y])=>{const p=new DOMPoint(x,y).matrixTransform(matrix);return p.x>=1&&p.y>=1&&p.x<=width-1&&p.y<=height-1;});});})),'Every book and shelf fits inside its existing cabinet');
+    assert.equal(await page.locator('.room-stage .room-design').count(),1);
+    assert.equal(await page.locator('.room-stage .design-floor-texture').count(),1,'Both styles include the realistic marble floor');
+    assert.equal(await page.locator('.room-stage .design-table-texture').count(),1,'Both styles include the realistic tabletop texture');
     assert.equal(await page.locator('.design-cabinet-texture').count(),0,'Bookcases keep their restored light appearance');
     let screenAronHeight=0;
-    if(!monochrome){
+    {
       for(const scope of ['.room-stage','#seats-print']){
         const material=await page.locator(scope+' .design-table-texture').evaluate(async node=>{const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();return [new URL(picture.src).pathname,picture.naturalWidth,picture.naturalHeight];});assert.deepEqual(material,['/assets/seats/light-tabletop-v1.png',2172,724],'Tables use a pale photographic wood texture');
       }
       const contrast=await page.locator('.room-stage .design-table-texture').evaluate(async node=>{
-        const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();const canvas=document.createElement('canvas');canvas.width=picture.naturalWidth;canvas.height=picture.naturalHeight;const ctx=canvas.getContext('2d');ctx.fillStyle=node.parentElement.querySelector('rect').getAttribute('fill');ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalAlpha=Number(node.getAttribute('opacity'));ctx.drawImage(picture,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height).data,minimum=[255,255,255];for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)minimum[c]=Math.min(minimum[c],data[i+c]);
+        const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();const canvas=document.createElement('canvas');canvas.width=picture.naturalWidth;canvas.height=picture.naturalHeight;const ctx=canvas.getContext('2d');ctx.fillStyle=node.parentElement.querySelector('rect').getAttribute('fill');ctx.fillRect(0,0,canvas.width,canvas.height);ctx.globalAlpha=Number(node.getAttribute('opacity'));ctx.filter=getComputedStyle(node).filter;ctx.drawImage(picture,0,0);const data=ctx.getImageData(0,0,canvas.width,canvas.height).data,minimum=[255,255,255];for(let i=0;i<data.length;i+=4)for(let c=0;c<3;c++)minimum[c]=Math.min(minimum[c],data[i+c]);
         const luminance=rgb=>rgb.reduce((sum,value,index)=>{const v=value/255;return sum+(v<=.04045?v/12.92:((v+.055)/1.055)**2.4)*[.2126,.7152,.0722][index];},0);return ['.seat-name','.empty-seat'].map(selector=>{const ink=getComputedStyle(document.querySelector('.room-stage .table-seat '+selector)).fill.match(/[\d.]+/g).slice(0,3).map(Number);return (luminance(minimum)+.05)/(luminance(ink)+.05);});
       });assert.ok(contrast.every(value=>value>=4.5),'Names and empty-seat numbers remain readable over the darkest grain');
       for(const scope of ['.room-stage','#seats-print']){
@@ -109,7 +114,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       for(const [scope,id]of [['.room-stage','screen'],['#seats-print','print']])assert.ok(await page.locator(scope+' .table-surface').evaluateAll((nodes,id)=>nodes.every(node=>{const fill=getComputedStyle(node).fill,filter=getComputedStyle(node).filter;return fill.includes('#room-design-'+id+'-tabletop')&&filter.includes('#room-design-'+id+'-shadow');}),id),'Each drawing uses its own light tabletop material and shadow definitions');
       const printFills=await page.locator('#seats-print .table-item .seat-area').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fill))]);assert.deepEqual(printFills,seatFills);
       const labelColors=async scope=>page.locator(scope+' .book-label-strip').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).stroke))].sort());
-      const colors=await labelColors('.room-stage');assert.equal(colors.length,4,'Book sets use the red, blue, green and off-white tape seen in the room photos');assert.deepEqual(await labelColors('#seats-print'),colors,'Printed books keep the same varied tape colors');
+      const colors=await labelColors('.room-stage');assert.equal(colors.length,4,'Book sets keep their varied tape in both styles');if(monochrome)assert.ok(colors.every(color=>{const rgb=color.match(/\d+/g).map(Number);return rgb[0]===rgb[1]&&rgb[1]===rgb[2];}),'Book labels use neutral grays');assert.deepEqual(await labelColors('#seats-print'),colors,'Printed books keep the same varied tape colors');
     }
     const directions={'rear-case-left':'north','rear-case-center':'north','rear-case-right':'north','rear-case-side-left':'east','rear-case-side-right':'west','rear-case-a7':'east'};
     for(const [id,direction]of Object.entries(directions)){
@@ -129,11 +134,11 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       await page.emulateMedia({media:null});
     }
     await page.screenshot({path:path.join(output,'design-'+variant+'.png'),fullPage:true});
-    if(!monochrome)await page.locator('.room-stage .room-diagram').screenshot({path:path.join(output,'room-'+variant+'.png')});
+    await page.locator('.room-stage .room-diagram').screenshot({path:path.join(output,'room-'+variant+'.png')});
     for(const paper of ['auto','letter','tabloid']){
       await page.locator('#paper-size').selectOption(paper);
       await uniformSeatBackgrounds();
-      if(!monochrome){
+      {
         const screenViewport=page.viewportSize();await page.setViewportSize(paper==='tabloid'?{width:1536,height:960}:{width:989,height:749});
         await page.emulateMedia({media:'print'});
         assert.ok(await fixturesClearOfNames('#seats-print'),'The enlarged bimah stays clear of every seat name on '+paper+' paper');
@@ -143,7 +148,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
         await page.emulateMedia({media:null});
         await page.setViewportSize(screenViewport);
       }
-      const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper,monochrome?'0':'1'],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});
+      const pdf=path.join(output,'design-'+variant+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});const info=JSON.parse(execFileSync('python',['-c',inspectPdf,pdf,paper==='auto'?'letter':paper,'1',monochrome?'1':'0'],{encoding:'utf8'}));assert.ok(info.drawings>offInfo.drawings+50,'Designed shelves must appear in the native PDF');console.log({width,monochrome,...info});
     }
     const afterPaper=await raw();await page.reload();await page.locator('.room-stage').waitFor();assert.ok(await toggle.isChecked());assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-room-design')),null,'Toggling one chart must not write a device-wide choice');assert.equal(await raw(),afterPaper);
     await toggle.uncheck();assert.equal(await page.locator('.cabinet-design').count(),0);assert.deepEqual(await page.locator('.room-stage .room-object').evaluateAll(nodes=>nodes.map(node=>node.innerHTML)),oldArt,'Switching off restores the original room drawing');assert.equal(await raw(),afterPaper);
@@ -170,14 +175,16 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     const reopened=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')));assert.deepEqual(reopened.plans.find(p=>p.id===a.id),a);assert.deepEqual(reopened.plans.find(p=>p.id===b.id),b);assert.deepEqual(errors,[]);await context.close();
     console.log('PASS '+width+'px: Room design choices are independent across saved charts, reload, Back/Forward and new drafts, with chart data unchanged.');
   }
+  for(const monochrome of [true,false]){
   const slow=await browser.newContext({viewport:{width:1440,height:1000}}),slowPage=await slow.newPage();
   let releasePictures,requestedPictures;const picturesHeld=new Promise(resolve=>{releasePictures=resolve;}),picturesRequested=new Promise(resolve=>{requestedPictures=resolve;});
-  plan.monochrome=false;
+  plan.monochrome=monochrome;
   await slow.addInitScript(sample=>{localStorage.setItem('lakewood-commons-seats-v1',JSON.stringify(sample));localStorage.setItem('lakewood-commons-seats-room-design','1');window.printCalls=0;window.print=()=>window.printCalls++;},sample);
   await slow.route('**/light-tabletop-v1.png',async route=>{requestedPictures();await picturesHeld;await route.continue();});
   await slowPage.goto(origin+'/seats/?count=off');await slowPage.locator('#seats-name').fill('Synthetic Print Organizer');await slowPage.locator('#seats-pin').fill('4444');await slowPage.getByRole('button',{name:'Open Seats',exact:true}).click();await slowPage.getByRole('button',{name:'View saved charts',exact:true}).click();await slowPage.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
   await picturesRequested;await slowPage.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await slowPage.evaluate(()=>window.printCalls),0,'Printing must wait while the artwork is loading');
   releasePictures();await slowPage.waitForFunction(()=>window.printCalls===1);await slow.close();
+  }
   console.log('PASS: optional room design in color and black/white on phone/desktop and Letter/Tabloid PDFs, uniform name backgrounds, contained artwork, stable positions/focus, original drawing restored, persistent preference and unchanged chart data.');console.log('Artifacts: '+output);
   }finally{await browser.close();if(!remote)server.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;server.close();});

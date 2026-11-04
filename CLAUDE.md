@@ -1457,8 +1457,12 @@ ship offline too.
 Names and empty seats share one continuous table background in every chart style,
 with Room design on or off. Keep seat fills transparent for assigned names,
 hover, editing, drop targets and remote reservations; use outlines for those
-interaction states so names never recolor the tabletop. Black & white keeps
-the illustrated line drawing. Turning the switch off restores the original art.
+interaction states so names never recolor the tabletop. Black & white uses the
+same complete room design in grayscale, including realistic fixtures, marble,
+table grain and detailed bookcases. Convert vector paint to neutral grays and
+filter only raster images so printed names and shelf details stay sharp. Both
+styles wait for the artwork before printing. Turning the switch off restores
+the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this
 display preference. Keep separate SVG paint IDs for screen and print.
 `tests/seats-room-design-choice.mjs` checks isolation, migration and storage failure.

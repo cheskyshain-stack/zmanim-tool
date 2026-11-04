@@ -3,8 +3,24 @@ import { SEATS_BOUNDS } from './model.js';
 const SEATS_FLOOR_TEXTURE = '/assets/seats/light-marble-floor-v1.png';
 const SEATS_TABLE_TEXTURE = '/assets/seats/light-tabletop-v1.png';
 
+const SEATS_ROOM_PALETTE = {
+  ink: '#344757', boundary: '#9ca29e', outline: '#8b9699',
+  'edge-line': '#a18c74', highlight: '#ede5d5', name: '#243b4d', number: '#596771',
+  'chair-line': '#69777c', piping: '#e4e6e1', 'cabinet-line': '#876b55',
+  'shelf-line': '#a98e70', molding: '#dcc9aa', 'book-line': '#a49984',
+  'book-0': '#242522', 'book-1': '#343029', 'book-2': '#292b30', 'book-3': '#46312e',
+  band: '#c5ad79', 'label-red': '#bd4745', 'label-blue': '#4382b5',
+  'label-green': '#57916c', 'label-cream': '#ddd8c7', hover: '#a78b53', remote: '#347b60',
+};
+
+function seatsGrayscaleColor(hex) {
+  const rgb = hex.slice(1).match(/../g).map(value => parseInt(value, 16));
+  const gray = Math.round(rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722).toString(16).padStart(2, '0');
+  return '#' + gray.repeat(3);
+}
+
 // Artwork only. Saved room geometry, seat hit areas and names stay independent.
-export function seatsRoomDesignPaint(id) {
+export function seatsRoomDesignPaint(id, monochrome = false) {
   const gradient = (name, stops) => `<linearGradient id="${id}-${name}" x1="0" y1="0" x2="0" y2="1">${stops.map(([offset, color]) => `<stop offset="${offset}" stop-color="${color}"/>`).join('')}</linearGradient>`;
   const tileWidth = 144, tileHeight = 72;
   // One larger stone swatch spans nine tiles, with its repeat seams on grout lines.
@@ -12,8 +28,7 @@ export function seatsRoomDesignPaint(id) {
   const floorX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right - floorWidth) / 2;
   const floorY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom - floorHeight) / 2;
   const joints = Array.from({ length: 4 }, (_, index) => `<path d="M${index * tileWidth} 0 V${floorHeight}"/><path d="M0 ${index * tileHeight} H${floorWidth}"/>`).join('');
-  return {
-    defs: gradient('wood-tone', [['0%', '#fffefa'], ['45%', '#faf7ef'], ['100%', '#eee9de']])
+  const defs = gradient('wood-tone', [['0%', '#fffefa'], ['45%', '#faf7ef'], ['100%', '#eee9de']])
       + `<pattern id="${id}-wood" width="180" height="40" patternUnits="userSpaceOnUse"><rect width="180" height="40" fill="url(#${id}-wood-tone)"/><path d="M0 8 Q45 6 90 9 T180 8 M0 20 Q65 17 120 21 T180 20 M0 33 Q60 31 110 34 T180 33" fill="none" stroke="#ad967b" stroke-width=".5" opacity=".09"/></pattern>`
       + `<pattern id="${id}-tabletop" width="240" height="80" viewBox="0 0 240 80" patternUnits="userSpaceOnUse"><rect width="240" height="80" fill="#faf8f2"/><image class="design-table-texture" href="${SEATS_TABLE_TEXTURE}" width="240" height="80" preserveAspectRatio="xMidYMid meet" opacity=".5"/></pattern>`
       + gradient('edge', [['0%', '#c9b49a'], ['100%', '#ab9479']])
@@ -21,8 +36,15 @@ export function seatsRoomDesignPaint(id) {
       + gradient('cabinet', [['0%', '#a58b71'], ['100%', '#715a47']])
       + gradient('shelf', [['0%', '#f3efe6'], ['100%', '#e7dfd1']])
       + `<pattern id="${id}-floor" x="${floorX}" y="${floorY}" width="${floorWidth}" height="${floorHeight}" viewBox="0 0 ${floorWidth} ${floorHeight}" patternUnits="userSpaceOnUse"><rect width="${floorWidth}" height="${floorHeight}" fill="#fafaf7"/><image class="design-floor-texture" href="${SEATS_FLOOR_TEXTURE}" width="${floorWidth}" height="${floorHeight}" preserveAspectRatio="xMidYMid meet" opacity=".5"/><g class="floor-tile-joints" fill="none" stroke="#dcdcd6" stroke-width=".7">${joints}</g></pattern>`
-      + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`,
-    style: ['wood', 'tabletop', 'edge', 'chair', 'cabinet', 'shelf', 'floor', 'shadow'].map(name => `--room-${name}:url(#${id}-${name})`).join(';'),
+      + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`;
+  // Convert vector paint directly so printed names and book details remain searchable and sharp.
+  // Raster artwork receives an image-only grayscale filter in CSS.
+  return {
+    defs: monochrome ? defs.replace(/#[0-9a-f]{6}\b/gi, seatsGrayscaleColor) : defs,
+    style: [
+      ...['wood', 'tabletop', 'edge', 'chair', 'cabinet', 'shelf', 'floor', 'shadow'].map(name => `--room-${name}:url(#${id}-${name})`),
+      ...Object.entries(SEATS_ROOM_PALETTE).map(([name, color]) => `--room-${name}:${monochrome ? seatsGrayscaleColor(color) : color}`),
+    ].join(';'),
   };
 }
 
