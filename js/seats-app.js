@@ -10,6 +10,8 @@ import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
 import { seatsCreateWorkspace } from './seats/workspace.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
+import { seatsBuildCmykPdf } from './seats/cmyk-pdf.js';
+import { seatsChartPdfPage, seatsRosterPdfPages } from './seats/pdf-pages.js';
 import { seatsCreateEditor } from './seats/editor.js';
 import { seatsReadNames } from './seats/import.js';
 import { seatsCreateSharing, SEATS_SHARING_KEY } from './seats/sharing.js';
@@ -276,7 +278,7 @@ function seatsStart(root, auth, updates) {
     document.title = 'Seated names | ' + plan().name;
     setPrintPage('@page { size: letter portrait; margin: .5in; }');
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="back-to-chart">← Back to chart</button>
-      <section class="seats-roster-controls no-print"><div><h1>Alphabetical seat list</h1><p><bdi>${html(plan().name)}</bdi></p></div><div class="seats-roster-actions"><button type="button" data-action="download-seated-list" ${rows.length ? '' : 'disabled'}>Download CSV</button><button type="button" class="primary" data-action="print" ${rows.length ? '' : 'disabled'}>Print / PDF</button><button type="button" data-action="cmyk-pdf">CMYK PDF</button></div><label for="roster-sort">Sort names <select id="roster-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></label><p>Each seated name appears once, with all its tables.</p></section>
+      <section class="seats-roster-controls no-print"><div><h1>Alphabetical seat list</h1><p><bdi>${html(plan().name)}</bdi></p></div><div class="seats-roster-actions"><button type="button" data-action="download-seated-list" ${rows.length ? '' : 'disabled'}>Download CSV</button><button type="button" class="primary" data-action="print" ${rows.length && !preparingPrint ? '' : 'disabled'}>Print / PDF</button><button type="button" class="text-button" data-action="browser-print" ${rows.length ? '' : 'disabled'}>Printer dialog</button><button type="button" class="text-button" data-action="cmyk-pdf">Convert saved PDF</button></div><label for="roster-sort">Sort names <select id="roster-sort"><option value="first" ${nameOrder === 'first' ? 'selected' : ''}>First name</option><option value="last" ${nameOrder === 'last' ? 'selected' : ''}>Last name</option></select></label><p>Each seated name appears once, with all its tables.</p></section>
       <section id="seats-roster-print"><header class="seats-roster-title"><h2>7:30 Minyan</h2><div class="no-print"><strong>Seated names</strong><p>Sorted by ${nameOrder === 'last' ? 'last' : 'first'} name · ${rows.length} ${rows.length === 1 ? 'name' : 'names'}</p></div></header>
       ${rows.length ? `<div class="seats-roster-columns"><table class="seats-roster-table"><colgroup><col class="roster-name"><col class="roster-table"></colgroup><thead><tr><th scope="col">Name</th><th scope="col">Table</th></tr></thead><tbody>${rows.map(row => `<tr><td><bdi>${html(row.name)}</bdi></td><td><bdi>${html(row.table)}</bdi></td></tr>`).join('')}</tbody></table></div>` : '<p class="empty-list">No seats assigned yet. Assign names on the chart to create this list.</p>'}</section>
       <p id="seats-notice" class="seats-notice no-print" role="status" aria-live="polite">${html(notice)}</p>`;
@@ -481,9 +483,9 @@ function seatsStart(root, auth, updates) {
       <div class="title-line"><h1>Seating chart</h1><span class="tool-badge">7:30 MINYAN</span></div>
       <div class="plan-line"><label class="sr-only" for="chart-name">Chart name</label><div class="chart-name-field"><input id="chart-name" value="${attr(current.name)}" maxlength="80">${seatsEditorIcon('pencil')}</div></div>
       <div class="editor-status"><span class="saved-label">${storageError ? 'Backup needed' : html(savedLabel())}</span><div id="seats-sharing-status" class="sharing-status" role="status" aria-live="polite">${sharing?.markup() || ''}</div></div>
-      <div class="top-actions"><button type="button" class="editor-save-button" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>${seatsEditorIcon('save')}Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" class="primary editor-print-button" data-action="print">${seatsEditorIcon('print')}Print / PDF</button><details id="chart-more" class="chart-more"><summary aria-label="More" title="More chart tools">${seatsEditorIcon('more')}<span class="sr-only">More</span></summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="cmyk-pdf">CMYK print PDF</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="logout">Log out</button></div></details></div>
+      <div class="top-actions"><button type="button" class="editor-save-button" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>${seatsEditorIcon('save')}Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" class="primary editor-print-button" data-action="print" ${preparingPrint ? 'disabled aria-busy="true"' : ''}>${seatsEditorIcon('print')}Print / PDF</button><details id="chart-more" class="chart-more"><summary aria-label="More" title="More chart tools">${seatsEditorIcon('more')}<span class="sr-only">More</span></summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="browser-print">Printer dialog</button><button type="button" data-action="cmyk-pdf">Convert saved PDF</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="logout">Log out</button></div></details></div>
       <section class="seats-controls seats-editor-print no-print"><div class="print-settings"><label>Paper <select id="paper-size" aria-label="Print size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Auto fit</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17</option></select></label><label>Style <select id="print-color" aria-label="Print style"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
-      <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Auto fit uses the paper chosen in your printer dialog. Choose <strong>Landscape</strong>.' : `Choose <strong>${current.paper === 'tabloid' ? '11 × 17 / Tabloid' : 'Letter'}</strong> and <strong>Landscape</strong> in the printer dialog. Use <strong>Auto fit</strong> for another paper size.`}</p>
+      <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Print / PDF creates a CMYK file on Letter. Choose <strong>11 × 17</strong> for a larger PDF.' : `Print / PDF creates a CMYK file on <strong>${current.paper === 'tabloid' ? '11 × 17' : 'Letter'}</strong>. Print the PDF at its actual size.`}</p>
     </section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
 
@@ -586,6 +588,39 @@ function seatsStart(root, auth, updates) {
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
     print: async () => {
+      if (preparingPrint || editor.flush() === false) return;
+      if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.');
+      const tab = window.open('', '_blank');
+      if (tab) { tab.opener = null; tab.document.title = 'Preparing CMYK PDF'; tab.document.body.textContent = 'Preparing your CMYK PDF...'; }
+      preparingPrint = true;
+      const currentId = plan().id, currentScreen = screen, button = root.querySelector('[data-action="print"]');
+      if (button) { button.disabled = true; button.setAttribute('aria-busy', 'true'); }
+      const status = message => { if (screen !== currentScreen || plan().id !== currentId) return; const node = root.querySelector('#seats-notice'); if (node) node.textContent = message; };
+      status('Preparing CMYK PDF...');
+      try {
+        await document.fonts.ready;
+        if (currentScreen === 'editor' && roomDesign()) await seatsWaitForFixturePictures();
+        if (screen !== currentScreen || plan().id !== currentId) { tab?.close(); return; }
+        const monochrome = currentScreen === 'roster' || plan().monochrome, filename = plan().name;
+        const pages = currentScreen === 'roster' ? seatsRosterPdfPages(seatsRosterRows(plan(), nameOrder)) : [await seatsChartPdfPage(root.querySelector('#seats-print .room-diagram'), plan().paper)];
+        const blob = await seatsBuildCmykPdf(pages, { monochrome,
+          progress: fraction => status('Preparing CMYK PDF: ' + Math.round(fraction * 100) + '%') });
+        if (screen !== currentScreen || plan().id !== currentId) { tab?.close(); return; }
+        const url = URL.createObjectURL(blob);
+        if (tab && !tab.closed) tab.location = url;
+        else { const link = document.createElement('a'); link.href = url; link.download = (filename.replace(/[\\/:*?"<>|]/g, '-').slice(0, 100) || 'Seating chart') + '-CMYK.pdf'; link.click(); }
+        setTimeout(() => URL.revokeObjectURL(url), 300000);
+        status('CMYK PDF ready. Open the PDF to print it.');
+      } catch (error) {
+        tab?.close(); console.error('CMYK PDF export failed', error);
+        status('The CMYK PDF could not be created. Check your connection and try again.');
+      } finally {
+        preparingPrint = false;
+        const activeButton = root.querySelector('[data-action="print"]');
+        if (activeButton) { activeButton.disabled = screen === 'roster' && !seatsRosterRows(plan(), nameOrder).length; activeButton.removeAttribute('aria-busy'); }
+      }
+    },
+    'browser-print': async () => {
       if (preparingPrint || editor.flush() === false) return;
       if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.');
       preparingPrint = true;

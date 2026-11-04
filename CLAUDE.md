@@ -362,8 +362,9 @@ tool converts an already saved PDF locally using pinned, lazily loaded PDF.js un
 `vendor/pdfjs-6.5.438/`. `cmyk-document.js` writes Flate-compressed DeviceCMYK images
 at up to 300 dpi, preserving physical page sizes and rotation. Neutral pixels use K
 only. This explicit copy flattens text; native printing must retain selectable text.
-Do not label native printing as CMYK, claim PDF/X compliance, or imply a specific ICC
-profile. No printer profile was supplied. The file picker never uploads its input.
+For this saved-file converter, do not label native printing as CMYK, claim PDF/X
+compliance, or imply a specific ICC profile. No printer profile was supplied.
+Seats also has a direct, profiled SVG export described in its section below. The file picker never uploads its input.
 Keep conversion separate from HTML rendering: the old html2canvas/jsPDF exporter
 remains disabled. The USB copy keeps native printing without this hosted-only tool.
 `node --test tests/cmyk-document.mjs` checks ink separations; `node tests/cmyk-pdf.cjs`
@@ -1481,6 +1482,32 @@ display preference. Keep separate SVG paint IDs for screen and print.
 `tests/seats-room-design-choice.mjs` checks isolation, migration and storage failure.
 `tests/seats-room-design.cjs` checks both styles, phone/desktop, native PDFs,
 contained books, uniform seat backgrounds and unchanged chart data.
+
+Seats **Print / PDF** creates a real CMYK PDF locally, for both the chart and the
+alphabetical name list. `js/seats/cmyk-pdf.js` uses Little CMS with the embedded
+FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
+Black & white option use only K. Keep all page artwork in DeviceCMYK and all
+vector colors in CMYK or gray, with no RGB fallback. Text stays selectable and
+uses embedded Hebrew/Latin fonts. Only decorative art is sampled, at 300 dpi in
+small strips to bound phone memory. Keep the existing room geometry and fixture
+proportions. `js/seats/pdf-pages.js` captures the current SVG appearance, including
+initials, Reserved and per-chart Room design, without changing saved names or
+assignments. The name list keeps names unique and table labels grouped, wraps
+long cells and paginates between rows.
+PDFs use Letter for Auto fit or Letter, and 11 x 17 for Tabloid. Retain the original
+browser printing under **More > Printer dialog**, and on the name-list page, for
+custom printer paper. That legacy browser path cannot guarantee a CMYK file.
+New tabs open directly from the click for phone compatibility, falling back to a
+named download if blocked. Failures remain visible and retryable; never silently
+substitute an RGB browser printout for a failed CMYK export.
+The printing libraries in `vendor/cmyk/` and fonts/profile in `assets/print/` are
+self-hosted and loaded only on export. Keep all license notices. No names or chart
+data are uploaded for conversion. This is a CMYK PDF, not a claim of PDF/X
+conformance or an exact match to an unspecified printer's paper and inks.
+`tests/seats-cmyk-pdf.cjs` preflights the actual PDF image channels, vector operators,
+embedded ICC profile, ink coverage, searchable Hebrew/Latin text, page dimensions,
+roster pagination, phone/desktop output, failure/retry and blocked-popup downloads.
+
 
 The chart status box and Saved charts rows show the organizer who last assigned
 a name to a seat. Later renames, room edits, name-list imports, restores and

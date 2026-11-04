@@ -62,7 +62,7 @@ print(json.dumps({'pages':len(doc),'printedNames':len(names),'fullNamesRetained'
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'The list and long chart titles must fit the viewport');
       const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download CSV',exact:true}).click();const file=await download,csv=path.join(output,'seated-'+width+'.csv');await file.saveAs(csv);
       assert.deepEqual(seatsParseDelimited(fs.readFileSync(csv,'utf8')).slice(1),await rows());
-      await page.evaluate(()=>{window.__rosterPrints=0;window.print=()=>window.__rosterPrints++;});await page.getByRole('button',{name:'Print / PDF',exact:true}).click();assert.equal(await page.evaluate(()=>window.__rosterPrints),1,'The list prints even when a chart name is too long to fit');
+      await page.evaluate(()=>{window.__rosterPrints=0;window.print=()=>window.__rosterPrints++;});await page.getByRole('button',{name:'Printer dialog',exact:true}).click();assert.equal(await page.evaluate(()=>window.__rosterPrints),1,'The list prints even when a chart name is too long to fit');
       for(const order of ['first','last']){
         await page.locator('#roster-sort').selectOption(order);const pdf=path.join(output,'list-'+width+'-'+order+'.pdf'),names=(await rows()).map(row=>row[0]);
         await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspectPdf,pdf,JSON.stringify(names)],{encoding:'utf8'}).trim());
