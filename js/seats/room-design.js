@@ -82,7 +82,7 @@ export async function seatsWaitForFixturePictures() {
 }
 
 function seatsFixtureSketchFilter(id, crop) {
-  // Keep the original silhouette, with white interiors and gray structural edges.
+  // Keep the original silhouette and gray edges, with pale gray paper that blends with the stone.
   // Flatten the corrected crown and photograph together before finding the edges.
   const radius = Math.min(crop[2], crop[3]) / 250;
   return `<filter class="fixture-sketch-filter" id="${id}" filterUnits="userSpaceOnUse" x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}" color-interpolation-filters="sRGB">
@@ -90,7 +90,7 @@ function seatsFixtureSketchFilter(id, crop) {
     <feColorMatrix in="gray" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 1" result="opaque"/>
     <feGaussianBlur in="opaque" stdDeviation="${radius * .45}" result="smooth"/>
     <feConvolveMatrix in="smooth" order="3" kernelMatrix="0 -6 0 -6 24 -6 0 -6 0" bias="1" preserveAlpha="true" result="edges"/>
-    <feComponentTransfer in="edges" result="paper"><feFuncR type="table" tableValues=".45 1"/><feFuncG type="table" tableValues=".45 1"/><feFuncB type="table" tableValues=".45 1"/></feComponentTransfer>
+    <feComponentTransfer in="edges" result="paper"><feFuncR type="table" tableValues=".45 .94"/><feFuncG type="table" tableValues=".45 .94"/><feFuncB type="table" tableValues=".45 .94"/></feComponentTransfer>
     <feComposite in="paper" in2="SourceAlpha" operator="in" result="drawing"/>
     <feMorphology in="SourceAlpha" operator="erode" radius="${radius * .8}" result="inside"/>
     <feComposite in="SourceAlpha" in2="inside" operator="out" result="rim"/>

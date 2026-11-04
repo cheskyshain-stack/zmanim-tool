@@ -32,13 +32,14 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
    x0,y0,x1,y1=box
    r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
    samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3]
-   assert sum(samples)/len(samples)>215, (fixture,'The sketch must stay light instead of retaining photographic black fills')
+   assert sum(samples)/len(samples)>200, (fixture,'The sketch must stay light instead of retaining photographic black fills')
    assert sum(value<220 for value in samples)/len(samples)>.03, (fixture,'Outline details must remain visible at print size')
   for fixture,box in [('Aron',(590,80,610,100)),('amud',(595,212,605,220)),('bimah',(588,540,612,546))]:
    x0,y0,x1,y1=box
    r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
-   samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples
-   assert sum(samples)/len(samples)>215, (fixture,'The sketch interior must be light paper instead of solid dark wood or fabric')
+   samples=sorted(p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3])
+   assert sum(samples)/len(samples)>200, (fixture,'The sketch interior must stay light instead of solid dark wood or fabric')
+   assert 225<=samples[int(len(samples)*.95)]<=248, (fixture,'Sketch paper must be softly gray instead of a bright white cutout')
 if len(sys.argv)>4 and sys.argv[4]=='1':
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples
