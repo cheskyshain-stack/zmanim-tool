@@ -357,6 +357,19 @@ directly, preserving PDF text; CSS grayscale filters rasterize the tables and te
 `tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
 ink modes, including saved defaults and a custom colour.
 
+Browser Print / Save as PDF cannot guarantee CMYK output. The separate **CMYK PDF**
+tool converts an already saved PDF locally using pinned, lazily loaded PDF.js under
+`vendor/pdfjs-6.5.438/`. `cmyk-document.js` writes Flate-compressed DeviceCMYK images
+at up to 300 dpi, preserving physical page sizes and rotation. Neutral pixels use K
+only. This explicit copy flattens text; native printing must retain selectable text.
+Do not label native printing as CMYK, claim PDF/X compliance, or imply a specific ICC
+profile. No printer profile was supplied. The file picker never uploads its input.
+Keep conversion separate from HTML rendering: the old html2canvas/jsPDF exporter
+remains disabled. The USB copy keeps native printing without this hosted-only tool.
+`node --test tests/cmyk-document.mjs` checks ink separations; `node tests/cmyk-pdf.cjs`
+checks actual chart, Netz and Seats PDFs, rotated mixed paper, mobile geometry,
+invalid/encrypted files, cancellation, download, colour spaces and page appearance.
+
 The Chanukah morning block uses a light neutral 4% gray (`#f5f5f5`). Draw it as
 decorative SVG artwork behind selectable text as well as a CSS background, so browsers
 can retain it when background graphics are disabled. Add the artwork after building the

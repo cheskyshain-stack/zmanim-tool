@@ -4,6 +4,20 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 [Support the shul and donate](https://baismedrashoflakewoodcommons.org/donate/).
 
+## CMYK print PDFs
+
+For a printer requesting CMYK colours, use **Print / Save as PDF** first. Then open
+**CMYK PDF**, choose that saved file, convert it and download the CMYK copy. Charts,
+weekly cards and special schedules offer this beside Print. Seats offers it under
+**More**, and beside Print on the alphabetical seat list.
+
+Conversion stays on your device and preserves page sizes and layout. This copy uses
+CMYK images at up to 300 dpi, with black and gray using only black ink. Its text is
+flattened. Regular Print keeps selectable text and the browser's normal colour
+settings. The converter uses generic CMYK, with no printer-specific ICC profile or
+PDF/X certification. A physical proof still depends on the printer and paper.
+The USB offline copy retains regular printing.
+
 ## Development
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.

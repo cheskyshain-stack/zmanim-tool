@@ -1,3 +1,4 @@
+import { cmykButtonHtml, wireCmykButton } from './cmyk-pdf.js';
 import { safeHeaderImage } from '../security.js';
 import {
   resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR, LEGACY_ACCENT_COLORS,
@@ -532,7 +533,7 @@ export function renderSheet(container, state, sheet, onChange) {
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
       ${chartPrintLayoutHtml(printLayout, Boolean(companion))}
-      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
+      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>${cmykButtonHtml()}
     </div>
     <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
@@ -573,6 +574,7 @@ export function renderSheet(container, state, sheet, onChange) {
   useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  wireCmykButton(container);
   container.querySelector('#chart-print-layout').addEventListener('change', event => {
     rememberChartPrintLayout(event.target.value);
     keepPosition(container, () => renderSheet(container, state, sheet, onChange));
