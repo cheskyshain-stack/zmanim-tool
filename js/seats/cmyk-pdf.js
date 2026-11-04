@@ -140,6 +140,7 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
   const tools = await seatsLoadCmykTools();
   seatsPdfRegisterImages(tools.jsPDF);
   const first = pages[0], doc = new tools.jsPDF({ unit: 'pt', format: first.size, orientation: first.size[0] > first.size[1] ? 'landscape' : 'portrait', compress: true, putOnlyUsedFonts: true });
+  doc.__private__.setPdfVersion('1.7');
   for (let index = 0; index < tools.fonts.length; index++) {
     const file = 'seats-font-' + index + '.ttf';
     doc.addFileToVFS(file, seatsPdfBinary(tools.fonts[index]));

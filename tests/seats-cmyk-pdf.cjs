@@ -9,7 +9,8 @@ const server=http.createServer((req,res)=>{
 });
 const inspect=String.raw`
 import fitz,sys,re,json,statistics
-d=fitz.open(sys.argv[1]);mono=sys.argv[2]=='1';paper=sys.argv[3];roster=paper=='roster'
+d=fitz.open(sys.argv[1]);assert d.metadata['format']=='PDF 1.7', 'Declare a PDF version that supports transparency and output profiles'
+mono=sys.argv[2]=='1';paper=sys.argv[3];roster=paper=='roster'
 expected=(612,792) if roster else (1224,792) if paper=='tabloid' else (792,612)
 if not roster:assert len(d)==1, 'Chart must remain one page'
 intent=d.xref_get_key(d.pdf_catalog(),'OutputIntents')[1];assert 'FOGRA39' in intent
