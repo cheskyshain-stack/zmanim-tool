@@ -16,7 +16,7 @@ assert abs(p.rect.width-w)<.1 and abs(p.rect.height-h)<.1
 text=''.join(p.get_text().split())
 assert all(name in text for name in ['DesignTest','BookcaseExample','RavTest'])
 if len(sys.argv)>3 and sys.argv[3]=='1':
- assert len(p.get_image_info())>=4, 'All three realistic fixtures and the round crown tip must be embedded in the native PDF'
+ assert len(p.get_image_info())>=(3 if len(sys.argv)>4 and sys.argv[4]=='1' else 4), 'All three fixture pictures must be embedded in the native PDF'
  margin=36 if sys.argv[2]=='tabloid' else 25.2
  floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2)/916)
  stone=p.get_pixmap(matrix=fitz.Matrix(3,3),clip=floor,alpha=False).samples
@@ -25,6 +25,20 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
  pixels=pix.samples
  header_ink=sum(1 for y in range(round(margin*2),round((margin+25.2)*2)) for x in range(round(w*.43*2),round(w*.57*2)) if max(pixels[(y*pix.width+x)*3:(y*pix.width+x)*3+3])<205)
  assert header_ink>30, 'The Aron must use the empty center header instead of shrinking the room'
+ if len(sys.argv)>4 and sys.argv[4]=='1':
+  # Check the actual printed artwork, including visible lines on the small fixtures.
+  sx=(w-2*margin)/1176;sy=(h-2*margin-25.2)/916
+  for fixture,box in [('Aron',(552,18,648,118)),('amud',(586,184,614,230)),('bimah',(570,514,630,552))]:
+   x0,y0,x1,y1=box
+   r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
+   samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3]
+   assert sum(samples)/len(samples)>215, (fixture,'The sketch must stay light instead of retaining photographic black fills')
+   assert sum(value<220 for value in samples)/len(samples)>.03, (fixture,'Outline details must remain visible at print size')
+  for fixture,box in [('Aron',(590,80,610,100)),('amud',(595,212,605,220)),('bimah',(588,540,612,546))]:
+   x0,y0,x1,y1=box
+   r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
+   samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples
+   assert sum(samples)/len(samples)>220, (fixture,'The sketch interior must be light paper instead of solid dark wood or fabric')
 if len(sys.argv)>4 and sys.argv[4]=='1':
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples
@@ -97,12 +111,16 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
       assert.ok(Math.abs(amudHeight/plan.objects.find(object=>object.type==='amud').height-1.21)<.01,'The amud illustration is ten percent larger than its previous 1.1 scale');
       const bimahSize=await page.locator('.room-stage .design-bimah .fixture-picture').evaluate(node=>{const v=node.viewBox.baseVal,m=node.getScreenCTM(),scene=node.closest('.room-art').getScreenCTM();return {width:v.width*m.a/scene.a,height:v.height*m.d/scene.d};});
       const bimah=plan.objects.find(object=>object.type==='bimah');assert.ok(Math.abs(bimahSize.width/(Math.min(bimah.width,bimah.height)*1.1)-.75)<.001,'The bimah is 25% narrower than the original wide illustration');assert.ok(bimahSize.width/bimahSize.height>=1.25&&bimahSize.width/bimahSize.height<=1.75,'The bimah keeps the requested lower rectangular silhouette');
-      const bimahImage=await page.locator('.room-stage .design-bimah .fixture-picture > image').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(bimahImage,['/assets/seats/bimah-two-panel-photo-v2.png',1419,1108],'The bimah uses the clean-glass two-panel illustration');
-      const amudImage=await page.locator('.room-stage .design-amud .fixture-picture > image').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(amudImage,['/assets/seats/amud-front-photo-v1.png',990,1589],'The amud uses the straight-on illustration');
+      const bimahImage=await page.locator('.room-stage .design-bimah .fixture-source-picture').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(bimahImage,['/assets/seats/bimah-two-panel-photo-v2.png',1419,1108],'The bimah uses the clean-glass two-panel illustration');
+      const amudImage=await page.locator('.room-stage .design-amud .fixture-source-picture').evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [new URL(image.src).pathname,image.naturalWidth,image.naturalHeight];});assert.deepEqual(amudImage,['/assets/seats/amud-front-photo-v1.png',990,1589],'The amud uses the straight-on illustration');
       assert.ok(await fixturesClearOfNames('.room-stage'),'Enlarged fixture pictures must remain clear of seat names');
-      assert.equal(await page.locator('.room-stage .fixture-picture > image').count(),3);
-      assert.equal(await page.locator('#seats-print .fixture-picture > image').count(),3);
-      for(const scope of ['.room-stage','#seats-print'])assert.equal(await page.locator(scope+' .fixture-crown-correction image').count(),1,'Only the Aron crown tip receives the artwork correction');
+      assert.equal(await page.locator('.room-stage .fixture-source-picture').count(),3);
+      assert.equal(await page.locator('#seats-print .fixture-source-picture').count(),3);
+      for(const scope of ['.room-stage','#seats-print']){
+        assert.equal(await page.locator(scope+' .fixture-crown-correction image').count(),1,'Only the Aron crown tip receives the artwork correction');
+        assert.equal(await page.locator(scope+' .fixture-sketch').count(),monochrome?3:0,'Only black and white renders the three fixtures as light sketches');
+        if(monochrome)assert.ok(await page.locator(scope+' .fixture-sketch image').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).filter==='none')),'The sketch filter handles grayscale without stacking image filters');
+      }
       const picture=await page.locator('.room-stage .fixture-picture image').first().evaluate(async node=>{const image=new Image();image.src=node.getAttribute('href');await image.decode();return [image.naturalWidth,image.naturalHeight];});
       assert.deepEqual(picture,[2172,724],'The transparent fixture artwork must load before printing');
       assert.ok(await page.locator('.fixture-picture').evaluateAll(nodes=>nodes.every(node=>{const crop=node.viewBox.baseVal,clip=node.querySelector('clipPath rect');return ['x','y','width','height'].every(key=>Math.abs(crop[key]-Number(clip.getAttribute(key)))<.01);})), 'Letterboxing must not reveal a neighboring fixture from the source sheet');

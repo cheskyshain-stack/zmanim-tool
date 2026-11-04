@@ -1475,9 +1475,14 @@ Names and empty seats share one continuous table background in every chart style
 with Room design on or off. Keep seat fills transparent for assigned names,
 hover, editing, drop targets and remote reservations; use outlines for those
 interaction states so names never recolor the tabletop. Black & white uses the
-same complete room design in grayscale, including realistic fixtures, marble,
-table grain and detailed bookcases. Convert vector paint to neutral grays and
-filter only raster images so printed names and shelf details stay sharp. Both
+same complete room design with marble, table grain and detailed bookcases.
+The Aron Kodesh, bimah and amud use light outline sketches derived from their
+original photos, with white interiors and gray structural details instead of
+solid dark fills. Preserve their exact silhouettes, proportions and corrected
+round crown tip. Apply the sketch filter to each combined picture; do not stack
+another image grayscale filter inside it. Color keeps the original photographs.
+Convert vector paint to neutral grays and filter only raster artwork so printed
+names and shelf details stay sharp. Both
 styles wait for the artwork before printing. Turning the switch off restores
 the original art.
 Do not change chart geometry, names, assignments or saved-chart dates for this

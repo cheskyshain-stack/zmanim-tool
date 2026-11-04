@@ -11,7 +11,7 @@ export function seatsRoomFeatures(plan, designed = false, printScale = 1, frontT
   const aRight = a.length ? Math.min(...a.map(table => table.x)) : 103;
   const dRight = d.length ? Math.min(...d.map(table => table.x)) : 1030;
   const dLeft = plan.tables.find(table => table.id === 'D6')?.x ?? 968;
-  const aronPanel = designed ? seatsAronDesign(aron, printScale, frontTop) : '';
+  const aronPanel = designed ? seatsAronDesign(aron, printScale, frontTop, plan.monochrome) : '';
   const side = (id, left, right) => right - left < 24 ? '' : `<g class="walkway rear-side-walkway" data-walkway="${id}"><path d="M${left} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y} M${right} ${cross.bottom} V${SEATS_BACK_WALKWAY_Y}"/></g>`;
   return `<path class="room-boundary" d="M17 ${cross.top} V70 H1183 V${door.top} M1183 ${door.bottom} V${cross.top} M1183 ${cross.bottom} V960 H17 V${cross.bottom}"/>
     <g class="aron-kodesh${designed ? ' realistic-fixture' : ''}" data-fixture="aron" aria-label="Aron Kodesh"><rect class="aron" x="${aron.x}" y="${aron.y}" width="${aron.width}" height="${aron.height}"/>${aronPanel}${designed ? '' : `<text class="aron-label" text-anchor="middle" style="font-size:${font}px"><tspan x="${aron.x + aron.width / 2}" y="90">ARON</tspan><tspan x="${aron.x + aron.width / 2}" y="108">KODESH</tspan></text>`}</g>

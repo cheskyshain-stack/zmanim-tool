@@ -81,17 +81,37 @@ export async function seatsWaitForFixturePictures() {
   }));
 }
 
-function seatsFixturePicture(kind, center, top, width, height, printScale) {
+function seatsFixtureSketchFilter(id, crop) {
+  // Keep the original silhouette, with white interiors and gray structural edges.
+  // Flatten the corrected crown and photograph together before finding the edges.
+  const radius = Math.min(crop[2], crop[3]) / 250;
+  return `<filter class="fixture-sketch-filter" id="${id}" filterUnits="userSpaceOnUse" x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}" color-interpolation-filters="sRGB">
+    <feColorMatrix in="SourceGraphic" type="saturate" values="0" result="gray"/>
+    <feColorMatrix in="gray" values="1 0 0 0 0 0 1 0 0 0 0 0 1 0 0 0 0 0 0 1" result="opaque"/>
+    <feGaussianBlur in="opaque" stdDeviation="${radius * .45}" result="smooth"/>
+    <feConvolveMatrix in="smooth" order="3" kernelMatrix="0 -6 0 -6 24 -6 0 -6 0" bias="1" preserveAlpha="true" result="edges"/>
+    <feComponentTransfer in="edges" result="paper"><feFuncR type="table" tableValues=".45 1"/><feFuncG type="table" tableValues=".45 1"/><feFuncB type="table" tableValues=".45 1"/></feComponentTransfer>
+    <feComposite in="paper" in2="SourceAlpha" operator="in" result="drawing"/>
+    <feMorphology in="SourceAlpha" operator="erode" radius="${radius * .8}" result="inside"/>
+    <feComposite in="SourceAlpha" in2="inside" operator="out" result="rim"/>
+    <feFlood flood-color="#777" result="outline-ink"/>
+    <feComposite in="outline-ink" in2="rim" operator="in" result="outline"/>
+    <feMerge><feMergeNode in="drawing"/><feMergeNode in="outline"/></feMerge>
+  </filter>`;
+}
+
+function seatsFixturePicture(kind, center, top, width, height, printScale, sketch = false) {
   const crop = SEATS_FIXTURE_CROPS[kind], clip = 'seats-fixture-clip-' + ++seatsFixtureClipCount;
   const [source, imageWidth, imageHeight] = SEATS_FIXTURE_IMAGES[kind];
   // Replace only the small crown finial with a round bead. Keep the original artwork everywhere else.
   const crown = kind === 'aron' ? `<defs><clipPath id="${clip}-crown" clipPathUnits="userSpaceOnUse"><rect x="386" y="280" width="24" height="27"/></clipPath></defs><g class="fixture-crown-correction" clip-path="url(#${clip}-crown)"><image href="${SEATS_CROWN_PICTURE}" x="340" y="270" width="115" height="110" preserveAspectRatio="none"/></g>` : '';
-  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath></defs><image href="${source}" width="${imageWidth}" height="${imageHeight}" clip-path="url(#${clip})"/>${crown}</svg></g></g></g></g>`;
+  const picture = `<image class="fixture-source-picture" href="${source}" width="${imageWidth}" height="${imageHeight}" clip-path="url(#${clip})"/>${crown}`;
+  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath>${sketch ? seatsFixtureSketchFilter(clip + '-sketch', crop) : ''}</defs>${sketch ? `<g class="fixture-sketch" filter="url(#${clip}-sketch)">${picture}</g>` : picture}</svg></g></g></g></g>`;
 }
 
-export function seatsAronDesign(aron, printScale = 1, frontTop = 15) {
+export function seatsAronDesign(aron, printScale = 1, frontTop = 15, sketch = false) {
   const height = Math.min(100, aron.y + aron.height - frontTop - 2);
-  return seatsFixturePicture('aron', aron.x + aron.width / 2, aron.y + aron.height - height, aron.width, height, printScale);
+  return seatsFixturePicture('aron', aron.x + aron.width / 2, aron.y + aron.height - height, aron.width, height, printScale, sketch);
 }
 
 export function seatsTableDesign(table) {
@@ -100,16 +120,16 @@ export function seatsTableDesign(table) {
     <path class="design-table-highlight" d="M2 ${height + .5} H${Math.max(2, table.width - 2)}" aria-hidden="true"/>`;
 }
 
-export function seatsBimahDesign(x, y, width, height, printScale = 1) {
+export function seatsBimahDesign(x, y, width, height, printScale = 1, sketch = false) {
   // The previous broad picture was 1.1 times the footprint's depth in width.
   const pictureWidth = height * 1.1 * .75;
   const crop = SEATS_FIXTURE_CROPS.bimah, pictureHeight = pictureWidth * crop[3] / crop[2];
-  return seatsFixturePicture('bimah', x + width / 2, y + (height - pictureHeight) / 2, pictureWidth, pictureHeight, printScale);
+  return seatsFixturePicture('bimah', x + width / 2, y + (height - pictureHeight) / 2, pictureWidth, pictureHeight, printScale, sketch);
 }
 
-export function seatsAmudDesign(x, y, width, height, printScale = 1) {
+export function seatsAmudDesign(x, y, width, height, printScale = 1, sketch = false) {
   const size = 1.21;
-  return seatsFixturePicture('amud', x + width / 2, y - height * (size - 1) / 2, width * printScale * size, height * size, printScale);
+  return seatsFixturePicture('amud', x + width / 2, y - height * (size - 1) / 2, width * printScale * size, height * size, printScale, sketch);
 }
 
 export function seatsChairDesign(center, top) {
