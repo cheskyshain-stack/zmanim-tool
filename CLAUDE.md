@@ -1489,8 +1489,10 @@ hover, editing, drop targets and remote reservations; use outlines for those
 interaction states so names never recolor the tabletop. Black & white uses the
 same complete room design with marble, table grain and detailed bookcases.
 The Aron Kodesh, bimah and amud use light outline sketches derived from their
-original photos, with white interiors and gray structural details instead of
-solid dark fills. Preserve their exact silhouettes, proportions and corrected
+original photos, with very light gray interiors and gray structural details instead of
+solid dark fills. Limit the paper tone to about #f0f0f0 so the pictures blend with
+the light marble rather than looking like bright white cutouts. Keep the existing
+outline detail, shapes, sizes, floor and Color artwork. Preserve their exact silhouettes, proportions and corrected
 round crown tip. Apply the sketch filter to each combined picture; do not stack
 another image grayscale filter inside it. Color keeps the original photographs.
 Convert vector paint to neutral grays and filter only raster artwork so printed
