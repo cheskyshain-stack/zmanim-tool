@@ -195,40 +195,41 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
 .shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
-.room-diagram.room-design-color{color:#344757}
-.room-design-color .design-room-floor{fill:var(--room-floor);pointer-events:none}
-.room-design-color .room-boundary{fill:none;stroke:#9ca29e;stroke-width:3;stroke-linejoin:round}
-.room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .cabinet-designed-surface{fill:var(--room-wood);stroke:#8b9699;stroke-width:1.3}
-.room-design-color .table-surface{fill:var(--room-tabletop)}
-.room-design-color .room-object>.object-surface.cabinet-designed-surface{fill:var(--room-wood)}
-.room-design-color .table-surface,.room-design-color .shtender-surface,.room-design-color .amud-surface,.room-design-color .room-landmark>.object-surface,.room-design-color .aron,.room-design-color .chair-marker,.room-design-color .rav-chair{filter:var(--room-shadow)}
-.room-design-color .design-table-edge{fill:var(--room-edge);stroke:#a18c74;stroke-width:.7;pointer-events:none}
-.room-design-color .design-table-highlight{fill:none;stroke:#ede5d5;stroke-width:.65;pointer-events:none}
-.room-design-color .table-seat .seat-name,.room-design-color .room-landmark .seat-name,.room-design-color .rav-label{fill:#243b4d}
-.room-design-color .table-seat .empty-seat,.room-design-color .table-seat .blocked-seat-label,.room-design-color .pending-seats{fill:#596771}
-.room-design-color .chair-marker,.room-design-color .rav-chair{fill:var(--room-chair);stroke:#69777c;stroke-width:.85}
-.room-design-color .design-chair-piping{fill:none;stroke:#e4e6e1;stroke-width:.5;pointer-events:none}
-.room-design-color .cabinet-design{stroke:#876b55;stroke-width:.65;fill:none}
-.room-design-color .cabinet-design .cabinet-frame:first-child{fill:var(--room-shelf);stroke:#a98e70;stroke-width:1.2}
-.room-design-color .cabinet-cornice,.room-design-color .cabinet-plinth,.room-design-color .cabinet-stile{fill:var(--room-cabinet);stroke:none}
-.room-design-color .cabinet-molding{fill:none;stroke:#dcc9aa;stroke-width:.6}
-.room-design-color .cabinet-design .book-volume{stroke:#a49984;stroke-width:.4}
-.room-design-color .cabinet-design .book-tone-0{fill:#242522}
-.room-design-color .cabinet-design .book-tone-1{fill:#343029}
-.room-design-color .cabinet-design .book-tone-2{fill:#292b30}
-.room-design-color .cabinet-design .book-tone-3{fill:#46312e}
-.room-design-color .cabinet-design .book-band{stroke:#c5ad79;stroke-width:.5}
-.room-design-color .cabinet-design .book-label-strip{display:inline;fill:none;stroke-width:1.1}
-.room-design-color .cabinet-design .book-label-red{stroke:#bd4745}
-.room-design-color .cabinet-design .book-label-blue{stroke:#4382b5}
-.room-design-color .cabinet-design .book-label-green{stroke:#57916c}
-.room-design-color .cabinet-design .book-label-cream{stroke:#ddd8c7}
+.room-diagram.monochrome.room-design image{filter:grayscale(1)}
+.room-diagram.room-design{color:var(--room-ink)}
+.room-design .design-room-floor{fill:var(--room-floor);pointer-events:none}
+.room-design .room-boundary{fill:none;stroke:var(--room-boundary);stroke-width:3;stroke-linejoin:round}
+.room-design .table-surface,.room-design .shtender-surface,.room-design .amud-surface,.room-design .room-landmark>.object-surface,.room-design .aron,.room-design .cabinet-designed-surface{fill:var(--room-wood);stroke:var(--room-outline);stroke-width:1.3}
+.room-design .table-surface{fill:var(--room-tabletop)}
+.room-design .room-object>.object-surface.cabinet-designed-surface{fill:var(--room-wood)}
+.room-design .table-surface,.room-design .shtender-surface,.room-design .amud-surface,.room-design .room-landmark>.object-surface,.room-design .aron,.room-design .chair-marker,.room-design .rav-chair{filter:var(--room-shadow)}
+.room-design .design-table-edge{fill:var(--room-edge);stroke:var(--room-edge-line);stroke-width:.7;pointer-events:none}
+.room-design .design-table-highlight{fill:none;stroke:var(--room-highlight);stroke-width:.65;pointer-events:none}
+.room-design .table-seat .seat-name,.room-design .room-landmark .seat-name,.room-design .rav-label{fill:var(--room-name)}
+.room-design .table-seat .empty-seat,.room-design .table-seat .blocked-seat-label,.room-design .pending-seats{fill:var(--room-number)}
+.room-design .chair-marker,.room-design .rav-chair{fill:var(--room-chair);stroke:var(--room-chair-line);stroke-width:.85}
+.room-design .design-chair-piping{fill:none;stroke:var(--room-piping);stroke-width:.5;pointer-events:none}
+.room-design .cabinet-design{stroke:var(--room-cabinet-line);stroke-width:.65;fill:none}
+.room-design .cabinet-design .cabinet-frame:first-child{fill:var(--room-shelf);stroke:var(--room-shelf-line);stroke-width:1.2}
+.room-design .cabinet-cornice,.room-design .cabinet-plinth,.room-design .cabinet-stile{fill:var(--room-cabinet);stroke:none}
+.room-design .cabinet-molding{fill:none;stroke:var(--room-molding);stroke-width:.6}
+.room-design .cabinet-design .book-volume{stroke:var(--room-book-line);stroke-width:.4}
+.room-design .cabinet-design .book-tone-0{fill:var(--room-book-0)}
+.room-design .cabinet-design .book-tone-1{fill:var(--room-book-1)}
+.room-design .cabinet-design .book-tone-2{fill:var(--room-book-2)}
+.room-design .cabinet-design .book-tone-3{fill:var(--room-book-3)}
+.room-design .cabinet-design .book-band{stroke:var(--room-band);stroke-width:.5}
+.room-design .cabinet-design .book-label-strip{display:inline;fill:none;stroke-width:1.1}
+.room-design .cabinet-design .book-label-red{stroke:var(--room-label-red)}
+.room-design .cabinet-design .book-label-blue{stroke:var(--room-label-blue)}
+.room-design .cabinet-design .book-label-green{stroke:var(--room-label-green)}
+.room-design .cabinet-design .book-label-cream{stroke:var(--room-label-cream)}
 .design-realistic-fixture{pointer-events:none}
-.room-design-color .realistic-fixture>.object-surface,.room-design-color .realistic-fixture>.aron{opacity:0;filter:none}
-.room-design-color .realistic-fixture.selected>.object-surface,.room-design-color .realistic-fixture:focus-visible>.object-surface{opacity:1;fill:transparent;stroke:#2a67a0;stroke-width:2}
-.room-design-color .aron-label{fill:#243b4d}
-.room-design-color .table-seat:hover .seat-area,.room-design-color .table-seat.is-active .seat-area{fill:transparent;stroke:#a78b53;stroke-width:1.5}
-.room-design-color .table-seat.name-drop-target .seat-area,.room-design-color .table-seat.is-remote .seat-area{fill:transparent;stroke:#347b60;stroke-width:2.5}
+.room-design .realistic-fixture>.object-surface,.room-design .realistic-fixture>.aron{opacity:0;filter:none}
+.room-design .realistic-fixture.selected>.object-surface,.room-design .realistic-fixture:focus-visible>.object-surface{opacity:1;fill:transparent;stroke:#2a67a0;stroke-width:2}
+.room-design .aron-label{fill:var(--room-name)}
+.room-design .table-seat:hover .seat-area,.room-design .table-seat.is-active .seat-area{fill:transparent;stroke:var(--room-hover);stroke-width:1.5}
+.room-design .table-seat.name-drop-target .seat-area,.room-design .table-seat.is-remote .seat-area{fill:transparent;stroke:var(--room-remote);stroke-width:2.5}
 .canvas-foot{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;font-size:10px;color:var(--seats-muted);padding:10px 17px;border-top:1px solid #edf0f2}
 .seats-notice{font-size:13px;line-height:1.5;min-height:25px;margin:12px 0;color:#265779}
 .storage-warning,.fit-warning{padding:12px 15px;border:1px solid #d7b881;border-radius:5px;background:#fff8e9;font-size:12px;margin-bottom:12px;color:#6f4c17}
@@ -516,7 +517,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   #seats-print .minyan-logo{display:inline-flex;align-items:baseline;gap:.07in;line-height:1;white-space:nowrap}
   #seats-print .minyan-logo-name{font:inherit}
   #seats-print .room-diagram{flex:1;min-height:0;width:100%;height:100%;print-color-adjust:exact;-webkit-print-color-adjust:exact}
-  #seats-print .room-diagram.room-design-color{overflow:visible}
+  #seats-print .room-diagram.room-design{overflow:visible}
   #seats-print .room-item{cursor:default}
   #seats-print .shtender-surface,#seats-print .amud-surface{vector-effect:non-scaling-stroke}
   #seats-print .table-seat:hover .seat-area{fill:transparent;stroke:none}

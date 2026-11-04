@@ -25,7 +25,7 @@ export function seatsRoomFeatures(plan, designed = false, printScale = 1, frontT
     <g class="room-door closed-door" data-door="back-right" data-kind="closed" aria-label="Back right door"><path class="door-gap" d="M909 960 H959"/><path class="door-leaf" d="M909 960 H959 M909 956 V964 M959 956 V964"/></g>`;
 }
 
-function seatsBookcaseDesign(object, colored) {
+function seatsBookcaseDesign(object) {
   const vertical = object.height > object.width, inset = 2;
   const width = vertical ? object.height : object.width, height = vertical ? object.width : object.height;
   const centerX = (SEATS_BOUNDS.left + SEATS_BOUNDS.right) / 2, centerY = (SEATS_BOUNDS.top + SEATS_BOUNDS.bottom) / 2;
@@ -37,15 +37,15 @@ function seatsBookcaseDesign(object, colored) {
       : facing === 'north' ? `translate(${object.width} ${object.height}) rotate(180)` : '';
   const labelTones = ['red', 'red', 'blue', 'green', 'cream'];
   const columns = Math.max(1, Math.round(width / (height * 1.8)));
-  const bayWidth = (width - inset * 2) / columns, bayHeight = height - inset * 2;
+  const bayWidth = (width - inset * 2) / columns;
   const n = value => Math.round(value * 100) / 100;
   const art = [`<rect class="cabinet-frame" x="${inset}" y="${inset}" width="${width - inset * 2}" height="${height - inset * 2}"/>`];
-  if (colored) art.push(`<rect class="cabinet-cornice" x="1.2" y="1.2" width="${width - 2.4}" height="1.6"/><path class="cabinet-molding" d="M2 4 H${width - 2}"/><rect class="cabinet-plinth" x="1.2" y="${height - 2.8}" width="${width - 2.4}" height="1.6"/>`);
+  art.push(`<rect class="cabinet-cornice" x="1.2" y="1.2" width="${width - 2.4}" height="1.6"/><path class="cabinet-molding" d="M2 4 H${width - 2}"/><rect class="cabinet-plinth" x="1.2" y="${height - 2.8}" width="${width - 2.4}" height="1.6"/>`);
   for (let column = 0; column < columns; column++) {
-    const left = inset + column * bayWidth, top = colored ? 4 : inset, seed = column;
+    const left = inset + column * bayWidth, top = 4, seed = column;
     if (column) art.push(`<path class="cabinet-frame" d="M${n(left)} ${inset} V${height - inset}"/>`);
-    if (column && colored) art.push(`<rect class="cabinet-stile" x="${n(left - 1)}" y="3" width="2" height="${height - 6}"/>`);
-    const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = (colored ? height - top * 2 : bayHeight) - 2.2;
+    if (column) art.push(`<rect class="cabinet-stile" x="${n(left - 1)}" y="3" width="2" height="${height - 6}"/>`);
+    const x = left + 1.2, y = top + 1.1, w = bayWidth - 2.4, h = height - top * 2 - 2.2;
     const count = Math.max(3, Math.min(7, Math.floor(w / (h * .24 + 1.2)))), slot = w / count;
     for (let index = 0; index < count; index++) {
       const bookX = x + index * slot, bookHeight = h * (.72 + ((seed + index * 2) % 5) * .055), bottom = y + h;
@@ -59,17 +59,15 @@ function seatsBookcaseDesign(object, colored) {
         const bookWidth = slot * (.68 + ((seed + index) % 3) * .06), bookLeft = bookX + slot * .08, bookTop = bottom - bookHeight;
         art.push(`<rect class="book-volume book-tone-${(seed + index) % 4}" x="${n(bookLeft)}" y="${n(bookTop)}" width="${n(bookWidth)}" height="${n(bookHeight)}"/>`);
         if ((seed + index) % 3 === 0) art.push(`<path class="book-band" d="M${n(bookLeft)} ${n(bookTop + bookHeight * .22)} h${n(bookWidth)} M${n(bookLeft)} ${n(bookTop + bookHeight * .33)} h${n(bookWidth)}"/>`);
-        if (colored) {
-          const labelTone = labelTones[(seed + Math.floor(index / 3)) % labelTones.length];
-          art.push(`<path class="book-label-strip book-label-${labelTone}" d="M${n(bookLeft)} ${n(bottom - h * .12)} h${n(bookWidth)}"/>`);
-        }
+        const labelTone = labelTones[(seed + Math.floor(index / 3)) % labelTones.length];
+        art.push(`<path class="book-label-strip book-label-${labelTone}" d="M${n(bookLeft)} ${n(bottom - h * .12)} h${n(bookWidth)}"/>`);
       }
     }
   }
   return `<g class="cabinet-design" data-facing="${facing}"${transform ? ` transform="${transform}"` : ''} aria-hidden="true">${art.join('')}</g>`;
 }
 
-export function seatsCabinetArt(object, drawName, designed = false, colored = false) {
+export function seatsCabinetArt(object, drawName, designed = false) {
   const vertical = object.height > object.width;
   const length = vertical ? object.height : object.width, depth = vertical ? object.width : object.height;
   const spines = Array.from({ length: Math.max(0, Math.floor((length - 8) / 12)) }, (_, index) => {
@@ -77,7 +75,7 @@ export function seatsCabinetArt(object, drawName, designed = false, colored = fa
     return vertical ? `<path d="M4 ${coordinate} h${object.width - 8}" class="shelf-line"/>`
       : `<path d="M${coordinate} 4 v${object.height - 8}" class="shelf-line"/>`;
   }).join('');
-  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface${designed ? ' cabinet-designed-surface' : ''}"/>${designed ? seatsBookcaseDesign(object, colored) : spines}`;
+  const surface = `<rect width="${object.width}" height="${object.height}" rx="1" class="object-surface${designed ? ' cabinet-designed-surface' : ''}"/>${designed ? seatsBookcaseDesign(object) : spines}`;
   if (object.id.startsWith('rear-case-')) return surface;
   const labelWidth = Math.min(length - 6, Math.max(60, object.label.length * 5.5));
   return `${surface}<g transform="translate(${object.width / 2} ${object.height / 2})${vertical ? ' rotate(-90)' : ''}"><rect class="cabinet-label-bg" x="${-labelWidth / 2}" y="${-(depth - 6) / 2}" width="${labelWidth}" height="${depth - 6}"/>
