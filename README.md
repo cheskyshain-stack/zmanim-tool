@@ -4,6 +4,24 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 [Support the shul and donate](https://baismedrashoflakewoodcommons.org/donate/).
 
+## CMYK print PDFs
+
+In Seats, **Print / PDF** creates the chart or alphabetical name list directly as
+a CMYK PDF, with embedded fonts and a FOGRA39L Coated printing profile. Auto fit
+and Letter use Letter paper; choose 11 × 17 for a larger chart. Text remains
+selectable. Black & white uses only black ink. Open the resulting PDF to print it.
+The original browser printer dialog remains available under More.
+
+For charts, weekly cards and special schedules, use **Print / Save as PDF** first.
+Then open **CMYK PDF**, select the saved file and download its CMYK copy. Seats
+also retains this tool as **Convert saved PDF**. This saved-file converter preserves
+page sizes and layout, uses generic CMYK at up to 300 dpi, and flattens text.
+
+Both conversions run on your device. The direct Seats export uses a standard
+coated-paper profile, rather than a profile supplied for a particular printer.
+The saved-file converter uses no ICC profile. Neither claims PDF/X certification.
+The USB offline copy retains regular printing.
+
 ## Development
 
 The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
