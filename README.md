@@ -10,6 +10,10 @@ In Seats, **Print / PDF** creates the chart or alphabetical name list directly a
 a CMYK PDF, with embedded fonts and a FOGRA39L Coated printing profile. Auto fit
 and Letter use Letter paper; choose 11 × 17 for a larger chart. Text remains
 selectable. Black & white uses only black ink. Open the resulting PDF to print it.
+Open **Header & footer** below the Seats print settings to edit the text on each
+chart. It starts with “First Draft” in the top right and “Anyone who would like
+a seat should speak to the Gabbaim.” beneath the room. Leave a field blank to
+hide it. Wording saves with the chart and follows copies and shared edits.
 The original browser printer dialog remains available under More.
 
 For charts, weekly cards and special schedules, use **Print / Save as PDF** first.

@@ -1,7 +1,8 @@
 import { seatsCreatePlan, seatsCreateOriginalPlan } from './model.js';
 import { seatsIsRoomChartName } from './chart-names.js';
+import { seatsPrintNotes, SEATS_PRINT_NOTE_DEFAULTS } from './print-notes.js';
 
-const seatsContentIgnored = new Set(['id', 'name', 'people', 'layoutVersion', 'paper', 'monochrome']);
+const seatsContentIgnored = new Set(['id', 'name', 'people', 'layoutVersion', 'paper', 'monochrome', 'printHeader', 'printFooter']);
 const seatsContentMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 let seatsContentBaseline = null;
 
@@ -39,6 +40,7 @@ function seatsContentEqual(a, b) {
 export function seatsHasContent(plan) {
   if (!plan || typeof plan !== 'object') return false;
   if (!seatsIsAutomaticChartName(plan.name) || plan.people?.length) return true;
+  if (Object.entries(seatsPrintNotes(plan)).some(([key, value]) => value !== SEATS_PRINT_NOTE_DEFAULTS[key])) return true;
   if (!seatsContentBaseline) seatsContentBaseline = [seatsCreatePlan(), seatsCreateOriginalPlan()].map(seatsContentShape);
   return !seatsContentBaseline.some(baseline => seatsContentEqual(seatsContentShape(plan), baseline));
 }

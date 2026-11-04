@@ -81,7 +81,7 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true });
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {

@@ -1491,6 +1491,21 @@ display preference. Keep separate SVG paint IDs for screen and print.
 `tests/seats-room-design.cjs` checks both styles, phone/desktop, native PDFs,
 contained books, uniform seat backgrounds and unchanged chart data.
 
+The chart's **Header & footer** section below the print settings edits per-chart
+`printHeader` (80 characters) and `printFooter` (240 characters). Starting wording
+is **First Draft** at the top right and **Anyone who would like a seat should
+speak to the Gabbaim.** below the room. Missing fields show that wording without
+rewriting legacy chart data; empty strings hide the corresponding note. Custom
+notes save, copy, restore and sync with the chart, independently of seats. Keep
+the header clear of the center Aron and the left minyan wordmark. Wrap notes on
+paper, reserving only the footer height actually needed; blank footers restore
+the original room print area. Both native and CMYK chart printing use the same
+note layout. Commit focused note inputs before printing or leaving. Shared field
+patches use explicit nulls for missing notes so new wording can be undone back
+to the legacy state. Deploy the updated shared service before the new client.
+`tests/seats-print-notes.mjs` and `tests/seats-print-notes.cjs` cover storage,
+concurrent merging, immediate printing, wrapping and unchanged assignments.
+
 Seats **Print / PDF** creates a real CMYK PDF locally, for both the chart and the
 alphabetical name list. `js/seats/cmyk-pdf.js` uses Little CMS with the embedded
 FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the

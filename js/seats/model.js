@@ -1,5 +1,6 @@
 import { seatsFormatName } from './name-format.js';
 import { SEATS_DEFAULT_ROOM } from './default-room.js';
+import { seatsNormalizePrintNotes } from './print-notes.js';
 
 export const SEATS_STORAGE_KEY = 'lakewood-commons-seats-v1';
 export const SEATS_ROOM = { width: 1200, height: 1000 };
@@ -626,7 +627,8 @@ export function seatsNormalizeState(input) {
     });
     const name = str(raw.name, 80, 'plan name');
     return { id, name: /^main shul$/i.test(name) ? SEATS_DEFAULT_NAME : name, layoutVersion: [2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].includes(raw.layoutVersion) ? raw.layoutVersion : 1, people, tables, objects,
-      paper: ['auto', 'tabloid'].includes(raw.paper) ? raw.paper : 'letter', monochrome: raw.monochrome !== false };
+      paper: ['auto', 'tabloid'].includes(raw.paper) ? raw.paper : 'letter', monochrome: raw.monochrome !== false,
+      ...seatsNormalizePrintNotes(raw) };
   });
   if (!plans.length || !planIds.has(input.activeId)) fail('no active plan.');
   return { version: 1, activeId: input.activeId, plans };

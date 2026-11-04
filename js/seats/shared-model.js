@@ -2,7 +2,7 @@ import { seatsNormalizeState } from './model.js';
 
 const seatsSharedGroups = ['people', 'tables', 'objects'];
 const seatsSharedFields = {
-  plan: ['name', 'layoutVersion', 'paper', 'monochrome'],
+  plan: ['name', 'layoutVersion', 'paper', 'monochrome', 'printHeader', 'printFooter'],
   people: ['name'],
   tables: ['label', 'column', 'anchor', 'autoSize', 'x', 'y', 'width', 'height', 'count', 'seats'],
   objects: ['label', 'type', 'x', 'y', 'width', 'height', 'count', 'seats'],
@@ -15,7 +15,7 @@ export function seatsSharedPlan(value) {
 
 export function seatsSharedDiff(before, after) {
   const changes = [];
-  for (const key of seatsSharedFields.plan) if (!seatsSharedEqual(before[key], after[key])) changes.push({ group: 'plan', key, before: before[key], after: after[key] });
+  for (const key of seatsSharedFields.plan) if (!seatsSharedEqual(before[key] ?? null, after[key] ?? null)) changes.push({ group: 'plan', key, before: before[key] ?? null, after: after[key] ?? null });
   for (const group of seatsSharedGroups) {
     const previous = new Map(before[group].map(item => [item.id, item])), next = new Map(after[group].map(item => [item.id, item]));
     for (const id of new Set([...previous.keys(), ...next.keys()])) {

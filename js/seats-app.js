@@ -10,6 +10,7 @@ import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
 import { seatsCreateWorkspace } from './seats/workspace.js';
 import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
+import { seatsPrintNotes, seatsNormalizePrintNotes, seatsPrintLayout } from './seats/print-notes.js';
 import { seatsBuildCmykPdf } from './seats/cmyk-pdf.js';
 import { seatsChartPdfPage, seatsRosterPdfPages } from './seats/pdf-pages.js';
 import { seatsCreateEditor } from './seats/editor.js';
@@ -332,9 +333,9 @@ function seatsStart(root, auth, updates) {
     const rtl = /[א-ת]/.test(name) && !/[A-Za-z]/.test(name);
     return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
   }
-  function diagram(interactive = true) {
+  function diagram(interactive = true, printGeometry = null) {
     const current = plan(), designed = roomDesign();
-    const geometry = seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
+    const geometry = printGeometry || seatsPrintGeometry(current.paper), printScale = interactive ? 1 : geometry.xScale;
     const paint = designed ? seatsRoomDesignPaint('room-design-' + (interactive ? 'screen' : 'print'), current.monochrome) : null;
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
@@ -471,14 +472,9 @@ function seatsStart(root, auth, updates) {
     const current = plan(), assigned = seatsAssigned(current), unset = current.tables.filter(table => table.count === null).length;
     const capacity = seatsItems(current).reduce((total, table) => total + seatsUsableCount(current, table), 0);
     const room = diagram();
-    const printRoom = diagram(false), printGeometry = seatsPrintGeometry(current.paper);
+    const printNotes = seatsPrintNotes(current);
     document.title = 'Seats | ' + current.name;
     document.body.classList.add('seats-people-mode');
-    document.documentElement.style.setProperty('--seats-page-width', printGeometry.contentWidth + 'in');
-    document.documentElement.style.setProperty('--seats-page-height', printGeometry.contentHeight + 'in');
-    document.documentElement.style.setProperty('--seats-print-aspect', printGeometry.contentWidth / (printGeometry.contentHeight - printGeometry.header));
-    const css = '@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + printGeometry.margin + 'in; }';
-    setPrintPage(css);
     root.innerHTML = `<button type="button" class="text-button seats-editor-home no-print" data-action="home">← Seats home</button><section class="seats-top seats-editor-head no-print" data-shared="${Boolean(sharing?.linked(current.id))}">
       <div class="title-line"><h1>Seating chart</h1><span class="tool-badge">7:30 MINYAN</span></div>
       <div class="plan-line"><label class="sr-only" for="chart-name">Chart name</label><div class="chart-name-field"><input id="chart-name" value="${attr(current.name)}" maxlength="80">${seatsEditorIcon('pencil')}</div></div>
@@ -486,6 +482,7 @@ function seatsStart(root, auth, updates) {
       <div class="top-actions"><button type="button" class="editor-save-button" data-action="save-site" ${!sharing?.enabled || sharing?.saving || !canSaveCurrent() ? 'disabled' : ''}>${seatsEditorIcon('save')}Save</button><button type="button" data-action="open-pages"><svg class="page-folder-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true" focusable="false"><path d="M3 7V5h7l2 2h9v13H3Z"/><path d="M3 10h18"/></svg>Saved charts</button><button type="button" class="primary editor-print-button" data-action="print" ${preparingPrint ? 'disabled aria-busy="true"' : ''}>${seatsEditorIcon('print')}Print / PDF</button><details id="chart-more" class="chart-more"><summary aria-label="More" title="More chart tools">${seatsEditorIcon('more')}<span class="sr-only">More</span></summary><div><button type="button" data-action="date-name">Use today’s date</button><button type="button" data-action="chart-history">Change history</button><button type="button" data-action="seat-list">Alphabetical seat list</button><button type="button" data-action="browser-print">Printer dialog</button><button type="button" data-action="cmyk-pdf">Convert saved PDF</button><button type="button" data-action="backup">Download backup</button><button type="button" data-action="logout">Log out</button></div></details></div>
       <section class="seats-controls seats-editor-print no-print"><div class="print-settings"><label>Paper <select id="paper-size" aria-label="Print size"><option value="auto" ${current.paper === 'auto' ? 'selected' : ''}>Auto fit</option><option value="letter" ${current.paper === 'letter' ? 'selected' : ''}>Letter</option><option value="tabloid" ${current.paper === 'tabloid' ? 'selected' : ''}>11 × 17</option></select></label><label>Style <select id="print-color" aria-label="Print style"><option value="mono" ${current.monochrome ? 'selected' : ''}>Black &amp; white</option><option value="color" ${!current.monochrome ? 'selected' : ''}>Color</option></select></label></div></section>
       <p class="print-paper-hint no-print">${current.paper === 'auto' ? 'Print / PDF creates a CMYK file on Letter. Choose <strong>11 × 17</strong> for a larger PDF.' : `Print / PDF creates a CMYK file on <strong>${current.paper === 'tabloid' ? '11 × 17' : 'Letter'}</strong>. Print the PDF at its actual size.`}</p>
+      <details id="chart-print-notes" class="chart-print-notes no-print"><summary>Header &amp; footer</summary><div class="print-note-fields"><label for="print-header">Header text<input id="print-header" maxlength="80" value="${attr(printNotes.printHeader)}" placeholder="Optional header"></label><label for="print-footer">Footer text<textarea id="print-footer" maxlength="240" rows="2" placeholder="Optional footer">${html(printNotes.printFooter)}</textarea></label></div><p>Saved with this chart. Leave either field blank to hide it.</p></details>
     </section>
       <p id="seats-page-help" class="seats-page-help no-print">${pageHelp()}</p>
 
@@ -495,15 +492,44 @@ function seatsStart(root, auth, updates) {
         <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" aria-label="Initials + last name" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="reserved-print" type="checkbox" role="switch" aria-label="Reserved instead of names" ${reservedPrint ? 'checked' : ''} aria-describedby="reserved-print-help"><span>Reserved</span></label><span id="reserved-print-help" class="sr-only">Show Reserved on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="room-design" type="checkbox" role="switch" ${roomDesign() ? 'checked' : ''} aria-describedby="room-design-help"><span>Room design</span></label><span id="room-design-help" class="sr-only">Show illustrated bookcases and room design details on the chart and printouts. This choice is remembered for this chart on this device. Includes light tables, centered rectangular tiles and detailed room fixtures. Black &amp; white shows the same details in grayscale.</span></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
+        <div class="chart-note-preview chart-header-preview" dir="auto"></div>
         <div class="room-scroll"><div class="room-stage${zoom ? ' is-zoomed' : ''}${wholeRoom ? ' fits-room' : ''}" ${zoom ? `style="width:${zoom}px"` : ''}>${room}</div></div>
+        <div class="chart-note-preview chart-footer-preview" dir="auto"></div>
         <div class="canvas-foot"><span>${seatsCanDragNames() ? 'Drag names to seats · Ctrl/Option-drag to copy · Zoom for a closer view' : 'Tap a seat to edit · Pinch to zoom'}</span><span>${current.monochrome ? 'Black & white' : 'Color'} print preview</span></div></section></div>
       <p id="seats-notice" class="seats-notice no-print" role="status" aria-live="polite">${html(notice)}</p>
       <input id="names-file" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls" hidden><input id="backup-file" type="file" accept=".json" hidden>
 
-      <section id="seats-print" class="seats-print${current.paper === 'auto' ? ' auto-paper' : ''}"><header><h1 class="minyan-logo" aria-label="7:30 Minyan"><span class="minyan-logo-time">7:30</span> <span class="minyan-logo-name">Minyan</span></h1></header>${printRoom}</section>`;
-    seatsPreparePrint(root.querySelector('#seats-print .room-diagram'), printGeometry);
+      <section id="seats-print" class="seats-print${current.paper === 'auto' ? ' auto-paper' : ''}"></section>`;
+    refreshPrintPresentation();
     sharing?.decorate(root);
     workspaceControls.refresh(); assignmentControls.refresh();
+  }
+  function refreshPrintPresentation() {
+    const current = plan(), { notes, headerFont, headerLines, footerLines, geometry } = seatsPrintLayout(current);
+    const style = document.documentElement.style;
+    style.setProperty('--seats-page-width', geometry.contentWidth + 'in');
+    style.setProperty('--seats-page-height', geometry.contentHeight + 'in');
+    style.setProperty('--seats-print-footer', geometry.footer + 'in');
+    style.setProperty('--seats-header-font', headerFont + 'pt');
+    style.setProperty('--seats-print-aspect', geometry.contentWidth / (geometry.contentHeight - geometry.header - geometry.footer));
+    setPrintPage('@page { size: ' + (current.paper === 'auto' ? 'landscape' : current.paper === 'tabloid' ? '17in 11in' : '11in 8.5in') + '; margin: ' + geometry.margin + 'in; }');
+    const lines = values => values.map(value => `<span dir="auto">${html(value)}</span>`).join('');
+    const target = root.querySelector('#seats-print');
+    target.innerHTML = `<header><h1 class="minyan-logo" aria-label="7:30 Minyan"><span class="minyan-logo-time">7:30</span> <span class="minyan-logo-name">Minyan</span></h1><div class="chart-print-header">${lines(headerLines)}</div></header>${diagram(false, geometry)}${footerLines.length ? `<footer class="chart-print-footer">${lines(footerLines)}</footer>` : ''}`;
+    seatsPreparePrint(target.querySelector('.room-diagram'), geometry);
+    for (const [selector, value] of [['.chart-header-preview', notes.printHeader], ['.chart-footer-preview', notes.printFooter]]) {
+      const preview = root.querySelector(selector); preview.textContent = value; preview.hidden = !value;
+    }
+  }
+  function commitPrintNotes() {
+    if (screen !== 'editor') return true;
+    const header = root.querySelector('#print-header'), footer = root.querySelector('#print-footer');
+    if (!header || !footer) return true;
+    const next = seatsNormalizePrintNotes({ printHeader: header.value, printFooter: footer.value });
+    const current = seatsPrintNotes(plan());
+    if (next.printHeader === current.printHeader && next.printFooter === current.printFooter) return true;
+    if (!change(() => Object.assign(plan(), next), null, false)) return false;
+    refreshPrintPresentation(); return true;
   }
   function dropName(data, target) {
     if (!data || data.planId !== plan().id) return;
@@ -588,7 +614,7 @@ function seatsStart(root, auth, updates) {
     'zoom-in': () => zoomControls.increase(),
     'zoom-out': () => zoomControls.decrease(),
     print: async () => {
-      if (preparingPrint || editor.flush() === false) return;
+      if (preparingPrint || editor.flush() === false || !commitPrintNotes()) return;
       if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.');
       const tab = window.open('', '_blank');
       if (tab) { tab.opener = null; tab.document.title = 'Preparing CMYK PDF'; tab.document.body.textContent = 'Preparing your CMYK PDF...'; }
@@ -602,7 +628,7 @@ function seatsStart(root, auth, updates) {
         if (currentScreen === 'editor' && roomDesign()) await seatsWaitForFixturePictures();
         if (screen !== currentScreen || plan().id !== currentId) { tab?.close(); return; }
         const monochrome = currentScreen === 'roster' || plan().monochrome, filename = plan().name;
-        const pages = currentScreen === 'roster' ? seatsRosterPdfPages(seatsRosterRows(plan(), nameOrder)) : [await seatsChartPdfPage(root.querySelector('#seats-print .room-diagram'), plan().paper)];
+        const pages = currentScreen === 'roster' ? seatsRosterPdfPages(seatsRosterRows(plan(), nameOrder)) : [await seatsChartPdfPage(root.querySelector('#seats-print .room-diagram'), plan().paper, plan())];
         const blob = await seatsBuildCmykPdf(pages, { monochrome,
           progress: fraction => status('Preparing CMYK PDF: ' + Math.round(fraction * 100) + '%') });
         if (screen !== currentScreen || plan().id !== currentId) { tab?.close(); return; }
@@ -621,7 +647,7 @@ function seatsStart(root, auth, updates) {
       }
     },
     'browser-print': async () => {
-      if (preparingPrint || editor.flush() === false) return;
+      if (preparingPrint || editor.flush() === false || !commitPrintNotes()) return;
       if (screen === 'editor' && overflowTables.size) return alertMessage('Printing paused because some names do not fit. Increase the affected tables’ width or depth.');
       preparingPrint = true;
       const currentId = plan().id, currentScreen = screen;
@@ -694,6 +720,13 @@ function seatsStart(root, auth, updates) {
     if (id === 'selected-item' || id === 'layout-item') { selected = control.value; renderInPlace(); return; }
     if (id === 'chart-view') { if (control.value === 'whole') zoomControls.fitWhole(); else if (control.value === 'actual') zoomControls.actual(); else zoomControls.fit(); return; }
     if (id === 'chart-name') { const name = control.value.trim(); if (name) return change(() => { plan().name = name.slice(0, 80); }, null, false); control.value = plan().name; return; }
+    if (id === 'print-header' || id === 'print-footer') {
+      const key = id === 'print-header' ? 'printHeader' : 'printFooter';
+      if (change(() => Object.assign(plan(), seatsNormalizePrintNotes({ [key]: control.value })), null, false)) {
+        control.value = plan()[key]; refreshPrintPresentation();
+      }
+      return;
+    }
     if (id === 'paper-size' || id === 'print-color') return change(() => { if (id === 'paper-size') plan().paper = control.value; else plan().monochrome = control.value === 'mono'; });
     if (id === 'show-assigned') { showAssigned = control.checked; renderInPlace(); return; }
     if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count, plan()); });
@@ -791,12 +824,12 @@ function seatsStart(root, auth, updates) {
     storedRaw = event.newValue;
     conflict = true; storageError = 'Seats changed in another tab. Reload to use that version, or download a backup before saving this version instead.'; renderInPlace();
   });
-  window.addEventListener('beforeprint', () => { printing = true; editor.flush(); document.body.classList.toggle('seats-print-error', screen === 'editor' && overflowTables.size > 0); });
+  window.addEventListener('beforeprint', () => { printing = true; editor.flush(); commitPrintNotes(); document.body.classList.toggle('seats-print-error', screen === 'editor' && overflowTables.size > 0); });
   window.addEventListener('afterprint', () => { printing = false; document.body.classList.remove('seats-print-error'); sharing?.flush(); });
   window.addEventListener('pagehide', () => {
     const name = root.querySelector('#chart-name')?.value.trim();
     if (name && name !== plan().name) change(() => { plan().name = name.slice(0, 80); }, null, false);
-    editor.flush(); save();
+    editor.flush(); commitPrintNotes(); save();
   });
   sharing = seatsCreateSharing({
     onDialogChange: () => navigation?.sync(),
@@ -816,7 +849,9 @@ function seatsStart(root, auth, updates) {
     },
     updatePlan: (id, incoming, activate = false) => {
       const focused = document.activeElement;
-      const draft = root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
+      const noteKey = focused?.id === 'print-header' ? 'printHeader' : focused?.id === 'print-footer' ? 'printFooter' : null;
+      const preserveDraft = !noteKey || focused.value !== seatsPrintNotes(plan())[noteKey];
+      const draft = preserveDraft && root.contains(focused) && focused.matches('input:not([type=checkbox]),textarea') && focused.id ? { id: focused.id, value: focused.value, start: focused.selectionStart, end: focused.selectionEnd } : null;
       if (activate) { editor.flush(); editor.close(); screen = 'editor'; }
       incoming.name = seatsChartName(incoming.name, sharing?.metadata(id) || records.info(id));
       if (seatsNeedsUpgrade(incoming)) {

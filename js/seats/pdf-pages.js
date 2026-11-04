@@ -1,4 +1,4 @@
-import { seatsPrintGeometry } from './print.js';
+import { seatsPrintLayout } from './print-notes.js';
 
 const SEATS_PDF_NS = 'http://www.w3.org/2000/svg';
 const SEATS_PDF_STYLES = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity', 'color', 'font-size', 'font-weight', 'font-style', 'letter-spacing', 'text-anchor', 'dominant-baseline', 'visibility', 'filter'];
@@ -27,8 +27,8 @@ async function seatsPdfPicture(url) {
   });
 }
 
-export async function seatsChartPdfPage(source, paper) {
-  const geometry = seatsPrintGeometry(paper === 'tabloid' ? 'tabloid' : 'letter');
+export async function seatsChartPdfPage(source, paper, plan = {}) {
+  const { geometry, headerFont, headerLines, footerLines } = seatsPrintLayout({ ...plan, paper: paper === 'tabloid' ? 'tabloid' : 'letter' });
   const page = seatsPdfPage(geometry.width * 72, geometry.height * 72), room = source.cloneNode(true);
   const originals = [source, ...source.querySelectorAll('*')], copies = [room, ...room.querySelectorAll('*')];
   for (let index = 0; index < originals.length; index++) {
@@ -54,9 +54,17 @@ export async function seatsChartPdfPage(source, paper) {
     picture.setAttribute('href', await pictures.get(href));
   }));
   room.setAttribute('x', geometry.margin * 72); room.setAttribute('y', (geometry.margin + geometry.header) * 72);
-  room.setAttribute('width', geometry.contentWidth * 72); room.setAttribute('height', (geometry.contentHeight - geometry.header) * 72);
+  room.setAttribute('width', geometry.contentWidth * 72); room.setAttribute('height', (geometry.contentHeight - geometry.header - geometry.footer) * 72);
   room.setAttribute('viewBox', geometry.viewBox); room.setAttribute('preserveAspectRatio', 'none'); room.style.overflow = 'visible';
   page.append(seatsPdfText('7:30 Minyan', geometry.margin * 72, geometry.margin * 72 + 17, 17, true, true), room);
+  for (let index = 0; index < headerLines.length; index++) {
+    const text = seatsPdfText(headerLines[index], (geometry.width - geometry.margin) * 72, geometry.margin * 72 + headerFont + index * 11, headerFont, true);
+    text.setAttribute('text-anchor', 'end'); page.append(text);
+  }
+  for (let index = 0; index < footerLines.length; index++) {
+    const text = seatsPdfText(footerLines[index], geometry.width * 36, (geometry.height - geometry.margin - geometry.footer) * 72 + 13 + index * 11, 9);
+    text.setAttribute('text-anchor', 'middle'); page.append(text);
+  }
   return { svg: page, size: [geometry.width * 72, geometry.height * 72] };
 }
 
