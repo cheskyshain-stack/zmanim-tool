@@ -28,7 +28,7 @@ print('PASS PDF:',sys.argv[2],round(page.rect.width),round(page.rect.height))
 (async()=>{
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
   const {seatsCreateState,seatsWriteName}=await import('../js/seats/model.js'),sample=seatsCreateState(),plan=sample.plans[0];plan.name='Synthetic initials chart';plan.paper='letter';
-  const cases=[['A1',0,'Yosef Chuam Cohen','Y C Cohen'],['A1',1,'Alexander Theodore Levi','A T Levi'],['A1',2,'Christopher Alexander Stone','C A Stone'],['A1',3,'Amrom Yitzchok Friedman','A Y Friedman'],['A1',4,'הרב משה דוד כהן','מ ד כהן'],['B1',0,'Sarah van der Meer','S van der Meer'],['B1',1,'Rabbi Chaim Dovid Brown Jr.','C D Brown Jr.'],['rav-seat',0,'Rav Chaim Dovid Stern','C D Stern']];
+  const cases=[['A1',0,'Yosef Chuam Cohen','Y C Cohen'],['A1',1,'Alexander Theodore Levi','A T Levi'],['A1',2,'Christopher Alexander Stone','C A Stone'],['A1',3,'Amrom Yitzchok Friedman','A Y Friedman'],['A1',4,'הרב משה דוד כהן','מ ד כהן'],['B1',0,'Sarah van der Meer','S van der Meer'],['B1',1,'Rabbi Chaim Dovid Brown Jr.','C D Brown Jr.']];
   for(const [table,index,name]of cases)seatsWriteName(plan,table,index,name);
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
   try{

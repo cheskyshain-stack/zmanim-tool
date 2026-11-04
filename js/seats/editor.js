@@ -45,7 +45,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     if (!ok) return false;
     close();
     if (next) {
-      const seats = seatsItems(getPlan()).flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
+      const seats = getPlan().tables.flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
       const index = seats.findIndex(seat => seat.tableId === target.tableId && seat.index === target.index);
       let destination;
       for (let step = 1; step <= seats.length; step++) {

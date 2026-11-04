@@ -1,8 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { seatsCreateRoomDesignChoice } from '../js/seats/room-design-choice.js';
+import { seatsCreateRoomDesignChoice, seatsCreateChartDisplayChoice } from '../js/seats/room-design-choice.js';
 
 const legacyKey = 'lakewood-commons-seats-room-design';
+test('open-seat display choices are independent from other charts and Room design', () => {
+  const values = new Map(), store = {getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)};
+  const create = () => seatsCreateChartDisplayChoice({storageKey:'open-seats',getStorage:()=>store});
+  const open = create(), design = seatsCreateRoomDesignChoice({getStorage:()=>store});
+  assert.equal(open.get('a'),false);open.set('a',true);
+  assert.equal(open.get('b'),false);assert.equal(design.get('a'),false);assert.equal(create().get('a'),true);
+  open.set('b',true);open.set('a',false);assert.equal(open.get('b'),true);
+});
 function storage(initial = {}) {
   const values = new Map(Object.entries(initial));
   return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) };

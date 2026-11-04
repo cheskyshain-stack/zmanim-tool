@@ -4,7 +4,7 @@ import { keepPosition } from './ui/keep-position.js';
 import { SEATS_STORAGE_KEY, SEATS_ROOM, SEATS_BOUNDS, SEATS_ROOM_UPDATE, SEATS_SEAT_WIDTH, SEATS_TABLE_HEIGHT, SEATS_BACK_WALKWAY_Y, SEATS_CROSS_WALKWAY, seatsItems, seatsFront, seatsSyncFront, seatsIsFixed, seatsChairPillar, seatsSeatBlocked, seatsUsableCount, seatsUid, seatsCreatePlan, seatsCreateState, seatsNormalizeState, seatsNeedsUpgrade, seatsUpgradePlan, seatsSetCount, seatsAssign, seatsAssigned, seatsAddNames, seatsRemovePeople, seatsWriteName } from './seats/model.js';
 import { seatsRoomFeatures, seatsCabinetArt, seatsRavArt } from './seats/room.js';
 import { seatsRoomDesignPaint, seatsTableDesign, seatsBimahDesign, seatsAmudDesign, seatsChairDesign, seatsWaitForFixturePictures } from './seats/room-design.js';
-import { seatsCreateRoomDesignChoice } from './seats/room-design-choice.js';
+import { seatsCreateRoomDesignChoice, seatsCreateChartDisplayChoice } from './seats/room-design-choice.js';
 import { seatsEditorIcon } from './seats/editor-icons.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
@@ -126,6 +126,8 @@ function seatsStart(root, auth, updates) {
   if (['editor', 'roster'].includes(screen)) legacyDesignChartId = plan().id;
   const roomDesignChoice = seatsCreateRoomDesignChoice({ legacyChartId: state.plans.some(current => current.id === legacyDesignChartId) ? legacyDesignChartId : null });
   const roomDesign = () => roomDesignChoice.get(plan().id);
+  const openSeatChoice = seatsCreateChartDisplayChoice({ storageKey: 'lakewood-commons-seats-open-seats' });
+  const showOpenSeats = () => openSeatChoice.get(plan().id);
 
   const editor = seatsCreateEditor({
     getPlan: plan, commit: change,
@@ -341,10 +343,6 @@ function seatsStart(root, auth, updates) {
     const people = new Map(current.people.map(person => [person.id, person.name]));
     const displayName = name => reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
     const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
-    for (const rav of current.objects.filter(object => object.type === 'rav' && people.has(object.seats[0]))) {
-      const size = Math.min(rav.width - 2, rav.height - 30);
-      nameLayouts.push(seatsFitName(displayName(people.get(rav.seats[0])), size, size - 4, nameMeasure, 11));
-    }
     const commonFont = seatsCommonNameFont(nameLayouts);
     const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(displayName(name), x, y, width, height, id, Math.min(commonFont, maxFont));
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
@@ -355,7 +353,7 @@ function seatsStart(root, auth, updates) {
         const name = people.get(table.seats[index]), blocked = seatsSeatBlocked(current, table.id, index);
         return `<g data-facing="north" class="table-seat${name ? ' assigned' : ''}${blocked ? ' blocked-seat' : ''}" ${interactive ? `id="seat-${attr(table.id)}-${index}" data-seat="${index}" data-table="${attr(table.id)}" role="button" tabindex="${blocked && !name ? '-1' : '0'}"${blocked && !name ? ' aria-disabled="true"' : ''} aria-label="${attr(table.label + ', seat ' + (index + 1) + ': ' + (name || (blocked ? 'Pillar, unavailable' : 'empty')))}"` : ''}>
           <rect class="seat-area" x="${svgNumber(index * width + 1)}" y="2" width="${svgNumber(Math.max(1, width - 2))}" height="${table.height - 4}"/>
-          ${name ? seatName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : `<text class="${blocked ? 'blocked-seat-label' : 'empty-seat'}" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle">${blocked ? 'Pillar' : index + 1}</text>`}
+          ${name ? seatName(name, width * (index + 0.5), 2, width, table.height - 4, table.id) : blocked || showOpenSeats() ? `<text class="${blocked ? 'blocked-seat-label' : 'empty-seat'}" x="${svgNumber(width * (index + 0.5))}" y="${table.height / 2 + 4}" text-anchor="middle"${blocked ? '' : ` style="font-size:${svgNumber(Math.min(11, 11 * Math.max(1, width * printScale - 4) / Math.max(1, nameMeasure('Open', 11))))}px"`}>${blocked ? 'Pillar' : 'Open'}</text>` : ''}
           ${seatsChairPillar(current, table.id, index + 1) ? '' : designed ? seatsChairDesign(Number(svgNumber(width * (index + .5))), table.height) : `<path class="chair-marker" d="M${svgNumber(width * (index + 0.5) - 6)} ${table.height + 3} h12 v5 q0 3 -3 3 h-6 q-3 0 -3 -3 z M${svgNumber(width * (index + 0.5) - 4)} ${table.height + 11} v3 m8 0 v-3"/>`}
         </g>`;
       }).join('');
@@ -367,10 +365,10 @@ function seatsStart(root, auth, updates) {
       </g>`;
     }).join('');
     const objects = current.objects.map(object => {
-      const attributes = interactive ? `id="room-item-${attr(object.id)}" data-item="${attr(object.id)}" role="button" tabindex="0" aria-label="${attr(object.label)}"` : '';
+      const attributes = interactive ? `id="room-item-${attr(object.id)}" data-item="${attr(object.id)}" role="button" tabindex="0" aria-label="${attr(object.type === 'rav' ? 'Rav' : object.label)}"` : '';
       let art;
       if (object.type === 'cabinet') art = seatsCabinetArt(object, object.height > object.width ? nameText : wideName, designed);
-      else if (object.type === 'rav') art = seatsRavArt(object, people, seatName, interactive, printScale);
+      else if (object.type === 'rav') art = seatsRavArt(object, printScale);
       else if (['pillar', 'bimah'].includes(object.type)) {
         const side = Math.min(object.width, object.height), width = side / printScale, top = (object.height - side) / 2;
         const realistic = designed && object.type === 'bimah';
@@ -388,14 +386,14 @@ function seatsStart(root, auth, updates) {
       <g class="room-art"${interactive ? '' : ` transform="scale(${printScale} 1)"`}>${designed ? `<rect class="design-room-floor" x="${SEATS_BOUNDS.left}" y="${SEATS_BOUNDS.top}" width="${SEATS_BOUNDS.right - SEATS_BOUNDS.left}" height="${SEATS_BOUNDS.bottom - SEATS_BOUNDS.top}"/>${paint.grid}` : ''}${seatsRoomFeatures(current, designed, printScale)}${objects}${tables}</g>
     </svg>`;
   }
-  function tableOptions() {
-    return `<optgroup label="Tables">${plan().tables.map(table => `<option value="${attr(table.id)}" ${selected === table.id ? 'selected' : ''}>${html(table.label)}${table.count === null ? ' · seats not set' : ' · ' + seatsUsableCount(plan(), table) + ' seats'}</option>`).join('')}</optgroup>${plan().objects.length ? `<optgroup label="Room objects">${plan().objects.map(object => `<option value="${attr(object.id)}" ${selected === object.id ? 'selected' : ''}>${html(object.label)}</option>`).join('')}</optgroup>` : ''}`;
+  function tableOptions(includeObjects = true) {
+    return `<optgroup label="Tables">${plan().tables.map(table => `<option value="${attr(table.id)}" ${selected === table.id ? 'selected' : ''}>${html(table.label)}${table.count === null ? ' · seats not set' : ' · ' + seatsUsableCount(plan(), table) + ' seats'}</option>`).join('')}</optgroup>${includeObjects && plan().objects.length ? `<optgroup label="Room objects">${plan().objects.map(object => `<option value="${attr(object.id)}" ${selected === object.id ? 'selected' : ''}>${html(object.type === 'rav' ? 'Rav' : object.label)}</option>`).join('')}</optgroup>` : ''}`;
   }
   function layoutPanel() {
     const entry = item(), isTable = entry && !entry.type, fixed = seatsIsFixed(entry);
     return `<h2>${isTable ? 'Table settings' : entry ? 'Object settings' : 'Room setup'}</h2>
       <label for="layout-item">Selected ${entry?.type ? 'object' : 'table'}</label><select id="layout-item">${tableOptions()}</select>
-      ${entry ? `<label for="item-label">Label</label><input id="item-label" value="${attr(entry.label)}" maxlength="80">
+      ${entry ? `<label for="item-label">Label</label><input id="item-label" value="${attr(entry.type === 'rav' ? 'Rav' : entry.label)}" maxlength="80" ${entry.type === 'rav' ? 'disabled' : ''}>
         ${isTable ? `<label for="seat-count">Seats at this table</label><input id="seat-count" type="number" min="0" max="16" step="1" placeholder="Not set yet" value="${entry.count ?? ''}"><label class="check-label"><input id="auto-size" type="checkbox" ${entry.autoSize !== false ? 'checked' : ''}> Size table from seat count</label><p class="field-note">Five seats is the standard size. Chairs face the Aron Kodesh.</p>` : ''}
         <div class="field-pair"><div><label for="item-width">Width</label><input id="item-width" type="number" min="${isTable ? 60 : entry.type === 'rav' ? 30 : 20}" max="1100" value="${entry.width}" ${fixed || (isTable && entry.autoSize !== false) ? 'disabled' : ''}></div><div><label for="item-height">Depth</label><input id="item-height" type="number" min="${isTable ? 40 : entry.type === 'rav' ? 70 : 20}" max="600" value="${entry.height}" ${fixed ? 'disabled' : ''}></div></div>
         ${fixed ? '<p class="field-note">Fixed room fixture.</p>' : `<details class="position-details"><summary>Position &amp; remove</summary><div class="field-pair"><div><label for="item-x">Left</label><input id="item-x" type="number" value="${entry.x}" min="17" max="${SEATS_BOUNDS.right - entry.width}"></div><div><label for="item-y">Top</label><input id="item-y" type="number" value="${entry.y}" min="70" max="${itemBottom(entry) - entry.height}"></div></div><button type="button" class="danger" data-action="remove-item">Remove ${isTable ? 'table' : 'object'}</button></details>`}` : ''}
@@ -447,9 +445,9 @@ function seatsStart(root, auth, updates) {
       <button type="button" class="people-upload" data-action="upload-names" ${importing ? 'disabled' : ''}>${seatsEditorIcon('plus')}<span class="people-upload-label">${importing ? 'Reading names...' : html(sharing?.nameFilesLabel || 'Add names')}</span></button>`;
   }
   function peopleManualTools() {
-    const table = seatsItems(plan()).find(entry => entry.id === selected);
+    const table = plan().tables.find(entry => entry.id === selected);
     return `<details id="manual-names"><summary>Add names</summary><label for="new-names">One name per line</label><textarea id="new-names" rows="4" placeholder="English or Hebrew names"></textarea><button type="button" data-action="add-names">Add names</button></details>
-      <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions()}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}" ${seatsSeatBlocked(plan(), table.id, index) && !id ? 'disabled' : ''}>${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || (seatsSeatBlocked(plan(), table.id, index) ? 'Pillar' : 'Empty'))}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
+      <details id="seat-list"><summary>Choose a seat from a list</summary><label for="selected-item">Table</label><select id="selected-item">${tableOptions(false)}</select>${table?.count ? `<div class="seat-list">${table.seats.map((id, index) => `<button type="button" data-open-seat="${index}" data-table="${attr(table.id)}" ${seatsSeatBlocked(plan(), table.id, index) && !id ? 'disabled' : ''}>${index + 1}. <bdi>${html(plan().people.find(person => person.id === id)?.name || (seatsSeatBlocked(plan(), table.id, index) ? 'Pillar' : 'Empty'))}</bdi></button>`).join('')}</div>` : '<p class="field-note">This table has no seats.</p>'}</details>`;
   }
   function render() {
     navigation?.sync();
@@ -489,7 +487,7 @@ function seatsStart(root, auth, updates) {
       ${storageError ? `<div class="storage-warning no-print" role="alert">${html(storageError)}${conflict ? '<button type="button" data-action="download-recovery">Download stored data</button><button type="button" data-action="enable-save">Save this version instead</button>' : ''}</div>` : ''}
       <div class="seats-workspace seats-editor-workspace no-print"><aside class="seats-panel seats-editor-people">${peoplePanel()}<details id="people-extra-tools"><summary>More tools</summary>${peopleManualTools()}<details id="room-settings"><summary>Table &amp; room settings</summary>${layoutPanel()}</details><div class="upload-area"><p class="field-note">Excel, CSV, or text. ${sharing?.linked(current.id) ? 'Names are shared with the other organizers.' : 'Names stay on this device until you save this page to the site.'}</p><button type="button" class="text-button" data-action="template">Download example CSV</button></div><details id="plan-files"><summary>Plans &amp; backups</summary><button type="button" data-action="backup">Download backup</button><button type="button" data-action="restore">Restore backup</button><button type="button" data-action="export-list">Download seating list</button></details><details id="seats-help"><summary>How to use Seats</summary><p>New charts use the current 36-table room layout. A9 has 3 seats. A8, C1, C2, B6, and C6 have 4 seats. Other tables start with 5 seats. B and C skip table 7. Pillars block B8 seat 2 and C8 seat 4. C1 and D1 have a small gap between them. The rav’s seat faces the room beside the Aron Kodesh.</p><p>Click a seat and start typing a name. Choosing an existing name adds it to this seat and keeps its other seats. Copy name and Paste name give another seat the same name without moving the original. Ctrl+C and Ctrl+V also work on focused seats. Undo and Redo reverse changes.</p><p>Use Delete beside a name to remove one person. Delete names lets you select several people or delete the whole list, including seated people. Undo restores deleted names and seats.</p><p>Upload a Name column, First name and Last name columns, or one name per line. Excel imports the first worksheet and skips duplicate names.</p><p>Saved charts opens the folder of charts on the website and this device. Download a backup to keep a spare copy.</p>${sharing?.enabled ? '<p>Save puts the current chart on the website. Later changes save automatically. Anyone signed in can open it from Saved charts and edit it. Both people see each other’s changes. Undo keeps the other organizer’s work.</p>' : ''}<p>Printer paper (auto fit) fills the printable width and height of the paper selected in your printer dialog. Use Landscape and turn off browser headers and footers. For a fixed-size PDF, choose Letter or 11 × 17 and select Save as PDF. Match that size in the printer dialog, including Android’s paper-size picker.</p></details></details></aside>
       <section class="seats-canvas"><div class="canvas-heading"><h2>Room layout</h2><p>${current.tables.length} tables · ${capacity} seats · ${assigned.size} seated${unset ? ` · ${unset} not set` : ''}</p></div><div class="canvas-toolbar"><div class="canvas-buttons"><button type="button" data-action="undo" ${(sharing?.linked(current.id) ? sharing.canUndo() : history.length) ? '' : 'disabled'} aria-label="Undo" title="Undo">${seatsEditorIcon('undo')}</button><button type="button" data-action="redo" ${(sharing?.linked(current.id) ? sharing.canRedo() : future.length) ? '' : 'disabled'} aria-label="Redo" title="Redo">${seatsEditorIcon('redo')}</button><label class="chart-view-label"><span class="sr-only">Chart view</span><select id="chart-view"><option value="width" ${!zoom && !wholeRoom ? 'selected' : ''}>Full width</option><option value="whole" ${wholeRoom ? 'selected' : ''}>Whole chart</option><option value="actual" ${zoom === 1200 ? 'selected' : ''}>100%</option><option value="custom" hidden ${zoom && zoom !== 1200 ? 'selected' : ''}>${zoom ? Math.round(zoom / 1200 * 100) + '%' : 'Zoomed'}</option></select></label><output id="seats-zoom-level" class="sr-only" aria-label="Chart zoom">${zoom ? Math.round(zoom / 1200 * 100) + '%' : wholeRoom ? 'Whole chart' : 'Fit width'}</output><button type="button" data-action="zoom-out" aria-label="Zoom out">−</button><button type="button" data-action="zoom-in" aria-label="Zoom in">+</button></div>
-        <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" aria-label="Initials + last name" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="reserved-print" type="checkbox" role="switch" aria-label="Reserved instead of names" ${reservedPrint ? 'checked' : ''} aria-describedby="reserved-print-help"><span>Reserved</span></label><span id="reserved-print-help" class="sr-only">Show Reserved on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="room-design" type="checkbox" role="switch" ${roomDesign() ? 'checked' : ''} aria-describedby="room-design-help"><span>Room design</span></label><span id="room-design-help" class="sr-only">Show illustrated bookcases and room design details on the chart and printouts. This choice is remembered for this chart on this device. Includes light tables, centered rectangular tiles and detailed room fixtures. Black &amp; white shows the same details in grayscale.</span></div></div>
+        <div class="canvas-name-options"><label class="chart-name-switch"><input id="short-names" type="checkbox" role="switch" aria-label="Initials + last name" ${shortNames ? 'checked' : ''} aria-describedby="short-names-help"><span>Initials + last</span></label><span id="short-names-help" class="sr-only">Show given-name initials on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="reserved-print" type="checkbox" role="switch" aria-label="Reserved instead of names" ${reservedPrint ? 'checked' : ''} aria-describedby="reserved-print-help"><span>Reserved</span></label><span id="reserved-print-help" class="sr-only">Show Reserved on the chart and printouts. Full names stay in the People list and editor.</span><label class="chart-name-switch"><input id="open-seats" type="checkbox" role="switch" aria-label="Show Open on empty seats" ${showOpenSeats() ? 'checked' : ''} aria-describedby="open-seats-help"><span>Open seats</span></label><span id="open-seats-help" class="sr-only">Show Open in empty seats on the chart and printouts. Remembered for this chart on this device.</span><label class="chart-name-switch"><input id="room-design" type="checkbox" role="switch" ${roomDesign() ? 'checked' : ''} aria-describedby="room-design-help"><span>Room design</span></label><span id="room-design-help" class="sr-only">Show illustrated bookcases and room design details on the chart and printouts. This choice is remembered for this chart on this device. Includes light tables, centered rectangular tiles and detailed room fixtures. Black &amp; white shows the same details in grayscale.</span></div></div>
         ${unset ? '<p class="setup-hint">Next: set the number of seats at each table. You can also apply a count to a whole column.</p>' : ''}
         ${overflowTables.size ? `<p class="fit-warning" role="alert">Some names do not fit: ${html([...overflowTables].join(', '))}. Increase those tables’ width or depth before printing.</p>` : ''}
         <div class="chart-note-preview chart-header-preview" dir="auto"></div>
@@ -543,7 +541,7 @@ function seatsStart(root, auth, updates) {
       return;
     }
     const table = seatsItems(plan()).find(table => table.id === target.tableId);
-    if (!table || target.index < 0 || target.index >= table.count) return;
+    if (!table || table.type === 'rav' || target.index < 0 || target.index >= table.count) return;
     if (table.seats[target.index] === person.id && !data.copy) return;
     const previous = plan().people.find(person => person.id === table.seats[target.index]);
     const copying = data.copy || (!data.pointer && Boolean(source));
@@ -555,6 +553,7 @@ function seatsStart(root, auth, updates) {
   }
   function canEditSeat(tableId, index) {
     const table = seatsItems(plan()).find(entry => entry.id === tableId);
+    if (table?.type === 'rav') return false;
     if (seatsSeatBlocked(plan(), tableId, index) && !table?.seats[index]) { alertMessage('This position is blocked by a pillar. Choose another seat.'); return false; }
     return sharing?.canEdit(tableId, index) !== false;
   }
@@ -714,6 +713,7 @@ function seatsStart(root, auth, updates) {
     const control = event.target, id = control.id;
     if (id === 'reserved-print') { reservedPrint = control.checked; try { localStorage.setItem(SEATS_RESERVED_PRINT_KEY, reservedPrint ? '1' : '0'); } catch { /* Keep the print choice for this visit. */ } renderInPlace(); return; }
     if (id === 'room-design') { roomDesignChoice.set(plan().id, control.checked); renderInPlace(); return; }
+    if (id === 'open-seats') { openSeatChoice.set(plan().id, control.checked); renderInPlace(); return; }
     if (id === 'short-names') { shortNames = control.checked; try { localStorage.setItem(SEATS_SHORT_NAMES_KEY, shortNames ? '1' : '0'); } catch { /* Keep the choice for this visit when storage is unavailable. */ } renderInPlace(); return; }
     if (id === 'people-sort' || id === 'roster-sort') { nameOrder = control.value === 'last' ? 'last' : 'first'; try { localStorage.setItem(SEATS_NAME_SORT_KEY, nameOrder); } catch { /* Sorting remains available for this visit. */ } renderInPlace(); return; }
     if (control.dataset.deletePerson) { if (control.checked) deleteSelection.add(control.dataset.deletePerson); else deleteSelection.delete(control.dataset.deletePerson); renderInPlace(); return; }
@@ -732,6 +732,7 @@ function seatsStart(root, auth, updates) {
     if (id === 'auto-size') return change(() => { item().autoSize = control.checked; if (control.checked) seatsSetCount(item(), item().count, plan()); });
     if (id === 'seat-count') return change(() => { const removed = seatsSetCount(item(), control.value, plan()); if (removed) notice = removed + ' people returned to the waiting list.'; });
     if (id.startsWith('item-') && id !== 'item-label' && seatsIsFixed(item())) return;
+    if (id === 'item-label' && item()?.type === 'rav') return;
     if (id.startsWith('item-')) return change(() => {
       const entry = item(); if (!entry) return;
       if (id === 'item-label') { if (control.value.trim()) entry.label = control.value.trim().slice(0, 80); }

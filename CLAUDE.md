@@ -1418,6 +1418,18 @@ and uses the prominent navy style; Create new chart is the secondary white actio
 The Saved charts folder keeps compact list rows with matching navy and gold
 styling. Its close button stays visible at the top while scrolling long folders.
 
+Seat numbers are omitted from the chart and printouts. **Open seats** shows
+**Open** only in unassigned, unblocked table seats; off leaves them blank. This
+display choice is remembered separately for each chart on this device, outside
+shared chart data, with new charts off. It works with Initials, Reserved and
+Room design in both print styles. Keep accessible seat positions and editor
+navigation labels. The Rav always displays **Rav** and has no seat editor,
+assignment target or editable label. Skip it in Tab navigation and seat-picker
+lists. Retain any legacy Rav name, assignment and object label in stored data;
+do not clear them as a migration. The existing room footprint is retained.
+`tests/seats-open-seats.cjs` verifies these controls, both print paths, phone and
+desktop views, independent preferences and unchanged stored assignments.
+
 Room design is a display switch remembered separately for each chart on this
 device, outside shared chart data. New charts start with it off. Resolve the
 choice from the active chart on every render and print, including folder opens,
@@ -1429,7 +1441,7 @@ tables with dark names and subtle wood edges. Keep wood and burgundy as small
 accents drawn from the room photos, not a dark brown fill across the tables.
 Tables have a pale ivory, realistic fine-grain surface from
 assets/seats/light-tabletop-v1.png. Keep the texture subtle and the tables light,
-with at least 4.5:1 contrast for names and empty-seat numbers. The grain spans
+with at least 4.5:1 contrast for names and Open labels. The grain spans
 the entire tabletop with no separate name backgrounds. Retain the existing
 table edges, outlines and shadows. The texture ships offline and printing waits
 for it to load. Bookcases keep their previous light appearance.
