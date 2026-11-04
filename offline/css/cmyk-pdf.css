@@ -1,0 +1,39 @@
+.cmyk-pdf-button {
+  min-height: 44px; padding: .6rem .9rem; border: 1px solid #bac3cd;
+  border-radius: 8px; background: #fff; color: #162b45; font: inherit; cursor: pointer;
+}
+.luach-sheet-print { gap: .75rem; flex-wrap: wrap; }
+.special-print-action { flex-wrap: wrap; }
+.cmyk-pdf-dialog {
+  box-sizing: border-box;
+  width: min(34rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  overflow: auto;
+  padding: 1.5rem;
+  border: 1px solid #d6d8dc;
+  border-radius: 16px;
+  background: #fff;
+  color: #162b45;
+  font: 1rem/1.5 system-ui, sans-serif;
+  box-shadow: 0 16px 60px #0004;
+}
+.cmyk-pdf-dialog::backdrop { background: #101c2b88; }
+.cmyk-pdf-heading { display: flex; gap: 1rem; align-items: center; justify-content: space-between; }
+.cmyk-pdf-heading h2 { margin: 0; font: 700 1.4rem/1.3 system-ui, sans-serif; }
+.cmyk-pdf-dialog button, .cmyk-pdf-dialog [data-download] {
+  box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; padding: .6rem .9rem; border: 1px solid #bac3cd;
+  border-radius: 8px; font: inherit; cursor: pointer; background: #fff; color: #162b45;
+}
+.cmyk-pdf-heading button { min-width: 44px; font-size: 1.5rem; padding: 0; }
+.cmyk-pdf-dialog [data-convert], .cmyk-pdf-dialog [data-download] { background: #162b45; color: #fff; text-decoration: none; }
+.cmyk-pdf-dialog button:disabled { opacity: .5; cursor: default; }
+.cmyk-pdf-dialog label { display: block; font-weight: 600; margin: 1rem 0 .5rem; }
+.cmyk-pdf-dialog input { box-sizing: border-box; width: 100%; min-height: 44px; font: inherit; }
+.cmyk-pdf-dialog progress { display: block; width: 100%; margin: .5rem 0 1rem; }
+.cmyk-pdf-actions { display: flex; flex-wrap: wrap; gap: .75rem; }
+.cmyk-pdf-status { overflow-wrap: anywhere; }
+.cmyk-pdf-dialog details { margin-top: 1.25rem; color: #59616a; font-size: .875rem; }
+.cmyk-pdf-dialog summary { cursor: pointer; min-height: 32px; }
+.cmyk-pdf-dialog [hidden] { display: none !important; }
+@media print { .cmyk-pdf-dialog, .cmyk-pdf-button { display: none !important; } }
