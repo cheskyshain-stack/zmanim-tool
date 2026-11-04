@@ -1457,8 +1457,10 @@ wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
 actual book bases and labels, not just the shelf's direction attribute.
 Keep the floor light with the realistic gray-and-cream stone texture in
 assets/seats/light-marble-floor-v1.png. Do not restore drawn marble-vein curves.
-The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles, with
-only fine straight grout joints. Center one tile on both axes of SEATS_BOUNDS
+The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles. Reflect
+adjacent swatches on both axes so the texture does not have hard repeat seams.
+Keep physical grout joints as separate crisp neutral-gray SVG paths, drawn
+between the marble and the room furnishings, rather than inside the image pattern. Center one tile on both axes of SEATS_BOUNDS
 so the cuts at opposite walls match. The texture ships offline and printing
 waits for it to load. Saved fixture footprints and hit areas stay unchanged;
 the tall Aron picture uses the clear
@@ -1488,8 +1490,10 @@ alphabetical name list. `js/seats/cmyk-pdf.js` uses Little CMS with the embedded
 FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
 Black & white option use only K. Keep all page artwork in DeviceCMYK and all
 vector colors in CMYK or gray, with no RGB fallback. Text stays selectable and
-uses embedded Hebrew/Latin fonts. Only decorative art is sampled, at 300 dpi in
-small strips to bound phone memory. Keep the existing room geometry and fixture
+uses embedded Hebrew/Latin fonts. Photos and surface textures are sampled at 300 dpi in small strips to bound
+phone memory. Tile joints stay vector between the marble and furnishings. Use
+CMYK transparency blending and grayscale soft masks for the furniture overlay
+so grout stays hidden under tables, chairs and fixtures. Keep the existing room geometry and fixture
 proportions. `js/seats/pdf-pages.js` captures the current SVG appearance, including
 initials, Reserved and per-chart Room design, without changing saved names or
 assignments. The name list keeps names unique and table labels grouped, wraps

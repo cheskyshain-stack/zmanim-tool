@@ -44,6 +44,8 @@ export async function seatsChartPdfPage(source, paper) {
       clone.style.fontWeight = Number(style.fontWeight) >= 600 || style.fontWeight === 'bold' ? 'bold' : 'normal';
     }
     for (const attribute of [...clone.attributes]) if (/^(id|data-|aria-|role|tabindex)/.test(attribute.name) && attribute.name !== 'id') clone.removeAttribute(attribute.name);
+    if (original.classList.contains('design-room-floor')) clone.setAttribute('data-pdf-layer', 'floor');
+    if (original.classList.contains('floor-tile-joints')) clone.setAttribute('data-pdf-layer', 'grid');
   }
   const pictures = new Map();
   await Promise.all([...room.querySelectorAll('image')].map(async picture => {

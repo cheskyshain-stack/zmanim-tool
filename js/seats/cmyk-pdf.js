@@ -34,7 +34,7 @@ async function seatsLoadCmykTools() {
     ]);
     const input = lcms.cmsCreate_sRGBProfile(), output = lcms.cmsOpenProfileFromMem(profile, profile.length);
     if (!output || lcms.cmsGetColorSpaceASCII(output) !== 'CMYK') throw new Error('The CMYK printing profile is invalid.');
-    const transform = lcms.cmsCreateTransform(input, module.TYPE_RGBA_8, output, module.TYPE_CMYK_8, module.INTENT_RELATIVE_COLORIMETRIC, module.cmsFLAGS_BLACKPOINTCOMPENSATION);
+    const transform = lcms.cmsCreateTransform(input, module.TYPE_RGB_8, output, module.TYPE_CMYK_8, module.INTENT_RELATIVE_COLORIMETRIC, module.cmsFLAGS_BLACKPOINTCOMPENSATION);
     lcms.cmsCloseProfile(input); lcms.cmsCloseProfile(output);
     if (!transform) throw new Error('CMYK color conversion is unavailable.');
     const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif'];
@@ -49,7 +49,15 @@ async function seatsLoadCmykTools() {
 
 function seatsPdfCmyk(tools, rgba, monochrome) {
   const count = rgba.length / 4;
-  const result = monochrome ? new Uint8Array(count * 4) : tools.lcms.cmsDoTransform(tools.transform, rgba, count);
+  let result = new Uint8Array(count * 4);
+  if (!monochrome) {
+    const rgb = new Uint8Array(count * 3);
+    for (let source = 0, target = 0; source < rgba.length; source += 4) {
+      rgb[target++] = rgba[source]; rgb[target++] = rgba[source + 1]; rgb[target++] = rgba[source + 2];
+    }
+    result = tools.lcms.cmsDoTransform(tools.transform, rgb, count);
+  }
+  if (result.length !== count * 4) throw new Error('The printing profile produced invalid CMYK pixels.');
   for (let pixel = 0; pixel < rgba.length; pixel += 4) {
     const r = rgba[pixel], g = rgba[pixel + 1], b = rgba[pixel + 2];
     // Neutral text, white paper and grayscale artwork use black ink only.
@@ -71,6 +79,9 @@ async function seatsPdfDeflate(bytes) {
 
 function seatsPdfOutputIntent(doc, profile) {
   let profileId;
+  doc.internal.events.subscribe('putPage', () => {
+    doc.internal.write('/Group << /Type /Group /S /Transparency /CS /DeviceCMYK /I true >>');
+  });
   doc.internal.events.subscribe('putResources', () => {
     profileId = doc.internal.newObject();
     doc.internal.putStream({ data: seatsPdfBinary(profile), additionalKeyValues: [{ key: 'N', value: '4' }, { key: 'Alternate', value: '/DeviceCMYK' }] });
@@ -97,9 +108,11 @@ function seatsPdfVectorColors(doc, tools, monochrome) {
 function seatsPdfRegisterImages(jsPDF) {
   if (jsPDF.API.processCMYK) return;
   jsPDF.API.processCMYK = function (data, index, alias) {
-    const header = new DataView(data.buffer, data.byteOffset, 8);
-    return { width: header.getUint32(0), height: header.getUint32(4), data: seatsPdfBinary(data.subarray(8)), index, alias,
-      colorSpace: 'DeviceCMYK', bitsPerComponent: 8, filter: 'FlateDecode' };
+    const header = new DataView(data.buffer, data.byteOffset, 12), length = header.getUint32(8);
+    const result = { width: header.getUint32(0), height: header.getUint32(4), data: seatsPdfBinary(data.subarray(12, 12 + length)), index, alias,
+      colorSpace: 'DeviceCMYK', bitsPerComponent: 8, filter: 'FlateDecode', predictor: 1 };
+    if (data.length > length + 12) result.sMask = seatsPdfBinary(data.subarray(length + 12));
+    return result;
   };
 }
 
@@ -112,7 +125,16 @@ function seatsPdfImage(svg) {
   });
 }
 
-// Artwork is sampled at 300 dpi in small strips. Text stays vector and selectable.
+function seatsPdfSubset(svg, keep, keepDefinitions = false) {
+  const result = svg.cloneNode(true), definitions = new Set(result.querySelectorAll('defs,defs *'));
+  for (const node of [...result.querySelectorAll('*')].reverse()) {
+    if (definitions.has(node)) { if (!keepDefinitions) node.remove(); continue; }
+    if (!keep(node) && !node.children.length) node.remove();
+  }
+  return result;
+}
+
+// Photos are sampled at 300 dpi. Grout and text stay vector, with furniture above the grout.
 export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = () => {} } = {}) {
   if (!pages.length) throw new Error('There is nothing to export.');
   const tools = await seatsLoadCmykTools();
@@ -128,26 +150,37 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
   for (let number = 0; number < pages.length; number++) {
     const { svg, size } = pages[number];
     if (number) doc.addPage(size, size[0] > size[1] ? 'landscape' : 'portrait');
-    const art = svg.cloneNode(true), text = svg.cloneNode(true);
-    for (const node of art.querySelectorAll('text')) node.remove();
-    for (const node of [...text.querySelectorAll('*')].reverse()) if (!['svg', 'g', 'text', 'tspan'].includes(node.localName) || (!node.closest('text') && !node.querySelector('text'))) node.remove();
-    const picture = await seatsPdfImage(art), width = Math.round(size[0] / 72 * 300), height = Math.round(size[1] / 72 * 300);
+    const text = seatsPdfSubset(svg, node => ['text', 'tspan'].includes(node.localName));
+    const art = svg.cloneNode(true), hasFloor = Boolean(art.querySelector('[data-pdf-layer="floor"]'));
+    for (const node of art.querySelectorAll('text,[data-pdf-layer="floor"],[data-pdf-layer="grid"]')) node.remove();
+    const grid = hasFloor ? seatsPdfSubset(svg, node => Boolean(node.closest('[data-pdf-layer="grid"]'))) : null;
+    const layers = hasFloor ? [
+      { svg: seatsPdfSubset(svg, node => node.getAttribute('data-pdf-layer') === 'floor', true), alpha: false },
+      { svg: art, alpha: true },
+    ] : [{ svg: art, alpha: false }];
+    const width = Math.round(size[0] / 72 * 300), height = Math.round(size[1] / 72 * 300);
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 128;
     const context = canvas.getContext('2d', { willReadFrequently: true });
-    for (let top = 0; top < height; top += 128) {
-      const rows = Math.min(128, height - top);
-      context.fillStyle = '#fff'; context.fillRect(0, 0, width, 128);
-      context.drawImage(picture, 0, -top, width, height);
-      const rgba = context.getImageData(0, 0, width, rows).data;
-      const cmyk = seatsPdfCmyk(tools, rgba, monochrome);
-      // jsPDF writes an inverted Decode array for every CMYK image.
-      for (let byte = 0; byte < cmyk.length; byte++) cmyk[byte] = 255 - cmyk[byte];
-      const compressed = await seatsPdfDeflate(cmyk);
-      const image = new Uint8Array(compressed.length + 8), header = new DataView(image.buffer);
-      header.setUint32(0, width); header.setUint32(4, rows); image.set(compressed, 8);
-      doc.addImage(image, 'CMYK', 0, top / height * size[1], size[0], rows / height * size[1], 'cmyk-' + number + '-' + top);
-      progress((number + (top + rows) / height) / pages.length);
-      await new Promise(resolve => setTimeout(resolve, 0));
+    for (let layer = 0; layer < layers.length; layer++) {
+      if (layer === 1 && grid) await doc.svg(grid, { x: 0, y: 0, width: size[0], height: size[1] });
+      const picture = await seatsPdfImage(layers[layer].svg);
+      for (let top = 0; top < height; top += 128) {
+        const rows = Math.min(128, height - top);
+        context.clearRect(0, 0, width, 128);
+        if (!layers[layer].alpha) { context.fillStyle = '#fff'; context.fillRect(0, 0, width, 128); }
+        context.drawImage(picture, 0, -top, width, height);
+        const rgba = context.getImageData(0, 0, width, rows).data;
+        const cmyk = seatsPdfCmyk(tools, rgba, monochrome);
+        // jsPDF writes an inverted Decode array for every CMYK image.
+        for (let byte = 0; byte < cmyk.length; byte++) cmyk[byte] = 255 - cmyk[byte];
+        const compressed = await seatsPdfDeflate(cmyk);
+        const alpha = layers[layer].alpha ? await seatsPdfDeflate(Uint8Array.from({ length: width * rows }, (_, pixel) => rgba[pixel * 4 + 3])) : new Uint8Array();
+        const image = new Uint8Array(compressed.length + alpha.length + 12), header = new DataView(image.buffer);
+        header.setUint32(0, width); header.setUint32(4, rows); header.setUint32(8, compressed.length); image.set(compressed, 12); image.set(alpha, 12 + compressed.length);
+        doc.addImage(image, 'CMYK', 0, top / height * size[1], size[0], rows / height * size[1], 'cmyk-' + number + '-' + layer + '-' + top);
+        progress((number + (layer + (top + rows) / height) / layers.length) / pages.length);
+        await new Promise(resolve => setTimeout(resolve, 0));
+      }
     }
     await doc.svg(text, { x: 0, y: 0, width: size[0], height: size[1] });
     canvas.width = canvas.height = 0;
