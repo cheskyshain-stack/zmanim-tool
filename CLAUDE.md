@@ -1457,9 +1457,10 @@ wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
 actual book bases and labels, not just the shelf's direction attribute.
 Keep the floor light with the realistic gray-and-cream stone texture in
 assets/seats/light-marble-floor-v1.png. Do not restore drawn marble-vein curves.
-The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles. Reflect
-adjacent swatches on both axes so the texture does not have hard repeat seams.
-Keep physical grout joints as separate crisp neutral-gray SVG paths, drawn
+The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles. Keep the
+original photographic texture without mirrored repeats; the user preferred the
+earlier, more natural floor. Grout is subtle neutral #dcdcdc with .5-unit lines.
+Keep the joints as separate sharp SVG paths, drawn
 between the marble and the room furnishings, rather than inside the image pattern. Center one tile on both axes of SEATS_BOUNDS
 so the cuts at opposite walls match. The texture ships offline and printing
 waits for it to load. Saved fixture footprints and hit areas stay unchanged;
