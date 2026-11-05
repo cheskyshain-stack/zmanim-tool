@@ -997,6 +997,39 @@ Export/Import in Settings moves it between devices.
   checkbox, and all five card/ACH forms. Cardknox's Rav's Fund tab strip itself remains
   700px wide, but its tab labels and payment controls fit the narrower phone viewport.
 
+## Admin community calendar
+
+`/admin/#calendar` is the first, admin-only preview. Do not add it to congregation
+navigation or public feeds until the user asks to publish it. Reuse the workbook
+Hebrew calendar, published lookup tables and configured shul timezone. English months
+run Sunday through Shabbos, with Hebrew dates, month transitions, holidays and parshas.
+Use `js/calendar/model.js`; keep all manual events separate from minyan calculations.
+The calendar uses its own navy, cream and gold CSS, with plain-text event types and
+colours. Do not let global chart table stripes, fonts or borders alter its cells.
+Phone day clicks open a details dialog; the event dialog follows the visual viewport
+so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
+
+With `data/calendar.json` blank, only main admin gets device preview storage. Label
+that limitation. Examples are optional and are never persisted. Keep backup/restore
+and storage-error handling; never silently replace corrupt data or claim a failed
+write succeeded. The restricted `/admin/calendar/` page must not pretend that device
+storage or the main admin PIN is server authentication.
+
+`worker/calendar/` prepares a separate, authenticated service. Owner setup uses a
+private bootstrap link. Only the server creates roles; owners control all events and
+account access, editors can change only their own events. Invitations are one-use,
+seven-day links; passwords use salted PBKDF2, sessions are hashed, and revocation or
+reset invalidates them immediately. Do not expose private events or accounts in the
+public schedule API. Keep the endpoint disabled until the service has been deployed
+and verified with the user's Cloudflare account. `scripts/activate-calendar.mjs`
+stores the private setup link outside Git and preserves an existing owner. The main
+calendar admin must set their own server password; never derive owner authority from
+the client-side admin PIN. Activation does not publish a congregation calendar.
+
+`tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
+cover date grids across 51 years, actual phone/desktop layouts, event persistence,
+safe text rendering, keyboard viewport, private accounts and server role boundaries.
+
 ## Public schedule API
 
 Admin **Website preview** (`/admin/#preview`) embeds the real congregation pages with

@@ -593,7 +593,7 @@ def stamp_css_versions(page: Path, prefix: str):
         digest = hashlib.md5((ROOT / "css" / name).read_bytes()).hexdigest()[:8]
         return f'href="{prefix}css/{name}?v={digest}"'
 
-    stamped = re.sub(r'href="(?:\.\./)?css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
+    stamped = re.sub(r'href="(?:\.\./)*css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
     if stamped != html:
         page.write_text(stamped, encoding="utf-8", newline="\n")
 
@@ -995,7 +995,7 @@ def stamp_js_versions(page: Path, prefix: str, entry: str):
     else:
         html = html.replace("</head>", block + "\n</head>")
     html = re.sub(
-        r'src="(?:\.\./)?js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
+        r'src="(?:\.\./)*js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
         lambda m: f'src="{prefix}js/{entry}?v={digest(JS_DIR / entry)}"',
         html,
     )
@@ -1156,6 +1156,8 @@ def main():
     stamp_css_versions(ROOT / "seats" / "index.html", "../")
     stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
     stamp_seats_build()
+    stamp_css_versions(ROOT / "admin" / "calendar" / "index.html", "../../")
+    stamp_js_versions(ROOT / "admin" / "calendar" / "index.html", "../../", "calendar-app.js")
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain

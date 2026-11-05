@@ -20,9 +20,9 @@ function adminShellFixture({ open = true, hash = '' } = {}) {
   const location = { hash };
   const scope = {
     console, Event, Map, Set, location, ADMIN_NAV_SECTIONS, ADMIN_TAB_LABELS,
-    document: { addEventListener() {}, getElementById(id) { return id === 'main' ? main : nav; }, querySelector() { return element(); }, createElement: element },
+    document: { body: element(), addEventListener() {}, getElementById(id) { return id === 'main' ? main : nav; }, querySelector() { return element(); }, createElement: element },
     window: { scrollY: 0, scrollTo() {}, addEventListener(name, fn) { listeners.set(name, fn); }, dispatchEvent(event) { calls.push(event.type); } },
-    loadState: () => ({ sheets: [], settings: {} }), saveState() {}, wireSecretDoor() {},
+    loadState: () => ({ sheets: [], settings: {} }), saveState() {}, wireSecretDoor() {}, resolveSettings: value => value,
     installTimeExplanations() {}, installZmanimReferences() {}, setPrintPage() {}, keepPosition: (_, draw) => draw(),
     loadTables: async () => { calls.push('loadTables'); return {}; }, showDataError() {},
     isOpen: () => open, renderLock: (_, callback) => { unlock = callback; calls.push('lock'); },
@@ -32,6 +32,7 @@ function adminShellFixture({ open = true, hash = '' } = {}) {
     scope[`render${name}`] = () => calls.push(`render${name}`);
   }
   scope.renderWebsitePreview = () => { calls.push('renderWebsitePreview'); return () => calls.push('disposeWebsitePreview'); };
+  scope.renderCalendar = () => { calls.push('renderCalendar'); return () => calls.push('disposeCalendar'); };
   const context = vm.createContext(scope);
   vm.runInContext(adminShellSource.replace(/^import .*;\r?\n/gm, '')
     + '\nglobalThis.adminShell = { openTab, readRoute, current: () => currentTab };', context);
@@ -65,6 +66,18 @@ test('locked admin neither renders tabs nor dispatches an open event on hash cha
   assert(f.calls.includes('renderTraffic'));
   f.scope.openTab('home');
   assert.equal(f.calls.filter(name => name === 'zmanim-admin-open').length, 1);
+});
+
+test('calendar stays behind the admin entry and disposes its view when navigating away', async () => {
+  const f = adminShellFixture({ hash: '#calendar' });
+  await f.ready();
+  assert(f.calls.includes('renderCalendar'));
+  assert.match(f.nav.innerHTML, /href="#calendar"/);
+  f.hashChange('#preview');
+  assert(f.calls.includes('disposeCalendar'));
+  const locked = adminShellFixture({ open: false, hash: '#calendar' });
+  await locked.ready();
+  assert.deepEqual(locked.calls, ['lock']);
 });
 
 test('existing direct links and chart navigation retain their routes', async () => {
