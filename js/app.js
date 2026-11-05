@@ -1,3 +1,5 @@
+import { renderCalendar } from './ui/calendar-view.js';
+import { resolveSettings } from './settings.js';
 import { buildAutomaticCharts } from './publish.js';
 import { loadState, saveState } from './storage.js';
 import { loadTables, showDataError } from './data-loader.js';
@@ -27,6 +29,7 @@ let currentTab = 'home';
 let adminStarted = false;
 let currentSheetId = null;
 let disposeWebsitePreview = null;
+let disposeCalendar = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
@@ -61,7 +64,7 @@ const nav = document.getElementById('nav');
 installTimeExplanations(main, document.querySelector('.sidebar-foot'));
 installZmanimReferences(main, document.querySelector('.sidebar-foot'));
 // Keep existing hashes so saved links and the chart workflows continue to work.
-const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'preview', 'status', 'settings', 'traffic', 'program', 'guide'];
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'preview', 'calendar', 'status', 'settings', 'traffic', 'program', 'guide'];
 const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
@@ -120,6 +123,7 @@ window.addEventListener('hashchange', () => { if (adminStarted && tables && read
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
 // stays a single self-contained folder with no extra assets to load.
 const tabIcons = {
+  calendar: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3M6.5 12h1M10 12h1M13.5 12h1M6.5 15h1M10 15h1"/>',
   home: '<path d="M3 9.5 10 3.5l7 6"/><path d="M4.8 8.2v8.3h10.4V8.2M8.2 16.5v-5h3.6v5"/>',
   screen: '<rect x="2" y="3.5" width="16" height="11" rx="1.5"/><path d="M10 14.5v3M6.5 17.5h7"/>',
   generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
@@ -247,6 +251,9 @@ function render() {
 }
 
 function paint() {
+  document.body.classList.toggle('is-calendar-admin', currentTab === 'calendar' && !currentSheetId);
+  disposeCalendar?.();
+  disposeCalendar = null;
   disposeWebsitePreview?.();
   disposeWebsitePreview = null;
   setPrintPage('letter landscape');
@@ -255,7 +262,7 @@ function paint() {
   // a column next to the sidebar. Saved sheets gets a wider one: it's a seven-column table,
   // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
-  main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
+  main.classList.toggle('is-wide', !currentSheetId && ['saved', 'calendar'].includes(currentTab));
   if (currentTab !== 'posters' || currentSheetId) main.classList.remove('is-special-schedules', 'is-half-letter-print', 'is-half-paired-print');
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
@@ -281,6 +288,8 @@ function paint() {
     renderAdminHome(main, openTab);
   } else if (currentTab === 'preview') {
     disposeWebsitePreview = renderWebsitePreview(main);
+  } else if (currentTab === 'calendar') {
+    disposeCalendar = renderCalendar(main, resolveSettings(state.settings), tables);
   } else if (currentTab === 'settings') {
     renderSettings(
       main,
