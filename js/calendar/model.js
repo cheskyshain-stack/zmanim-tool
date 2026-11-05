@@ -1,5 +1,5 @@
 import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
-import { hebrewDateExtended, jewishDateString, hasParsha, hasYomTov, hasRoshChodesh, hasTaanis, hasSpecialParsha, JEWISH_MONTHS_EN } from '../hebrew-calendar.js';
+import { hebrewDateExtended, jewishDateString, hebrewYear, dateFromHebrew, hasParsha, hasYomTov, hasRoshChodesh, hasTaanis, hasBehab, hasSpecialParsha, isShabbosMevarchim, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 
 export const CALENDAR_TYPES = [
   { id: 'kiddush', label: 'Kiddush', compact: 'Kiddush', colour: '#24736c' },
@@ -52,6 +52,35 @@ export function calendarEventsOn(events, date) {
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.time.localeCompare(b.time) || a.title.localeCompare(b.title));
 }
 
+// Calendar wording follows the supplied monthly-calendar examples. These labels
+// do not replace the workbook's holiday names or change any minyan calculations.
+function calendarHoliday(serial, hebrew, settings, table) {
+  const source = hasYomTov(serial, settings, table);
+  const { month, dayOfMonth: day } = hebrew;
+  if (month === 1) {
+    if (day === 14) return 'ערב פסח';
+    if (day === 20) return 'ערב ז׳ פסח';
+    if (source.includes('חול המועד')) return 'חול המועד';
+    if (source === 'פסח') return ({ 15: 'א׳ פסח', 16: 'ב׳ פסח', 21: 'ז׳ פסח', 22: 'ח׳ פסח' })[day] || source;
+  }
+  if (month === 9 && day === 24) return 'ערב חנוכה';
+  if (source.includes('חול המועד')) return 'חול המועד';
+  return source;
+}
+
+function calendarRainPrayer(serial, hebrew, settings) {
+  if (settings.inIsrael) return hebrew.month === 8 && hebrew.dayOfMonth === 7;
+  const year = dateFromSerial(serial).getUTCFullYear();
+  // The diaspora's first daytime date is normally Dec 5, Dec 6 before a Julian
+  // leap year. Gregorian/Julian century drift remains relevant after 2099.
+  // Its first recitation is the preceding evening; a Shabbos start waits until
+  // Motzaei Shabbos, displayed under Sunday's Hebrew date in the reference style.
+  const drift = Math.floor(year / 100) - Math.floor(year / 400) - 15;
+  let start = calendarSerial(`${year}-12-${String(5 + drift + ((year + 1) % 4 === 0 ? 1 : 0)).padStart(2, '0')}`);
+  if (dateFromSerial(start).getUTCDay() === 6) start++;
+  return serial === start;
+}
+
 export function calendarMonth(month, settings, tables) {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Choose a valid month.');
   const first = calendarSerial(month + '-01');
@@ -59,23 +88,31 @@ export function calendarMonth(month, settings, tables) {
   const date = dateFromSerial(first), year = date.getUTCFullYear(), index = date.getUTCMonth();
   const last = first + new Date(Date.UTC(year, index + 1, 0)).getUTCDate() - 1;
   const start = first - date.getUTCDay(), count = Math.ceil((last - start + 1) / 7) * 7;
-  const english = { ...settings, english: true };
+  const hebrewSettings = { ...settings, english: false };
   const days = Array.from({ length: count }, (_, offset) => {
     const serial = start + offset, iso = calendarISO(serial), hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
     const label = jewishDateString(serial, false, settings.useGregorianBefore1582);
-    const holiday = hasYomTov(serial, english, tables.specialDays);
-    const roshChodesh = hasRoshChodesh(serial, english);
-    const fast = hasTaanis(serial, english);
-    const special = hasSpecialParsha(serial, english);
-    const parsha = hasParsha(serial, settings, tables);
-    const facts = [...new Set([holiday, roshChodesh, fast].filter(Boolean))];
+    const holiday = calendarHoliday(serial, hebrew, hebrewSettings, tables.specialDays);
+    const roshChodesh = hasRoshChodesh(serial, hebrewSettings).replace(/^ראש חדש /, 'ר״ח ');
+    const fast = hasTaanis(serial, hebrewSettings);
+    const special = hasSpecialParsha(serial, hebrewSettings);
+    const specialLabel = special ? (['שובה', 'שירה', 'הגדול', 'חזון', 'נחמו'].includes(special) ? 'שבת ' + special : special) : '';
+    const parsha = hasParsha(serial, hebrewSettings, tables);
+    const mevarchim = isShabbosMevarchim(serial, hebrewSettings);
+    const bechoros = dateFromHebrew(14, 1, hebrew.year);
+    const bechorosDate = dateFromSerial(bechoros).getUTCDay() === 6 ? bechoros - 2 : bechoros;
+    const yizkor = hebrew.month === 7 && [10, 22].includes(hebrew.dayOfMonth)
+      || hebrew.month === 1 && hebrew.dayOfMonth === (settings.inIsrael ? 21 : 22)
+      || hebrew.month === 3 && hebrew.dayOfMonth === (settings.inIsrael ? 6 : 7);
+    const facts = [...new Set([holiday, roshChodesh, fast, serial === bechorosDate ? 'ת׳ בכורים' : '',
+      hasBehab(serial, hebrewSettings), calendarRainPrayer(serial, hebrew, settings) ? 'טל ומטר' : '', yizkor ? 'יזכור' : ''].filter(Boolean))];
     return { serial, iso, inMonth: serial >= first && serial <= last, day: dateFromSerial(serial).getUTCDate(),
-      hebrew, hebrewLabel: label, hebrewDay: label.split(' ')[0], parsha, special, facts,
+      hebrew, hebrewLabel: label, hebrewDay: label.split(' ')[0].replace(/[׳״]/g, ''), parsha, special, specialLabel, mevarchim, facts,
       shabbos: dateFromSerial(serial).getUTCDay() === 6 };
   });
   const a = hebrewDateExtended(first, settings.useGregorianBefore1582), b = hebrewDateExtended(last, settings.useGregorianBefore1582);
-  const hebrewRange = a.month === b.month ? `${JEWISH_MONTHS_EN[a.month - 1]} ${a.year}`
-    : `${JEWISH_MONTHS_EN[a.month - 1]}${a.year === b.year ? '' : ' ' + a.year} - ${JEWISH_MONTHS_EN[b.month - 1]} ${b.year}`;
+  const hebrewRange = a.month === b.month ? `${JEWISH_MONTHS_HE[a.month - 1]} ${hebrewYear(a.year)}`
+    : `${JEWISH_MONTHS_HE[a.month - 1]}${a.year === b.year ? '' : ' ' + hebrewYear(a.year)} - ${JEWISH_MONTHS_HE[b.month - 1]} ${hebrewYear(b.year)}`;
   return { month, first: calendarISO(first), last: calendarISO(last), days, hebrewRange,
     title: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date) };
 }

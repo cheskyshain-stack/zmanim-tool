@@ -1008,6 +1008,16 @@ The calendar uses its own navy, cream and gold CSS, with plain-text event types 
 colours. Do not let global chart table stripes, fonts or borders alter its cells.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
+Calendar cells keep the English number at the top left and the unpunctuated Hebrew
+day at the bottom right, with clear space around both. The Hebrew month/year range,
+holiday wording and parshas always use Hebrew, independently of the schedule language.
+Follow the supplied April 2028 and December 2027 references: compact ר״ח, numbered
+פסח and חנוכה, חול המועד, שבת הגדול, מברכים, יזכור and בה״ב. Calendar-only wording
+and observances must not change the shared engine's labels or minyan calculations.
+The טל ומטר marker is the first daytime date whose preceding evening starts recitation,
+including the diaspora's Shabbos deferral and Gregorian/Julian century drift.
+`tests/calendar-hebrew-layout.cjs` measures both reference months on phone and desktop,
+including crowded event cells, to keep text and event markers above the Hebrew date.
 
 With `data/calendar.json` blank, only main admin gets device preview storage. Label
 that limitation. Examples are optional and are never persisted. Keep backup/restore

@@ -33,15 +33,55 @@ test('Hebrew dates, Jewish holidays, leap Adars and known parshas appear on thei
   const september = calendarMonth('2026-09', settings, tables);
   const rh = september.days.find(day => day.iso === '2026-09-12');
   assert.deepEqual([rh.hebrew.dayOfMonth, rh.hebrew.month, rh.hebrew.year], [1, 7, 5787]);
-  assert(rh.facts.some(value => /Rosh/i.test(value))); assert.equal(rh.parsha, '');
-  assert(september.days.find(day => day.iso === '2026-09-21').facts.some(value => /Kippur/i.test(value)));
+  assert(rh.facts.some(value => /ראש השנה/.test(value))); assert.equal(rh.parsha, '');
+  assert(september.days.find(day => day.iso === '2026-09-21').facts.some(value => /כפור|כיפור/.test(value)));
   const november = calendarMonth('2026-11', settings, tables);
   assert.equal(november.days.find(day => day.iso === '2026-11-07').parsha, 'חיי שרה');
-  for (const date of ['2026-11-10', '2026-11-11']) assert(november.days.find(day => day.iso === date).facts.includes('Rosh Chodesh Kislev'));
-  assert(calendarMonth('2024-02', settings, tables).hebrewRange.includes('Adar I'));
-  assert(calendarMonth('2024-03', settings, tables).hebrewRange.includes('Adar II'));
+  for (const date of ['2026-11-10', '2026-11-11']) assert(november.days.find(day => day.iso === date).facts.includes('ר״ח כסלו'));
+  assert(calendarMonth('2024-02', settings, tables).hebrewRange.includes('אדר א׳'));
+  assert(calendarMonth('2024-03', settings, tables).hebrewRange.includes('אדר ב׳'));
   const december = calendarMonth('2026-12', settings, tables);
-  assert(december.days.find(day => day.iso === '2026-12-05').facts.some(value => /Chanuk/i.test(value)));
+  assert(december.days.find(day => day.iso === '2026-12-05').facts.some(value => /חנוכה/.test(value)));
+});
+
+test('Hebrew wording matches the April 2028 and December 2027 reference calendars', () => {
+  const day = date => calendarMonth(date.slice(0, 7), settings, tables).days.find(item => item.iso === date);
+  assert.equal(calendarMonth('2028-04', settings, tables).hebrewRange, 'ניסן - אייר תשפ״ח');
+  assert.equal(day('2028-04-01').hebrewDay, 'ה');
+  assert.equal(day('2028-04-08').specialLabel, 'שבת הגדול');
+  assert.deepEqual(day('2028-04-10').facts, ['ערב פסח', 'ת׳ בכורים']);
+  assert(day('2028-04-11').facts.includes('א׳ פסח'));
+  assert(day('2028-04-12').facts.includes('ב׳ פסח'));
+  assert(day('2028-04-13').facts.includes('חול המועד'));
+  assert(day('2028-04-16').facts.includes('ערב ז׳ פסח'));
+  assert(day('2028-04-17').facts.includes('ז׳ פסח'));
+  assert.deepEqual(day('2028-04-18').facts, ['ח׳ פסח', 'יזכור']);
+  assert(day('2028-04-22').mevarchim);
+  assert(day('2028-04-26').facts.includes('ר״ח אייר'));
+  assert(day('2028-04-27').facts.includes('ר״ח אייר'));
+  assert(day('2028-05-01').facts.includes('בה״ב'));
+  assert(day('2027-12-06').facts.includes('טל ומטר'));
+  assert(day('2027-12-24').facts.includes('ערב חנוכה'));
+  assert(day('2027-12-25').facts.includes('א׳ חנוכה'));
+  assert.equal(day('2027-12-25').parsha, 'וישב'); assert(day('2027-12-25').mevarchim);
+  assert.deepEqual(day('2027-12-30').facts, ['ו׳ חנוכה', 'ר״ח טבת']);
+  assert.deepEqual(day('2027-12-31').facts, ['ז׳ חנוכה', 'ר״ח טבת']);
+  assert.deepEqual(day('2028-01-01').facts, ['ח׳ חנוכה']);
+  const english = calendarMonth('2028-04', { ...settings, english: true }, tables);
+  assert.equal(english.days.find(item => item.iso === '2028-04-01').parsha, 'ויקרא');
+  for (const date of english.days) assert(!/[a-z]/i.test(date.facts.join(' ') + date.specialLabel + date.parsha));
+});
+
+test('firstborn fast shifts from Shabbos and rain-prayer labels follow the first recitation day', () => {
+  const date = iso => calendarMonth(iso.slice(0, 7), settings, tables).days.find(day => day.iso === iso);
+  assert(date('2025-04-10').facts.includes('ת׳ בכורים'));
+  assert(!date('2025-04-12').facts.includes('ת׳ בכורים'));
+  assert(!date('2026-12-05').facts.includes('טל ומטר'));
+  assert(date('2026-12-06').facts.includes('טל ומטר'));
+  assert(date('2028-12-05').facts.includes('טל ומטר'));
+  assert(date('2103-12-07').facts.includes('טל ומטר'));
+  const israel = calendarMonth('2026-10', { ...settings, inIsrael: true }, tables);
+  assert(israel.days.find(day => day.hebrew.month === 8 && day.hebrew.dayOfMonth === 7).facts.includes('טל ומטר'));
 });
 
 test('month stepping and date parsing retain calendar dates without local timezone shifts', () => {

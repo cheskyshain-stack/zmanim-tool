@@ -3754,6 +3754,35 @@ function calendarEventsOn(events, date) {
     .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.time.localeCompare(b.time) || a.title.localeCompare(b.title));
 }
 
+// Calendar wording follows the supplied monthly-calendar examples. These labels
+// do not replace the workbook's holiday names or change any minyan calculations.
+function calendarHoliday(serial, hebrew, settings, table) {
+  const source = hasYomTov(serial, settings, table);
+  const { month, dayOfMonth: day } = hebrew;
+  if (month === 1) {
+    if (day === 14) return 'ערב פסח';
+    if (day === 20) return 'ערב ז׳ פסח';
+    if (source.includes('חול המועד')) return 'חול המועד';
+    if (source === 'פסח') return ({ 15: 'א׳ פסח', 16: 'ב׳ פסח', 21: 'ז׳ פסח', 22: 'ח׳ פסח' })[day] || source;
+  }
+  if (month === 9 && day === 24) return 'ערב חנוכה';
+  if (source.includes('חול המועד')) return 'חול המועד';
+  return source;
+}
+
+function calendarRainPrayer(serial, hebrew, settings) {
+  if (settings.inIsrael) return hebrew.month === 8 && hebrew.dayOfMonth === 7;
+  const year = dateFromSerial(serial).getUTCFullYear();
+  // The diaspora's first daytime date is normally Dec 5, Dec 6 before a Julian
+  // leap year. Gregorian/Julian century drift remains relevant after 2099.
+  // Its first recitation is the preceding evening; a Shabbos start waits until
+  // Motzaei Shabbos, displayed under Sunday's Hebrew date in the reference style.
+  const drift = Math.floor(year / 100) - Math.floor(year / 400) - 15;
+  let start = calendarSerial(`${year}-12-${String(5 + drift + ((year + 1) % 4 === 0 ? 1 : 0)).padStart(2, '0')}`);
+  if (dateFromSerial(start).getUTCDay() === 6) start++;
+  return serial === start;
+}
+
 function calendarMonth(month, settings, tables) {
   if (!/^\d{4}-\d{2}$/.test(month)) throw new Error('Choose a valid month.');
   const first = calendarSerial(month + '-01');
@@ -3761,23 +3790,31 @@ function calendarMonth(month, settings, tables) {
   const date = dateFromSerial(first), year = date.getUTCFullYear(), index = date.getUTCMonth();
   const last = first + new Date(Date.UTC(year, index + 1, 0)).getUTCDate() - 1;
   const start = first - date.getUTCDay(), count = Math.ceil((last - start + 1) / 7) * 7;
-  const english = { ...settings, english: true };
+  const hebrewSettings = { ...settings, english: false };
   const days = Array.from({ length: count }, (_, offset) => {
     const serial = start + offset, iso = calendarISO(serial), hebrew = hebrewDateExtended(serial, settings.useGregorianBefore1582);
     const label = jewishDateString(serial, false, settings.useGregorianBefore1582);
-    const holiday = hasYomTov(serial, english, tables.specialDays);
-    const roshChodesh = hasRoshChodesh(serial, english);
-    const fast = hasTaanis(serial, english);
-    const special = hasSpecialParsha(serial, english);
-    const parsha = hasParsha(serial, settings, tables);
-    const facts = [...new Set([holiday, roshChodesh, fast].filter(Boolean))];
+    const holiday = calendarHoliday(serial, hebrew, hebrewSettings, tables.specialDays);
+    const roshChodesh = hasRoshChodesh(serial, hebrewSettings).replace(/^ראש חדש /, 'ר״ח ');
+    const fast = hasTaanis(serial, hebrewSettings);
+    const special = hasSpecialParsha(serial, hebrewSettings);
+    const specialLabel = special ? (['שובה', 'שירה', 'הגדול', 'חזון', 'נחמו'].includes(special) ? 'שבת ' + special : special) : '';
+    const parsha = hasParsha(serial, hebrewSettings, tables);
+    const mevarchim = isShabbosMevarchim(serial, hebrewSettings);
+    const bechoros = dateFromHebrew(14, 1, hebrew.year);
+    const bechorosDate = dateFromSerial(bechoros).getUTCDay() === 6 ? bechoros - 2 : bechoros;
+    const yizkor = hebrew.month === 7 && [10, 22].includes(hebrew.dayOfMonth)
+      || hebrew.month === 1 && hebrew.dayOfMonth === (settings.inIsrael ? 21 : 22)
+      || hebrew.month === 3 && hebrew.dayOfMonth === (settings.inIsrael ? 6 : 7);
+    const facts = [...new Set([holiday, roshChodesh, fast, serial === bechorosDate ? 'ת׳ בכורים' : '',
+      hasBehab(serial, hebrewSettings), calendarRainPrayer(serial, hebrew, settings) ? 'טל ומטר' : '', yizkor ? 'יזכור' : ''].filter(Boolean))];
     return { serial, iso, inMonth: serial >= first && serial <= last, day: dateFromSerial(serial).getUTCDate(),
-      hebrew, hebrewLabel: label, hebrewDay: label.split(' ')[0], parsha, special, facts,
+      hebrew, hebrewLabel: label, hebrewDay: label.split(' ')[0].replace(/[׳״]/g, ''), parsha, special, specialLabel, mevarchim, facts,
       shabbos: dateFromSerial(serial).getUTCDay() === 6 };
   });
   const a = hebrewDateExtended(first, settings.useGregorianBefore1582), b = hebrewDateExtended(last, settings.useGregorianBefore1582);
-  const hebrewRange = a.month === b.month ? `${JEWISH_MONTHS_EN[a.month - 1]} ${a.year}`
-    : `${JEWISH_MONTHS_EN[a.month - 1]}${a.year === b.year ? '' : ' ' + a.year} - ${JEWISH_MONTHS_EN[b.month - 1]} ${b.year}`;
+  const hebrewRange = a.month === b.month ? `${JEWISH_MONTHS_HE[a.month - 1]} ${hebrewYear(a.year)}`
+    : `${JEWISH_MONTHS_HE[a.month - 1]}${a.year === b.year ? '' : ' ' + hebrewYear(a.year)} - ${JEWISH_MONTHS_HE[b.month - 1]} ${hebrewYear(b.year)}`;
   return { month, first: calendarISO(first), last: calendarISO(last), days, hebrewRange,
     title: new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(date) };
 }
@@ -3912,7 +3949,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const info = calendarMonth(date.slice(0, 7), settings, tables), day = info.days.find(item => item.iso === date);
     const list = calendarEventsOn(visibleEvents(), date);
     return `<div class="cal-day-heading"><p class="cal-eyebrow">${date === today ? 'Today' : 'Selected day'}</p><h3>${calEscape(calFullDate(date))}</h3><p lang="he" dir="rtl">${calEscape(day.hebrewLabel)}</p></div>
-      ${day.facts.length || day.parsha ? `<div class="cal-day-facts">${day.facts.map(fact => `<p>${calEscape(fact)}</p>`).join('')}${day.parsha ? `<p lang="he" dir="rtl">פרשת ${calEscape(day.parsha)}${day.special ? ' · ' + calEscape(day.special) : ''}</p>` : ''}</div>` : ''}
+      ${day.facts.length || day.parsha || day.specialLabel || day.mevarchim ? `<div class="cal-day-facts" lang="he" dir="rtl">${day.specialLabel ? `<p>${calEscape(day.specialLabel)}</p>` : ''}${day.facts.map(fact => `<p>${calEscape(fact)}</p>`).join('')}${day.parsha ? `<p>פרשת ${calEscape(day.parsha)}</p>` : ''}${day.mevarchim ? '<p>מברכים</p>' : ''}</div>` : ''}
       <div class="cal-day-events">${busy ? '<p class="cal-empty">Loading events…</p>' : loadError ? `<p class="cal-error">${calEscape(loadError)}</p><button type="button" data-cal-reload>Try again</button>` : list.length ? list.map(eventCard).join('') : '<p class="cal-empty">Nothing added yet.<br>Add a simcha, schedule or announcement.</p>'}</div>
       <p class="cal-error cal-day-status" role="status"></p><button type="button" class="cal-primary cal-day-add" data-cal-add="${date}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add an event</button>`;
   }
@@ -3938,16 +3975,15 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><button type="button" data-cal-access>Calendar access</button></div>
       <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
       <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div><button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button></header>
-        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p>${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
+        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         <div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div>
         <div class="cal-content"><div class="cal-grid-wrap"><table class="cal-grid" aria-label="${escAttr(info.title)}"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks.map(week => `<tr>${week.map(day => {
           const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calEventType(event.type).label}: ${event.title}`);
-          const label = [calFullDate(day.iso), day.hebrewLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', ...labels].filter(Boolean).join('. ');
-          return `<td class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${day.iso < '1900-01-01' || day.iso > '2299-12-31' ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span><span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></span>
-            ${day.hebrew.dayOfMonth === 1 ? `<span class="cal-hebrew-month" lang="he" dir="rtl">${calEscape(day.hebrewLabel.split(' ').slice(1).join(' ').replace(/,.*$/, ''))}</span>` : ''}
-            <span class="cal-facts">${day.facts.slice(0, 2).map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha" lang="he" dir="rtl">${calEscape(day.parsha)}</span>` : ''}</span>
+          const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
+          return `<td class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${day.iso < '1900-01-01' || day.iso > '2299-12-31' ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
+            <span class="cal-facts" lang="he" dir="rtl">${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}</span>
             <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(event.title)}"><span class="cal-chip-type">${calEscape(calEventType(event.type).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
-            ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calEventType(list[0].type).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}</button></td>`;
+            ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calEventType(list[0].type).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
         <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${user.role === 'owner' ? 'Main admin' : 'Calendar editor'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
