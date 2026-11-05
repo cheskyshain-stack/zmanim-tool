@@ -24,7 +24,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
-  const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', headless: true });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless: true });
   const context = async width => {
     const ctx = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true });
     await ctx.addInitScript(() => {
@@ -140,6 +140,19 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     };
     assert.equal((await call('/api/events?from=2026-11-01&to=2026-11-30')).status, 401);
     assert.equal((await call('/api/info', 'GET', null, null, 'https://unrelated.example')).status, 403);
+    const previewCtx = await context(375), previewPage = await previewCtx.newPage();
+    const previewRaw = JSON.stringify({ version: 1, events: [{ id: 'retained-preview', title: 'Existing device event', type: 'kiddush', date: '2026-11-07', endDate: '2026-11-07', allDay: true, revision: 1 }] });
+    await previewCtx.addInitScript(raw => localStorage.setItem('lakewood-commons-calendar-preview-v1', raw), previewRaw);
+    await previewPage.goto(origin + '/admin/#calendar');
+    await previewPage.getByRole('heading', { name: 'Calendar sign in' }).waitFor();
+    await previewPage.getByText('Previous device preview', { exact: true }).click();
+    const previewDownload = previewPage.waitForEvent('download');
+    await previewPage.getByRole('button', { name: 'Download device preview backup', exact: true }).click();
+    const previewBackup = path.join(output, 'retained-preview.json'); await (await previewDownload).saveAs(previewBackup);
+    assert.equal(fs.readFileSync(previewBackup, 'utf8'), previewRaw, 'Connecting shared accounts retains the original device backup');
+    assert.equal(await previewPage.evaluate(() => localStorage.getItem('lakewood-commons-calendar-preview-v1')), previewRaw);
+    assert(await previewPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+    await previewCtx.close();
     const ownerCtx = await context(1440), ownerPage = await ownerCtx.newPage();
     await ownerPage.goto(origin + '/admin/calendar/#setup=' + setupToken);
     await ownerPage.getByRole('heading', { name: 'Set up calendar access' }).waitFor();

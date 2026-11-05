@@ -10,8 +10,11 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('../', import.meta.url));
 const config = path.join(root, 'worker/calendar/wrangler.jsonc');
 function wrangler(args, input) {
-  const executable = process.env.CALENDAR_WRANGLER_BIN || 'npx';
-  const command = process.env.CALENDAR_WRANGLER_BIN ? args : ['--yes', 'wrangler@4.152.0', ...args];
+  const windows = !process.env.CALENDAR_WRANGLER_BIN && process.platform === 'win32';
+  const executable = process.env.CALENDAR_WRANGLER_BIN || (windows ? process.execPath : 'npx');
+  const command = process.env.CALENDAR_WRANGLER_BIN ? args : windows
+    ? [path.join(root, 'worker/calendar/node_modules/wrangler/bin/wrangler.js'), ...args]
+    : ['--yes', 'wrangler@4.152.0', ...args];
   const result = spawnSync(executable, command, { cwd: root, input, encoding: 'utf8', env: { ...process.env, WRANGLER_SEND_METRICS: 'false' }, stdio: ['pipe', 'pipe', 'inherit'] });
   if (result.status !== 0) throw new Error('Cloudflare could not complete the calendar setup. Check the authorized account and rerun this command.');
   return result.stdout;
@@ -21,7 +24,13 @@ const deployment = wrangler(['deploy', '--config', config]);
 const endpoint = deployment.match(/https:\/\/zmanim-calendar\.[a-z0-9-]+\.workers\.dev\b/)?.[0];
 if (!endpoint) throw new Error('Cloudflare did not return a calendar service URL. The website connection was left unchanged.');
 const origin = 'https://' + (await readFile(path.join(root, 'CNAME'), 'utf8')).trim();
-const info = await fetch(endpoint + '/api/info', { headers: { Origin: origin } });
+let info;
+for (let attempt = 0; attempt < 5; attempt++) {
+  info = await fetch(endpoint + '/api/info', { headers: { Origin: origin } });
+  if (info.ok || ![404, 429, 500, 502, 503, 504].includes(info.status) || attempt === 4) break;
+  await info.body?.cancel();
+  await new Promise(resolve => setTimeout(resolve, 2000));
+}
 if (!info.ok) throw new Error('The calendar service could not be verified. The website connection was left unchanged.');
 const state = await info.json();
 if (!state.private || !state.accounts) throw new Error('The service is not the expected private calendar.');

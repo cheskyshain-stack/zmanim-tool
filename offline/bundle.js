@@ -3833,6 +3833,20 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const dialogs = new Set();
   container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
 
+  function previewBackupMarkup() {
+    return standalone ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
+  }
+  function bindPreviewBackup(scope) {
+    scope.querySelector('[data-cal-preview-backup]')?.addEventListener('click', () => {
+      try {
+        const raw = localStorage.getItem(CALENDAR_STORAGE_KEY) || JSON.stringify({ version: 1, events: [] });
+        const url = URL.createObjectURL(new Blob([raw], { type: 'application/json' })), link = document.createElement('a');
+        link.href = url; link.download = 'lakewood-commons-calendar-preview-backup.json'; link.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } catch { scope.querySelector('[data-cal-preview-status]').textContent = 'The stored preview could not be read for backup. Try again on the device that created it.'; }
+    });
+  }
+
   function dialog(html, { onClose } = {}) {
     const previous = document.activeElement, el = document.createElement('dialog');
     el.className = 'cal-dialog no-print'; el.setAttribute('aria-labelledby', 'cal-dialog-title');
@@ -4077,7 +4091,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     if (user.role !== 'owner') {
       const view = dialog('<p>Your calendar account can add events and edit or delete the events you created. Other admin pages and account management stay with the main admin.</p>'); view.title('Your calendar access'); return;
     }
-    const view = dialog('<p>Editors choose their own password from a private invitation. They can manage their own events; you can manage every event.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a calendar editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>');
+    const view = dialog('<p>Editors choose their own password from a private invitation. They can manage their own events; you can manage every event.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a calendar editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
+    bindPreviewBackup(view.el);
     view.title('Calendar accounts');
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
@@ -4115,7 +4130,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       ${setupToken ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
       <label>Password<input name="password" type="password" minlength="12" maxlength="200" required autocomplete="${creating ? 'new-password' : 'current-password'}"></label>
       ${creating ? '<label>Confirm password<input name="confirmation" type="password" minlength="12" maxlength="200" required autocomplete="new-password"></label><p class="cal-form-note">Use at least 12 characters. Save your password for future sign-ins.</p>' : ''}
-      <p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form></section>`;
+      <p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${previewBackupMarkup()}</section>`;
+    bindPreviewBackup(container);
     container.querySelector('form').addEventListener('submit', async event => {
       event.preventDefault(); const button = event.submitter, fields = Object.fromEntries(new FormData(event.currentTarget));
       const status = container.querySelector('[role=status]'); button.disabled = true;

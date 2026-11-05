@@ -1025,6 +1025,9 @@ and verified with the user's Cloudflare account. `scripts/activate-calendar.mjs`
 stores the private setup link outside Git and preserves an existing owner. The main
 calendar admin must set their own server password; never derive owner authority from
 the client-side admin PIN. Activation does not publish a congregation calendar.
+After activation, the main admin sign-in and Calendar access screens retain
+Previous device preview backup. It downloads the exact existing local data without
+uploading it or replacing it with shared events. Calendar-only accounts do not see it.
 
 `tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
