@@ -39,23 +39,24 @@
 .cal-grid-wrap { min-width:0; }
 .cal-grid { width:100%; table-layout:fixed; border-collapse:collapse; font:400 .8rem/1.3 system-ui,sans-serif; }
 .cal-grid thead th { background:#f6f4ee; padding:.65rem .1rem; color:#6d726e; font-size:.7rem; font-weight:600; border:0; border-bottom:1px solid #e3dfd3; text-align:center; }
-.shul-calendar .cal-grid td { padding:0; border:1px solid #e5e7e6; background:#fff; vertical-align:top; height:124px; }
+.shul-calendar .cal-grid td { position:relative; padding:0; border:1px solid #e5e7e6; background:#fff; vertical-align:top; height:124px; }
 .cal-grid td:first-child { border-left:0; }
 .cal-grid td:last-child { border-right:0; }
 .cal-grid tr:last-child td { border-bottom:0; }
-.cal-grid .cal-day { display:flex; flex-direction:column; align-items:stretch; gap:.15rem; width:100%; height:100%; min-height:124px; padding:.45rem .35rem; border:2px solid transparent; border-radius:0; text-align:left; font-weight:400; background:transparent; }
+.cal-grid .cal-day { position:static; display:flex; flex-direction:column; align-items:stretch; gap:.15rem; width:100%; height:100%; min-height:124px; padding:.45rem .35rem 1.8rem; border:2px solid transparent; border-radius:0; text-align:left; font-weight:400; background:transparent; }
 .cal-grid .cal-day:hover:not(:disabled) { background:#f7f7f1; border-color:#c6b98c; }
 .cal-grid .cal-day.is-selected { background:#f7f5ec; border-color:#ac914d; }
 .shul-calendar .cal-grid td.cal-shabbos { background:#f6f8fb; }
 .cal-outside .cal-day { opacity:.48; }
-.cal-date-numbers { display:flex; align-items:center; justify-content:space-between; gap:.1rem; min-height:25px; }
+.cal-date-numbers { display:flex; align-items:center; justify-content:flex-start; gap:.1rem; min-height:25px; }
 .cal-english-day { display:inline-flex; justify-content:center; align-items:center; min-width:25px; height:25px; font-size:.9rem; font-weight:600; }
 .is-today .cal-english-day { background:#142b46; color:#fff; border-radius:50%; }
-.cal-hebrew-day { font-family:Arial,sans-serif; font-size:.75rem; color:#75786f; }
-.cal-hebrew-month { color:#8c7338; font:600 .7rem/1.2 Arial,sans-serif; text-align:right; }
-.cal-facts { display:flex; flex-direction:column; gap:.1rem; margin:.1rem 0 .15rem; }
-.cal-facts > span { color:#87691e; font-size:.66rem; line-height:1.25; overflow-wrap:anywhere; }
+.cal-hebrew-day { position:absolute; bottom:.4rem; right:.4rem; font:400 1rem/1 Arial,sans-serif; color:#75786f; }
+.cal-shabbos .cal-hebrew-day { color:#263e5a; }
+.cal-facts { display:flex; flex-direction:column; gap:.1rem; margin:.1rem 0 .15rem; text-align:center; }
+.cal-facts > span { color:#87691e; font:400 .78rem/1.25 Arial,sans-serif; overflow-wrap:anywhere; }
 .cal-facts .cal-parsha { color:#263e5a; font-size:.8rem; font-weight:600; }
+.cal-facts .cal-observance { color:#465366; }
 .cal-grid-events { display:flex; flex-direction:column; gap:3px; margin-top:auto; }
 .cal-event-chip { display:block; background:var(--cal-tint); color:var(--cal-type); border-left:2px solid var(--cal-type); border-radius:3px; padding:3px; font-size:.65rem; font-weight:600; line-height:1.3; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .cal-chip-type { display:none; }
@@ -66,7 +67,7 @@
 .cal-day-heading > p:last-child { margin:.3rem 0 1rem; color:#667177; font-family:Arial,sans-serif; font-size:.9rem; text-align:left; }
 .cal-day-facts { border-block:1px solid #ece8dc; padding:.55rem 0; margin:.6rem 0 1rem; color:#896e2e; font-size:.8rem; }
 .cal-day-facts p { margin:.2rem 0; }
-.cal-day-facts [lang=he] { color:#142b46; text-align:left; font-size:1rem; }
+.cal-day-facts[lang=he] { text-align:right; font-size:1rem; }
 .cal-event-card { border:1px solid #e4e7e6; border-left:3px solid var(--cal-type); border-radius:8px; padding:.85rem; margin:.75rem 0; background:#fff; overflow-wrap:anywhere; }
 .cal-event-meta { display:flex; flex-wrap:wrap; gap:.4rem; color:#747b80; font-size:.72rem; }
 .cal-tag { display:inline-block; background:var(--cal-tint); color:var(--cal-type); padding:3px 6px; border-radius:4px; font-size:.65rem; font-weight:700; }
@@ -144,14 +145,12 @@
   .cal-legend { gap:.2rem .65rem; padding:0 .8rem .8rem; }
   .cal-legend > span { font-size:.65rem; }
   .cal-grid thead th { font-size:.6rem; }
-  .shul-calendar .cal-grid td { height:91px; }
-  .cal-grid .cal-day { padding:.25rem .15rem; min-height:91px; }
-  .cal-date-numbers { flex-direction:column; gap:1px; align-items:flex-start; }
+  .shul-calendar .cal-grid td { height:104px; }
+  .cal-grid .cal-day { padding:.25rem .15rem 1.45rem; min-height:104px; }
+  .cal-date-numbers { gap:1px; align-items:flex-start; }
   .cal-english-day { min-width:22px; height:22px; font-size:.8rem; }
-  .cal-hebrew-day { align-self:flex-end; font-size:.62rem; margin-top:-.55rem; }
-  .cal-hebrew-month { font-size:.57rem; }
-  .cal-facts > span { font-size:.55rem; }
-  .cal-facts .cal-parsha { font-size:.62rem; }
+  .cal-hebrew-day { font-size:.85rem; bottom:.3rem; right:.25rem; }
+  .cal-facts > span, .cal-facts .cal-parsha { font-size:clamp(9px,2.7vw,11px); }
   .cal-grid-events { display:none; }
   .cal-mobile-events { display:flex; flex-direction:column; align-items:stretch; gap:1px; margin-top:auto; }
   .cal-mobile-events > span { display:block; padding:2px 0; background:var(--cal-tint); color:var(--cal-type); border-left:2px solid var(--cal-type); border-radius:2px; font-size:8px; font-weight:700; text-align:center; letter-spacing:-.02em; }
