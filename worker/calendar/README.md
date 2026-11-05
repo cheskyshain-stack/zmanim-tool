@@ -77,3 +77,6 @@ Open the private setup file to create the owner account, then use Calendar acces
 invite the test editor. Any browser-only preview events remain local and are not
 automatically uploaded. Shared accounts require this activation before they work on
 the website. Publishing a congregation-facing calendar is a later, separate change.
+The main admin can still download Previous device preview backups from the calendar
+sign-in screen or Calendar access after connecting. Use the browser that created
+those events; the backup keeps its original stored data and does not upload it.
