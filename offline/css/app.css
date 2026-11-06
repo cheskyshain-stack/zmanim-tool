@@ -5859,6 +5859,8 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-item-copy { flex:1; min-width:0; text-align:left; }
  .is-home .luach-item-title { display:block; font:700 25px/1.2 Georgia,serif; }
  .luach-item-description { display:block; margin-top:4px; font:400 12px/1.4 Arial,sans-serif; color:#64707c; }
+ body.is-luach .is-home .luach-coming-soon-card:disabled { width:100%; background:#eceeef; border-color:#d7dbdf; color:#69747d; opacity:1; cursor:default; transform:none; box-shadow:none; text-align:left; }
+ .luach-coming-soon-tag { display:inline-block; margin-top:7px; padding:3px 8px; border-radius:5px; background:#dce0e3; color:#59646d; font:600 11px/1.3 Arial,sans-serif; }
  .is-home .luach-item:hover { box-shadow:0 4px 14px #142b4610; }
  .luach-site-footer { width:100%; max-width:1080px; margin:36px auto 0; padding:22px 0 0; border-top:1px solid #e5e2da; text-align:center; color:#576674; }
  .luach-site-footer .luach-foot-part:first-child { display:block; font:400 15px/1.5 Georgia,serif; }

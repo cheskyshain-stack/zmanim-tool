@@ -3853,6 +3853,16 @@ function calendarStepMonth(month, amount) {
   return date.toISOString().slice(0, 7);
 }
 
+function calendarReaderMonths(today) {
+  if (!Number.isFinite(calendarSerial(today))) throw new Error('Choose a valid calendar date.');
+  const current = today.slice(0, 7);
+  return {
+    first: current === '1900-01' ? current : calendarStepMonth(current, -1),
+    current,
+    last: current === '2299-12' ? current : calendarStepMonth(current, 1),
+  };
+}
+
 function calendarClock(time) {
   if (!time) return '';
   const [hour, minute] = time.split(':').map(Number);
@@ -4304,6 +4314,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const visibleEvents = () => [...events, ...sampleEvents()];
   const role = () => user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => user?.role === 'owner' && previewRole !== 'owner';
+  const reader = () => !!endpoint && role() === 'viewer';
+  const monthAllowed = value => !reader() || value >= calendarReaderMonths(today).first && value <= calendarReaderMonths(today).last;
+  const dateAllowed = value => value >= '1900-01-01' && value <= '2299-12-31' && monthAllowed(value.slice(0, 7));
   const canAdd = () => !endpoint || ['owner', 'editor'].includes(role());
   const canEdit = event => !event.example && (!endpoint || role() === 'owner' || role() === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
@@ -4338,45 +4351,98 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     if (disposed) return;
     keepPosition(container, draw);
   }
+  function viewChoice() {
+    return `<label class="cal-view-choice">View as<select data-cal-view aria-label="View calendar as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Calendar editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>`;
+  }
+  function bindViewChoice(scope, close = () => {}) {
+    scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
+      const next = event.target.value; close(); previewRole = next;
+      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
+      else { announcements.start(user, { previewRole: previewing() ? previewRole : '' }); redraw(); }
+    });
+  }
+  async function signOut() {
+    try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
+    calendarSession(null); user = null; events = []; signIn();
+  }
+  function readerOptions() {
+    const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p><a href="/texts/" target="_blank" rel="noopener noreferrer">Schedule messages</a></p><button type="button" data-cal-signout>Sign out</button>`);
+    view.title('Calendar options'); bindViewChoice(view.el, view.close);
+    view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
+  }
+  function fitReader() {
+    if (disposed) return;
+    const calendar = container.querySelector('.shul-calendar');
+    if (reader() && calendar && !standalone) {
+      const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
+      container.style.setProperty('--cal-reader-height', `${Math.floor((window.visualViewport?.height || innerHeight) - top - bottom)}px`);
+    } else container.style.removeProperty('--cal-reader-height');
+    // Fit complete Hebrew words to a narrow Shabbos column without breaking them.
+    const context = document.createElement('canvas').getContext('2d');
+    for (const label of container.querySelectorAll('.cal-parsha')) {
+      label.style.fontSize = '';
+      const style = getComputedStyle(label); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+      const widest = Math.max(...label.textContent.split(/\s+/).map(word => context.measureText(word).width));
+      const width = label.getBoundingClientRect().width;
+      if (widest > width && width > 0) label.style.fontSize = `${parseFloat(style.fontSize) * (width - 1) / widest}px`;
+      if (reader() && getComputedStyle(label).visibility !== 'hidden') {
+        let size = parseFloat(getComputedStyle(label).fontSize);
+        while (label.getBoundingClientRect().height > label.parentElement.getBoundingClientRect().height - 1 && size > 7) {
+          size -= .25; label.style.fontSize = `${size}px`;
+        }
+      }
+    }
+  }
+  function gridFacts(day) {
+    if (reader()) {
+      const text = day.parsha || day.facts[0] || day.specialLabel || (day.mevarchim ? 'מברכים' : '');
+      return text ? `<span class="${day.parsha ? 'cal-parsha' : 'cal-observance'}">${calEscape(text)}</span>` : '';
+    }
+    return `${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}`;
+  }
+  function mobileEvents(list) {
+    if (!list.length) return '';
+    const types = [...new Set(list.map(event => event.type))];
+    const text = list.length > 1 || reader() ? `${list.length} ${list.length === 1 ? 'event' : 'events'}` : calendarEventCategory(list[0]).compact;
+    return `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-event-total">${calEscape(text)}</span><span class="cal-event-colors">${types.map(type => `<i class="cal-type-${type}"></i>`).join('')}</span></span>`;
+  }
   function draw() {
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
-    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? `<label class="cal-view-choice">View as<select data-cal-view aria-label="View calendar as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Calendar editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>` : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>
-      ${previewing() ? `<div class="cal-preview-banner" data-cal-view-notice><strong>${previewRole === 'editor' ? 'Calendar editor preview' : 'Congregation preview'}</strong><span>Preview only. Choose Main admin above to make changes.${previewRole === 'editor' ? ' Editors can edit and delete only their own events.' : ''}</span></div>` : ''}
-      <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
-      <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}</header>
-        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
-        <div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div>
-        <p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>
-        <div class="cal-content"><div class="cal-grid-wrap"><table class="cal-grid" aria-label="${escAttr(info.title)}"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks.map(week => `<tr>${week.map(day => {
+    const isReader = reader();
+    container.classList.toggle('is-cal-congregation', isReader);
+    document.body.classList.toggle('cal-reader-page', standalone && isReader);
+    container.style.setProperty('--cal-weeks', weeks.length);
+    container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
+      ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
+      ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
+      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<a class="cal-reader-back" href="/" aria-label="Back to congregation page" title="Back to congregation page">‹</a><h3>Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h3><div>${announcements.markup()}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
+        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
+        ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
+        <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
           const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
-          return `<td class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${day.iso < '1900-01-01' || day.iso > '2299-12-31' ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
-            <span class="cal-facts" lang="he" dir="rtl">${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}</span>
+          return `<td role="cell" class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${!dateAllowed(day.iso) || isReader && busy ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
+            <span class="cal-facts" lang="he" dir="rtl">${gridFacts(day)}</span>
             <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(calendarEventCategory(event).label + ': ' + event.title)}"><span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
-            ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calendarEventCategory(list[0]).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
+            ${mobileEvents(list)}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
-        <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${role() === 'owner' ? 'Main admin' : role() === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
-      </section><p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
+        ${isReader ? `<p class="cal-reader-status cal-error" role="status" aria-live="polite">${calEscape(storageError || note)}</p>` : `<footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${role() === 'owner' ? 'Main admin' : role() === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>`}
+      </section>${isReader ? '' : `<p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>`}${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
     container.querySelectorAll('[data-cal-step]').forEach(button => button.addEventListener('click', () => changeMonth(calendarStepMonth(month, Number(button.dataset.calStep)))));
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
-    container.querySelector('[data-cal-view]')?.addEventListener('change', event => {
-      previewRole = event.target.value;
-      announcements.start(user, { previewRole: previewing() ? previewRole : '' }); redraw();
-    });
+    bindViewChoice(container);
+    container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
-    container.querySelector('[data-cal-signout]')?.addEventListener('click', async () => {
-      try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
-      calendarSession(null); user = null; events = []; signIn();
-    });
+    container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {
       button.addEventListener('click', () => {
         selected = button.dataset.calDay; redraw();
-        if (matchMedia('(max-width: 700px)').matches) {
+        if (reader() || matchMedia('(max-width: 700px)').matches) {
           const view = dialog(dayHtml(selected)); view.title('Day details'); wireDay(view.el, view.close);
         }
       });
@@ -4385,23 +4451,26 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
           Home: -new Date(button.dataset.calDay + 'T12:00:00Z').getUTCDay(), End: 6 - new Date(button.dataset.calDay + 'T12:00:00Z').getUTCDay() };
         if (!(event.key in offsets)) return;
         event.preventDefault(); selected = calendarISO(calendarSerial(button.dataset.calDay) + offsets[event.key]);
-        if (selected < '1900-01-01' || selected > '2299-12-31') { selected = button.dataset.calDay; return; }
+        if (!dateAllowed(selected)) { selected = button.dataset.calDay; return; }
         if (!info.days.some(day => day.iso === selected)) changeMonth(selected.slice(0, 7), false);
         else redraw();
         container.querySelector(`[data-cal-day="${selected}"]`)?.focus({ preventScroll: true });
       });
     });
     wireDay(container);
+    fitReader(); document.fonts.ready.then(fitReader);
   }
   function chooseMonth() {
-    const view = dialog(`<form class="cal-form"><label>Month<input type="month" name="month" required min="1900-01" max="2299-12" value="${month}"></label><button class="cal-primary" type="submit">Show month</button><p role="status"></p></form>`); view.title('Go to month');
+    const range = reader() ? calendarReaderMonths(today) : { first: '1900-01', last: '2299-12' };
+    const view = dialog(`<form class="cal-form"><label>Month<input type="month" name="month" required min="${range.first}" max="${range.last}" value="${month}"></label><button class="cal-primary" type="submit">Show month</button><p role="status"></p></form>`); view.title('Go to month');
     view.el.querySelector('form').addEventListener('submit', event => {
       event.preventDefault(); const next = event.currentTarget.elements.month.value;
-      try { calendarMonth(next, settings, tables); view.close(); changeMonth(next); }
+      try { calendarMonth(next, settings, tables); if (!monthAllowed(next)) throw new Error('Choose last month, this month or next month.'); view.close(); changeMonth(next); }
       catch (error) { view.el.querySelector('[role=status]').textContent = error.message; }
     });
   }
   async function changeMonth(next, reset = true) {
+    if (!monthAllowed(next)) return;
     month = next; if (reset) selected = month + '-01'; note = ''; await loadEvents();
   }
   async function loadEvents() {
@@ -4559,6 +4628,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     try { await list(); } catch (error) { status.textContent = error.message; }
   }
   function signIn(error = '') {
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.style.removeProperty('--cal-reader-height');
     if (disposed) return;
     announcements.stop();
     dialogs.forEach(el => el.calDispose());
@@ -4589,10 +4660,16 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   window.addEventListener('storage', storageListener);
   const updateToday = () => {
     const now = calendarISO(shulNow(new Date(), settings).serial);
-    if (now !== today && container.querySelector('.shul-calendar')) { today = now; redraw(); }
+    if (now !== today && container.querySelector('.shul-calendar')) {
+      today = now;
+      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
+      else redraw();
+    }
   };
   const dayTimer = setInterval(updateToday, 60000);
   document.addEventListener('visibilitychange', updateToday);
+  window.addEventListener('resize', fitReader);
+  window.visualViewport?.addEventListener('resize', fitReader);
   (async () => {
     try {
       endpoint = await calendarConfig(); if (disposed) return;
@@ -4609,7 +4686,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       }
     } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
   })();
-  return () => { disposed = true; requestNumber++; announcements.dispose(); clearInterval(dayTimer); document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener); dialogs.forEach(el => el.calDispose()); };
+  return () => {
+    disposed = true; requestNumber++; announcements.dispose(); clearInterval(dayTimer);
+    document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
+    window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.style.removeProperty('--cal-reader-height'); dialogs.forEach(el => el.calDispose());
+  };
 }
 
 // ==== ui/chart-print-layout.js ====

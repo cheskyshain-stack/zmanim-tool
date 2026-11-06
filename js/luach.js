@@ -148,6 +148,7 @@ const ICON_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="no
   <rect x="3" y="5" width="18" height="16" rx="2.6"/><path d="M8 2.6v4M16 2.6v4M3 10h18"/>
   <path d="M7.6 13.6h.01M12 13.6h.01M16.4 13.6h.01M7.6 17.4h.01M12 17.4h.01M16.4 17.4h.01" stroke-width="2.3"/>
 </svg>`;
+const ICON_COMMUNITY_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h1M15 14h1M8 18h1M15 18h1"/></svg>`;
 const ICON_CALENDAR_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
   <path d="M10.5 21H5.6A2.6 2.6 0 0 1 3 18.4V7.6A2.6 2.6 0 0 1 5.6 5h12.8A2.6 2.6 0 0 1 21 7.6v3M8 2.6v4M16 2.6v4M3 10h18"/>
   <circle cx="17" cy="17" r="5.2"/><path d="M17 14v3l2 1.2"/>
@@ -542,6 +543,9 @@ function homeHtml(published) {
       <a class="luach-item luach-home-primary" href="/week/">
         ${ICON_CALENDAR_CLOCK}<span class="luach-item-copy"><span class="luach-item-title">Zmanim</span><span class="luach-item-description">Daily minyanim &amp; Shabbos times</span></span>${CHEVRON}
       </a>
+      <button class="luach-item luach-coming-soon-card" type="button" disabled aria-label="Community calendar, coming soon">
+        ${ICON_COMMUNITY_CALENDAR}<span class="luach-item-copy"><span class="luach-item-title">Community calendar</span><span class="luach-coming-soon-tag">Coming soon</span></span>
+      </button>
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>

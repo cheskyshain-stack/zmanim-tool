@@ -151,6 +151,16 @@ export function calendarStepMonth(month, amount) {
   return date.toISOString().slice(0, 7);
 }
 
+export function calendarReaderMonths(today) {
+  if (!Number.isFinite(calendarSerial(today))) throw new Error('Choose a valid calendar date.');
+  const current = today.slice(0, 7);
+  return {
+    first: current === '1900-01' ? current : calendarStepMonth(current, -1),
+    current,
+    last: current === '2299-12' ? current : calendarStepMonth(current, 1),
+  };
+}
+
 export function calendarClock(time) {
   if (!time) return '';
   const [hour, minute] = time.split(':').map(Number);

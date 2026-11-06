@@ -1039,6 +1039,22 @@ Previews retain the real owner session and do not grant or change account roles.
 They show role-specific controls but disable writes. Announcement previews use
 GET, do not count opens or mark posts read, and cannot post, edit or delete.
 Switching previews ignores pending responses from the previous announcement view.
+Congregation viewing uses a fixed, full-screen calendar, on phones and larger
+screens. Use the dynamic viewport height and safe-area insets; distribute the month
+into equal rows without page scrolling. Keep Back to the congregation homepage,
+Announcements, More, month arrows and Today visible. Put the color key, account,
+Schedule messages and Sign out in More. Day details and announcements open dialogs,
+not extra sections below the month. The owner preview uses the same congregation UI.
+Readers browse only the previous, current and next month in the shul's timezone.
+Enforce that UI limit on arrows, month input, padding-day clicks and keyboard moves,
+and refresh it at month rollover. Admin/editor browsing remains unrestricted.
+Show a total event count and every category's color on crowded days. The full list
+always opens on a date click. Keep Hebrew parsha words whole, fitting the font when
+necessary instead of splitting a word. Very short landscape windows keep the full
+day labels in their day dialogs. `tests/calendar-congregation.cjs` checks fitting,
+whole words, eight-event Shabbos dates, month limits, rollover and the homepage.
+The public homepage now has a gray disabled Community calendar card with a Coming
+soon tag. This is a placeholder, not an active link or a public calendar feed.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew
