@@ -396,6 +396,15 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
     await ownerPage.locator('[data-cal-step="-1"]').click();
     await ownerPage.locator('[data-cal-day="2026-11-11"] .cal-event-chip').waitFor();
+    const activityBeforeBulk = await call('/api/access/activity', 'GET', null, owner);
+    for (let index = 0; index < 129; index++) {
+      const registered = await call('/api/register', 'POST', { name: 'Capacity viewer ' + index, email: 'capacity-' + index + '@example.test', password: 'Synthetic capacity password 2026' }, null, origin, '192.0.2.' + (index + 1));
+      assert.equal(registered.status, 201, 'Viewer registration above the storage multi-get limit');
+    }
+    const bulkActivity = await call('/api/access/activity', 'GET', null, owner);
+    assert.equal(bulkActivity.status, 200, 'Sign-in history supports more than 128 accounts');
+    assert.equal(bulkActivity.body.users.length, activityBeforeBulk.body.users.length + 129);
+    assert.equal(bulkActivity.body.users.filter(account => account.email.startsWith('capacity-') && account.signInCount === 1).length, 129);
     assert(!requests.some(request => /[?&](token|setup|invite)=/.test(request.url)), 'Account secrets never appear in request URLs');
     assert.deepEqual(errors, []);
     checks.push({ sharedAccounts: true, editorBoundaries: true, ownerControls: true, revocation: true, concurrentEdits: true, inviteRegistration: true });
