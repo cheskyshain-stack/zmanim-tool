@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>LC Shul Seating</title>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ffc433"/>
+      <stop offset="1" stop-color="#ffa31e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#071433"/>
+  <g id="artwork">
+    <g id="mark" fill="none" stroke="#f7ecdd" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="225" y="100" width="62" height="102" rx="13"/>
+      <path d="M225 220V286M287 220V286"/>
+      <path d="M218 218H294" stroke="#ffaf26"/>
+      <rect x="125" y="130" width="62" height="92" rx="13"/>
+      <path d="M125 240V300M187 240V300"/>
+      <path d="M118 238H194" stroke="#ffaf26"/>
+      <rect x="325" y="130" width="62" height="92" rx="13"/>
+      <path d="M325 240V300M387 240V300"/>
+      <path d="M318 238H394" stroke="#ffaf26"/>
+    </g>
+    <g id="wordmark" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="600">
+      <text x="256" y="386" font-size="68" fill="#f7ecdd">LC Shul</text>
+      <text x="256" y="454" font-size="70" fill="url(#gold)">Seating</text>
+    </g>
+  </g>
+</svg>

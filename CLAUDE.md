@@ -263,7 +263,19 @@ that fakes a tint is a row of magic numbers nobody can check. The icon links liv
 `build-offline.py` strips that block, because the paths are site absolute and a web
 manifest cannot be fetched over `file://` at all.
 
-Both manifests carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
+Calendar and Seating have their own installable identities: manifests under
+`/admin/calendar/` and `/seats/` use those exact paths for id, scope and start_url.
+Installing either tool must launch that tool, without replacing the main site's or
+main admin's app. Their matching navy/cream/gold artwork lives in
+`icons/calendar/source.svg` and `icons/seats/source.svg`. Run
+`node scripts/make-tool-icons.cjs` with the test Playwright and Chrome setup after
+editing either SVG; commit the generated PNGs. It creates ordinary 192/512px icons,
+maskable versions with all artwork inside the central 80%-diameter safe circle,
+180px Apple touch icons and mark-only 16/32px favicons. Keep the page icon URLs
+and manifest icon URLs versioned when changing artwork. Leave the original
+Zmanim/admin icons and application identities intact.
+
+All manifests carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
 and that pair is load-bearing, not a leftover. Android reads `display_override`, so Chrome
 installs the site as a real app: no Chrome badge on the icon, and the launcher gets the
 maskable icon instead of zooming and cropping the plain one. Safari does not implement
