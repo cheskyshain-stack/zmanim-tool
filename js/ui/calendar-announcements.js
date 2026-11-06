@@ -49,8 +49,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     active?.cleanup(); active?.view.el.calDispose(); active = null;
     total = readCount = deletedCount = editCount = 0; canPost = canDelete = canEdit = unavailable = false;
   }
-  function start(user, { previewRole = '' } = {}) {
-    const role = previewRole || user.role, preview = !!previewRole;
+  function start(user, { previewRole = '', readOnly = false } = {}) {
+    const role = readOnly ? 'viewer' : previewRole || user.role, preview = !!previewRole;
     if (actor?.id === user.id && actor.role === role && actor.preview === preview) return;
     stop(); actor = { ...user, role, preview };
     document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
