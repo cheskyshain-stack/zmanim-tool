@@ -1014,6 +1014,19 @@ never use custom wording as a CSS class. Preserve older generic event types for
 existing events and editing them without migration. Deploy the matching shared
 event validator before its client. Category changes retain normal role checks,
 revision conflicts, calendar dates and private activity tracking.
+The event form has one Details textarea instead of separate title, location and
+description boxes. Derive the short calendar-cell title from its first line; keep
+the remaining text in the existing description field. Existing events show all
+three legacy fields in the single box and preserve those fields when its text is
+unchanged. There is no All day checkbox. Both times are optional independently;
+blank times show no time label, and an end alone is labelled Until. Preserve old
+allDay records. Deploy the optional-time validator before publishing its client.
+Remove Kahal Lev Menachem from the calendar header and sign-in cards.
+The owner has a View as selector for Main admin, Calendar editor and Congregation.
+Previews retain the real owner session and do not grant or change account roles.
+They show role-specific controls but disable writes. Announcement previews use
+GET, do not count opens or mark posts read, and cannot post, edit or delete.
+Switching previews ignores pending responses from the previous announcement view.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew
@@ -1065,6 +1078,10 @@ Calendar account rows give the name and email their full width, with action butt
 on a separate wrapping row below. Never let the buttons compete with the identity
 column on phones or stretch to match wrapped account text. Check pending invitations,
 editors, viewers and long names/emails at 320px through 393px before publishing.
+
+Show the Calendar access toolbar button only to the owner of the shared calendar.
+Editors and viewers do not manage accounts, so omit this button for them. Keep it
+in the main admin's device preview, where it provides backup and restore controls.
 
 Calendar access offers an owner-only Sign-in history list with every account's
 name, email, successful sign-in count, first/last sign-in and paginated timestamps.

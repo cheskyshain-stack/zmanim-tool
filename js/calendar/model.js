@@ -51,16 +51,29 @@ export function calendarEvent(value) {
   if (![...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].some(item => item.id === type)) throw new Error('Choose an event category.');
   const customCategory = type === 'custom' ? text('customCategory', 60) : '';
   if (type === 'custom' && !customCategory) throw new Error('Enter a category name.');
-  if (value.allDay != null && typeof value.allDay !== 'boolean') throw new Error('Choose an all-day event or a time.');
-  const allDay = value.allDay !== false;
-  const time = allDay ? '' : text('time', 5), endTime = allDay ? '' : text('endTime', 5);
-  if (!allDay && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Choose a start time.');
+  if (value.allDay != null && typeof value.allDay !== 'boolean') throw new Error('Choose valid event times.');
+  const time = value.allDay === true ? '' : text('time', 5), endTime = value.allDay === true ? '' : text('endTime', 5);
+  const allDay = !time && !endTime;
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Choose a valid start time.');
   if (endTime && !/^([01]\d|2[0-3]):[0-5]\d$/.test(endTime)) throw new Error('Choose a valid end time.');
-  if (endDate === date && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
+  if (endDate === date && time && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
     location: text('location', 200), description: text('description', 4000), revision };
+}
+
+export function calendarEventDetails(event) {
+  return [event.title, event.location, event.description].filter(Boolean).join('\n');
+}
+
+export function calendarDetailsFields(details, original = {}) {
+  const text = details.trim(), firstLine = text.split('\n', 1)[0];
+  if (!text) throw new Error('Enter the event details.');
+  // Keep legacy fields intact when only a category, date or time is changed.
+  if (details === calendarEventDetails(original)) return { title: original.title || '', location: original.location || '', description: original.description || '' };
+  const title = firstLine.slice(0, 160), description = text.slice(title.length).trim();
+  return { title, location: '', description };
 }
 
 export function calendarEventsOn(events, date) {
@@ -139,7 +152,13 @@ export function calendarStepMonth(month, amount) {
 }
 
 export function calendarClock(time) {
-  if (!time) return 'All day';
+  if (!time) return '';
   const [hour, minute] = time.split(':').map(Number);
   return `${hour % 12 || 12}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`;
+}
+
+export function calendarEventTime(event) {
+  if (event.time && event.endTime) return `${calendarClock(event.time)} - ${calendarClock(event.endTime)}`;
+  if (event.endTime) return `Until ${calendarClock(event.endTime)}`;
+  return calendarClock(event.time);
 }

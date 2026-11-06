@@ -42,6 +42,13 @@ include both their start and end dates. Calendar notices do not change minyan ru
 
 ## Test
 
+The event editor uses one Details box, category and date, with independently optional
+start and end times. It retains the existing title/location/description storage fields
+and all older events. Empty times have no displayed label; an end time alone reads
+Until. Deploy the shared validator with `optionalEventTimes` before the website.
+The owner can preview the editor and congregation screens using View as. Those
+previews are read-only and never change roles, announcement reads or activity totals.
+
 ```sh
 npm ci --prefix worker/calendar
 python build-offline.py
