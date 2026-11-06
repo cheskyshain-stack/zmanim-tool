@@ -16,6 +16,9 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
 export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false } = {}) {
+  // The homepage shortcut opens the actual congregation experience, even for an
+  // owner/editor. Admin View as remains a separate preview with no read writes.
+  const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
@@ -89,8 +92,8 @@ export function renderCalendar(container, settings, tables, { standalone = false
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events, ...sampleEvents()];
-  const role = () => user?.role === 'owner' ? previewRole : user?.role;
-  const previewing = () => user?.role === 'owner' && previewRole !== 'owner';
+  const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
+  const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
   const monthAllowed = value => !reader() || value >= calendarReaderMonths(today).first && value <= calendarReaderMonths(today).last;
   const dateAllowed = value => value >= '1900-01-01' && value <= '2299-12-31' && monthAllowed(value.slice(0, 7));
@@ -135,7 +138,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
       const next = event.target.value; close(); previewRole = next;
       if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
-      else { announcements.start(user, { previewRole: previewing() ? previewRole : '' }); redraw(); }
+      else { announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation }); redraw(); }
     });
   }
   async function signOut() {
@@ -143,29 +146,40 @@ export function renderCalendar(container, settings, tables, { standalone = false
     calendarSession(null); user = null; events = []; signIn();
   }
   function readerOptions() {
-    const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p><a href="/texts/" target="_blank" rel="noopener noreferrer">Schedule messages</a></p><button type="button" data-cal-signout>Sign out</button>`);
+    const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function fitReader() {
     if (disposed) return;
     const calendar = container.querySelector('.shul-calendar');
-    if (reader() && calendar && !standalone) {
+    if (reader() && calendar) {
       const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
-      container.style.setProperty('--cal-reader-height', `${Math.floor((window.visualViewport?.height || innerHeight) - top - bottom)}px`);
+      const rows = Number(container.style.getPropertyValue('--cal-weeks'));
+      const chrome = calendar.getBoundingClientRect().height - calendar.querySelector('tbody').getBoundingClientRect().height;
+      const rowHeight = Math.min(128, Math.max(72, calendar.clientWidth * 1.35 / 7));
+      const available = (window.visualViewport?.height || innerHeight) - top - bottom;
+      container.style.setProperty('--cal-reader-height', `${Math.max(0, Math.floor(Math.min(available, chrome + rows * rowHeight)))}px`);
     } else container.style.removeProperty('--cal-reader-height');
     // Fit complete Hebrew words to a narrow Shabbos column without breaking them.
     const context = document.createElement('canvas').getContext('2d');
+    if (reader()) container.querySelectorAll('.cal-facts > span').forEach(label => { label.style.fontSize = ''; });
     for (const label of container.querySelectorAll('.cal-parsha')) {
       label.style.fontSize = '';
       const style = getComputedStyle(label); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
       const widest = Math.max(...label.textContent.split(/\s+/).map(word => context.measureText(word).width));
       const width = label.getBoundingClientRect().width;
       if (widest > width && width > 0) label.style.fontSize = `${parseFloat(style.fontSize) * (width - 1) / widest}px`;
-      if (reader() && getComputedStyle(label).visibility !== 'hidden') {
-        let size = parseFloat(getComputedStyle(label).fontSize);
-        while (label.getBoundingClientRect().height > label.parentElement.getBoundingClientRect().height - 1 && size > 7) {
-          size -= .25; label.style.fontSize = `${size}px`;
+    }
+    // Holidays can share a cell with other labels and event markers too.
+    if (reader()) for (const facts of container.querySelectorAll('.cal-facts')) {
+      if (getComputedStyle(facts).visibility === 'hidden') continue;
+      const labels = [...facts.children], space = facts.getBoundingClientRect();
+      const fits = () => labels.every(label => { const box = label.getBoundingClientRect(); return box.top >= space.top + .5 && box.bottom <= space.bottom - .5; });
+      while (!fits() && labels.some(label => parseFloat(getComputedStyle(label).fontSize) > 7)) {
+        for (const label of labels) {
+          const size = parseFloat(getComputedStyle(label).fontSize);
+          if (size > 7) label.style.fontSize = `${Math.max(7, size - .25)}px`;
         }
       }
     }
@@ -254,7 +268,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
     if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
-    announcements.start(user, { previewRole: previewing() ? previewRole : '' });
+    announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
     try {
@@ -272,6 +286,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (!disposed && number === requestNumber) { busy = false; redraw(); }
   }
   async function saveEvent(item, remove = false) {
+    if (congregation) throw new Error('This calendar is for viewing.');
     if (previewing()) throw new Error('Choose Main admin to change events.');
     if (endpoint) {
       const result = await calendarRequest('/api/events/' + encodeURIComponent(item.id), { method: remove ? 'DELETE' : 'PUT', body: item });

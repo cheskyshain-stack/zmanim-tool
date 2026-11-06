@@ -125,6 +125,13 @@ test('multi-day events are inclusive and daily lists put all-day entries before 
   assert.equal(calendarEventsOn(list, '2026-11-08').length, 1); assert.equal(calendarEventsOn(list, '2026-11-09').length, 0);
 });
 
+test('daily events group matching categories, named custom groups and times without changing saved order', () => {
+  const list = [event({ type:'kiddush', title:'Late Kiddush', allDay:false, time:'13:00' }), event({ type:'custom', customCategory:'Learning', title:'Learning later', allDay:false, endTime:'21:00' }), event({ type:'shalom-zachor', title:'Shalom Zachor' }), event({ type:'kiddush', title:'Early Kiddush', allDay:false, time:'11:00' }), event({ type:'custom', customCategory:'Community', title:'Community event' }), event({ type:'kiddush', title:'Untimed Kiddush' }), event({ type:'custom', customCategory:'Learning', title:'Learning first', allDay:false, time:'19:00' })];
+  const original = JSON.stringify(list);
+  assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['Shalom Zachor','Untimed Kiddush','Early Kiddush','Late Kiddush','Community event','Learning first','Learning later']);
+  assert.equal(JSON.stringify(list), original);
+});
+
 test('event times are independently optional and blank times have no label', () => {
   const untimed = event({ allDay: false, time: '', endTime: '' });
   assert.equal(untimed.allDay, true); assert.equal(calendarEventTime(untimed), ''); assert.equal(calendarClock(''), '');

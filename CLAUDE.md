@@ -1033,15 +1033,22 @@ three legacy fields in the single box and preserve those fields when its text is
 unchanged. There is no All day checkbox. Both times are optional independently;
 blank times show no time label, and an end alone is labelled Until. Preserve old
 allDay records. Deploy the optional-time validator before publishing its client.
+Daily events sort by the category-picker order, keeping every matching category
+together. Named custom categories have their own alphabetical groups. Within each
+group, untimed events precede timed events in time order, with titles as tie-breakers.
+Apply the same order to month markers and day details without changing stored data.
 Remove Kahal Lev Menachem from the calendar header and sign-in cards.
 The owner has a View as selector for Main admin, Calendar editor and Congregation.
 Previews retain the real owner session and do not grant or change account roles.
 They show role-specific controls but disable writes. Announcement previews use
 GET, do not count opens or mark posts read, and cannot post, edit or delete.
 Switching previews ignores pending responses from the previous announcement view.
-Congregation viewing uses a fixed, full-screen calendar, on phones and larger
-screens. Use the dynamic viewport height and safe-area insets; distribute the month
-into equal rows without page scrolling. Keep Back to the congregation homepage,
+Congregation viewing keeps the shared navy Shul header and original building photo,
+with the same desktop name and navigation as Home. Use the dynamic viewport height
+and safe-area insets; distribute the month into equal, compact rows without page
+scrolling. Rows prefer 1.35 times their column width, between 72px and 128px, and
+shrink further when needed to keep the whole month within the remaining screen.
+Do not stretch the month to the bottom of a tall phone. Keep Back to the congregation homepage,
 Announcements, More, month arrows and Today visible. Put the color key, account,
 Schedule messages and Sign out in More. Day details and announcements open dialogs,
 not extra sections below the month. The owner preview uses the same congregation UI.
@@ -1059,11 +1066,17 @@ Ordinary single/double clicks do nothing. Three quick clicks or taps (within 750
 of each other and 1.5 seconds overall) open `/admin/calendar/?preview=congregation`.
 Use aria-disabled instead of native disabled so touch/click events can reach this
 hidden action; cancelled or interrupted gestures reset it. Do not advertise it as
-a public link. The destination retains normal calendar authentication. A verified
-owner starts in the existing read-only Congregation preview; other roles retain
-their actual permissions. The query cannot grant ownership or bypass sign-in.
+a public link. The destination retains normal calendar authentication and always
+shows the congregation experience, including for an owner or editor. Hide Preview,
+View as, editing, account management and Schedule messages from this screen and its
+dialogs. Actual server roles stay unchanged; management remains on the admin page.
+Reading announcements here records only that signed-in account's reads and opens,
+so the badge shows unread messages, hides at zero and updates for new posts. This
+is distinct from the main admin's explicit View as preview, which remains inert
+and never changes read markers. The query cannot grant ownership or bypass sign-in.
 `tests/calendar-home-preview.cjs` checks card order/geometry, mouse/touch gestures,
-sign-in, role preservation and preview-only announcement reads.
+sign-in, role preservation, congregation-only controls, visible-message read counts
+and unchanged read-only admin previews.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew

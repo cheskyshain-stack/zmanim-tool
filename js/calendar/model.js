@@ -20,6 +20,8 @@ export const CALENDAR_LEGACY_TYPES = [
   { id: 'other', label: 'Other', compact: 'Event', colour: '#596573' },
 ];
 
+const CALENDAR_TYPE_ORDER = new Map([...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].map((type, index) => [type.id, index]));
+
 export function calendarEventCategory(event) {
   const type = [...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].find(item => item.id === event.type) || CALENDAR_LEGACY_TYPES.at(-1);
   return event.type === 'custom' ? { ...type, label: event.customCategory || 'Custom', compact: event.customCategory || 'Custom' } : type;
@@ -78,7 +80,9 @@ export function calendarDetailsFields(details, original = {}) {
 
 export function calendarEventsOn(events, date) {
   return events.filter(item => item.date <= date && item.endDate >= date)
-    .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.time.localeCompare(b.time) || a.title.localeCompare(b.title));
+    .sort((a, b) => (CALENDAR_TYPE_ORDER.get(a.type) ?? 99) - (CALENDAR_TYPE_ORDER.get(b.type) ?? 99)
+      || (a.type === 'custom' && b.type === 'custom' ? (a.customCategory || '').localeCompare(b.customCategory || '') : 0)
+      || Number(b.allDay) - Number(a.allDay) || (a.time || a.endTime || '').localeCompare(b.time || b.endTime || '') || a.title.localeCompare(b.title));
 }
 
 // Calendar wording follows the supplied monthly-calendar examples. These labels
