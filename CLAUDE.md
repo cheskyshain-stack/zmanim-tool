@@ -1061,6 +1061,11 @@ cannot reactivate themselves through registration. Schedule messages at `/texts/
 remains open by direct link, as explicitly requested; this access restriction covers
 only the calendar and its private announcements.
 
+Calendar account rows give the name and email their full width, with action buttons
+on a separate wrapping row below. Never let the buttons compete with the identity
+column on phones or stretch to match wrapped account text. Check pending invitations,
+editors, viewers and long names/emails at 320px through 393px before publishing.
+
 Calendar access offers an owner-only Sign-in history list with every account's
 name, email, successful sign-in count, first/last sign-in and paginated timestamps.
 Account creation and invitation acceptance create the first recorded sign-in.

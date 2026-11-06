@@ -150,12 +150,12 @@
 .cal-file-label { display:inline-flex; align-items:center; position:relative; overflow:hidden; }
 .cal-file-label input { position:absolute; inset:0; opacity:0; width:100%; cursor:pointer; }
 .cal-file-label:focus-within { outline:3px solid #9e7b31; outline-offset:2px; }
-.cal-account { padding:.85rem 0; border-bottom:1px solid #dddcd3; display:flex; flex-wrap:wrap; gap:.6rem; }
-.cal-account > div:first-child { display:flex; flex-direction:column; gap:.2rem; flex:1; min-width:0; overflow-wrap:anywhere; }
+.cal-account { padding:.85rem 0; border-bottom:1px solid #dddcd3; display:grid; grid-template-columns:minmax(0,1fr); gap:.6rem; }
+.cal-account > div:first-child { display:flex; flex-direction:column; gap:.2rem; min-width:0; overflow-wrap:anywhere; }
 .cal-account span { font-size:.8rem; color:#60717d; }
 .cal-account small { color:#8c7338; }
-.cal-account > div:last-child { display:flex; flex-wrap:wrap; gap:.4rem; }
-.cal-account button { font-size:.72rem; }
+.cal-account > div + div { display:flex; flex-wrap:wrap; align-items:flex-start; gap:.4rem; min-width:0; }
+.cal-account button { max-width:100%; white-space:normal; font-size:.72rem; }
 .cal-invite-form { margin-top:1.3rem; }
 .cal-invite-form h3 { margin:0; font:700 1.15rem Georgia,serif; }
 .cal-login { max-width:28rem; margin:1.5rem auto; padding:1.5rem; border:1px solid #e0ddcf; border-top:3px solid #a88c47; border-radius:14px; background:#faf7f0; color:#142b46; }
