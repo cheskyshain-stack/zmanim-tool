@@ -101,6 +101,15 @@ text returns the existing post instead of creating a duplicate.
 GET /api/announcements/status returns the current account's unread count.
 GET /api/announcements (and ?before=<sequence>) returns messages and read states.
 POST /api/announcements takes {id,text}; POST /api/announcements/read takes {ids}.
+Every message response uses authorName Shul, including legacy posts, without
+rewriting stored original identity. PUT /api/announcements/:id accepts text,
+revision and operationId from any owner/editor. It keeps the post's sequence,
+creation time, position and read markers. Revision conflicts return 409; retrying
+the same completed operation returns its saved result. Deleted posts cannot be
+edited. GET /api/announcements/updates?after=<editCount> returns up to 100 update
+index entries, with nextAfter for older pending updates. Status includes editCount
+and canEdit. Editors keep unsaved text on failures/conflicts. Private activity totals
+include announcementsEdited. Deploy announcementEditing:true before the client.
 DELETE /api/announcements/:id lets any owner or calendar editor remove any post,
 regardless of its author. Viewers cannot delete. Repeated deletion succeeds without
 changing counts again. Deleted posts are omitted from the ordering index and kept

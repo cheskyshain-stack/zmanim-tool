@@ -31,7 +31,7 @@ const server = http.createServer((req, res) => {
       if (req.method() === 'OPTIONS') return route.fulfill({ status: 204, headers: { 'Access-Control-Allow-Origin': origin, 'Access-Control-Allow-Headers': 'Authorization,Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' } });
       if (url.pathname === '/api/activity' && req.method() === 'GET' && role === 'owner') {
         activityQueries.push(url.search); const start = url.searchParams.get('start'), end = url.searchParams.get('end'), snapshotAt = url.searchParams.get('asOf'), old = start < '2026-01-01';
-        return fulfill(route, { schemaVersion: 1, timezone: 'America/New_York', range: { start, end }, snapshotAt, startedAt: '2026-11-05T12:00:00Z', coverage: old ? 'not-tracked' : 'partial', counts: Object.fromEntries(['signIns', 'registrations', 'eventsCreated', 'eventsEdited', 'eventsDeleted', 'announcementsPosted', 'announcementsDeleted', 'announcementOpens'].map((key, i) => [key, old ? 0 : i + 2])) });
+        return fulfill(route, { schemaVersion: 1, timezone: 'America/New_York', range: { start, end }, snapshotAt, startedAt: '2026-11-05T12:00:00Z', coverage: old ? 'not-tracked' : 'partial', counts: Object.fromEntries(['signIns', 'registrations', 'eventsCreated', 'eventsEdited', 'eventsDeleted', 'announcementsPosted', 'announcementsEdited', 'announcementsDeleted', 'announcementOpens'].map((key, i) => [key, old ? 0 : i + 2])) });
       }
       if (url.pathname === '/api/session' && req.method() === 'GET') return fulfill(route, { user: { id: 'fixture-' + role, role, name: 'Example ' + role, email: role + '@example.test', active: true } });
       if (url.pathname === '/api/events' && req.method() === 'GET') return fulfill(route, { events: [] });
@@ -49,7 +49,7 @@ const server = http.createServer((req, res) => {
   try {
     let ctx = await makeContext('owner'), page = await ctx.newPage();
     await page.goto(origin + '/admin/#traffic'); await page.locator('.traffic-activity-grid dd').first().waitFor();
-    assert.equal(await page.locator('.traffic-activity-grid dd').count(), 8);
+    assert.equal(await page.locator('.traffic-activity-grid dd').count(), 9);
     assert((await page.locator('#traffic-body').innerText()).includes('Calendar'));
     for (const width of [375, 393, 1440]) {
       await page.setViewportSize({ width, height: 900 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -60,7 +60,7 @@ const server = http.createServer((req, res) => {
     const heldSnapshot = todayQuery.get('asOf');
     await page.getByRole('button', { name: '7 days', exact: true }).click(); await page.locator('.traffic-activity-grid dd').first().waitFor(); assert.equal(new URLSearchParams(activityQueries.at(-1)).get('asOf'), heldSnapshot);
     await page.locator('#traffic-range-form [name=start]').fill('2020-01-01'); await page.locator('#traffic-range-form [name=end]').fill('2020-01-01'); await page.getByRole('button', { name: 'Apply dates', exact: true }).click();
-    await page.waitForFunction(() => [...document.querySelectorAll('.traffic-activity-grid dd')].length === 8 && [...document.querySelectorAll('.traffic-activity-grid dd')].every(node => node.textContent === 'Not tracked'));
+    await page.waitForFunction(() => [...document.querySelectorAll('.traffic-activity-grid dd')].length === 9 && [...document.querySelectorAll('.traffic-activity-grid dd')].every(node => node.textContent === 'Not tracked'));
     await page.goto(origin + '/admin/calendar/'); await page.locator('.shul-calendar').waitFor();
     assert.equal(await page.evaluate(() => window.calendarOpenEvents), 1);
     await page.locator('[data-cal-step="1"]').click(); await page.locator('[data-cal-step="-1"]').click();

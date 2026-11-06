@@ -1085,6 +1085,14 @@ until viewed. Late read requests cannot clear newer announcements. Refresh count
 on focus/visibility and every 30 seconds, with a button for new posts in an open
 feed. Stop timers and observers on logout or navigation. This feed does not publish
 calendar information or activate the separate phone-notification feature.
+Every announcement displays Shul as its author, including legacy records. Project
+the label in API responses without rewriting old stored author identity. All owners
+and calendar editors can edit any active announcement. Keep its ID, creation date,
+sequence, order and read markers; show its edited time. Use optimistic revisions
+and operation IDs so concurrent edits conflict and retries count once. Record edits
+in private activity totals. Sync edited messages into open feeds without losing
+older pages or drafts; skip deleted posts and keep a conflicting edit draft intact.
+Viewers cannot edit. Never expose an author-name choice in the posting form.
 Deleting requires confirmation and removes the post from every account's feed and
 unread count. Keep a private tombstone and the existing record for recovery, remove
 its ordering entry, and never restore a deleted post when an old submission retries.

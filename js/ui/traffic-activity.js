@@ -2,7 +2,7 @@ import { calendarRequest, calendarSession } from '../calendar/api.js';
 import { escText } from '../util.js';
 import { keepPosition } from './keep-position.js';
 
-const calendarActivityLabels = { signIns: 'Successful sign-ins', registrations: 'Viewing accounts created', eventsCreated: 'Calendar events added', eventsEdited: 'Calendar events edited', eventsDeleted: 'Calendar events deleted', announcementsPosted: 'Announcements posted', announcementsDeleted: 'Announcements deleted', announcementOpens: 'Announcement feed opens' };
+const calendarActivityLabels = { signIns: 'Successful sign-ins', registrations: 'Viewing accounts created', eventsCreated: 'Calendar events added', eventsEdited: 'Calendar events edited', eventsDeleted: 'Calendar events deleted', announcementsPosted: 'Announcements posted', announcementsEdited: 'Announcements edited', announcementsDeleted: 'Announcements deleted', announcementOpens: 'Announcement feed opens' };
 
 export async function renderTrafficActivity(host, range, snapshot) {
   const write = html => { if (host.isConnected) keepPosition(host.closest('.traffic-view') || host, () => { host.innerHTML = html; }); };
