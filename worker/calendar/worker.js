@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
-import { calendarAnnouncementText } from '../../js/calendar/announcement-model.js';
+import { calendarAnnouncementText, calendarAnnouncementView } from '../../js/calendar/announcement-model.js';
 import { requestedRange, civilDate } from '../traffic-calendar.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -13,7 +13,7 @@ const email = value => typeof value === 'string' && value.trim().length <= 254 &
 const name = value => typeof value === 'string' && value.trim().length > 0 && value.trim().length <= 60 ? value.trim() : fail('Enter a name of up to 60 characters.');
 const userView = user => ({ id: user.id, name: user.name, email: user.email, role: user.role, active: user.active, pending: !user.password });
 const identifier = value => /^[a-zA-Z0-9_-]{8,100}$/.test(value || '');
-const activityTypes = ['signIns', 'registrations', 'eventsCreated', 'eventsEdited', 'eventsDeleted', 'announcementsPosted', 'announcementsDeleted', 'announcementOpens'];
+const activityTypes = ['signIns', 'registrations', 'eventsCreated', 'eventsEdited', 'eventsDeleted', 'announcementsPosted', 'announcementsEdited', 'announcementsDeleted', 'announcementOpens'];
 const activityFields = (types, at = new Date().toISOString()) => ({ ['activity:' + at + ':' + crypto.randomUUID()]: { at, types } });
 async function passwordHash(password, salt) {
   if (typeof password !== 'string' || password.length < 12 || password.length > 200) fail('Use a password with 12 to 200 characters.');
@@ -122,11 +122,22 @@ export class CommunityCalendar extends DurableObject {
     const seen = new Set([...read.keys()].map(key => key.slice(prefix.length)));
     for (const key of deleted.keys()) seen.add(key.slice('announcement-deleted:'.length));
     const admin = ['owner', 'editor'].includes(user.role);
-    return { total, unread: Math.max(0, total - seen.size), deletedCount: deleted.size, canPost: admin, canDelete: admin };
+    return { total, unread: Math.max(0, total - seen.size), deletedCount: deleted.size, editCount: await this.ctx.storage.get('announcement-edit-count') || 0, canPost: admin, canDelete: admin, canEdit: admin };
   }
   async announcements(request, user, url) {
     const storage = this.ctx.storage, method = request.method;
     if (url.pathname === '/api/announcements/status' && method === 'GET') return json(await this.announcementStatus(user));
+    if (url.pathname === '/api/announcements/updates' && method === 'GET') {
+      const after = url.searchParams.get('after') || '0';
+      if (!/^\d+$/.test(after) || !Number.isSafeInteger(Number(after))) fail('Choose a valid announcement update.');
+      const prefix = 'announcement-edit-order:';
+      const rows = await storage.list({ prefix, startAfter: prefix + String(Number(after)).padStart(16, '0'), limit: 101 });
+      const batch = [...rows].slice(0, 100), ids = [...new Set(batch.map(([, id]) => id))];
+      const records = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
+      return json({ messages: [...records.values()].filter(message => !message.deletedAt).map(calendarAnnouncementView),
+        nextAfter: rows.size > 100 ? Number(batch.at(-1)[0].slice(prefix.length)) : null,
+        editCount: await storage.get('announcement-edit-count') || 0 });
+    }
     if (url.pathname === '/api/announcements/open' && method === 'POST') {
       const body = await this.body(request);
       if (typeof body.id !== 'string' || !identifier(body.id)) fail('Choose a valid announcement opening.');
@@ -143,6 +154,27 @@ export class CommunityCalendar extends DurableObject {
       return json({ ids: [...rows.keys()].map(key => key.slice('announcement-deleted:'.length)), deletedCount: rows.size });
     }
     const removal = /^\/api\/announcements\/([^/]+)$/.exec(url.pathname);
+    if (removal && method === 'PUT') {
+      if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can edit announcements.', 403);
+      const id = removal[1]; if (!identifier(id)) fail('Choose a valid announcement.');
+      const key = 'announcement:' + id, old = await storage.get(key);
+      if (!old || old.deletedAt) fail('That announcement was not found.', 404);
+      const body = await this.body(request);
+      if (typeof body.operationId !== 'string' || !identifier(body.operationId)) fail('Reload the announcement editor and try again.');
+      let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
+      if (old.lastEditId === body.operationId) {
+        if (old.updatedBy !== user.id || old.text !== text) fail('This edit was already saved with different information.', 409);
+        return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
+      }
+      if (body.revision !== (old.revision || 1)) fail('This announcement changed. Cancel and reopen Edit before saving.', 409);
+      if (text === old.text) return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
+      await this.limited(request, 'announcement-write', 60);
+      const now = new Date().toISOString(), editSequence = (await storage.get('announcement-edit-count') || 0) + 1;
+      const message = { ...old, text, authorName: 'Shul', revision: (old.revision || 1) + 1, updatedAt: now, updatedBy: user.id, lastEditId: body.operationId };
+      await storage.put({ [key]: message, 'announcement-edit-count': editSequence,
+        ['announcement-edit-order:' + String(editSequence).padStart(16, '0')]: id, ...activityFields(['announcementsEdited'], now) });
+      return json({ message: calendarAnnouncementView(message), ...await this.announcementStatus(user) });
+    }
     if (removal && method === 'DELETE') {
       if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can delete announcements.', 403);
       const id = removal[1]; if (!identifier(id)) fail('Choose a valid announcement.');
@@ -176,14 +208,14 @@ export class CommunityCalendar extends DurableObject {
       if (old) {
         if (old.deletedAt) fail('This announcement was deleted. Create a new post to share a new update.', 409);
         if (old.authorId !== user.id || old.text !== text) fail('This announcement was already posted with different text. Refresh the feed.', 409);
-        return json({ message: old, ...await this.announcementStatus(user) });
+        return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
       }
       await this.limited(request, 'announcement-write', 60);
       const sequence = (await storage.get('announcement-count') || 0) + 1;
-      const message = { id: body.id, sequence, text, authorId: user.id, authorName: user.name, createdAt: new Date().toISOString() };
+      const message = { id: body.id, sequence, text, authorId: user.id, authorName: 'Shul', revision: 1, createdAt: new Date().toISOString() };
       await storage.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
         ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt) });
-      return json({ message, ...await this.announcementStatus(user) }, 201);
+      return json({ message: calendarAnnouncementView(message), ...await this.announcementStatus(user) }, 201);
     }
     if (method === 'GET') {
       const before = url.searchParams.get('before');
@@ -192,7 +224,7 @@ export class CommunityCalendar extends DurableObject {
         ...(before === null ? {} : { end: 'announcement-order:' + before.padStart(16, '0') }) });
       const ids = [...rows.values()].slice(0, 30), records = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
       const read = await storage.list({ prefix: 'announcement-read:' + user.id + ':' });
-      const messages = ids.map(id => ({ ...records.get('announcement:' + id), read: read.has('announcement-read:' + user.id + ':' + id) }));
+      const messages = ids.map(id => ({ ...calendarAnnouncementView(records.get('announcement:' + id)), read: read.has('announcement-read:' + user.id + ':' + id) }));
       return json({ messages, nextBefore: rows.size > 30 ? messages.at(-1).sequence : null, ...await this.announcementStatus(user) });
     }
     return json({ error: 'Announcement page not found.' }, 404);
@@ -205,7 +237,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true });
     if (path === '/api/register' && method === 'POST') {
       if (!await this.ctx.storage.get('config:owner')) fail('The calendar owner must finish setup before registration opens.', 409);
       await this.limited(request, 'register');
