@@ -3856,6 +3856,41 @@ function calendarWritePreview(events, storage) {
   catch { throw new Error('The calendar could not be saved. Allow site storage or download a backup before continuing.'); }
 }
 
+// ==== ui/calendar-activity.js ====
+async function openCalendarActivity({ dialog, timeZone }) {
+  const view = dialog('<p>Successful sign-ins recorded since tracking was enabled. Earlier sign-ins were not recorded.</p><div data-cal-activity-accounts>Loading sign-in history…</div><p class="cal-error" role="status"></p><button type="button" data-cal-activity-retry hidden>Try again</button>');
+  view.title('Sign-in history');
+  const content = view.el.querySelector('[data-cal-activity-accounts]'), status = view.el.querySelector('[role=status]');
+  const retry = view.el.querySelector('[data-cal-activity-retry]');
+  const when = value => new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
+  async function load() {
+    retry.disabled = true;
+    try {
+      const value = await calendarRequest('/api/access/activity'); if (!view.el.isConnected) return;
+      content.innerHTML = value.users.map(account => `<article class="cal-activity-account"><header><strong dir="auto">${escText(account.name)}</strong><span>${account.active ? account.pending ? 'Invitation pending' : account.role === 'owner' ? 'Owner' : account.role === 'editor' ? 'Calendar editor' : 'Viewer' : 'Access removed'}</span></header><p>${escText(account.email)}</p><p><strong>${account.signInCount}</strong> recorded sign-ins${account.lastSignInAt ? ` · Last: ${escText(when(account.lastSignInAt))}` : ''}</p>${account.signInCount ? `<button type="button" data-cal-account-history="${escAttr(account.id)}">View sign-ins for ${escText(account.name)}</button><div data-cal-account-signins hidden><ol></ol><button type="button" data-cal-signins-more hidden>Load older sign-ins</button><p class="cal-error" role="status"></p></div>` : ''}</article>`).join('');
+      status.textContent = ''; retry.hidden = true;
+      content.querySelectorAll('[data-cal-account-history]').forEach(button => {
+        const details = button.nextElementSibling, list = details.querySelector('ol'), more = details.querySelector('button'), error = details.querySelector('[role=status]');
+        let loaded = false, before = null, busy = false;
+        async function entries() {
+          if (busy) return; busy = true; button.disabled = more.disabled = true;
+          try {
+            const result = await calendarRequest('/api/access/activity/' + encodeURIComponent(button.dataset.calAccountHistory) + (before ? '?before=' + before : ''));
+            if (!details.isConnected) return;
+            list.insertAdjacentHTML('beforeend', result.entries.map(entry => `<li><time datetime="${escAttr(entry.at)}">${escText(when(entry.at))}</time> · ${entry.type === 'account-created' ? 'Account created' : entry.type === 'invitation-claimed' ? 'Invitation accepted' : 'Signed in'}</li>`).join(''));
+            before = result.nextBefore; more.hidden = !before; loaded = true; error.textContent = '';
+          } catch (issue) { if (details.isConnected) error.textContent = issue.message; }
+          finally { busy = false; if (details.isConnected) button.disabled = more.disabled = false; }
+        }
+        button.addEventListener('click', () => { details.hidden = loaded && !details.hidden; if (!loaded) entries(); });
+        more.addEventListener('click', entries);
+      });
+    } catch (error) { if (view.el.isConnected) { status.textContent = error.message; retry.hidden = false; } }
+    finally { if (view.el.isConnected) retry.disabled = false; }
+  }
+  retry.addEventListener('click', load); await load();
+}
+
 // ==== calendar/announcement-model.js ====
 const CALENDAR_ANNOUNCEMENT_LENGTH = 4000;
 
@@ -4029,7 +4064,7 @@ const calEventType = id => CALENDAR_TYPES.find(type => type.id === id) || CALEND
 function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '' } = {}) {
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null;
-  let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '';
+  let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const dialogs = new Set();
   const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
     calendarSession(null); user = null; events = []; signIn(message);
@@ -4100,7 +4135,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events, ...sampleEvents()];
-  const canEdit = event => !event.example && (!endpoint || user?.role === 'owner' || event.createdBy === user?.id);
+  const canAdd = () => !endpoint || ['owner', 'editor'].includes(user?.role);
+  const canEdit = event => !event.example && (!endpoint || user?.role === 'owner' || user?.role === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
     const type = calEventType(event.type);
@@ -4116,8 +4152,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const list = calendarEventsOn(visibleEvents(), date);
     return `<div class="cal-day-heading"><p class="cal-eyebrow">${date === today ? 'Today' : 'Selected day'}</p><h3>${calEscape(calFullDate(date))}</h3><p lang="he" dir="rtl">${calEscape(day.hebrewLabel)}</p></div>
       ${day.facts.length || day.parsha || day.specialLabel || day.mevarchim ? `<div class="cal-day-facts" lang="he" dir="rtl">${day.specialLabel ? `<p>${calEscape(day.specialLabel)}</p>` : ''}${day.facts.map(fact => `<p>${calEscape(fact)}</p>`).join('')}${day.parsha ? `<p>פרשת ${calEscape(day.parsha)}</p>` : ''}${day.mevarchim ? '<p>מברכים</p>' : ''}</div>` : ''}
-      <div class="cal-day-events">${busy ? '<p class="cal-empty">Loading events…</p>' : loadError ? `<p class="cal-error">${calEscape(loadError)}</p><button type="button" data-cal-reload>Try again</button>` : list.length ? list.map(eventCard).join('') : '<p class="cal-empty">Nothing added yet.<br>Add a simcha, schedule or announcement.</p>'}</div>
-      <p class="cal-error cal-day-status" role="status"></p><button type="button" class="cal-primary cal-day-add" data-cal-add="${date}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add an event</button>`;
+      <div class="cal-day-events">${busy ? '<p class="cal-empty">Loading events…</p>' : loadError ? `<p class="cal-error">${calEscape(loadError)}</p><button type="button" data-cal-reload>Try again</button>` : list.length ? list.map(eventCard).join('') : `<p class="cal-empty">${canAdd() ? 'Nothing added yet.<br>Add a simcha, schedule or announcement.' : 'No events for this day.'}</p>`}</div>
+      <p class="cal-error cal-day-status" role="status"></p>${canAdd() ? `<button type="button" class="cal-primary cal-day-add" data-cal-add="${date}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add an event</button>` : ''}`;
   }
   function wireDay(scope, close = () => {}) {
     scope.querySelectorAll('[data-cal-reload]').forEach(button => button.addEventListener('click', () => { close(); loadEvents(); }));
@@ -4140,7 +4176,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
     container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${endpoint && user ? announcements.markup() : ''}${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
       <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
-      <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div><button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button></header>
+      <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}</header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         <div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div>
         <div class="cal-content"><div class="cal-grid-wrap"><table class="cal-grid" aria-label="${escAttr(info.title)}"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks.map(week => `<tr>${week.map(day => {
@@ -4152,7 +4188,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
             ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calEventType(list[0].type).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
-        <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${user.role === 'owner' ? 'Main admin' : 'Calendar editor'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
+        <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${user.role === 'owner' ? 'Main admin' : user.role === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
       </section><p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
     container.querySelectorAll('[data-cal-step]').forEach(button => button.addEventListener('click', () => changeMonth(calendarStepMonth(month, Number(button.dataset.calStep)))));
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
@@ -4293,11 +4329,14 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       return;
     }
     if (user.role !== 'owner') {
-      const view = dialog('<p>Your calendar account can add events and edit or delete the events you created. Other admin pages and account management stay with the main admin.</p>'); view.title('Your calendar access'); return;
+      const view = dialog(user.role === 'viewer' ? '<p>Your account can view the private calendar and announcements. Calendar admins manage events and posts. Your name, email and successful sign-in times are visible to the calendar owner.</p>' : '<p>Your calendar account can add events and edit or delete the events you created. Other admin pages and account management stay with the main admin.</p>'); view.title('Your calendar access'); return;
     }
     const view = dialog('<p>Editors choose their own password from a private invitation. They can manage their own events; you can manage every event.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a calendar editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
     bindPreviewBackup(view.el);
     view.title('Calendar accounts');
+    const historyButton = document.createElement('button'); historyButton.type = 'button'; historyButton.textContent = 'Sign-in history';
+    view.el.querySelector('header').after(historyButton);
+    historyButton.addEventListener('click', () => { view.close(); openCalendarActivity({ dialog, timeZone: settings.timezone.id }); });
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
       const area = view.el.querySelector('[data-cal-invitation]'); area.hidden = false;
@@ -4306,7 +4345,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     };
     const list = async () => {
       const result = await calendarRequest('/api/access'); if (!view.el.isConnected) return;
-      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : 'Calendar editor'}</small></div>${account.role !== 'owner' ? `<div><button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
+      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : account.role === 'editor' ? 'Calendar editor' : 'Viewer'}</small></div>${account.role !== 'owner' ? `<div>${!account.pending ? `<button type="button" data-cal-role="${escAttr(account.id)}" data-role="${account.role === 'editor' ? 'viewer' : 'editor'}">${account.role === 'editor' ? 'Make viewer' : 'Allow calendar editing'}</button>` : ''}<button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
+      view.el.querySelectorAll('[data-cal-role]').forEach(button => button.addEventListener('click', async () => {
+        if (!confirm(button.dataset.role === 'editor' ? 'Allow this viewer to add calendar events and post announcements?' : 'Change this calendar editor to viewing access only?')) return;
+        button.disabled = true;
+        try { await calendarRequest('/api/access/' + button.dataset.calRole + '/role', { method: 'POST', body: { role: button.dataset.role } }); status.textContent = 'Access updated. This person must sign in again.'; await list(); }
+        catch (error) { status.textContent = error.message; button.disabled = false; }
+      }));
       view.el.querySelectorAll('[data-cal-revoke],[data-cal-reinvite]').forEach(button => button.addEventListener('click', async () => {
         const removing = !!button.dataset.calRevoke, id = button.dataset.calRevoke || button.dataset.calReinvite;
         if (!confirm(removing ? 'Remove this person’s calendar access?' : 'End this person’s sessions and create a new password invitation?')) return;
@@ -4330,21 +4375,23 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   function signIn(error = '') {
     if (disposed) return;
     announcements.stop();
-    const creating = setupToken || inviteToken;
-    container.innerHTML = `<section class="cal-login"><p class="cal-eyebrow">Kahal Lev Menachem</p><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : 'Use your calendar account to view and manage events.'}</p><form class="cal-form">
-      ${setupToken ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
+    dialogs.forEach(el => el.calDispose());
+    const creating = setupToken || inviteToken || registering;
+    container.innerHTML = `<section class="cal-login"><p class="cal-eyebrow">Kahal Lev Menachem</p><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : registering ? 'Create a calendar viewing account' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : registering ? 'Enter your name and email, then choose a password. You can view the private calendar and announcements as soon as you register.' : 'Sign in to view the private calendar and announcements.'}</p><form class="cal-form">
+      ${setupToken || registering ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
       <label>Password<input name="password" type="password" minlength="12" maxlength="200" required autocomplete="${creating ? 'new-password' : 'current-password'}"></label>
       ${creating ? '<label>Confirm password<input name="confirmation" type="password" minlength="12" maxlength="200" required autocomplete="new-password"></label><p class="cal-form-note">Use at least 12 characters. Save your password for future sign-ins.</p>' : ''}
-      <p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${previewBackupMarkup()}</section>`;
+      <p class="cal-form-note">Your name, email and successful sign-in times are visible to the calendar owner.</p><p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${!setupToken && !inviteToken ? `<button type="button" class="cal-switch-login" data-cal-switch-login>${registering ? 'Already registered? Sign in' : 'New here? Create a viewing account'}</button>` : ''}${previewBackupMarkup()}</section>`;
     bindPreviewBackup(container);
+    container.querySelector('[data-cal-switch-login]')?.addEventListener('click', () => { registering = !registering; signIn(); });
     container.querySelector('form').addEventListener('submit', async event => {
       event.preventDefault(); const button = event.submitter, fields = Object.fromEntries(new FormData(event.currentTarget));
       const status = container.querySelector('[role=status]'); button.disabled = true;
       try {
         if (creating && fields.password !== fields.confirmation) throw new Error('The passwords do not match.');
         delete fields.confirmation;
-        const session = await calendarRequest(setupToken ? '/api/setup' : inviteToken ? '/api/invitations/claim' : '/api/session', { method: 'POST', body: { ...fields, ...(setupToken ? { setupToken } : {}), ...(inviteToken ? { token: inviteToken } : {}) } });
-        calendarSession(session); user = session.user; setupToken = inviteToken = ''; await loadEvents();
+        const session = await calendarRequest(setupToken ? '/api/setup' : inviteToken ? '/api/invitations/claim' : registering ? '/api/register' : '/api/session', { method: 'POST', body: { ...fields, ...(setupToken ? { setupToken } : {}), ...(inviteToken ? { token: inviteToken } : {}) } });
+        calendarSession(session); user = session.user; setupToken = inviteToken = ''; registering = false; await loadEvents();
       } catch (issue) { status.textContent = issue.message; button.disabled = false; }
     });
   }

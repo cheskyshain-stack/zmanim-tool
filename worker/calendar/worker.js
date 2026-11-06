@@ -67,11 +67,34 @@ export class CommunityCalendar extends DurableObject {
     if (owner && user.role !== 'owner') fail('Only the main calendar admin can manage accounts.', 403);
     return user;
   }
-  async session(user) {
+  async session(user, type = 'sign-in') {
     const token = random(), expires = Date.now() + 2 * 86400000;
-    await this.ctx.storage.put('session:' + await hash(token), { userId: user.id, version: user.version, expires });
+    const now = new Date().toISOString(), key = 'login-stats:' + user.id, old = await this.ctx.storage.get(key);
+    const count = (old?.count || 0) + 1;
+    await this.ctx.storage.put({ ['session:' + await hash(token)]: { userId: user.id, version: user.version, expires },
+      [key]: { count, firstAt: old?.firstAt || now, lastAt: now },
+      ['login-history:' + user.id + ':' + String(count).padStart(16, '0')]: { sequence: count, at: now, type } });
     await this.ctx.storage.setAlarm(expires);
     return { token, expires, user: userView(user) };
+  }
+  async loginActivity(url) {
+    const storage = this.ctx.storage;
+    if (url.pathname === '/api/access/activity') {
+      const users = [...(await storage.list({ prefix: 'user:' })).values()];
+      const stats = users.length ? await storage.get(users.map(user => 'login-stats:' + user.id)) : new Map();
+      return json({ users: users.map(user => {
+        const history = stats.get('login-stats:' + user.id);
+        return { ...userView(user), signInCount: history?.count || 0, firstSignInAt: history?.firstAt || null, lastSignInAt: history?.lastAt || null };
+      }).sort((a, b) => (b.lastSignInAt || '').localeCompare(a.lastSignInAt || '') || a.name.localeCompare(b.name)) });
+    }
+    const id = url.pathname.slice('/api/access/activity/'.length);
+    if (!identifier(id) || !await storage.get('user:' + id)) fail('That account was not found.', 404);
+    const before = url.searchParams.get('before');
+    if (before !== null && (!/^[1-9]\d*$/.test(before) || !Number.isSafeInteger(Number(before)))) fail('Choose a valid sign-in history page.');
+    const prefix = 'login-history:' + id + ':';
+    const rows = await storage.list({ prefix, reverse: true, limit: 51, ...(before === null ? {} : { end: prefix + before.padStart(16, '0') }) });
+    const entries = [...rows.values()].slice(0, 50);
+    return json({ entries, nextBefore: rows.size > 50 ? entries.at(-1).sequence : null });
   }
   async announcementStatus(user) {
     const total = await this.ctx.storage.get('announcement-count') || 0;
@@ -127,7 +150,19 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, loginHistory: true, selfRegistration: true });
+    if (path === '/api/register' && method === 'POST') {
+      if (!await this.ctx.storage.get('config:owner')) fail('The calendar owner must finish setup before registration opens.', 409);
+      await this.limited(request, 'register');
+      const body = await this.body(request), address = email(body.email), displayName = name(body.name);
+      const users = [...(await this.ctx.storage.list({ prefix: 'user:' })).values()];
+      if (users.some(user => user.email === address)) fail('An account already uses this email. Sign in or contact the calendar admin.', 409);
+      if (users.filter(user => user.active && user.role === 'viewer').length >= 2000) fail('Calendar registration is full. Contact the calendar admin.', 409);
+      const salt = random(), password = await passwordHash(body.password, salt), id = crypto.randomUUID();
+      const viewer = { id, email: address, name: displayName, password, salt, role: 'viewer', active: true, version: 1 };
+      await this.ctx.storage.put('user:' + id, viewer);
+      return json(await this.session(viewer, 'account-created'), 201);
+    }
     if (path === '/api/setup' && method === 'POST') {
       await this.limited(request, 'setup', 5);
       const body = await this.body(request);
@@ -137,7 +172,7 @@ export class CommunityCalendar extends DurableObject {
       const password = await passwordHash(body.password, salt), id = crypto.randomUUID();
       const owner = { id, email: address, name: displayName, password, salt, role: 'owner', active: true, version: 1 };
       await this.ctx.storage.put({ ['user:' + id]: owner, 'config:owner': id });
-      return json(await this.session(owner), 201);
+      return json(await this.session(owner, 'account-created'), 201);
     }
     if (path === '/api/session' && method === 'POST') {
       await this.limited(request, 'signin');
@@ -156,9 +191,10 @@ export class CommunityCalendar extends DurableObject {
       const salt = random(), password = await passwordHash(body.password, salt);
       const next = { ...user, password, salt, version: user.version + 1 };
       await this.ctx.storage.put('user:' + user.id, next); await this.ctx.storage.delete(key);
-      return json(await this.session(next));
+      return json(await this.session(next, 'invitation-claimed'));
     }
     const user = await this.signedIn(request, path.startsWith('/api/access'));
+    if ((path === '/api/access/activity' || path.startsWith('/api/access/activity/')) && method === 'GET') return this.loginActivity(url);
     if (path === '/api/announcements' || path.startsWith('/api/announcements/')) return this.announcements(request, user, url);
     if (path === '/api/session' && method === 'GET') return json({ user: userView(user) });
     if (path === '/api/session' && method === 'DELETE') {
@@ -170,11 +206,26 @@ export class CommunityCalendar extends DurableObject {
       const body = await this.body(request), address = email(body.email), displayName = name(body.name);
       const users = [...(await this.ctx.storage.list({ prefix: 'user:' })).values()];
       if (users.some(value => value.active && value.email === address)) fail('That email already has calendar access.', 409);
-      if (users.filter(value => value.active).length >= 20) fail('Remove an unused calendar account before adding another.', 409);
+      if (users.filter(value => value.active && value.role !== 'viewer').length >= 20) fail('Remove an unused calendar admin before adding another.', 409);
       const editor = { id: crypto.randomUUID(), email: address, name: displayName, role: 'editor', active: true, version: 1, password: null };
       const token = random();
       await this.ctx.storage.put({ ['user:' + editor.id]: editor, ['invite:' + await hash(token)]: { userId: editor.id, version: editor.version, expires: Date.now() + 7 * 86400000 } });
       return json({ user: userView(editor), token }, 201);
+    }
+    const roleChange = /^\/api\/access\/([a-zA-Z0-9_-]+)\/role$/.exec(path);
+    if (roleChange && method === 'POST') {
+      const body = await this.body(request), account = await this.ctx.storage.get('user:' + roleChange[1]);
+      if (!account?.active) fail('That account was not found.', 404);
+      if (account.role === 'owner' || !['editor', 'viewer'].includes(body.role)) fail('Choose viewing or calendar editing access.');
+      if (!account.password) fail('Finish account setup before changing editing access.');
+      if (account.role === body.role) return json({ user: userView(account) });
+      if (body.role === 'editor') {
+        const users = [...(await this.ctx.storage.list({ prefix: 'user:' })).values()];
+        if (users.filter(user => user.active && user.role !== 'viewer').length >= 20) fail('Remove an unused calendar admin before adding another.', 409);
+      }
+      const next = { ...account, role: body.role, version: account.version + 1 };
+      await this.ctx.storage.put('user:' + next.id, next);
+      return json({ user: userView(next) });
     }
     const access = /^\/api\/access\/([a-zA-Z0-9_-]+)$/.exec(path);
     if (access && ['DELETE', 'POST'].includes(method)) {
@@ -195,6 +246,7 @@ export class CommunityCalendar extends DurableObject {
     }
     const entry = /^\/api\/events\/([a-zA-Z0-9_-]+)$/.exec(path);
     if (entry && ['PUT', 'DELETE'].includes(method)) {
+      if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can add or change events.', 403);
       await this.limited(request, 'event-write', 120);
       if (!identifier(entry[1])) fail('That event was not found.', 404);
       const body = await this.body(request), key = 'event:' + entry[1], old = await this.ctx.storage.get(key);
