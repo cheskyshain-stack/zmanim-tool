@@ -39,6 +39,7 @@ async function seatsEntry() {
   if (await updates.check()) return;
   updates.protect(() => !root.querySelector('#seats-unlock'));
   const auth = await seatsOpenSession(root);
+  window.dispatchEvent(new Event('zmanim-seats-open'));
   seatsStart(root, auth, updates);
 }
 

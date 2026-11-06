@@ -644,7 +644,7 @@ def stamp_site_url(page: Path):
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
-def stamp_analytics(page: Path, *, admin=False):
+def stamp_analytics(page: Path, *, admin=False, ready_event=None, spa=True, exclude_account_links=False):
     """Write the analytics loader into the page head, or take it out again.
 
     Between markers like everything else stamped here, so a second run replaces rather than
@@ -676,7 +676,7 @@ def stamp_analytics(page: Path, *, admin=False):
     # stripper that keeps this repository's reasoning out of the browser would have to be
     # taught about it otherwise. The reasoning is above, where it belongs.
     beacon_config = {"token": ANALYTICS_TOKEN}
-    if admin:
+    if admin or ready_event or not spa:
         beacon_config["spa"] = False
     loader = (
         "function(){try{"
@@ -695,8 +695,11 @@ def stamp_analytics(page: Path, *, admin=False):
         f"s.setAttribute(\"data-cf-beacon\",'{json.dumps(beacon_config)}');"
         "document.head.appendChild(s);}catch(e){}}"
     )
-    loader = (f'<script>window.addEventListener("zmanim-admin-open",{loader},{{once:true}});</script>'
-              if admin else f"<script>({loader})();</script>")
+    event = "zmanim-admin-open" if admin else ready_event
+    loader = (f'<script>window.addEventListener("{event}",{loader},{{once:true}});</script>'
+              if event else f"<script>({loader})();</script>")
+    if exclude_account_links:
+        loader = loader.replace('<script>', '<script>if(!new URLSearchParams(location.hash.slice(1)).has("setup")&&!new URLSearchParams(location.hash.slice(1)).has("invite"))', 1)
     block = f"{ANALYTICS_MARKER}\n{loader}" if ANALYTICS_TOKEN else ""
     pattern = re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n"
     if ANALYTICS_MARKER in html:
@@ -1152,12 +1155,15 @@ def main():
     # modules. Its own entry, since it is a much smaller program than the admin.
     stamp_css_versions(ROOT / "texts" / "index.html", "../")
     stamp_js_versions(ROOT / "texts" / "index.html", "../", "texts-app.js")
+    stamp_analytics(ROOT / "texts" / "index.html", spa=False)
     # Seats is a separate browser-local tool, with its own PIN and no public route.
     stamp_css_versions(ROOT / "seats" / "index.html", "../")
     stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
+    stamp_analytics(ROOT / "seats" / "index.html", ready_event="zmanim-seats-open")
     stamp_seats_build()
     stamp_css_versions(ROOT / "admin" / "calendar" / "index.html", "../../")
     stamp_js_versions(ROOT / "admin" / "calendar" / "index.html", "../../", "calendar-app.js")
+    stamp_analytics(ROOT / "admin" / "calendar" / "index.html", ready_event="zmanim-calendar-open", exclude_account_links=True)
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain

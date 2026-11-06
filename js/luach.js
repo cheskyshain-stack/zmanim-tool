@@ -890,6 +890,15 @@ function schedulesNow(published) {
 function renderSchedulesPage(published) {
   stopNextUp();
   const sheets = schedulesNow(published);
+  if (!sheets.length) {
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      const home = new URL('/', location.href), target = isWebsitePreview() ? websitePreviewURL(home) : home;
+      history.replaceState(null, '', target.pathname + target.search);
+    }
+    stampPage('');
+    window.scrollTo(0, 0);
+    return renderHome(published);
+  }
   const allHandouts = sheets.length > 0 && sheets.every(sheet => sheet.handout);
   const mixedHandouts = !allHandouts && sheets.some(sheet => sheet.handout);
   setPrintPage(allHandouts ? 'letter landscape' : 'letter portrait');
@@ -913,6 +922,15 @@ function renderSchedulesPage(published) {
     layoutPosters(main.querySelector('.luach-sheets'));
     wirePrintButton(main, 'sheet-print');
   }
+  const checkActive = () => {
+    if (!schedulesNow(published).length) return route(published);
+    nextUpTimer = setTimeout(checkActive, 60000 - Date.now() % 60000 + 50);
+  };
+  nextUpTimer = setTimeout(checkActive, 60000 - Date.now() % 60000 + 50);
+  nextUpWake = () => { if (document.visibilityState === 'hidden') return; clearTimeout(nextUpTimer); checkActive(); };
+  document.addEventListener('visibilitychange', nextUpWake);
+  window.addEventListener('pageshow', nextUpWake);
+  window.addEventListener('focus', nextUpWake);
 }
 
 function renderChartPage(published) {

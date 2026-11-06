@@ -4935,6 +4935,10 @@ body.is-locked { overflow: hidden; }
 .traffic-total-primary p { color: #d0dbe6; }
 .traffic-total-coverage { margin: 0.7rem 0; color: var(--traffic-navy); font-size: 1.4rem; font-weight: 650; }
 .traffic-panel { min-width: 0; border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1.2rem; margin: 0 0 1rem; background: var(--surface); }
+.traffic-activity-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); gap:.8rem; margin:1rem 0; }
+.traffic-activity-grid > div { min-width:0; padding:.8rem; border:1px solid var(--traffic-line); border-radius:8px; }
+.traffic-activity-grid dt { font-size:.75rem; color:#697486; overflow-wrap:anywhere; }
+.traffic-activity-grid dd { margin:.4rem 0 0; font-size:1.35rem; font-weight:700; color:var(--traffic-navy); }
 .traffic-admin-activity { display: grid; grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 2fr); gap: 1.2rem; align-items: center; border-left: 3px solid var(--traffic-gold); }
 .traffic-admin-count strong { display: block; margin-top: 0.35rem; font-size: 1.5rem; line-height: 1.2; color: var(--traffic-navy); font-variant-numeric: tabular-nums; }
 .traffic-admin-count .traffic-admin-qualifier { display: block; color: #846631; font-size: 0.7rem; margin-top: 0.5rem; }
