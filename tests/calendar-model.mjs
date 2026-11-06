@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
-import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 
 const read = async name => JSON.parse(await readFile(new URL('../data/' + name + '.json', import.meta.url), 'utf8'));
@@ -162,4 +162,13 @@ test('preview storage preserves corrupt data and reports unavailable storage ins
   assert.throws(() => calendarReadPreview(storage), /could not be read/);
   assert.throws(() => calendarWritePreview([], { setItem() { throw new Error('quota'); } }), /could not be saved/);
   assert.equal(CALENDAR_STORAGE_KEY, 'lakewood-commons-calendar-preview-v1');
+});
+
+test('congregation month limits follow the current month across years and calendar boundaries', () => {
+  assert.deepEqual(calendarReaderMonths('2026-11-06'), { first:'2026-10', current:'2026-11', last:'2026-12' });
+  assert.deepEqual(calendarReaderMonths('2027-01-01'), { first:'2026-12', current:'2027-01', last:'2027-02' });
+  assert.deepEqual(calendarReaderMonths('2026-12-31'), { first:'2026-11', current:'2026-12', last:'2027-01' });
+  assert.deepEqual(calendarReaderMonths('1900-01-01'), { first:'1900-01', current:'1900-01', last:'1900-02' });
+  assert.deepEqual(calendarReaderMonths('2299-12-31'), { first:'2299-11', current:'2299-12', last:'2299-12' });
+  assert.throws(() => calendarReaderMonths('2026-02-30'), /valid calendar date/);
 });
