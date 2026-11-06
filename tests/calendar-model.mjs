@@ -2,13 +2,29 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
-import { calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 
 const read = async name => JSON.parse(await readFile(new URL('../data/' + name + '.json', import.meta.url), 'utf8'));
 const [published, parshaChutz, parshaEY, parshaNames, specialDays] = await Promise.all(['published', 'parsha_chutz', 'parsha_ey', 'parsha_names', 'special_days'].map(read));
 const settings = resolveSettings(published.settings), tables = { parshaChutz, parshaEY, parshaNames, specialDays };
 const event = fields => calendarEvent({ title: 'Synthetic Kiddush', type: 'kiddush', date: '2026-11-07', ...fields });
+
+test('calendar offers the requested categories and preserves older event types', () => {
+  assert.deepEqual(CALENDAR_TYPES.map(type => type.label), ['Shalom Zachor', 'Kiddush', 'Vort', 'Aufruf', 'Chasuna', 'Bar mitzva shabbos', 'Bar mitzva dessert', 'Custom']);
+  for (const type of [...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES]) assert.equal(event({ type: type.id, customCategory: 'Community learning' }).type, type.id);
+  assert.equal(calendarEventCategory(event({ type: 'wedding' })).label, 'Chasuna');
+  assert.equal(calendarEventCategory(event({ type: 'bar-mitzvah' })).label, 'Bar mitzvah');
+});
+test('custom category names persist as plain text and are required only for Custom', () => {
+  const customCategory = 'Community learning שיעור <img src=x>';
+  const custom = event({ type: 'custom', customCategory: '  ' + customCategory + '  ' });
+  assert.equal(custom.customCategory, customCategory); assert.equal(calendarEventCategory(custom).label, customCategory);
+  assert.deepEqual(calendarEvent(JSON.parse(JSON.stringify(custom))), custom);
+  for (const value of ['', '   ', undefined, 5, {}, 'x'.repeat(61)]) assert.throws(() => event({ type: 'custom', customCategory: value }));
+  assert.equal(event({ type: 'custom', customCategory: 'x'.repeat(60) }).customCategory.length, 60);
+  assert.equal(event({ type: 'kiddush', customCategory: 'Old draft' }).customCategory, '');
+});
 
 test('monthly grids cover consecutive complete Sunday to Shabbos weeks across 51 years', () => {
   for (let year = 2000; year <= 2050; year++) for (let index = 1; index <= 12; index++) {
@@ -96,7 +112,7 @@ test('event validation rejects impossible dates and times and allowlists fields'
   assert.throws(() => event({ endDate: '2026-11-06' }), /end date/);
   assert.throws(() => event({ allDay: false, time: '25:00' }), /start time/);
   assert.throws(() => event({ allDay: false, time: '18:00', endTime: '17:00' }), /end time/);
-  assert.throws(() => event({ type: 'admin', createdBy: 'owner' }), /event type/);
+  assert.throws(() => event({ type: 'admin', createdBy: 'owner' }), /event category/);
   assert.throws(() => event({ title: '' }), /title/);
   assert.throws(() => event({ title: 'x'.repeat(161) }), /too long/);
   const value = event({ title: '<img src=x onerror=alert(1)>', description: 'מזל טוב\nA second line', createdBy: 'owner', revision: 2 });

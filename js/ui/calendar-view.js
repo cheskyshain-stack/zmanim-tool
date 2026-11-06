@@ -1,4 +1,4 @@
-import { CALENDAR_TYPES, calendarMonth, calendarEvent, calendarEventsOn, calendarClock, calendarSerial, calendarISO, calendarStepMonth } from '../calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarMonth, calendarEvent, calendarEventsOn, calendarClock, calendarSerial, calendarISO, calendarStepMonth } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession } from '../calendar/api.js';
 import { shulNow } from '../zmanim/solar.js';
@@ -12,7 +12,6 @@ let calendarAnalyticsOpened = false;
 
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
-const calEventType = id => CALENDAR_TYPES.find(type => type.id === id) || CALENDAR_TYPES[6];
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
@@ -85,8 +84,8 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (!examples) return [];
     const info = calendarMonth(month, settings, tables);
     const firstShabbos = info.days.find(day => day.inMonth && day.shabbos)?.iso || info.first;
-    const definitions = [['kiddush', 'Example Kiddush', firstShabbos], ['wedding', 'Example wedding', month + '-11'],
-      ['bar-mitzvah', 'Example bar mitzvah', calendarISO(calendarSerial(firstShabbos) + 14)], ['announcement', 'Example shul announcement', month + '-18']];
+    const definitions = [['kiddush', 'Example Kiddush', firstShabbos], ['wedding', 'Example Chasuna', month + '-11'],
+      ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events, ...sampleEvents()];
@@ -94,7 +93,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const canEdit = event => !event.example && (!endpoint || user?.role === 'owner' || user?.role === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
-    const type = calEventType(event.type);
+    const type = calendarEventCategory(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}</div>
       <h4 dir="auto">${calEscape(event.title)}</h4><p class="cal-event-clock">${calEscape(calendarClock(event.time))}${event.endTime ? ' - ' + calEscape(calendarClock(event.endTime)) : ''}</p>
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
@@ -135,12 +134,12 @@ export function renderCalendar(container, settings, tables, { standalone = false
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         <div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div>
         <div class="cal-content"><div class="cal-grid-wrap"><table class="cal-grid" aria-label="${escAttr(info.title)}"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks.map(week => `<tr>${week.map(day => {
-          const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calEventType(event.type).label}: ${event.title}`);
+          const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
           return `<td class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${day.iso < '1900-01-01' || day.iso > '2299-12-31' ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
             <span class="cal-facts" lang="he" dir="rtl">${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}</span>
-            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(event.title)}"><span class="cal-chip-type">${calEscape(calEventType(event.type).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
-            ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calEventType(list[0].type).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
+            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(calendarEventCategory(event).label + ': ' + event.title)}"><span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
+            ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calendarEventCategory(list[0]).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
         <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${user.role === 'owner' ? 'Main admin' : user.role === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
@@ -226,7 +225,8 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const original = item || { id: crypto.randomUUID(), title: '', type: 'kiddush', date, endDate: date, allDay: true, time: '', endTime: '', location: '', description: '', revision: 0 };
     let saving = false, initial = '';
     const view = dialog(`<form class="cal-form"><label>Event title<input name="title" required maxlength="160" placeholder="What’s happening?" value="${escAttr(original.title)}"></label>
-      <div class="cal-form-row"><label>Event type<select name="type">${CALENDAR_TYPES.map(type => `<option value="${type.id}" ${type.id === original.type ? 'selected' : ''}>${calEscape(type.label)}</option>`).join('')}</select></label><label>Date<input name="date" type="date" required min="1900-01-01" max="2299-12-31" value="${original.date}"></label></div>
+      <div class="cal-form-row"><label>Category<select name="type">${[...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES.filter(type => type.id === original.type)].map(type => `<option value="${type.id}" ${type.id === original.type ? 'selected' : ''}>${calEscape(type.label)}</option>`).join('')}</select></label><label>Date<input name="date" type="date" required min="1900-01-01" max="2299-12-31" value="${original.date}"></label></div>
+      <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
       <p class="cal-form-hebrew" lang="he" dir="rtl"></p><label class="cal-checkbox"><input type="checkbox" name="allDay" ${original.allDay ? 'checked' : ''}> All day</label>
       <div class="cal-form-row" data-cal-times ${original.allDay ? 'hidden' : ''}><label>Starts<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
       <label>Location (optional)<input name="location" maxlength="200" value="${escAttr(original.location)}" placeholder="For example, the shul or a simcha hall"></label>
@@ -237,6 +237,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
       { onClose: () => !saving && (new URLSearchParams(new FormData(view.el.querySelector('form'))).toString() === initial || confirm('Discard your unsaved event changes?')) });
     view.title(item ? 'Edit event' : 'Add an event');
     const form = view.el.querySelector('form');
+    form.elements.type.addEventListener('change', () => {
+      const custom = form.elements.type.value === 'custom';
+      form.querySelector('[data-cal-custom-category]').hidden = !custom;
+      form.elements.customCategory.disabled = !custom; form.elements.customCategory.required = custom;
+    });
     initial = new URLSearchParams(new FormData(form)).toString();
     const updateDate = () => {
       const value = form.elements.date.value;

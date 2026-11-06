@@ -1,5 +1,11 @@
 # Private community calendar
 
+New event categories are Shalom Zachor, Kiddush, Vort, Aufruf, Chasuna, Bar mitzva
+shabbos, Bar mitzva dessert and Custom. Custom events require customCategory, a
+plain-text name of up to 60 characters. It is validated and saved with the event.
+The wedding ID remains Chasuna; older generic types remain accepted for existing
+records. No event migration runs. Deploy customCategories:true before the new client.
+
 Phase one is an admin-only preview at `/admin/#calendar`. The congregation homepage,
 public navigation, schedule API, announcements and notification service are unchanged.
 With `data/calendar.json` disabled, the main admin can add, edit and delete test events

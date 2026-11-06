@@ -1006,6 +1006,14 @@ run Sunday through Shabbos, with Hebrew dates, month transitions, holidays and p
 Use `js/calendar/model.js`; keep all manual events separate from minyan calculations.
 The calendar uses its own navy, cream and gold CSS, with plain-text event types and
 colours. Do not let global chart table stripes, fonts or borders alter its cells.
+New event categories are Shalom Zachor, Kiddush, Vort, Aufruf, Chasuna, Bar mitzva
+shabbos, Bar mitzva dessert and Custom. Retain the existing wedding ID for Chasuna.
+Custom requires a plain-text category name of up to 60 characters, saved with the
+event and shown in its labels, details and accessible day text. Escape it everywhere;
+never use custom wording as a CSS class. Preserve older generic event types for
+existing events and editing them without migration. Deploy the matching shared
+event validator before its client. Category changes retain normal role checks,
+revision conflicts, calendar dates and private activity tracking.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew

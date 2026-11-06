@@ -24,9 +24,9 @@ const server = http.createServer((req, res) => {
         try {
           localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
           localStorage.setItem('zmanim-nocount', '1');
-          const events = ['2028-04-18', '2027-12-30'].flatMap(date => Array.from({ length: 4 }, (_, index) => ({
+          const events = ['2028-04-18', '2027-12-30'].flatMap(date => Array.from({ length: 8 }, (_, index) => ({
             id: 'reference-' + date + '-' + index, date, endDate: date, title: 'אירוע לדוגמה עם כותרת ארוכה ' + index,
-            type: ['kiddush', 'wedding', 'bar-mitzvah', 'announcement'][index], allDay: true, revision: 1,
+            type: ['custom', 'shalom-zachor', 'bar-mitzva-shabbos', 'bar-mitzva-dessert', 'kiddush', 'wedding', 'bar-mitzvah', 'announcement'][index], customCategory: index === 0 ? 'A'.repeat(60) : '', allDay: true, revision: 1,
           })));
           localStorage.setItem('lakewood-commons-calendar-preview-v1', JSON.stringify({ version: 1, events }));
         } catch { /* Initial opaque documents cannot use site storage. */ }
@@ -65,7 +65,7 @@ const server = http.createServer((req, res) => {
         await page.locator(`[data-cal-day="${target}"]`).click();
         const panel = width <= 700 ? page.locator('.cal-dialog') : page.locator('.cal-day-panel');
         await panel.locator('.cal-event-card').first().waitFor();
-        assert.equal(await panel.locator('.cal-event-card').count(), 4);
+        assert.equal(await panel.locator('.cal-event-card').count(), 8);
         if (width <= 700) await page.keyboard.press('Escape');
         checks.push({ width, month, days: measured.length, allDatesAligned: true, HebrewLabels: true, crowdedEventsFit: true });
       }

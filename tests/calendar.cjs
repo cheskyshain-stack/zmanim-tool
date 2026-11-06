@@ -95,7 +95,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.locator('[data-cal-day="2026-11-07"]').focus(); await page.keyboard.press('ArrowRight');
       assert.equal(await page.locator('[data-cal-day="2026-11-08"]').getAttribute('aria-pressed'), 'true');
       if (width === 375) {
-        const another = await fillEvent(page, '<img src=x onerror="window.calendarXss=1">', 'announcement', '2026-11-08');
+        const another = await fillEvent(page, '<img src=x onerror="window.calendarXss=1">', 'vort', '2026-11-08');
         await another.getByRole('button', { name: 'Save event', exact: true }).click();
         await page.locator('[data-cal-day="2026-11-08"]').click();
         assert.equal(await page.evaluate(() => window.calendarXss), undefined);
@@ -512,6 +512,44 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal(afterOpen.counts.signIns, activity.counts.signIns, 'Submitted activity types cannot forge server totals');
     const held = (await call('/api/activity?start=' + activity.range.start + '&end=' + activity.range.end + '&asOf=' + encodeURIComponent(activity.snapshotAt), 'GET', null, owner)).body;
     assert.deepEqual(held.counts, activity.counts, 'Activity uses the selected snapshot instead of later operations');
+    await ownerPage.setViewportSize({ width: 375, height: 900 });
+    const customForm = await fillEvent(ownerPage, 'Synthetic custom category event', 'custom', '2026-11-15');
+    assert.deepEqual(await customForm.locator('[name=type] option').allTextContents(), ['Shalom Zachor', 'Kiddush', 'Vort', 'Aufruf', 'Chasuna', 'Bar mitzva shabbos', 'Bar mitzva dessert', 'Custom']);
+    assert(await customForm.locator('[name=customCategory]').isVisible());
+    const customCategory = 'Community learning שיעור <img src=x>';
+    await customForm.locator('[name=customCategory]').fill(customCategory);
+    await ownerPage.screenshot({ path: path.join(output, 'calendar-custom-category-form-375.png'), fullPage: true });
+    await customForm.getByRole('button', { name: 'Save event', exact: true }).click(); await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
+    await ownerPage.locator('[data-cal-day="2026-11-15"]').click();
+    await ownerPage.locator('.cal-dialog .cal-tag').filter({ hasText: customCategory }).waitFor(); assert.equal(await ownerPage.locator('.cal-event-card img').count(), 0);
+    await ownerPage.locator('.cal-dialog .cal-event-card [data-cal-edit]').click();
+    assert.equal(await ownerPage.locator('[name=customCategory]').inputValue(), customCategory, 'Saved custom category reopens for editing');
+    await ownerPage.locator('[name=customCategory]').fill('Community learning updated');
+    await ownerPage.getByRole('button', { name: 'Save changes', exact: true }).click(); await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
+    assert.equal((await call('/api/events?from=2026-11-15&to=2026-11-15', 'GET', null, owner)).body.events.find(item => item.title === 'Synthetic custom category event').customCategory, 'Community learning updated');
+    await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
+    await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+    assert((await ownerPage.locator('[data-cal-day="2026-11-15"]').getAttribute('aria-label')).includes('Community learning updated'));
+    const newTypes = ['shalom-zachor', 'kiddush', 'vort', 'aufruf', 'wedding', 'bar-mitzva-shabbos', 'bar-mitzva-dessert', 'custom'];
+    for (const type of newTypes) {
+      const saved = await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Category ' + type, type, customCategory: 'A'.repeat(60), date: '2026-11-20', revision: 0 }, owner);
+      assert.equal(saved.status, 201); assert.equal(saved.body.event.type, type); if (type === 'custom') assert.equal(saved.body.event.customCategory, 'A'.repeat(60));
+    }
+    assert.equal((await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Missing custom label', type: 'custom', date: '2026-11-20', revision: 0 }, owner)).status, 400);
+    const legacyId = crypto.randomUUID();
+    assert.equal((await call('/api/events/' + legacyId, 'PUT', { title: 'Older generic bar mitzvah', type: 'bar-mitzvah', date: '2026-11-16', revision: 0 }, owner)).status, 201);
+    await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
+    await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+    await ownerPage.locator('[data-cal-day="2026-11-16"]').click(); await ownerPage.locator('.cal-dialog [data-cal-edit="' + legacyId + '"]').click();
+    assert.equal(await ownerPage.locator('[name=type]').inputValue(), 'bar-mitzvah', 'Editing an older category retains its original value');
+    await ownerPage.getByRole('button', { name: 'Save changes', exact: true }).click(); await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
+    assert.equal((await call('/api/events?from=2026-11-16&to=2026-11-16', 'GET', null, owner)).body.events.find(item => item.id === legacyId).type, 'bar-mitzvah');
+    await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
+    await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+    for (const width of [375, 393, 1440]) {
+      await ownerPage.setViewportSize({ width, height: 900 }); assert(await ownerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+      await ownerPage.screenshot({ path: path.join(output, 'calendar-new-categories-' + width + '.png'), fullPage: true });
+    }
     assert(!requests.some(request => /[?&](token|setup|invite)=/.test(request.url)), 'Account secrets never appear in request URLs');
     assert.deepEqual(errors, []);
     checks.push({ sharedAccounts: true, editorBoundaries: true, ownerControls: true, revocation: true, concurrentEdits: true, inviteRegistration: true });
