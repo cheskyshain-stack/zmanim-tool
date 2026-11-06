@@ -98,12 +98,36 @@ export class CommunityCalendar extends DurableObject {
   }
   async announcementStatus(user) {
     const total = await this.ctx.storage.get('announcement-count') || 0;
-    const read = await this.ctx.storage.list({ prefix: 'announcement-read:' + user.id + ':' });
-    return { total, unread: Math.max(0, total - read.size), canPost: ['owner', 'editor'].includes(user.role) };
+    const prefix = 'announcement-read:' + user.id + ':';
+    const read = await this.ctx.storage.list({ prefix }), deleted = await this.ctx.storage.list({ prefix: 'announcement-deleted:' });
+    const seen = new Set([...read.keys()].map(key => key.slice(prefix.length)));
+    for (const key of deleted.keys()) seen.add(key.slice('announcement-deleted:'.length));
+    const admin = ['owner', 'editor'].includes(user.role);
+    return { total, unread: Math.max(0, total - seen.size), deletedCount: deleted.size, canPost: admin, canDelete: admin };
   }
   async announcements(request, user, url) {
     const storage = this.ctx.storage, method = request.method;
     if (url.pathname === '/api/announcements/status' && method === 'GET') return json(await this.announcementStatus(user));
+    if (url.pathname === '/api/announcements/deleted' && method === 'GET') {
+      const rows = await storage.list({ prefix: 'announcement-deleted:' });
+      return json({ ids: [...rows.keys()].map(key => key.slice('announcement-deleted:'.length)), deletedCount: rows.size });
+    }
+    const removal = /^\/api\/announcements\/([^/]+)$/.exec(url.pathname);
+    if (removal && method === 'DELETE') {
+      if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can delete announcements.', 403);
+      const id = removal[1]; if (!identifier(id)) fail('Choose a valid announcement.');
+      const key = 'announcement:' + id, message = await storage.get(key);
+      if (!message) fail('That announcement was not found.', 404);
+      if (!message.deletedAt) {
+        await this.limited(request, 'announcement-write', 60);
+        const deletion = { id, sequence: message.sequence, deletedAt: new Date().toISOString(), deletedBy: user.id };
+        await storage.transaction(async transaction => {
+          await transaction.put({ [key]: { ...message, ...deletion }, ['announcement-deleted:' + id]: deletion });
+          await transaction.delete('announcement-order:' + String(message.sequence).padStart(16, '0'));
+        });
+      }
+      return json({ removed: true, id, ...await this.announcementStatus(user) });
+    }
     if (url.pathname === '/api/announcements/read' && method === 'POST') {
       const body = await this.body(request);
       if (!Array.isArray(body.ids) || body.ids.length > 100 || body.ids.some(id => typeof id !== 'string' || !identifier(id))) fail('Choose valid announcements to mark as read.');
@@ -120,6 +144,7 @@ export class CommunityCalendar extends DurableObject {
       let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
       const key = 'announcement:' + body.id, old = await storage.get(key);
       if (old) {
+        if (old.deletedAt) fail('This announcement was deleted. Create a new post to share a new update.', 409);
         if (old.authorId !== user.id || old.text !== text) fail('This announcement was already posted with different text. Refresh the feed.', 409);
         return json({ message: old, ...await this.announcementStatus(user) });
       }
@@ -150,7 +175,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, loginHistory: true, selfRegistration: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, loginHistory: true, selfRegistration: true });
     if (path === '/api/register' && method === 'POST') {
       if (!await this.ctx.storage.get('config:owner')) fail('The calendar owner must finish setup before registration opens.', 409);
       await this.limited(request, 'register');

@@ -95,6 +95,16 @@ text returns the existing post instead of creating a duplicate.
 GET /api/announcements/status returns the current account's unread count.
 GET /api/announcements (and ?before=<sequence>) returns messages and read states.
 POST /api/announcements takes {id,text}; POST /api/announcements/read takes {ids}.
+DELETE /api/announcements/:id lets any owner or calendar editor remove any post,
+regardless of its author. Viewers cannot delete. Repeated deletion succeeds without
+changing counts again. Deleted posts are omitted from the ordering index and kept
+with private recovery metadata; an old POST retry cannot restore them or read them.
+The monotonic total remains the number of posts ever created. Deleted IDs count as
+seen for every account, so unread counts exclude removed posts without double
+counting existing reads. GET /api/announcements/deleted returns deletion IDs for
+signed-in feed synchronization; it never returns deleted text. Status includes
+deletedCount and canDelete. Open feeds remove those IDs without losing older loaded
+messages or drafts. Confirm announcementDeletion:true before publishing the client.
 All endpoints require the calendar session and allowed origin. Read markers belong
 to the authenticated account, persist across devices, and are independent per post.
 The author's own post starts read; it never clears other unread messages.
