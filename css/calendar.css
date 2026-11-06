@@ -1,12 +1,16 @@
-.cal-admin-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.cal-admin-heading { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:1rem; }
+.cal-admin-actions { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; }
+.cal-admin-actions a { display:inline-flex; align-items:center; text-decoration:none; }
 .is-calendar-admin .sidebar-foot :is(.time-explain-bar,.zmanim-reference-bar) { display:none; }
 .cal-admin-heading h2 { margin:0 0 .3rem; }
 .cal-admin-heading p { margin:0; }
-.cal-admin-heading button, .shul-calendar button, .cal-dialog button, .cal-login button, .cal-file-label {
+.cal-admin-heading button, .cal-admin-actions a, .shul-calendar button, .cal-dialog button, .cal-login button, .cal-file-label {
   box-sizing:border-box; min-height:44px; padding:.55rem .85rem; border:1px solid #d9dcd8; border-radius:9px;
   background:#fff; color:#142b46; font:600 .9rem/1.3 system-ui,sans-serif; cursor:pointer;
 }
 .cal-admin-heading button { flex:none; }
+.cal-admin-actions a:hover { border-color:#a88c47; background:#f1eadb; }
+.cal-admin-actions a:focus-visible { outline:3px solid #9e7b31; outline-offset:2px; }
 .shul-calendar { --cal-ink:#142b46; --cal-gold:#a88c47; background:#faf7f0; color:var(--cal-ink); border:1px solid #e3dfd3; border-top:3px solid var(--cal-gold); border-radius:17px; overflow:hidden; box-shadow:0 3px 16px #142b4606; }
 .cal-preview-banner { display:flex; flex-wrap:wrap; align-items:baseline; gap:.25rem .7rem; padding:.65rem .85rem; margin-bottom:1rem; background:#e9eef4; color:#31455e; border-radius:8px; font-size:.8rem; }
 .cal-preview-banner strong { font-size:.75rem; letter-spacing:.03em; }
@@ -133,7 +137,7 @@
 @media (max-width:700px) {
   .cal-admin-heading { align-items:flex-start; gap:.5rem; }
   .cal-admin-heading p { font-size:.8rem; }
-  .cal-admin-heading button { font-size:.75rem; padding:.5rem .6rem; }
+  .cal-admin-heading button, .cal-admin-actions a { font-size:.75rem; padding:.5rem .6rem; }
   .cal-brand { padding:1rem .8rem .8rem; gap:.5rem; }
   .cal-brand h3 { font-size:1.35rem; }
   .cal-brand .cal-primary { font-size:.75rem; padding:.5rem .65rem; }
