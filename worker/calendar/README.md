@@ -17,14 +17,17 @@ included in public site data, Git or application logs.
 
 The owner sees all events, can edit or delete any event, and can invite, revoke or
 reset editor access. Editors see the private calendar but can change only their own
-events. Neither account grants schedule-settings, seating-plan or GitHub access.
+events. New readers register with their name, email and a password and immediately
+receive viewer access. Viewers can read the calendar and announcements but cannot
+change events, post announcements or manage accounts. No calendar role grants
+schedule-settings, seating-plan or GitHub access.
 Passwords use salted PBKDF2-SHA256 with 100,000 iterations, the supported Workerd
 limit. Random bearer sessions last 48 hours and are stored hashed on the server.
 Removing or resetting an editor immediately invalidates their sessions. Reset also
 disables their old password until the new invitation is claimed. The owner account
 cannot be removed through the account-management screen.
 
-All calendar events and account endpoints require a server session. There is no public
+All calendar events and account-management endpoints require a server session. There is no public
 event endpoint in this phase. CORS is limited to the shul's origin. Writes validate
 event types, real dates, time order and text lengths, take ownership from the session,
 and reject stale revisions. Deleted-event markers prevent stale retries recreating an
@@ -105,3 +108,33 @@ announcements:true in /api/info and unauthenticated HTTP 401 responses, without
 posting real or synthetic messages to production. The calendar browser suite uses
 local Workerd to test posting, lost responses, independent read counts, pagination,
 cross-session persistence and revoked access.
+
+## Viewer registration and private sign-in history
+
+POST /api/register accepts {name,email,password} once the owner is set up. It
+validates all fields, rejects existing or revoked emails and always creates a viewer,
+ignoring submitted roles. Registration signs the reader in immediately. Viewer
+accounts have a separate 2,000-account limit and do not consume the 20 calendar-admin
+slots. They can read events and announcements and mark their messages read; all
+event and announcement-content mutations require owner/editor access.
+
+Only the owner may POST /api/access/:id/role with {role:"editor"} or {role:"viewer"}.
+The owner's role cannot be changed. Permission changes invalidate existing sessions
+while keeping the account, password, events, read states and history. Calendar access
+offers these controls alongside the existing invitation and password-reset actions.
+
+GET /api/access/activity lists each account's name, email, role/access state, recorded
+sign-in count and first/last sign-in dates, including removed accounts. GET
+/api/access/activity/:id returns 50 successful sign-ins, newest first, with nextBefore;
+pass ?before=<sequence> for older records. Both endpoints require owner access.
+Only session creation records a sign-in, including account creation and invitation
+claim. Failed passwords, GET session checks and calendar refreshes do not increase
+counts. Old sign-ins are not reconstructed. Activity records contain timestamps and
+event types, not passwords, password hashes, session tokens or IP addresses.
+
+The account forms explain that names, emails and sign-in times are visible to the
+owner. No street address is collected. The user explicitly kept /texts/ open by
+direct link; only calendar and announcement information requires calendar sign-in.
+Verify selfRegistration:true and loginHistory:true after deploying the service,
+before publishing its client. Keep the existing account records and CALENDAR v1
+storage. Do not create production registrations or test sign-ins during activation.

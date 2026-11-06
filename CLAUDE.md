@@ -1038,9 +1038,29 @@ the client-side admin PIN. Activation does not publish a congregation calendar.
 After activation, the main admin sign-in and Calendar access screens retain
 Previous device preview backup. It downloads the exact existing local data without
 uploading it or replacing it with shared events. Calendar-only accounts do not see it.
-After signing in on `/admin/calendar/`, owners and calendar editors can open
+After signing in on `/admin/calendar/`, calendar accounts can open
 Schedule messages at `/texts/` from the calendar toolbar. Open it in a separate
 tab so their calendar stays available. This link does not grant other admin access.
+
+New readers can register immediately with their name, email address and their own
+password. The server always assigns viewer access; submitted role fields cannot
+grant editing. Viewers read calendar events and announcements but cannot add,
+change or delete events, post announcements, invite people or see account activity.
+The owner can grant calendar editing or return an editor to viewing access; role
+changes invalidate existing sessions and can never change the owner's role.
+Existing owner/editor accounts and invitation flows are preserved. Removed emails
+cannot reactivate themselves through registration. Schedule messages at `/texts/`
+remains open by direct link, as explicitly requested; this access restriction covers
+only the calendar and its private announcements.
+
+Calendar access offers an owner-only Sign-in history list with every account's
+name, email, successful sign-in count, first/last sign-in and paginated timestamps.
+Account creation and invitation acceptance create the first recorded sign-in.
+GET session checks, page refreshes and failed passwords must not increase counts.
+Keep removed accounts' history and distinguish unrecorded earlier activity from
+new history. No password material, session tokens or IP addresses belong in the
+activity response. Show the recording notice on account forms. Deploy the updated
+calendar service before the client; keep the existing Durable Object and migration.
 
 The signed-in calendar toolbar also offers Announcements, a private plain-text
 message feed. Owners and calendar editors can append posts; every active calendar
