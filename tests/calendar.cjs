@@ -46,7 +46,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
   const fillEvent = async (page, title, type = 'kiddush', date = '2026-11-07') => {
     await page.locator('.cal-brand [data-cal-add]').click();
     const form = page.locator('.cal-dialog form');
-    await form.locator('[name=title]').fill(title); await form.locator('[name=type]').selectOption(type); await form.locator('[name=date]').fill(date);
+    await form.locator('[name=details]').fill(title); await form.locator('[name=type]').selectOption(type); await form.locator('[name=date]').fill(date);
     return form;
   };
   const fit = async (page, label) => {
@@ -64,7 +64,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
   };
   try {
     // The first phase is explicitly a device preview inside the existing admin.
-    for (const width of [320, 375, 768, 1440]) {
+    for (const width of [320, 375, 393, 768, 1440]) {
       const ctx = await context(width), page = await ctx.newPage();
       await page.goto(origin + '/admin/#calendar'); await page.locator('.shul-calendar').waitFor();
       await jump(page, '2026-11'); await fit(page, 'preview-' + width);
@@ -78,8 +78,10 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.evaluate(() => scrollTo(0, 0));
       await page.screenshot({ path: path.join(output, 'calendar-' + width + '.png'), fullPage: true });
       const form = await fillEvent(page, 'Synthetic Kiddush with a long title - מזל טוב למשפחה ולכל הקהילה', 'kiddush');
-      await form.locator('[name=description]').fill('First line\nSecond line: מזל טוב');
-      await form.locator('[name=location]').fill('Synthetic shul location');
+      await form.locator('[name=details]').fill('Synthetic Kiddush with a long title - מזל טוב למשפחה ולכל הקהילה\nSynthetic shul location\nFirst line\nSecond line: מזל טוב');
+      assert.equal(await form.locator('textarea').count(), 1);
+      assert.equal(await form.locator('[name=title],[name=location],[name=description],[name=allDay]').count(), 0);
+      assert.equal(await form.locator('[name=time]').getAttribute('required'), null);
       await form.getByRole('button', { name: 'Save event', exact: true }).click();
       await page.locator('.cal-dialog').waitFor({ state: 'detached' });
       await page.reload(); await page.locator('.shul-calendar').waitFor(); await jump(page, '2026-11');
@@ -87,11 +89,13 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.locator('[data-cal-day="2026-11-07"]').click();
       const scope = width <= 700 ? page.locator('.cal-dialog') : page.locator('.cal-day-panel');
       await scope.locator('[data-cal-edit]').click();
-      await page.locator('.cal-dialog [name=title]').fill('Updated synthetic Kiddush');
+      await page.locator('.cal-dialog [name=details]').fill('Updated synthetic Kiddush\nSynthetic shul location\nFirst line\nSecond line: מזל טוב');
       await page.getByRole('button', { name: 'Save changes', exact: true }).click();
       await page.locator('.cal-dialog').waitFor({ state: 'detached' });
       const raw = await page.evaluate(() => JSON.parse(localStorage.getItem('lakewood-commons-calendar-preview-v1')));
       assert.equal(raw.events.length, 1); assert.equal(raw.events[0].title, 'Updated synthetic Kiddush'); assert.equal(raw.events[0].revision, 2);
+      assert.equal(raw.events[0].description, 'Synthetic shul location\nFirst line\nSecond line: מזל טוב');
+      assert.equal(await page.locator('.cal-event-clock').count(), 0, 'Events without times have no time label');
       await page.locator('[data-cal-day="2026-11-07"]').focus(); await page.keyboard.press('ArrowRight');
       assert.equal(await page.locator('[data-cal-day="2026-11-08"]').getAttribute('aria-pressed'), 'true');
       if (width === 375) {
@@ -107,7 +111,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
         assert.equal(JSON.parse(fs.readFileSync(backup)).events.length, 2);
         await page.keyboard.press('Escape');
         const timed = await fillEvent(page, 'Keyboard viewport test');
-        await timed.locator('[name=allDay]').uncheck(); await timed.locator('[name=time]').fill('19:15');
+        await timed.locator('[name=time]').fill('19:15');
         await page.screenshot({ path: path.join(output, 'event-form-phone.png') });
         // Simulate an on-screen keyboard reducing the visual viewport.
         await page.evaluate(() => {
@@ -120,6 +124,15 @@ const editorPassword = 'Synthetic calendar editor password 2026';
         page.once('dialog', dialog => dialog.accept()); await page.keyboard.press('Escape');
       }
       await fit(page, 'populated-' + width);
+      if (width === 393) {
+        const removable = await fillEvent(page, 'Delete button verification', 'kiddush', '2026-11-09');
+        await removable.getByRole('button', { name: 'Save event', exact: true }).click(); await page.locator('.cal-dialog').waitFor({ state: 'detached' });
+        await page.locator('[data-cal-day="2026-11-09"]').click(); await page.locator('.cal-dialog [data-cal-edit]').click();
+        page.once('dialog', popup => popup.accept()); await page.getByRole('button', { name: 'Delete event', exact: true }).click();
+        await page.locator('.cal-dialog').waitFor({ state: 'detached' });
+        const kept = await page.evaluate(() => JSON.parse(localStorage.getItem('lakewood-commons-calendar-preview-v1')).events);
+        assert.equal(kept.length, 1); assert.equal(kept[0].title, 'Updated synthetic Kiddush', 'Deleting from the event editor preserves other events');
+      }
       await page.goto(origin + '/admin/calendar/'); await page.getByRole('heading', { name: 'Calendar editor access' }).waitFor();
       assert.equal(await page.locator('.cal-grid').count(), 0, 'Unconnected editor page does not simulate private access');
       await page.goto(origin + '/?count=off');
@@ -190,7 +203,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await viewerPage.getByRole('button', { name: 'Create account', exact: true }).click(); await viewerPage.locator('.shul-calendar').waitFor();
     let viewerSession = await viewerPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')));
     assert.equal(viewerSession.user.role, 'viewer');
-    assert.equal(await viewerPage.locator('[data-cal-add],[data-cal-edit],[data-cal-delete]').count(), 0);
+    assert.equal(await viewerPage.locator('[data-cal-add],[data-cal-edit],[data-cal-delete],[data-cal-access],[data-cal-view]').count(), 0);
     assert.equal((await call('/api/events?from=2026-11-01&to=2026-11-30', 'GET', null, viewerSession.token)).status, 200);
     assert.equal((await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Forbidden' }, viewerSession.token)).status, 403);
     assert.equal((await call('/api/events/' + crypto.randomUUID(), 'DELETE', { revision: 0 }, viewerSession.token)).status, 403);
@@ -224,6 +237,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     const editorSession = await editorPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1'))), editor = editorSession.token;
     assert.equal(editorSession.user.role, 'editor');
     const messages = editorPage.getByRole('link', { name: 'Schedule messages', exact: true });
+    assert.equal(await editorPage.locator('[data-cal-access],[data-cal-view]').count(), 0, 'Editors have no account-management or owner-preview button');
     assert.equal(await messages.getAttribute('href'), '/texts/');
     assert.equal(await messages.getAttribute('target'), '_blank');
     for (const width of [320, 375, 393, 1440]) {
@@ -474,7 +488,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await deletionPage.getByText('First update after an empty feed', { exact: true }).waitFor();
     await deletionCtx.close();
     const ownForm = await fillEvent(editorPage, 'Synthetic editor wedding', 'wedding', '2026-11-11');
-    await ownForm.locator('[name=allDay]').uncheck(); await ownForm.locator('[name=time]').fill('19:00');
+    await ownForm.locator('[name=time]').fill('19:00');
     await ownForm.getByRole('button', { name: 'Save event', exact: true }).click(); await editorPage.locator('.cal-dialog').waitFor({ state: 'detached' });
     let result = await call('/api/events?from=2026-11-01&to=2026-11-30', 'GET', null, owner);
     const item = result.body.events[0]; assert.equal(item.title, 'Synthetic editor wedding'); assert.equal(item.createdBy, editorSession.user.id);
@@ -591,20 +605,56 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       assert.equal(saved.status, 201); assert.equal(saved.body.event.type, type); if (type === 'custom') assert.equal(saved.body.event.customCategory, 'A'.repeat(60));
     }
     assert.equal((await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Missing custom label', type: 'custom', date: '2026-11-20', revision: 0 }, owner)).status, 400);
+    for (const times of [{ time: '', endTime: '' }, { time: '19:00', endTime: '' }, { time: '', endTime: '21:00' }, { time: '19:00', endTime: '21:00' }]) {
+      const saved = await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Optional times', type: 'kiddush', date: '2026-11-20', allDay: false, ...times, revision: 0 }, owner);
+      assert.equal(saved.status, 201); assert.equal(saved.body.event.time, times.time); assert.equal(saved.body.event.endTime, times.endTime);
+      assert.equal(saved.body.event.allDay, !times.time && !times.endTime);
+    }
     const legacyId = crypto.randomUUID();
-    assert.equal((await call('/api/events/' + legacyId, 'PUT', { title: 'Older generic bar mitzvah', type: 'bar-mitzvah', date: '2026-11-16', revision: 0 }, owner)).status, 201);
+    assert.equal((await call('/api/events/' + legacyId, 'PUT', { title: 'Older generic bar mitzvah', location: 'Original location', description: 'Original details\nמזל טוב', type: 'bar-mitzvah', date: '2026-11-16', revision: 0 }, owner)).status, 201);
     await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
     await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
     await ownerPage.locator('[data-cal-day="2026-11-16"]').click(); await ownerPage.locator('.cal-dialog [data-cal-edit="' + legacyId + '"]').click();
     assert.equal(await ownerPage.locator('[name=type]').inputValue(), 'bar-mitzvah', 'Editing an older category retains its original value');
+    assert.equal(await ownerPage.locator('[name=details]').inputValue(), 'Older generic bar mitzvah\nOriginal location\nOriginal details\nמזל טוב');
     await ownerPage.getByRole('button', { name: 'Save changes', exact: true }).click(); await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
-    assert.equal((await call('/api/events?from=2026-11-16&to=2026-11-16', 'GET', null, owner)).body.events.find(item => item.id === legacyId).type, 'bar-mitzvah');
+    const legacySaved = (await call('/api/events?from=2026-11-16&to=2026-11-16', 'GET', null, owner)).body.events.find(item => item.id === legacyId);
+    assert.equal(legacySaved.type, 'bar-mitzvah'); assert.equal(legacySaved.location, 'Original location'); assert.equal(legacySaved.description, 'Original details\nמזל טוב');
     await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
     await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
     for (const width of [375, 393, 1440]) {
       await ownerPage.setViewportSize({ width, height: 900 }); assert(await ownerPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
       await ownerPage.screenshot({ path: path.join(output, 'calendar-new-categories-' + width + '.png'), fullPage: true });
     }
+    const previewBefore = (await call('/api/activity?days=1', 'GET', null, owner)).body.counts;
+    const previewReads = (await call('/api/announcements/status', 'GET', null, owner)).body;
+    const previewRequestStart = requests.length;
+    for (const role of ['editor', 'viewer']) {
+      await ownerPage.locator('[data-cal-view]').selectOption(role);
+      await ownerPage.locator('[data-cal-view-notice]').waitFor();
+      assert.equal(await ownerPage.locator('[data-cal-access]').count(), 0);
+      assert.equal(await ownerPage.locator('.cal-brand [data-cal-add]').count(), role === 'editor' ? 1 : 0);
+      for (const width of [375, 393, 1440]) {
+        await ownerPage.setViewportSize({ width, height: 900 }); await fit(ownerPage, role + '-preview-' + width);
+        await ownerPage.screenshot({ path: path.join(output, 'calendar-' + role + '-preview-' + width + '.png'), fullPage: true });
+      }
+      await ownerPage.getByRole('button', { name: /^Announcements/ }).click();
+      await ownerPage.locator('.cal-announcement-message').first().waitFor();
+      if (role === 'viewer') assert.equal(await ownerPage.locator('.cal-announcement-compose:visible,[data-cal-edit-announcement]:visible,[data-cal-delete-announcement]:visible').count(), 0);
+      else {
+        assert.equal(await ownerPage.locator('.cal-announcement-compose textarea').isDisabled(), true);
+        assert.equal(await ownerPage.locator('[data-cal-edit-announcement]').first().isDisabled(), true);
+        assert.equal(await ownerPage.locator('[data-cal-delete-announcement]').first().isDisabled(), true);
+      }
+      await ownerPage.keyboard.press('Escape');
+    }
+    assert.equal(requests.slice(previewRequestStart).filter(request => /\/api\//.test(request.url) && ['POST', 'PUT', 'DELETE'].includes(request.method)).length, 0, 'Owner previews never write or record announcement opens/read markers');
+    assert.deepEqual((await call('/api/activity?days=1', 'GET', null, owner)).body.counts, previewBefore);
+    assert.deepEqual((await call('/api/announcements/status', 'GET', null, owner)).body, previewReads);
+    assert.equal(await ownerPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), 'owner');
+    await ownerPage.locator('[data-cal-view]').selectOption('owner');
+    assert.equal(await ownerPage.locator('[data-cal-access]').count(), 1);
+    assert.equal(await ownerPage.locator('text=Kahal Lev Menachem').count(), 0);
     const lastAnnouncement = (await call('/api/announcements', 'GET', null, owner)).body.messages[0];
     const beforeEdits = (await call('/api/announcements/status', 'GET', null, owner)).body.editCount;
     for (let index = 0; index < 102; index++) {

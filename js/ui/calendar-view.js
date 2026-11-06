@@ -1,4 +1,4 @@
-import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarMonth, calendarEvent, calendarEventsOn, calendarClock, calendarSerial, calendarISO, calendarStepMonth } from '../calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession } from '../calendar/api.js';
 import { shulNow } from '../zmanim/solar.js';
@@ -17,7 +17,7 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 // With no service configured, only the main admin gets a clearly labelled device preview.
 export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '' } = {}) {
   let today = calendarISO(shulNow(new Date(), settings).serial);
-  let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null;
+  let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = 'owner';
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const dialogs = new Set();
   const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
@@ -89,17 +89,17 @@ export function renderCalendar(container, settings, tables, { standalone = false
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events, ...sampleEvents()];
-  const canAdd = () => !endpoint || ['owner', 'editor'].includes(user?.role);
-  const canEdit = event => !event.example && (!endpoint || user?.role === 'owner' || user?.role === 'editor' && event.createdBy === user.id);
+  const role = () => user?.role === 'owner' ? previewRole : user?.role;
+  const previewing = () => user?.role === 'owner' && previewRole !== 'owner';
+  const canAdd = () => !endpoint || ['owner', 'editor'].includes(role());
+  const canEdit = event => !event.example && (!endpoint || role() === 'owner' || role() === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
     const type = calendarEventCategory(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}</div>
-      <h4 dir="auto">${calEscape(event.title)}</h4><p class="cal-event-clock">${calEscape(calendarClock(event.time))}${event.endTime ? ' - ' + calEscape(calendarClock(event.endTime)) : ''}</p>
+      <p class="cal-event-description" dir="auto">${calEscape(calendarEventDetails(event))}</p>${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
-      ${event.location ? `<p class="cal-event-location" dir="auto">${calEscape(event.location)}</p>` : ''}
-      ${event.description ? `<p class="cal-event-description" dir="auto">${calEscape(event.description)}</p>` : ''}
-      ${canEdit(event) ? `<div class="cal-event-actions"><button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}">Delete</button></div>` : ''}</article>`;
+      ${canEdit(event) ? `<div class="cal-event-actions"><button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}" ${previewing() ? 'disabled' : ''}>Delete</button></div>` : ''}</article>`;
   }
   function dayHtml(date) {
     const info = calendarMonth(date.slice(0, 7), settings, tables), day = info.days.find(item => item.iso === date);
@@ -128,11 +128,13 @@ export function renderCalendar(container, settings, tables, { standalone = false
   function draw() {
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
-    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${endpoint && user ? announcements.markup() : ''}${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
+    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? `<label class="cal-view-choice">View as<select data-cal-view aria-label="View calendar as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Calendar editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>` : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>
+      ${previewing() ? `<div class="cal-preview-banner" data-cal-view-notice><strong>${previewRole === 'editor' ? 'Calendar editor preview' : 'Congregation preview'}</strong><span>Preview only. Choose Main admin above to make changes.${previewRole === 'editor' ? ' Editors can edit and delete only their own events.' : ''}</span></div>` : ''}
       <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
-      <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}</header>
+      <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}</header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         <div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div>
+        <p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>
         <div class="cal-content"><div class="cal-grid-wrap"><table class="cal-grid" aria-label="${escAttr(info.title)}"><thead><tr>${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th scope="col">${day}</th>`).join('')}</tr></thead><tbody>${weeks.map(week => `<tr>${week.map(day => {
           const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
@@ -142,12 +144,16 @@ export function renderCalendar(container, settings, tables, { standalone = false
             ${list.length ? `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-type-${list[0].type}">${calEscape(calendarEventCategory(list[0]).compact)}</span>${list.length > 1 ? `<small>+${list.length - 1}</small>` : ''}</span>` : ''}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
-        <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${user.role === 'owner' ? 'Main admin' : user.role === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
+        <footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${role() === 'owner' ? 'Main admin' : role() === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>
       </section><p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
     container.querySelectorAll('[data-cal-step]').forEach(button => button.addEventListener('click', () => changeMonth(calendarStepMonth(month, Number(button.dataset.calStep)))));
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
-    container.querySelector('[data-cal-access]').addEventListener('click', access);
+    container.querySelector('[data-cal-access]')?.addEventListener('click', access);
+    container.querySelector('[data-cal-view]')?.addEventListener('change', event => {
+      previewRole = event.target.value;
+      announcements.start(user, { previewRole: previewing() ? previewRole : '' }); redraw();
+    });
     announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', async () => {
@@ -189,7 +195,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
     if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
-    announcements.start(user);
+    announcements.start(user, { previewRole: previewing() ? previewRole : '' });
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
     try {
@@ -207,6 +213,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (!disposed && number === requestNumber) { busy = false; redraw(); }
   }
   async function saveEvent(item, remove = false) {
+    if (previewing()) throw new Error('Choose Main admin to change events.');
     if (endpoint) {
       const result = await calendarRequest('/api/events/' + encodeURIComponent(item.id), { method: remove ? 'DELETE' : 'PUT', body: item });
       events = events.filter(event => event.id !== item.id);
@@ -224,16 +231,14 @@ export function renderCalendar(container, settings, tables, { standalone = false
   function editEvent(item, date = selected) {
     const original = item || { id: crypto.randomUUID(), title: '', type: 'kiddush', date, endDate: date, allDay: true, time: '', endTime: '', location: '', description: '', revision: 0 };
     let saving = false, initial = '';
-    const view = dialog(`<form class="cal-form"><label>Event title<input name="title" required maxlength="160" placeholder="What’s happening?" value="${escAttr(original.title)}"></label>
+    const view = dialog(`<form class="cal-form"><label>Details<textarea name="details" required maxlength="4364" rows="4" placeholder="Enter all the event information">${calEscape(calendarEventDetails(original))}</textarea></label>
       <div class="cal-form-row"><label>Category<select name="type">${[...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES.filter(type => type.id === original.type)].map(type => `<option value="${type.id}" ${type.id === original.type ? 'selected' : ''}>${calEscape(type.label)}</option>`).join('')}</select></label><label>Date<input name="date" type="date" required min="1900-01-01" max="2299-12-31" value="${original.date}"></label></div>
       <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
-      <p class="cal-form-hebrew" lang="he" dir="rtl"></p><label class="cal-checkbox"><input type="checkbox" name="allDay" ${original.allDay ? 'checked' : ''}> All day</label>
-      <div class="cal-form-row" data-cal-times ${original.allDay ? 'hidden' : ''}><label>Starts<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
-      <label>Location (optional)<input name="location" maxlength="200" value="${escAttr(original.location)}" placeholder="For example, the shul or a simcha hall"></label>
-      <label>Details (optional)<textarea name="description" maxlength="4000" rows="3" placeholder="Anything people should know">${calEscape(original.description)}</textarea></label>
+      <p class="cal-form-hebrew" lang="he" dir="rtl"></p>
+      <div class="cal-form-row" data-cal-times><label>Starts (optional)<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
       <details class="cal-extra"><summary>More options</summary><label>Last date (for a multi-day event)<input name="endDate" type="date" min="${original.date}" max="2299-12-31" value="${original.endDate !== original.date ? original.endDate : ''}"></label></details>
       <p class="cal-form-note">Times use ${calEscape(settings.timezone.id.replaceAll('_', ' '))}. Calendar entries do not change the minyan schedule.</p>
-      <p role="status" class="cal-error" aria-live="polite"></p><div class="cal-form-actions"><button type="submit" class="cal-primary">${item ? 'Save changes' : 'Save event'}</button><button type="button" data-cal-cancel>Cancel</button></div></form>`,
+      ${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin to save changes.</p>' : ''}<p role="status" class="cal-error" aria-live="polite"></p><div class="cal-form-actions"><button type="submit" class="cal-primary" ${previewing() ? 'disabled' : ''}>${item ? 'Save changes' : 'Save event'}</button><button type="button" data-cal-cancel>Cancel</button>${item ? `<button type="button" data-cal-remove-event ${previewing() ? 'disabled' : ''}>Delete event</button>` : ''}</div></form>`,
       { onClose: () => !saving && (new URLSearchParams(new FormData(view.el.querySelector('form'))).toString() === initial || confirm('Discard your unsaved event changes?')) });
     view.title(item ? 'Edit event' : 'Add an event');
     const form = view.el.querySelector('form');
@@ -249,17 +254,24 @@ export function renderCalendar(container, settings, tables, { standalone = false
       form.elements.endDate.min = value;
     };
     updateDate(); form.elements.date.addEventListener('change', updateDate);
-    form.elements.allDay.addEventListener('change', () => {
-      view.el.querySelector('[data-cal-times]').hidden = form.elements.allDay.checked;
-      form.elements.time.required = !form.elements.allDay.checked;
-    });
     view.el.querySelector('[data-cal-cancel]').addEventListener('click', view.close);
+    view.el.querySelector('[data-cal-remove-event]')?.addEventListener('click', async () => {
+      if (saving || previewing() || !confirm('Delete this event from the calendar?')) return;
+      const status = view.el.querySelector('[role=status]');
+      saving = true; form.querySelectorAll('button').forEach(button => { button.disabled = true; }); status.textContent = 'Deleting…';
+      try {
+        await saveEvent(original, true); saving = false; initial = new URLSearchParams(new FormData(form)).toString(); view.close();
+        note = 'Event deleted.'; redraw();
+      } catch (error) {
+        saving = false; form.querySelectorAll('button').forEach(button => { button.disabled = false; }); status.textContent = error.message;
+      }
+    });
     form.addEventListener('submit', async event => {
-      event.preventDefault(); if (saving) return;
+      event.preventDefault(); if (saving || previewing()) return;
       const status = view.el.querySelector('[role=status]');
       try {
         const fields = Object.fromEntries(new FormData(form));
-        const next = { ...original, ...calendarEvent({ ...fields, allDay: form.elements.allDay.checked, revision: original.revision }) };
+        const next = { ...original, ...calendarEvent({ ...fields, ...calendarDetailsFields(fields.details, original), allDay: false, revision: original.revision }) };
         saving = true; form.querySelector('[type=submit]').disabled = true; status.textContent = 'Saving…';
         await saveEvent(next); saving = false; initial = new URLSearchParams(new FormData(form)).toString(); view.close();
         selected = next.date; note = 'Event saved.';
@@ -338,7 +350,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     announcements.stop();
     dialogs.forEach(el => el.calDispose());
     const creating = setupToken || inviteToken || registering;
-    container.innerHTML = `<section class="cal-login"><p class="cal-eyebrow">Kahal Lev Menachem</p><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : registering ? 'Create a calendar viewing account' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : registering ? 'Enter your name and email, then choose a password. You can view the private calendar and announcements as soon as you register.' : 'Sign in to view the private calendar and announcements.'}</p><form class="cal-form">
+    container.innerHTML = `<section class="cal-login"><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : registering ? 'Create a calendar viewing account' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : registering ? 'Enter your name and email, then choose a password. You can view the private calendar and announcements as soon as you register.' : 'Sign in to view the private calendar and announcements.'}</p><form class="cal-form">
       ${setupToken || registering ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
       <label>Password<input name="password" type="password" minlength="12" maxlength="200" required autocomplete="${creating ? 'new-password' : 'current-password'}"></label>
       ${creating ? '<label>Confirm password<input name="confirmation" type="password" minlength="12" maxlength="200" required autocomplete="new-password"></label><p class="cal-form-note">Use at least 12 characters. Save your password for future sign-ins.</p>' : ''}

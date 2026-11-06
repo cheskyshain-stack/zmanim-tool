@@ -6,7 +6,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   let actor = null, timer = null, button = null, active = null;
   let total = 0, readCount = 0, deletedCount = 0, editCount = 0, canPost = false, canDelete = false, canEdit = false, unavailable = false;
   const unread = () => Math.max(0, total - readCount);
-  const matches = id => actor?.id === id;
+  const matches = value => actor === value;
+  const previewing = () => actor?.preview === true;
   function paint() {
     if (button?.isConnected) {
       const count = unread(), badge = button.querySelector('[data-cal-announcement-count]');
@@ -17,8 +18,9 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     if (active) {
       active.newButton.hidden = total <= active.latest;
       active.form.hidden = !canPost;
-      active.feed.querySelectorAll('[data-cal-delete-announcement]').forEach(control => { control.hidden = !canDelete; });
-      active.feed.querySelectorAll('[data-cal-edit-announcement]').forEach(control => { control.hidden = !canEdit; });
+      active.form.querySelectorAll('textarea,button').forEach(control => { if (previewing()) control.disabled = true; });
+      active.feed.querySelectorAll('[data-cal-delete-announcement]').forEach(control => { control.hidden = !canDelete; if (previewing()) control.disabled = true; });
+      active.feed.querySelectorAll('[data-cal-edit-announcement]').forEach(control => { control.hidden = !canEdit; if (previewing()) control.disabled = true; });
     }
   }
   function status(value) {
@@ -27,7 +29,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     readCount = Math.max(readCount, value.total - value.unread);
     deletedCount = Math.max(deletedCount, value.deletedCount || 0);
     editCount = Math.max(editCount, value.editCount || 0);
-    canPost = value.canPost === true; canDelete = value.canDelete === true; canEdit = value.canEdit === true; unavailable = false; paint();
+    const editor = ['owner', 'editor'].includes(actor?.role);
+    canPost = editor && value.canPost === true; canDelete = editor && value.canDelete === true; canEdit = editor && value.canEdit === true; unavailable = false; paint();
   }
   function failed(error, id) {
     if (matches(id) && error.status === 401) { onSessionExpired(error.message); return true; }
@@ -35,7 +38,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
-    const id = actor.id;
+    const id = actor;
     try { const value = await calendarRequest('/api/announcements/status'); if (matches(id)) { status(value); await active?.syncDeleted(); await active?.syncEdits(); } }
     catch (error) { if (matches(id) && !failed(error, id)) { unavailable = true; paint(); } }
   }
@@ -46,9 +49,10 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     active?.cleanup(); active?.view.el.calDispose(); active = null;
     total = readCount = deletedCount = editCount = 0; canPost = canDelete = canEdit = unavailable = false;
   }
-  function start(user) {
-    if (actor?.id === user.id) return;
-    stop(); actor = user;
+  function start(user, { previewRole = '' } = {}) {
+    const role = previewRole || user.role, preview = !!previewRole;
+    if (actor?.id === user.id && actor.role === role && actor.preview === preview) return;
+    stop(); actor = { ...user, role, preview };
     document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
     timer = setInterval(refresh, 30000); refresh();
   }
@@ -61,7 +65,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   }
   async function open() {
     if (!actor || active) return;
-    const id = actor.id;
+    const id = actor;
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
     const openingId = crypto.randomUUID(); let openingRecorded = false;
@@ -74,6 +78,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       },
     });
     view.title('Announcements'); view.el.classList.add('cal-announcements-dialog');
+    if (previewing()) view.el.querySelector('.cal-announcement-intro').textContent = 'Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.';
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
@@ -129,7 +134,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       messageNode(key)?.querySelector('[data-cal-edit-announcement]')?.focus({ preventScroll: true });
     }
     function editMessage(key) {
-      if (!canEdit || posting || deleting || editing?.saving) return;
+      if (previewing() || !canEdit || posting || deleting || editing?.saving) return;
       if (editing?.id === key) { editing.field.focus(); return; }
       if (editing && editing.field.value !== editing.original && !confirm('Discard your unsaved announcement changes?')) return;
       closeEditor(); const message = messages.get(key), node = messageNode(key); if (!message || !node) return;
@@ -179,7 +184,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       try { await syncing; } finally { syncing = null; }
     }
     async function markRead() {
-      if (!current() || reading || !pending.size || document.visibilityState !== 'visible') return;
+      if (previewing() || !current() || reading || !pending.size || document.visibilityState !== 'visible') return;
       reading = true; let saved = false;
       const ids = [...pending].slice(0, 100); ids.forEach(value => pending.delete(value));
       try {
@@ -198,13 +203,13 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     }
     function observe() {
       observer?.disconnect();
-      if (!current() || document.visibilityState !== 'visible') return;
+      if (previewing() || !current() || document.visibilityState !== 'visible') return;
       for (const node of feed.querySelectorAll('[data-cal-announcement-end]')) {
         if (!messages.get(node.dataset.calAnnouncementEnd)?.read) observer.observe(node);
       }
     }
     observer = new IntersectionObserver(entries => {
-      if (!current() || document.visibilityState !== 'visible') return;
+      if (previewing() || !current() || document.visibilityState !== 'visible') return;
       for (const entry of entries) if (entry.isIntersecting) {
         pending.add(entry.target.dataset.calAnnouncementEnd); observer.unobserve(entry.target);
       }
@@ -219,7 +224,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       }
       loading = true; older.disabled = retry.disabled = newButton.disabled = true;
       try {
-        const value = !openingRecorded && !append
+        const value = !previewing() && !openingRecorded && !append
           ? await calendarRequest('/api/announcements/open', { method: 'POST', body: { id: openingId } })
           : await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
         if (!current()) return;
@@ -244,7 +249,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       } finally { loading = false; if (current()) older.disabled = retry.disabled = newButton.disabled = false; }
     }
     form.addEventListener('submit', async event => {
-      event.preventDefault(); if (posting || deleting || editing?.saving) return;
+      event.preventDefault(); if (previewing() || posting || deleting || editing?.saving) return;
       let text; try { text = calendarAnnouncementText(textarea.value); } catch (error) { notice(error.message, true, 'post'); return; }
       if (!operation || operation.text !== text) operation = { id: crypto.randomUUID(), text };
       posting = true; textarea.disabled = true; form.querySelector('button').disabled = true; notice('Posting…');
@@ -258,7 +263,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     feed.addEventListener('click', async event => {
       const edit = event.target.closest('[data-cal-edit-announcement]'); if (edit) { editMessage(edit.dataset.calEditAnnouncement); return; }
       const control = event.target.closest('[data-cal-delete-announcement]');
-      if (!control || !canDelete || posting || deleting || editing?.saving || !current() || !confirm('Delete this announcement for everyone?')) return;
+      if (previewing() || !control || !canDelete || posting || deleting || editing?.saving || !current() || !confirm('Delete this announcement for everyone?')) return;
       const messageId = control.dataset.calDeleteAnnouncement;
       deleting = true; control.disabled = true; form.querySelector('button').disabled = true; notice('Deleting…');
       try {

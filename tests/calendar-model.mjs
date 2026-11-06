@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
-import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 
 const read = async name => JSON.parse(await readFile(new URL('../data/' + name + '.json', import.meta.url), 'utf8'));
@@ -123,6 +123,34 @@ test('multi-day events are inclusive and daily lists put all-day entries before 
   const list = [event({ allDay: false, time: '19:00', title: 'Evening' }), event({ title: 'All day' }), event({ allDay: false, time: '08:30', title: 'Morning' }), event({ date: '2026-11-06', endDate: '2026-11-08', title: 'Three days' })];
   assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['All day', 'Three days', 'Morning', 'Evening']);
   assert.equal(calendarEventsOn(list, '2026-11-08').length, 1); assert.equal(calendarEventsOn(list, '2026-11-09').length, 0);
+});
+
+test('event times are independently optional and blank times have no label', () => {
+  const untimed = event({ allDay: false, time: '', endTime: '' });
+  assert.equal(untimed.allDay, true); assert.equal(calendarEventTime(untimed), ''); assert.equal(calendarClock(''), '');
+  assert.equal(calendarEventTime(event({ time: '19:00' })), '7:00 PM');
+  const endOnly = event({ allDay: false, endTime: '21:00' });
+  assert.equal(endOnly.time, ''); assert.equal(endOnly.allDay, false); assert.equal(calendarEventTime(endOnly), 'Until 9:00 PM');
+  assert.equal(calendarEventTime(event({ time: '19:00', endTime: '21:00' })), '7:00 PM - 9:00 PM');
+  assert.throws(() => event({ endTime: '25:00' }), /valid end time/);
+  assert.throws(() => event({ time: '19:00', endTime: '19:00' }), /follow/);
+  const legacy = event({ allDay: true, time: '19:00', endTime: '21:00' });
+  assert.equal(legacy.time, ''); assert.equal(legacy.endTime, ''); assert.equal(calendarEventTime(legacy), '');
+  assert.deepEqual(calendarEvent(JSON.parse(JSON.stringify(endOnly))), endOnly);
+});
+
+test('one details box keeps legacy information and separates a short calendar summary without dropping text', () => {
+  const original = event({ title: 'Kiddush', location: 'Downstairs', description: 'מזל טוב\nAll are welcome' });
+  const details = calendarEventDetails(original);
+  assert.equal(details, 'Kiddush\nDownstairs\nמזל טוב\nAll are welcome');
+  const unchanged = calendarEvent({ ...original, ...calendarDetailsFields(details, original), time: '10:00', allDay: false });
+  for (const field of ['title', 'location', 'description']) assert.equal(unchanged[field], original[field]);
+  const changed = event(calendarDetailsFields('New Kiddush\nDownstairs\nמזל טוב'));
+  assert.equal(changed.title, 'New Kiddush'); assert.equal(changed.location, ''); assert.equal(changed.description, 'Downstairs\nמזל טוב');
+  assert.equal(calendarEventDetails(changed), 'New Kiddush\nDownstairs\nמזל טוב');
+  const long = 'A'.repeat(200), split = calendarDetailsFields(long);
+  assert.equal(split.title + split.description, long); assert.equal(split.title.length, 160);
+  assert.throws(() => calendarDetailsFields('  '), /details/);
 });
 
 test('preview storage preserves corrupt data and reports unavailable storage instead of claiming a save', () => {
