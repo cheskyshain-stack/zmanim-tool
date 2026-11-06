@@ -4238,9 +4238,9 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '' } = {}) {
+function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false } = {}) {
   let today = calendarISO(shulNow(new Date(), settings).serial);
-  let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = 'owner';
+  let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const dialogs = new Set();
   const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {

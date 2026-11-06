@@ -1053,8 +1053,17 @@ always opens on a date click. Keep Hebrew parsha words whole, fitting the font w
 necessary instead of splitting a word. Very short landscape windows keep the full
 day labels in their day dialogs. `tests/calendar-congregation.cjs` checks fitting,
 whole words, eight-event Shabbos dates, month limits, rollover and the homepage.
-The public homepage now has a gray disabled Community calendar card with a Coming
-soon tag. This is a placeholder, not an active link or a public calendar feed.
+The homepage puts the gray Community calendar card after Donate, with the same
+width and height as its other cards. Keep Coming soon and its inert appearance.
+Ordinary single/double clicks do nothing. Three quick clicks or taps (within 750ms
+of each other and 1.5 seconds overall) open `/admin/calendar/?preview=congregation`.
+Use aria-disabled instead of native disabled so touch/click events can reach this
+hidden action; cancelled or interrupted gestures reset it. Do not advertise it as
+a public link. The destination retains normal calendar authentication. A verified
+owner starts in the existing read-only Congregation preview; other roles retain
+their actual permissions. The query cannot grant ownership or bypass sign-in.
+`tests/calendar-home-preview.cjs` checks card order/geometry, mouse/touch gestures,
+sign-in, role preservation and preview-only announcement reads.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew

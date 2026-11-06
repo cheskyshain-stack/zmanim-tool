@@ -5854,13 +5854,15 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
   .is-home .luach-next.is-paired .luach-next-box { grid-template-rows:subgrid; }
  }
  .is-home .luach-menu { gap:12px; }
- .is-home .luach-item { gap:16px; padding:18px 20px; min-height:74px; border:1px solid #e9e5dc; border-radius:16px; box-shadow:0 3px 10px #142b4606; }
+ .is-home .luach-item { gap:16px; padding:18px 20px; min-height:90px; border:1px solid #e9e5dc; border-radius:16px; box-shadow:0 3px 10px #142b4606; }
  .is-home .luach-item-icon { width:27px; height:27px; }
  .luach-item-copy { flex:1; min-width:0; text-align:left; }
  .is-home .luach-item-title { display:block; font:700 25px/1.2 Georgia,serif; }
  .luach-item-description { display:block; margin-top:4px; font:400 12px/1.4 Arial,sans-serif; color:#64707c; }
- body.is-luach .is-home .luach-coming-soon-card:disabled { width:100%; background:#eceeef; border-color:#d7dbdf; color:#69747d; opacity:1; cursor:default; transform:none; box-shadow:none; text-align:left; }
- .luach-coming-soon-tag { display:inline-block; margin-top:7px; padding:3px 8px; border-radius:5px; background:#dce0e3; color:#59646d; font:600 11px/1.3 Arial,sans-serif; }
+ body.is-luach #main.is-home .luach-coming-soon-card[aria-disabled="true"] { width:100%; background:#eceeef; border-color:#d7dbdf; color:#69747d; opacity:1; cursor:default; transform:none; box-shadow:none; text-align:left; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+ body.is-luach #main.is-home .luach-coming-soon-card[aria-disabled="true"] svg { color:inherit; opacity:1; }
+ .is-home .luach-coming-soon-card .luach-item-title { font-size:clamp(20px,calc(8vw - 5.6px),25px); white-space:nowrap; }
+ .luach-coming-soon-tag { display:inline-block; margin-top:4px; padding:1px 7px; border-radius:5px; background:#dce0e3; color:#59646d; font:600 11px/1.3 Arial,sans-serif; }
  .is-home .luach-item:hover { box-shadow:0 4px 14px #142b4610; }
  .luach-site-footer { width:100%; max-width:1080px; margin:36px auto 0; padding:22px 0 0; border-top:1px solid #e5e2da; text-align:center; color:#576674; }
  .luach-site-footer .luach-foot-part:first-child { display:block; font:400 15px/1.5 Georgia,serif; }
@@ -6002,6 +6004,8 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .is-home .luach-home:has(.luach-next.is-paired) .luach-menu { max-width:560px; }
  .is-home .luach-item { min-height:106px; padding:16px 18px; gap:12px; border-radius:15px; }
  .is-home .luach-item-title { font-size:27px; }
+ .is-home .luach-coming-soon-card { grid-column:1 / -1; max-width:calc((100% - 18px) / 2); justify-self:center; }
+ .is-home .luach-coming-soon-card .luach-item-title { font-size:21px; white-space:normal; }
  .is-home .luach-site-footer { max-width:640px; margin-top:46px; padding-top:25px; }
  body.is-luach main.is-give { padding-top:calc(112px + var(--luach-safe-top, 0px)); }
  .is-give .luach-give-head-block { margin-bottom:25px; }
