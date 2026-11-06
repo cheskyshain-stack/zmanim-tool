@@ -81,7 +81,7 @@ export class CommunityCalendar extends DurableObject {
     const storage = this.ctx.storage;
     if (url.pathname === '/api/access/activity') {
       const users = [...(await storage.list({ prefix: 'user:' })).values()];
-      const stats = users.length ? await storage.get(users.map(user => 'login-stats:' + user.id)) : new Map();
+      const stats = await storage.list({ prefix: 'login-stats:' });
       return json({ users: users.map(user => {
         const history = stats.get('login-stats:' + user.id);
         return { ...userView(user), signInCount: history?.count || 0, firstSignInAt: history?.firstAt || null, lastSignInAt: history?.lastAt || null };
