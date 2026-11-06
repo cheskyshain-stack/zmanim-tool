@@ -543,12 +543,12 @@ function homeHtml(published) {
       <a class="luach-item luach-home-primary" href="/week/">
         ${ICON_CALENDAR_CLOCK}<span class="luach-item-copy"><span class="luach-item-title">Zmanim</span><span class="luach-item-description">Daily minyanim &amp; Shabbos times</span></span>${CHEVRON}
       </a>
-      <button class="luach-item luach-coming-soon-card" type="button" disabled aria-label="Community calendar, coming soon">
-        ${ICON_COMMUNITY_CALENDAR}<span class="luach-item-copy"><span class="luach-item-title">Community calendar</span><span class="luach-coming-soon-tag">Coming soon</span></span>
-      </button>
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>
+      <button class="luach-item luach-coming-soon-card" type="button" aria-disabled="true" aria-label="Community calendar, coming soon" data-calendar-preview>
+        ${ICON_COMMUNITY_CALENDAR}<span class="luach-item-copy"><span class="luach-item-title">Community calendar</span><span class="luach-coming-soon-tag">Coming soon</span></span>
+      </button>
     </nav>
     </div>
     </div>
@@ -801,6 +801,7 @@ function renderHome(published) {
   markNextInline(main);
   candleDialogCleanup = wireCandleLightingDialog(main, resolveSettings(published.settings));
   openTheDoor();
+  wireCalendarPreview(main.querySelector('[data-calendar-preview]'));
   startNextUp(published);
 
   const toAnnounce = chartAnnouncement(published);
@@ -811,6 +812,29 @@ function renderHome(published) {
     main.insertAdjacentHTML('beforeend', chartAnnouncementHtml(toAnnounce));
     wireChartAnnouncement(main);
   }
+}
+
+// Keep ordinary activation inert. Native disabled buttons suppress touch/click events,
+// so this placeholder uses aria-disabled and a deliberate three-click/tap sequence.
+// The destination still requires its existing server-checked calendar account.
+function wireCalendarPreview(button) {
+  if (!button) return;
+  let count = 0, first = 0, last = 0;
+  const reset = () => { count = first = last = 0; };
+  button.addEventListener('click', event => {
+    event.preventDefault();
+    const now = performance.now();
+    if (!count || now - last > 750 || now - first > 1500) { count = 0; first = now; }
+    last = now;
+    if (++count < 3) return;
+    reset();
+    location.assign('/admin/calendar/?preview=congregation');
+  });
+  button.addEventListener('pointercancel', reset);
+  button.addEventListener('blur', reset);
+  button.closest('.luach-home')?.addEventListener('pointerdown', event => {
+    if (!button.contains(event.target)) reset();
+  });
 }
 
 /** Three taps in the navy cap go to the generator. Wired after every render, since each
