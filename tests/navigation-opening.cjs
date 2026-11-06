@@ -14,6 +14,7 @@ const server=http.createServer((req,res)=>{
  try {
  const origin='http://127.0.0.1:'+server.address().port;
  const page=await browser.newPage({viewport:{width:393,height:852}});
+ await page.clock.setFixedTime(new Date('2026-12-10T15:00:00Z'));
  await page.route('**/*',r=>r.request().url().startsWith(origin)?r.continue():r.abort());
  for(const width of [393,1280]) {
  await page.setViewportSize({width,height:852});

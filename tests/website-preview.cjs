@@ -13,13 +13,13 @@ const server=http.createServer((req,res)=>{
 (async()=>{
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
  const origin=process.env.WEBSITE_PREVIEW_ORIGIN||'http://127.0.0.1:'+server.address().port;
- const browser=await chromium.launch({executablePath:'/usr/bin/chromium',args:['--no-sandbox']});
+ const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',args:['--no-sandbox']});
  const errors=[],checks=[];if(output)fs.mkdirSync(output,{recursive:true});
  const real='2026-10-25T12:00:00Z';
  const routes=[['/','.luach-home-date,.luach-next,.luach-menu,.luach-site-footer'],['/week/','#week-host'],['/chart/','#chart-host'],['/schedules/','.luach-sheets'],['/donate/','.luach-give-page']];
  const settle=page=>page.evaluate(async()=>{await document.fonts.ready;await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));});
  const ready=async(page,route)=>{
-  await page.locator(route==='/'?'.luach-menu':route==='/week/'?'.reader-nav,.week-nav':route==='/chart/'?'.pages .page':route==='/schedules/'?'.luach-sheets':'.luach-give-page').first().waitFor();await settle(page);
+  await page.locator(route==='/'?'.luach-menu':route==='/week/'?'.reader-nav,.week-nav':route==='/chart/'?'.pages .page':route==='/schedules/'?'.luach-sheets,.luach-menu':'.luach-give-page').first().waitFor();await settle(page);
  };
  const snapshot=(page,selector)=>page.locator(selector).evaluateAll(nodes=>nodes.map(node=>node.innerText));
  const closeNotice=async(page)=>{const button=page.locator('.luach-announce[open] .luach-announce-close');if(await button.count())await button.click();};

@@ -62,6 +62,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     const id = actor.id;
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
+    const openingId = crypto.randomUUID(); let openingRecorded = false;
     let observer;
     const view = dialog('<p class="cal-announcement-intro">Updates for everyone with calendar access.</p><form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>', {
       onClose: () => {
@@ -148,8 +149,11 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       if (!current() || loading) return;
       loading = true; older.disabled = retry.disabled = newButton.disabled = true;
       try {
-        const value = await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
+        const value = !openingRecorded && !append
+          ? await calendarRequest('/api/announcements/open', { method: 'POST', body: { id: openingId } })
+          : await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
         if (!current()) return;
+        openingRecorded = true;
         if (messageStatus.dataset.source === 'load') notice('');
         if (!append) { messages.clear(); feed.innerHTML = ''; feed.scrollTop = 0; }
         else if (!messages.size) feed.innerHTML = '';

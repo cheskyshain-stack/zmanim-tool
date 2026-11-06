@@ -1,6 +1,7 @@
 // All displayed statistics share the Worker's explicit New York window and snapshot.
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
 import { keepPosition } from './keep-position.js';
+import { renderTrafficActivity } from './traffic-activity.js';
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
 const TRAFFIC_ADMIN_TRACKING_START = '2026-10-02T03:45:00Z';
@@ -16,6 +17,7 @@ const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
   '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
+  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -350,7 +352,7 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Unlocked admin page opens were added with the October 1, 2026 update. Shul View and Messages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in calendar page opens. Seats, Schedule messages and calendar tracking begins with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
       <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>
@@ -423,9 +425,10 @@ function drawTraffic(container, options) {
       <div class="traffic-ranges" role="group" aria-label="Date range presets">${TRAFFIC_RANGES.map((choice) => `<button type="button" class="traffic-range${trafficSelection.preset === choice.key ? ' is-on' : ''}" data-traffic-preset="${choice.key}" aria-pressed="${trafficSelection.preset === choice.key}">${choice.label}</button>`).join('')}</div>
       <form id="traffic-range-form" class="traffic-range-form"><label>From<input type="date" name="start" value="${range.start}" max="${trafficToday()}" required></label><label>Through<input type="date" name="end" value="${range.end}" max="${trafficToday()}" required></label><button type="submit" class="traffic-apply">Apply dates</button><p class="traffic-range-error" id="traffic-range-error" role="alert"></p></form>
       <div class="traffic-range-summary"><div><strong>${trafficEsc(rangeLabel)}</strong><span>New York time · Same range for every panel</span></div><span id="traffic-freshness">Snapshot: ${trafficEsc(trafficStamp(trafficSnapshot))}</span></div>
-    </section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
+    </section><section class="traffic-panel" id="traffic-calendar-activity" aria-label="Calendar and announcement activity"></section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
   if (offline) return;
   const body = container.querySelector('#traffic-body');
+  const activityHost = container.querySelector('#traffic-calendar-activity');
   if (loadingHeight) body.style.minHeight = `${loadingHeight}px`;
   const loadStatus = container.querySelector('#traffic-load-status');
   const refresh = container.querySelector('#traffic-refresh');
@@ -472,6 +475,7 @@ function drawTraffic(container, options) {
     loadStatus.textContent = retryAt ? `Available figures retained. Collection can retry after ${retryAt} New York time.`
       : `Showing ${trafficStatus(data.coverage?.status).toLowerCase()} records. Snapshot held while changing ranges. Refresh for newer data.`;
     container.querySelector('#traffic-freshness').textContent = `Snapshot: ${trafficStamp(data.snapshotAt || trafficSnapshot)} NY · Updated ${trafficStamp(data.fetchedAt)} NY`;
+    renderTrafficActivity(activityHost, range, data.snapshotAt || trafficSnapshot);
   };
   const cacheKey = `${range.start}/${range.end}/${trafficSnapshot}`;
   const cached = trafficCache.get(cacheKey);
@@ -506,5 +510,6 @@ function drawTraffic(container, options) {
         body.style.minHeight = '';
       });
       loadStatus.textContent = 'The record could not be loaded.';
+      renderTrafficActivity(activityHost, range, trafficSnapshot);
     });
 }

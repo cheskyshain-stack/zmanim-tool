@@ -148,3 +148,20 @@ direct link; only calendar and announcement information requires calendar sign-i
 Verify selfRegistration:true and loginHistory:true after deploying the service,
 before publishing its client. Keep the existing account records and CALENDAR v1
 storage. Do not create production registrations or test sign-ins during activation.
+
+## Private activity totals
+
+GET /api/activity accepts the statistics service's start/end/asOf parameters and
+requires the calendar owner. It returns counts and daily buckets for successful
+sign-ins, viewer registrations, calendar event changes, announcement posts/deletions
+and feed opens. Dates and snapshots use the shared traffic-calendar.js policy.
+Records contain timestamps and fixed operation types, without account details or
+message text. They are written alongside successful mutations, including operations
+from browsers excluded from page-view analytics. The original tracking-start value
+is preserved; earlier ranges are Not tracked, never measured zero.
+
+POST /api/announcements/open takes an operation id and returns the first message
+page. Any signed-in account can open its feed. The id makes retries count once;
+read markers remain separate. This endpoint accepts no client-supplied count/type.
+Public analytics cannot read these private totals. Deploy activityStatistics:true
+before its client. Keep existing bindings, accounts, events, posts and login history.

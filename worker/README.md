@@ -10,7 +10,9 @@ secret in the site, a fixture, a response, or this repository.
 - **Entry visits**: Cloudflare's direct or external-referrer entries, not unique people.
 - Tracking is installed on Home, Weekly Zmanim, Zmanim Chart, Special Schedules,
   and Donate. Admin tracking begins with the October 2026 admin update and runs only
-  after its PIN is accepted or remembered. Shul View and Messages are not tracked.
+  after its PIN is accepted or remembered. The November 5, 2026 update adds Schedule
+  messages, unlocked Seats and signed-in calendar page opens, once per document.
+  Shul View remains on its separate service. Earlier new-page opens were not recorded.
 - Offline use, blocked beacons, and the per-browser `?count=off` opt-out are not counted.
 - Admin activity uses page views for `/admin/` and `/admin/index.html`, including
   internal arrivals. Its beacon disables SPA measurement so changing tabs does not
@@ -99,3 +101,10 @@ and coverage, not just HTTP 200. Publish the compatible Worker before the new UI
 
 The aggregate endpoint retains its existing public/CORS behavior. CORS is not
 authentication. Closing this endpoint properly is a separate access-control change.
+
+Calendar and announcement operation totals come from the separate calendar Worker's
+owner-only `/api/activity`, never this public aggregate endpoint. The frontend uses
+the exact same selected New York range and snapshot for both sources. Sign in as
+owner through Admin > Calendar, then return to Site statistics. No names, emails or
+message text enter these totals. Existing browser exclusions still apply to page
+views; successful calendar operations are retained independently as operational data.

@@ -3961,6 +3961,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     const id = actor.id;
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
+    const openingId = crypto.randomUUID(); let openingRecorded = false;
     let observer;
     const view = dialog('<p class="cal-announcement-intro">Updates for everyone with calendar access.</p><form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>', {
       onClose: () => {
@@ -4047,8 +4048,11 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       if (!current() || loading) return;
       loading = true; older.disabled = retry.disabled = newButton.disabled = true;
       try {
-        const value = await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
+        const value = !openingRecorded && !append
+          ? await calendarRequest('/api/announcements/open', { method: 'POST', body: { id: openingId } })
+          : await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
         if (!current()) return;
+        openingRecorded = true;
         if (messageStatus.dataset.source === 'load') notice('');
         if (!append) { messages.clear(); feed.innerHTML = ''; feed.scrollTop = 0; }
         else if (!messages.size) feed.innerHTML = '';
@@ -4096,6 +4100,8 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
 }
 
 // ==== ui/calendar-view.js ====
+let calendarAnalyticsOpened = false;
+
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
 const calEventType = id => CALENDAR_TYPES.find(type => type.id === id) || CALENDAR_TYPES[6];
@@ -4275,6 +4281,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
+    if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
     announcements.start(user);
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
@@ -24208,9 +24215,32 @@ function renderStatus(main) {
     });
 }
 
+// ==== ui/traffic-activity.js ====
+const calendarActivityLabels = { signIns: 'Successful sign-ins', registrations: 'Viewing accounts created', eventsCreated: 'Calendar events added', eventsEdited: 'Calendar events edited', eventsDeleted: 'Calendar events deleted', announcementsPosted: 'Announcements posted', announcementsDeleted: 'Announcements deleted', announcementOpens: 'Announcement feed opens' };
+
+async function renderTrafficActivity(host, range, snapshot) {
+  const write = html => { if (host.isConnected) keepPosition(host.closest('.traffic-view') || host, () => { host.innerHTML = html; }); };
+  const signIn = '<h3>Calendar and announcements</h3><p class="traffic-small">Sign in as the calendar owner through <a href="#calendar">Admin → Calendar</a>, then return here to see private activity totals. Individual names and sign-in history remain under Calendar access.</p>';
+  if (calendarSession()?.user?.role !== 'owner') { write(signIn); return; }
+  write('<h3>Calendar and announcements</h3><p class="traffic-small">Loading recorded activity…</p>');
+  try {
+    const params = new URLSearchParams({ start: range.start, end: range.end, asOf: snapshot });
+    const value = await calendarRequest('/api/activity?' + params);
+    if (value.schemaVersion !== 1 || value.timezone !== 'America/New_York' || value.range?.start !== range.start || value.range?.end !== range.end || value.snapshotAt !== snapshot) throw new Error('The activity service did not return the selected dates and snapshot.');
+    if (!Object.keys(calendarActivityLabels).every(key => Number.isSafeInteger(value.counts?.[key]) && value.counts[key] >= 0)) throw new Error('Recorded activity counts are unavailable.');
+    const started = new Date(value.startedAt).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
+    const known = value.coverage !== 'not-tracked';
+    write(`<h3>Calendar and announcements</h3><p class="traffic-small">Owner-only activity for the selected New York dates and snapshot. Tracking began ${escText(started)}. Earlier activity is not included in these totals.${value.coverage === 'partial' ? ' These totals cover only the recorded part of this range.' : ''}</p><dl class="traffic-activity-grid">${Object.entries(calendarActivityLabels).map(([key, label]) => `<div><dt>${escText(label)}</dt><dd>${known ? Number(value.counts[key]).toLocaleString('en-US') : 'Not tracked'}</dd></div>`).join('')}</dl><p class="traffic-small">Successful sign-ins include account creation and accepted invitations. Activity counts successful operations, including those from browsers excluded from page-view tracking. Reopening a feed counts again; retries do not. Individual sign-in history is retained under Calendar access.</p>`);
+  } catch (error) {
+    if (error.status === 401 || error.status === 403) { write(signIn); return; }
+    write(`<h3>Calendar and announcements</h3><p class="traffic-small">Activity totals are unavailable. ${escText(error.message)} Use Refresh data to try again.</p>`);
+  }
+}
+
 // ==== ui/traffic-view.js ====
 // All displayed statistics share the Worker's explicit New York window and snapshot.
 // Never infer zero from an absent record or make a breakdown fit by scaling its values.
+
 
 const TRAFFIC_API = 'https://zmanim-traffic.cheskyshain.workers.dev';
 const TRAFFIC_ZONE = 'America/New_York';
@@ -24227,6 +24257,7 @@ const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
   '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
+  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -24561,7 +24592,7 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts the public Home, Weekly Zmanim, Zmanim Chart, Special Schedules, and Donate pages. Unlocked admin page opens were added with the October 1, 2026 update. Shul View and Messages are not tracked by this report. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in calendar page opens. Seats, Schedule messages and calendar tracking begins with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
       <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>
@@ -24634,9 +24665,10 @@ function drawTraffic(container, options) {
       <div class="traffic-ranges" role="group" aria-label="Date range presets">${TRAFFIC_RANGES.map((choice) => `<button type="button" class="traffic-range${trafficSelection.preset === choice.key ? ' is-on' : ''}" data-traffic-preset="${choice.key}" aria-pressed="${trafficSelection.preset === choice.key}">${choice.label}</button>`).join('')}</div>
       <form id="traffic-range-form" class="traffic-range-form"><label>From<input type="date" name="start" value="${range.start}" max="${trafficToday()}" required></label><label>Through<input type="date" name="end" value="${range.end}" max="${trafficToday()}" required></label><button type="submit" class="traffic-apply">Apply dates</button><p class="traffic-range-error" id="traffic-range-error" role="alert"></p></form>
       <div class="traffic-range-summary"><div><strong>${trafficEsc(rangeLabel)}</strong><span>New York time · Same range for every panel</span></div><span id="traffic-freshness">Snapshot: ${trafficEsc(trafficStamp(trafficSnapshot))}</span></div>
-    </section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
+    </section><section class="traffic-panel" id="traffic-calendar-activity" aria-label="Calendar and announcement activity"></section><p id="traffic-load-status" class="traffic-load-status" role="status" aria-live="polite">Loading the selected record...</p><div id="traffic-body" class="traffic-body" aria-busy="true"><div class="traffic-loading">Reading recorded activity...</div></div>`}`;
   if (offline) return;
   const body = container.querySelector('#traffic-body');
+  const activityHost = container.querySelector('#traffic-calendar-activity');
   if (loadingHeight) body.style.minHeight = `${loadingHeight}px`;
   const loadStatus = container.querySelector('#traffic-load-status');
   const refresh = container.querySelector('#traffic-refresh');
@@ -24683,6 +24715,7 @@ function drawTraffic(container, options) {
     loadStatus.textContent = retryAt ? `Available figures retained. Collection can retry after ${retryAt} New York time.`
       : `Showing ${trafficStatus(data.coverage?.status).toLowerCase()} records. Snapshot held while changing ranges. Refresh for newer data.`;
     container.querySelector('#traffic-freshness').textContent = `Snapshot: ${trafficStamp(data.snapshotAt || trafficSnapshot)} NY · Updated ${trafficStamp(data.fetchedAt)} NY`;
+    renderTrafficActivity(activityHost, range, data.snapshotAt || trafficSnapshot);
   };
   const cacheKey = `${range.start}/${range.end}/${trafficSnapshot}`;
   const cached = trafficCache.get(cacheKey);
@@ -24717,6 +24750,7 @@ function drawTraffic(container, options) {
         body.style.minHeight = '';
       });
       loadStatus.textContent = 'The record could not be loaded.';
+      renderTrafficActivity(activityHost, range, trafficSnapshot);
     });
 }
 

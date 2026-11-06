@@ -1140,6 +1140,27 @@ The statistics page and analytics Worker share one exact America/New_York date
 window and snapshot. Read [worker/README.md](worker/README.md) before changing
 collection, archives, metric definitions, or deployment. Missing history must never
 be presented as measured zero. Deploy the compatible Worker before its frontend.
+Tracking also covers Schedule messages, unlocked Seats and signed-in calendar page
+opens, once per document, with the existing live-host, preview and device exclusions.
+These pages were added November 5, 2026; do not imply older opens were recorded.
+Documents opened through one-time calendar setup/invitation links never load analytics,
+including after their hashes are cleared. Browser navigation timing retains the original
+URL, so waiting for sign-in alone would not keep the secret out of the beacon.
+The aggregate page-view endpoint remains separate from private calendar activity.
+Only the calendar owner can read `/api/activity`, using the same New York dates and
+snapshot as Site statistics. Activity records contain a timestamp and fixed operation
+types, without account names, emails or message text. Record successful sign-ins,
+viewer registrations, event changes, announcement posts/deletions and feed opens.
+Count retries once. Keep activity entries with their successful mutation, and retain
+the first tracking timestamp so older ranges show Not tracked or partial coverage.
+Operational counts include successful operations from excluded browsers. Sign-in
+history remains unchanged and owner-only. No new public feed or billing plan is added.
+
+An empty `/schedules/` replaces its current history entry with the congregation home
+page and updates the title/canonical URL. Legacy `/#schedules` behaves the same way.
+Keep an active schedule on its page, preserving printing and the current date rules.
+Check expiry every minute and on returning to the tab. Date previews follow the same
+fallback while retaining their preview date. Back/Forward must not loop on an empty page.
 
 ## הדלקת נרות on the congregation's home page
 

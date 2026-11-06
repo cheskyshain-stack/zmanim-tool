@@ -8,6 +8,8 @@ import { keepPosition } from './keep-position.js';
 import { createCalendarAnnouncements } from './calendar-announcements.js';
 import { openCalendarActivity } from './calendar-activity.js';
 
+let calendarAnalyticsOpened = false;
+
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
 const calEventType = id => CALENDAR_TYPES.find(type => type.id === id) || CALENDAR_TYPES[6];
@@ -187,6 +189,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
+    if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
     announcements.start(user);
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
