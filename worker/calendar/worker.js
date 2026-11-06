@@ -1,5 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
+import { calendarAnnouncementText } from '../../js/calendar/announcement-model.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -72,6 +73,52 @@ export class CommunityCalendar extends DurableObject {
     await this.ctx.storage.setAlarm(expires);
     return { token, expires, user: userView(user) };
   }
+  async announcementStatus(user) {
+    const total = await this.ctx.storage.get('announcement-count') || 0;
+    const read = await this.ctx.storage.list({ prefix: 'announcement-read:' + user.id + ':' });
+    return { total, unread: Math.max(0, total - read.size), canPost: ['owner', 'editor'].includes(user.role) };
+  }
+  async announcements(request, user, url) {
+    const storage = this.ctx.storage, method = request.method;
+    if (url.pathname === '/api/announcements/status' && method === 'GET') return json(await this.announcementStatus(user));
+    if (url.pathname === '/api/announcements/read' && method === 'POST') {
+      const body = await this.body(request);
+      if (!Array.isArray(body.ids) || body.ids.length > 100 || body.ids.some(id => typeof id !== 'string' || !identifier(id))) fail('Choose valid announcements to mark as read.');
+      const ids = [...new Set(body.ids)], messages = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
+      if (ids.some(id => !messages.has('announcement:' + id))) fail('An announcement was not found.', 404);
+      if (ids.length) await storage.put(Object.fromEntries(ids.map(id => ['announcement-read:' + user.id + ':' + id, messages.get('announcement:' + id).sequence])));
+      return json(await this.announcementStatus(user));
+    }
+    if (url.pathname !== '/api/announcements') return json({ error: 'Announcement page not found.' }, 404);
+    if (method === 'POST') {
+      if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can post announcements.', 403);
+      const body = await this.body(request);
+      if (typeof body.id !== 'string' || !identifier(body.id)) fail('Reload the announcement form and try again.');
+      let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
+      const key = 'announcement:' + body.id, old = await storage.get(key);
+      if (old) {
+        if (old.authorId !== user.id || old.text !== text) fail('This announcement was already posted with different text. Refresh the feed.', 409);
+        return json({ message: old, ...await this.announcementStatus(user) });
+      }
+      await this.limited(request, 'announcement-write', 60);
+      const sequence = (await storage.get('announcement-count') || 0) + 1;
+      const message = { id: body.id, sequence, text, authorId: user.id, authorName: user.name, createdAt: new Date().toISOString() };
+      await storage.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
+        ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence });
+      return json({ message, ...await this.announcementStatus(user) }, 201);
+    }
+    if (method === 'GET') {
+      const before = url.searchParams.get('before');
+      if (before !== null && (!/^[1-9]\d*$/.test(before) || !Number.isSafeInteger(Number(before)))) fail('Choose a valid announcement page.');
+      const rows = await storage.list({ prefix: 'announcement-order:', reverse: true, limit: 31,
+        ...(before === null ? {} : { end: 'announcement-order:' + before.padStart(16, '0') }) });
+      const ids = [...rows.values()].slice(0, 30), records = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
+      const read = await storage.list({ prefix: 'announcement-read:' + user.id + ':' });
+      const messages = ids.map(id => ({ ...records.get('announcement:' + id), read: read.has('announcement-read:' + user.id + ':' + id) }));
+      return json({ messages, nextBefore: rows.size > 30 ? messages.at(-1).sequence : null, ...await this.announcementStatus(user) });
+    }
+    return json({ error: 'Announcement page not found.' }, 404);
+  }
   async fetch(request) {
     return this.ctx.blockConcurrencyWhile(async () => {
       try { return await this.route(request); }
@@ -80,7 +127,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true });
     if (path === '/api/setup' && method === 'POST') {
       await this.limited(request, 'setup', 5);
       const body = await this.body(request);
@@ -112,6 +159,7 @@ export class CommunityCalendar extends DurableObject {
       return json(await this.session(next));
     }
     const user = await this.signedIn(request, path.startsWith('/api/access'));
+    if (path === '/api/announcements' || path.startsWith('/api/announcements/')) return this.announcements(request, user, url);
     if (path === '/api/session' && method === 'GET') return json({ user: userView(user) });
     if (path === '/api/session' && method === 'DELETE') {
       await this.ctx.storage.delete('session:' + await hash(request.headers.get('Authorization').slice(7)));

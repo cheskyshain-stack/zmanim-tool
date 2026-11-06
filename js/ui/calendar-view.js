@@ -5,6 +5,7 @@ import { shulNow } from '../zmanim/solar.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { escText, escAttr } from '../util.js';
 import { keepPosition } from './keep-position.js';
+import { createCalendarAnnouncements } from './calendar-announcements.js';
 
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
@@ -17,6 +18,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null;
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '';
   const dialogs = new Set();
+  const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
+    calendarSession(null); user = null; events = []; signIn(message);
+  } });
   container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
 
   function previewBackupMarkup() {
@@ -121,7 +125,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   function draw() {
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
-    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
+    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${endpoint && user ? announcements.markup() : ''}${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
       <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
       <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div><button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button></header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
@@ -141,6 +145,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]').addEventListener('click', access);
+    announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', async () => {
       try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
@@ -180,6 +185,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
+    announcements.start(user);
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
     try {
@@ -310,6 +316,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   function signIn(error = '') {
     if (disposed) return;
+    announcements.stop();
     const creating = setupToken || inviteToken;
     container.innerHTML = `<section class="cal-login"><p class="cal-eyebrow">Kahal Lev Menachem</p><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : 'Use your calendar account to view and manage events.'}</p><form class="cal-form">
       ${setupToken ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
@@ -356,5 +363,5 @@ export function renderCalendar(container, settings, tables, { standalone = false
       }
     } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
   })();
-  return () => { disposed = true; requestNumber++; clearInterval(dayTimer); document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener); dialogs.forEach(el => el.calDispose()); };
+  return () => { disposed = true; requestNumber++; announcements.dispose(); clearInterval(dayTimer); document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener); dialogs.forEach(el => el.calDispose()); };
 }

@@ -1042,6 +1042,24 @@ After signing in on `/admin/calendar/`, owners and calendar editors can open
 Schedule messages at `/texts/` from the calendar toolbar. Open it in a separate
 tab so their calendar stays available. This link does not grant other admin access.
 
+The signed-in calendar toolbar also offers Announcements, a private plain-text
+message feed. Owners and calendar editors can append posts; every active calendar
+account can read them. Keep author identity server-owned, preserve Hebrew and line
+breaks, and escape all displayed text. Post IDs make retries idempotent. The existing
+calendar Durable Object stores messages and individual per-account read markers;
+reading in one session carries to that account's other devices. An author's own post
+is read immediately, without clearing other posts. Never use a shared
+read flag or a client-supplied user ID. Loading a page of messages does not mark it
+read. The UI marks a message only when its end is visible in the open feed, and
+updates the badge after server confirmation. Older paginated messages remain unread
+until viewed. Late read requests cannot clear newer announcements. Refresh counts
+on focus/visibility and every 30 seconds, with a button for new posts in an open
+feed. Stop timers and observers on logout or navigation. This feed does not publish
+calendar information or activate the separate phone-notification feature.
+Deploy the calendar service before the client. Keep CALENDAR, CommunityCalendar,
+the lakewood-commons object name and v1 migration. Use only synthetic local records
+for write tests; production verification must not create announcements or accounts.
+
 `tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
 safe text rendering, keyboard viewport, private accounts and server role boundaries.

@@ -11,6 +11,21 @@
 .cal-admin-heading button { flex:none; }
 .cal-admin-actions a:hover { border-color:#a88c47; background:#f1eadb; }
 .cal-admin-actions a:focus-visible { outline:3px solid #9e7b31; outline-offset:2px; }
+.cal-unread-count { display:inline-flex; align-items:center; justify-content:center; min-width:1.35em; margin-left:.35rem; padding:.1em .3em; border-radius:1em; background:#142b46; color:#fff; font-size:.75rem; }
+.cal-unread-count[hidden] { display:none; }
+.cal-announcements-dialog { width:min(42rem,calc(100vw - 2rem)); }
+.cal-announcement-intro { color:#60717d; }
+.cal-announcement-compose { padding:1rem; background:#f6f3eb; border:1px solid #e3dfd3; border-radius:10px; }
+.cal-announcement-compose button { align-self:flex-end; }
+.cal-announcement-status { min-height:1.3em; }
+.cal-announcement-feed { margin:.75rem 0; max-height:min(45vh,28rem); min-height:7rem; overflow:auto; overscroll-behavior:contain; padding:.25rem; }
+.cal-announcement-message { margin:0 0 .85rem; padding:.9rem 1rem; border:1px solid #dedfd9; border-radius:12px; background:#faf7f0; overflow-wrap:anywhere; }
+.cal-announcement-message.is-unread { border-color:#a88c47; }
+.cal-announcement-message header { display:flex; flex-wrap:wrap; gap:.3rem .65rem; align-items:baseline; font-size:.8rem; }
+.cal-announcement-message time { color:#63717b; font-size:.7rem; }
+.cal-announcement-message p { margin:.65rem 0 0; white-space:pre-wrap; font-size:.95rem; line-height:1.6; }
+.cal-announcement-new { color:#806223; font-size:.7rem; font-weight:700; }
+.cal-announcement-end { display:block; height:1px; }
 .shul-calendar { --cal-ink:#142b46; --cal-gold:#a88c47; background:#faf7f0; color:var(--cal-ink); border:1px solid #e3dfd3; border-top:3px solid var(--cal-gold); border-radius:17px; overflow:hidden; box-shadow:0 3px 16px #142b4606; }
 .cal-preview-banner { display:flex; flex-wrap:wrap; align-items:baseline; gap:.25rem .7rem; padding:.65rem .85rem; margin-bottom:1rem; background:#e9eef4; color:#31455e; border-radius:8px; font-size:.8rem; }
 .cal-preview-banner strong { font-size:.75rem; letter-spacing:.03em; }
