@@ -2,14 +2,28 @@ import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
 import { hebrewDateExtended, jewishDateString, hebrewYear, dateFromHebrew, hasParsha, hasYomTov, hasRoshChodesh, hasTaanis, hasBehab, hasSpecialParsha, isShabbosMevarchim, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 
 export const CALENDAR_TYPES = [
+  { id: 'shalom-zachor', label: 'Shalom Zachor', compact: 'Shalom Z.', colour: '#356a9a' },
   { id: 'kiddush', label: 'Kiddush', compact: 'Kiddush', colour: '#24736c' },
-  { id: 'wedding', label: 'Wedding', compact: 'Wedding', colour: '#a4476e' },
+  { id: 'vort', label: 'Vort', compact: 'Vort', colour: '#705494' },
+  { id: 'aufruf', label: 'Aufruf', compact: 'Aufruf', colour: '#8c651e' },
+  { id: 'wedding', label: 'Chasuna', compact: 'Chasuna', colour: '#a4476e' },
+  { id: 'bar-mitzva-shabbos', label: 'Bar mitzva shabbos', compact: 'B.M. Shabbos', colour: '#356a9a' },
+  { id: 'bar-mitzva-dessert', label: 'Bar mitzva dessert', compact: 'B.M. dessert', colour: '#456b3b' },
+  { id: 'custom', label: 'Custom', compact: 'Custom', colour: '#596573' },
+];
+
+export const CALENDAR_LEGACY_TYPES = [
   { id: 'bar-mitzvah', label: 'Bar mitzvah', compact: 'Bar M.', colour: '#356a9a' },
   { id: 'simcha', label: 'Simcha', compact: 'Simcha', colour: '#8c651e' },
   { id: 'schedule', label: 'Schedule', compact: 'Times', colour: '#456b3b' },
   { id: 'announcement', label: 'Announcement', compact: 'Notice', colour: '#705494' },
   { id: 'other', label: 'Other', compact: 'Event', colour: '#596573' },
 ];
+
+export function calendarEventCategory(event) {
+  const type = [...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].find(item => item.id === event.type) || CALENDAR_LEGACY_TYPES.at(-1);
+  return event.type === 'custom' ? { ...type, label: event.customCategory || 'Custom', compact: event.customCategory || 'Custom' } : type;
+}
 
 export function calendarISO(serial) { return dateFromSerial(serial).toISOString().slice(0, 10); }
 
@@ -25,7 +39,7 @@ export function calendarEvent(value) {
   const text = (key, limit, required = false) => {
     if (typeof (value[key] ?? '') !== 'string') throw new Error('Enter valid event information.');
     const out = (value[key] || '').trim();
-    if (out.length > limit) throw new Error(`${key === 'description' ? 'Description' : key[0].toUpperCase() + key.slice(1)} is too long.`);
+    if (out.length > limit) throw new Error(`${key === 'description' ? 'Description' : key === 'customCategory' ? 'Category name' : key[0].toUpperCase() + key.slice(1)} is too long.`);
     if (required && !out) throw new Error('Enter an event title.');
     return out;
   };
@@ -34,7 +48,9 @@ export function calendarEvent(value) {
   if (!Number.isFinite(start) || !Number.isFinite(end)) throw new Error('Choose a valid date between 1900 and 2299.');
   if (end < start || end - start > 366) throw new Error('The end date must be on or after the start, within one year.');
   const type = text('type', 30);
-  if (!CALENDAR_TYPES.some(item => item.id === type)) throw new Error('Choose an event type.');
+  if (![...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].some(item => item.id === type)) throw new Error('Choose an event category.');
+  const customCategory = type === 'custom' ? text('customCategory', 60) : '';
+  if (type === 'custom' && !customCategory) throw new Error('Enter a category name.');
   if (value.allDay != null && typeof value.allDay !== 'boolean') throw new Error('Choose an all-day event or a time.');
   const allDay = value.allDay !== false;
   const time = allDay ? '' : text('time', 5), endTime = allDay ? '' : text('endTime', 5);
@@ -43,7 +59,7 @@ export function calendarEvent(value) {
   if (endDate === date && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
-  return { title: text('title', 160, true), type, date, endDate, allDay, time, endTime,
+  return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
     location: text('location', 200), description: text('description', 4000), revision };
 }
 
