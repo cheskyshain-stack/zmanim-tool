@@ -1045,7 +1045,7 @@ tab so their calendar stays available. This link does not grant other admin acce
 New readers can register immediately with their name, email address and their own
 password. The server always assigns viewer access; submitted role fields cannot
 grant editing. Viewers read calendar events and announcements but cannot add,
-change or delete events, post announcements, invite people or see account activity.
+change or delete events, post or delete announcements, invite people or see account activity.
 The owner can grant calendar editing or return an editor to viewing access; role
 changes invalidate existing sessions and can never change the owner's role.
 Existing owner/editor accounts and invitation flows are preserved. Removed emails
@@ -1063,7 +1063,8 @@ activity response. Show the recording notice on account forms. Deploy the update
 calendar service before the client; keep the existing Durable Object and migration.
 
 The signed-in calendar toolbar also offers Announcements, a private plain-text
-message feed. Owners and calendar editors can append posts; every active calendar
+message feed. Owners and calendar editors can append posts and delete any admin's
+post; every active calendar
 account can read them. Keep author identity server-owned, preserve Hebrew and line
 breaks, and escape all displayed text. Post IDs make retries idempotent. The existing
 calendar Durable Object stores messages and individual per-account read markers;
@@ -1076,6 +1077,14 @@ until viewed. Late read requests cannot clear newer announcements. Refresh count
 on focus/visibility and every 30 seconds, with a button for new posts in an open
 feed. Stop timers and observers on logout or navigation. This feed does not publish
 calendar information or activate the separate phone-notification feature.
+Deleting requires confirmation and removes the post from every account's feed and
+unread count. Keep a private tombstone and the existing record for recovery, remove
+its ordering entry, and never restore a deleted post when an old submission retries.
+Deletion retries are idempotent. Count deleted posts as seen for every account so
+monotonic read counters remain valid, including late reads and old status responses.
+An open feed syncs deletion IDs after the status count changes, retaining older
+loaded messages, scroll position and unsent drafts. Viewers cannot delete through
+either the UI or API. Existing events, accounts and sign-in history stay unchanged.
 Deploy the calendar service before the client. Keep CALENDAR, CommunityCalendar,
 the lakewood-commons object name and v1 migration. Use only synthetic local records
 for write tests; production verification must not create announcements or accounts.
