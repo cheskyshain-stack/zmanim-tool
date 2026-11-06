@@ -3856,6 +3856,169 @@ function calendarWritePreview(events, storage) {
   catch { throw new Error('The calendar could not be saved. Allow site storage or download a backup before continuing.'); }
 }
 
+// ==== calendar/announcement-model.js ====
+const CALENDAR_ANNOUNCEMENT_LENGTH = 4000;
+
+function calendarAnnouncementText(value) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error('Enter an announcement.');
+  if (value.length > CALENDAR_ANNOUNCEMENT_LENGTH) throw new Error('Use up to 4,000 characters for an announcement.');
+  return value.replace(/\r\n?/g, '\n').trim();
+}
+
+// ==== ui/calendar-announcements.js ====
+function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
+  let actor = null, timer = null, button = null, active = null;
+  let total = 0, readCount = 0, canPost = false, unavailable = false;
+  const unread = () => Math.max(0, total - readCount);
+  const matches = id => actor?.id === id;
+  function paint() {
+    if (button?.isConnected) {
+      const count = unread(), badge = button.querySelector('[data-cal-announcement-count]');
+      badge.textContent = unavailable ? '!' : count;
+      badge.hidden = !unavailable && !count;
+      button.setAttribute('aria-label', unavailable ? 'Announcements, unread count unavailable' : count ? `Announcements, ${count} unread` : 'Announcements');
+    }
+    if (active) {
+      active.newButton.hidden = total <= active.latest;
+      active.form.hidden = !canPost;
+    }
+  }
+  function status(value) {
+    // Posts and read markers only grow. Old responses cannot undo newer reads.
+    total = Math.max(total, value.total);
+    readCount = Math.max(readCount, value.total - value.unread);
+    canPost = value.canPost === true; unavailable = false; paint();
+  }
+  function failed(error, id) {
+    if (matches(id) && error.status === 401) { onSessionExpired(error.message); return true; }
+    return false;
+  }
+  async function refresh() {
+    if (!actor || document.visibilityState !== 'visible') return;
+    const id = actor.id;
+    try { const value = await calendarRequest('/api/announcements/status'); if (matches(id)) status(value); }
+    catch (error) { if (matches(id) && !failed(error, id)) { unavailable = true; paint(); } }
+  }
+  function visible() { refresh(); active?.observe(); }
+  function stop() {
+    actor = null; clearInterval(timer); timer = null;
+    document.removeEventListener('visibilitychange', visible); window.removeEventListener('focus', visible);
+    active?.cleanup(); active?.view.el.calDispose(); active = null;
+    total = readCount = 0; canPost = unavailable = false;
+  }
+  function start(user) {
+    if (actor?.id === user.id) return;
+    stop(); actor = user;
+    document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
+    timer = setInterval(refresh, 30000); refresh();
+  }
+  function bind(container) {
+    button = container.querySelector('[data-cal-announcements]');
+    button?.addEventListener('click', open); paint();
+  }
+  function markup() {
+    return '<button type="button" data-cal-announcements>Announcements <span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>';
+  }
+  async function open() {
+    if (!actor || active) return;
+    const id = actor.id;
+    let posting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, loading = false;
+    const pending = new Set(), messages = new Map();
+    let observer;
+    const view = dialog('<p class="cal-announcement-intro">Updates for everyone with calendar access.</p><form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>', {
+      onClose: () => {
+        if (posting || textarea.value.trim() && !confirm('Discard your announcement draft?')) return false;
+        cleanup(); active = null; return true;
+      },
+    });
+    view.title('Announcements'); view.el.classList.add('cal-announcements-dialog');
+    const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
+    const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
+    const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
+    const newButton = view.el.querySelector('[data-cal-new-announcements]');
+    const current = () => matches(id) && active?.view === view && view.el.isConnected;
+    function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); }
+    function notice(text, error = false, source = '') {
+      messageStatus.textContent = text; messageStatus.classList.toggle('cal-error', error); messageStatus.dataset.source = source;
+    }
+    function whenDate(value) {
+      return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
+    }
+    function card(message) {
+      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong dir="auto">${escText(message.authorName)}</strong><time datetime="${escAttr(message.createdAt)}">${escText(whenDate(message.createdAt))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${escText(message.text)}</p><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
+    }
+    async function markRead() {
+      if (!current() || reading || !pending.size || document.visibilityState !== 'visible') return;
+      reading = true; let saved = false;
+      const ids = [...pending].slice(0, 100); ids.forEach(value => pending.delete(value));
+      try {
+        const value = await calendarRequest('/api/announcements/read', { method: 'POST', body: { ids } });
+        if (!matches(id)) return;
+        status(value); saved = true;
+        if (current() && messageStatus.dataset.source === 'read') { notice(''); retry.hidden = true; }
+        if (current()) for (const key of ids) {
+          if (messages.has(key)) messages.get(key).read = true;
+          const node = [...feed.querySelectorAll('[data-announcement-id]')].find(item => item.dataset.announcementId === key);
+          node?.classList.remove('is-unread'); if (node) node.querySelector('.cal-announcement-new').hidden = true;
+        }
+      } catch (error) {
+        if (current() && !failed(error, id)) { ids.forEach(value => pending.add(value)); notice('Read status could not be saved. Use Try again to retry.', true, 'read'); retry.hidden = false; }
+      } finally { reading = false; if (saved && pending.size && current()) pendingTimer = setTimeout(markRead, 250); }
+    }
+    function observe() {
+      observer?.disconnect();
+      if (!current() || document.visibilityState !== 'visible') return;
+      for (const node of feed.querySelectorAll('[data-cal-announcement-end]')) {
+        if (!messages.get(node.dataset.calAnnouncementEnd)?.read) observer.observe(node);
+      }
+    }
+    observer = new IntersectionObserver(entries => {
+      if (!current() || document.visibilityState !== 'visible') return;
+      for (const entry of entries) if (entry.isIntersecting) {
+        pending.add(entry.target.dataset.calAnnouncementEnd); observer.unobserve(entry.target);
+      }
+      clearTimeout(pendingTimer); pendingTimer = setTimeout(markRead, 250);
+    }, { threshold: 1 });
+    active = { view, latest: 0, form, newButton, observe, cleanup }; paint();
+    async function load(append = false) {
+      if (!current() || loading) return;
+      loading = true; older.disabled = retry.disabled = newButton.disabled = true;
+      try {
+        const value = await calendarRequest('/api/announcements' + (append && nextBefore ? '?before=' + nextBefore : ''));
+        if (!current()) return;
+        if (messageStatus.dataset.source === 'load') notice('');
+        if (!append) { messages.clear(); feed.innerHTML = ''; feed.scrollTop = 0; }
+        for (const item of value.messages) if (!messages.has(item.id)) { messages.set(item.id, item); feed.insertAdjacentHTML('beforeend', card(item)); }
+        if (!messages.size) feed.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
+        active.latest = Math.max(active.latest, ...value.messages.map(item => item.sequence));
+        nextBefore = value.nextBefore; older.hidden = !nextBefore; retry.hidden = true; status(value); observe();
+      } catch (error) {
+        if (current() && !failed(error, id)) {
+          notice(error.message, true, 'load'); retry.hidden = false;
+          if (!messages.size) feed.innerHTML = '<p class="cal-empty">Announcements could not be loaded.</p>';
+        }
+      } finally { loading = false; if (current()) older.disabled = retry.disabled = newButton.disabled = false; }
+    }
+    form.addEventListener('submit', async event => {
+      event.preventDefault(); if (posting) return;
+      let text; try { text = calendarAnnouncementText(textarea.value); } catch (error) { notice(error.message, true, 'post'); return; }
+      if (!operation || operation.text !== text) operation = { id: crypto.randomUUID(), text };
+      posting = true; textarea.disabled = true; form.querySelector('button').disabled = true; notice('Posting…');
+      try {
+        const value = await calendarRequest('/api/announcements', { method: 'POST', body: operation });
+        if (!current()) return;
+        status(value); textarea.value = ''; operation = null; notice('Announcement posted.'); await load();
+      } catch (error) { if (current() && !failed(error, id)) notice(error.message + ' Your text is kept; try posting again.', true, 'post'); }
+      finally { posting = false; if (current()) { textarea.disabled = false; form.querySelector('button').disabled = false; } }
+    });
+    older.addEventListener('click', () => load(true));
+    newButton.addEventListener('click', () => load());
+    retry.addEventListener('click', () => { markRead(); load(); });
+    await load();
+  }
+  return { start, stop, bind, markup, refresh, dispose: stop };
+}
+
 // ==== ui/calendar-view.js ====
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
@@ -3868,6 +4031,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null;
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '';
   const dialogs = new Set();
+  const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
+    calendarSession(null); user = null; events = []; signIn(message);
+  } });
   container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
 
   function previewBackupMarkup() {
@@ -3972,7 +4138,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   function draw() {
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
-    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
+    container.innerHTML = `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${endpoint && user ? announcements.markup() : ''}${standalone && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}<button type="button" data-cal-access>Calendar access</button></div></div>
       <div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>
       <section class="shul-calendar" aria-label="Community calendar"><header class="cal-brand"><div><p class="cal-eyebrow">Kahal Lev Menachem</p><h3>Community Calendar</h3></div><button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button></header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
@@ -3992,6 +4158,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]').addEventListener('click', access);
+    announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', async () => {
       try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
@@ -4031,6 +4198,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
+    announcements.start(user);
     busy = true; loadError = ''; events = []; redraw();
     const info = calendarMonth(month, settings, tables);
     try {
@@ -4161,6 +4329,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   }
   function signIn(error = '') {
     if (disposed) return;
+    announcements.stop();
     const creating = setupToken || inviteToken;
     container.innerHTML = `<section class="cal-login"><p class="cal-eyebrow">Kahal Lev Menachem</p><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : 'Use your calendar account to view and manage events.'}</p><form class="cal-form">
       ${setupToken ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
@@ -4207,7 +4376,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       }
     } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
   })();
-  return () => { disposed = true; requestNumber++; clearInterval(dayTimer); document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener); dialogs.forEach(el => el.calDispose()); };
+  return () => { disposed = true; requestNumber++; announcements.dispose(); clearInterval(dayTimer); document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener); dialogs.forEach(el => el.calDispose()); };
 }
 
 // ==== ui/chart-print-layout.js ====

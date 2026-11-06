@@ -80,3 +80,28 @@ the website. Publishing a congregation-facing calendar is a later, separate chan
 The main admin can still download Previous device preview backups from the calendar
 sign-in screen or Calendar access after connecting. Use the browser that created
 those events; the backup keeps its original stored data and does not upload it.
+
+## Private calendar announcements
+
+Announcements in the calendar toolbar opens a message feed for signed-in calendar
+accounts. Both owners and editors can post up to 4,000 characters with line breaks.
+The server supplies the author and posting time. Messages are append-only, newest
+first, with older messages available in pages of 30. Retrying the same post ID and
+text returns the existing post instead of creating a duplicate.
+
+GET /api/announcements/status returns the current account's unread count.
+GET /api/announcements (and ?before=<sequence>) returns messages and read states.
+POST /api/announcements takes {id,text}; POST /api/announcements/read takes {ids}.
+All endpoints require the calendar session and allowed origin. Read markers belong
+to the authenticated account, persist across devices, and are independent per post.
+The author's own post starts read; it never clears other unread messages.
+Only visible messages in the open feed are marked read; opening a page does not
+clear unloaded older messages. Revocation and password reset invalidate access
+through the same session checks as calendar events. No public feed, email or phone
+notification is sent. The existing binding and v1 migration are unchanged.
+
+Deploy this Worker before publishing a client that uses these endpoints. Verify
+announcements:true in /api/info and unauthenticated HTTP 401 responses, without
+posting real or synthetic messages to production. The calendar browser suite uses
+local Workerd to test posting, lost responses, independent read counts, pagination,
+cross-session persistence and revoked access.
