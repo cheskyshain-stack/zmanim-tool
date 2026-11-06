@@ -1038,6 +1038,9 @@ the client-side admin PIN. Activation does not publish a congregation calendar.
 After activation, the main admin sign-in and Calendar access screens retain
 Previous device preview backup. It downloads the exact existing local data without
 uploading it or replacing it with shared events. Calendar-only accounts do not see it.
+After signing in on `/admin/calendar/`, owners and calendar editors can open
+Schedule messages at `/texts/` from the calendar toolbar. Open it in a separate
+tab so their calendar stays available. This link does not grant other admin access.
 
 `tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
