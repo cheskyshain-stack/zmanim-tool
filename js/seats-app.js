@@ -329,8 +329,12 @@ function seatsStart(root, auth, updates) {
     measure.font = font + 'px Arial';
     return measure.measureText(text).width;
   }
-  function nameText(name, x, y, width, height, tableId, maxFont = 13) {
-    const { font, lines, fits } = seatsFitName(name, width, height, nameMeasure, maxFont);
+  function boldNameMeasure(text, font) {
+    measure.font = '700 ' + font + 'px Arial';
+    return measure.measureText(text).width;
+  }
+  function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure) {
+    const { font, lines, fits } = seatsFitName(name, width, height, measureName, maxFont);
     if (!fits) overflowTables.add(tableId);
     const start = y + height / 2 - (lines.length - 1) * font * 0.55 + font * 0.33;
     const rtl = /[א-ת]/.test(name) && !/[A-Za-z]/.test(name);
@@ -343,9 +347,9 @@ function seatsStart(root, auth, updates) {
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
     const displayName = name => reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
-    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, nameMeasure)));
+    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, boldNameMeasure)));
     const commonFont = seatsCommonNameFont(nameLayouts);
-    const seatName = (name, x, y, width, height, id, maxFont = 13) => wideName(displayName(name), x, y, width, height, id, Math.min(commonFont, maxFont));
+    const seatName = (name, x, y, width, height, id, maxFont = 13) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), boldNameMeasure);
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
