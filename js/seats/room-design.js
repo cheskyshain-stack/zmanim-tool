@@ -4,7 +4,7 @@ const SEATS_FLOOR_TEXTURE = '/assets/seats/light-marble-floor-v1.png';
 const SEATS_TABLE_TEXTURE = '/assets/seats/light-tabletop-v1.png';
 
 const SEATS_ROOM_PALETTE = {
-  ink: '#344757', boundary: '#9ca29e', outline: '#8b9699', grout: '#dcdcdc',
+  ink: '#344757', boundary: '#9ca29e', outline: '#8b9699', grout: '#e8e8e8',
   'edge-line': '#a18c74', highlight: '#ede5d5', name: '#243b4d', number: '#596771',
   'chair-line': '#69777c', piping: '#e4e6e1', 'cabinet-line': '#876b55',
   'shelf-line': '#a98e70', molding: '#dcc9aa', 'book-line': '#a49984',
@@ -42,7 +42,7 @@ export function seatsRoomDesignPaint(id, monochrome = false) {
       + gradient('chair', [['0%', '#d0d2cf'], ['60%', '#a7aaa8'], ['100%', '#858a89']])
       + gradient('cabinet', [['0%', '#a58b71'], ['100%', '#715a47']])
       + gradient('shelf', [['0%', '#f3efe6'], ['100%', '#e7dfd1']])
-      + `<pattern id="${id}-floor" x="${floorX}" y="${floorY}" width="${floorWidth}" height="${floorHeight}" viewBox="0 0 ${floorWidth} ${floorHeight}" patternUnits="userSpaceOnUse"><rect width="${floorWidth}" height="${floorHeight}" fill="#fafaf7"/><image class="design-floor-texture" href="${SEATS_FLOOR_TEXTURE}" width="${floorWidth}" height="${floorHeight}" preserveAspectRatio="xMidYMid meet" opacity=".5"/></pattern>`
+      + `<pattern id="${id}-floor" x="${floorX}" y="${floorY}" width="${floorWidth}" height="${floorHeight}" viewBox="0 0 ${floorWidth} ${floorHeight}" patternUnits="userSpaceOnUse"><rect width="${floorWidth}" height="${floorHeight}" fill="#fafafa"/><image class="design-floor-texture" href="${SEATS_FLOOR_TEXTURE}" width="${floorWidth}" height="${floorHeight}" preserveAspectRatio="xMidYMid meet" opacity=".08"/></pattern>`
       + `<filter id="${id}-shadow" x="-.15" y="-.4" width="1.3" height="1.9"><feDropShadow dx="0" dy="1.5" stdDeviation="1.1" flood-color="#544b41" flood-opacity=".14"/></filter>`;
   // Convert vector paint directly so printed names and book details remain searchable and sharp.
   // Raster artwork receives an image-only grayscale filter in CSS.
@@ -100,13 +100,20 @@ function seatsFixtureSketchFilter(id, crop) {
   </filter>`;
 }
 
+function seatsFixtureLightFilter(id, crop) {
+  // Lift photographic shadows for small printouts while retaining detail and alpha.
+  // Apply once to the photograph and its corrected crown together.
+  return `<filter class="fixture-light-filter" id="${id}" filterUnits="userSpaceOnUse" x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}" color-interpolation-filters="sRGB"><feComponentTransfer><feFuncR type="linear" slope=".55" intercept=".4"/><feFuncG type="linear" slope=".55" intercept=".4"/><feFuncB type="linear" slope=".55" intercept=".4"/><feFuncA type="identity"/></feComponentTransfer></filter>`;
+}
+
 function seatsFixturePicture(kind, center, top, width, height, printScale, sketch = false) {
   const crop = SEATS_FIXTURE_CROPS[kind], clip = 'seats-fixture-clip-' + ++seatsFixtureClipCount;
+  const filterId = clip + (sketch ? '-sketch' : '-light');
   const [source, imageWidth, imageHeight] = SEATS_FIXTURE_IMAGES[kind];
   // Replace only the small crown finial with a round bead. Keep the original artwork everywhere else.
   const crown = kind === 'aron' ? `<defs><clipPath id="${clip}-crown" clipPathUnits="userSpaceOnUse"><rect x="386" y="280" width="24" height="27"/></clipPath></defs><g class="fixture-crown-correction" clip-path="url(#${clip}-crown)"><image href="${SEATS_CROWN_PICTURE}" x="340" y="270" width="115" height="110" preserveAspectRatio="none"/></g>` : '';
   const picture = `<image class="fixture-source-picture" href="${source}" width="${imageWidth}" height="${imageHeight}" clip-path="url(#${clip})"/>${crown}`;
-  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath>${sketch ? seatsFixtureSketchFilter(clip + '-sketch', crop) : ''}</defs>${sketch ? `<g class="fixture-sketch" filter="url(#${clip}-sketch)">${picture}</g>` : picture}</svg></g></g></g></g>`;
+  return `<g class="design-realistic-fixture design-${kind}" aria-hidden="true"><g transform="translate(${center} ${top})"><g class="fixture-paper-correction"><g transform="scale(${1 / printScale} 1)"><svg class="fixture-picture" x="${-width / 2}" width="${width}" height="${height}" viewBox="${crop.join(' ')}" preserveAspectRatio="xMidYMid meet" overflow="hidden"><defs><clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${crop[0]}" y="${crop[1]}" width="${crop[2]}" height="${crop[3]}"/></clipPath>${sketch ? seatsFixtureSketchFilter(filterId, crop) : seatsFixtureLightFilter(filterId, crop)}</defs><g class="${sketch ? 'fixture-sketch' : 'fixture-light'}" filter="url(#${filterId})">${picture}</g></svg></g></g></g></g>`;
 }
 
 export function seatsAronDesign(aron, printScale = 1, frontTop = 15, sketch = false) {

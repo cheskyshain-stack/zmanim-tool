@@ -30,15 +30,29 @@ for p in d:
   assert images_by_order[0]<min(line['seqno'] for line in lines) and max(line['seqno'] for line in lines)<images_by_order[-1], 'Grout must sit above stone and beneath the furniture'
   assert sum(image[1]>0 for image in p.get_images(full=True))>0, 'Furniture must preserve transparency above the grout'
   assert all(0<line['width']<=.51 and min(line['color'])>.82 for line in lines), 'Tile joints must stay fine and light, without a strong grid'
+  margin=36 if paper=='tabloid' else 25.2;w,h=expected
+  sx=(w-2*margin)/1176;sy=(h-2*margin-25.2-16)/916
+  floor=fitz.Rect(margin+(550-12)*sx,margin+25.2+(600-50)*sy,margin+(650-12)*sx,margin+25.2+(620-50)*sy)
+  stone=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=floor,alpha=False)
+  stone_pixels=np.frombuffer(stone.samples,dtype=np.uint8).reshape(-1,3)
+  assert stone_pixels.mean()>244, 'The CMYK floor must remain a very pale neutral'
+  assert (stone_pixels.max(axis=1)-stone_pixels.min(axis=1)).max()<=2, 'The CMYK floor must have no colored cast'
+  if not mono:
+   for fixture,box in [('Aron',(590,80,610,100)),('amud',(595,212,605,220)),('bimah',(588,540,612,546))]:
+    x0,y0,x1,y1=box
+    r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
+    detail=p.get_pixmap(matrix=fitz.Matrix(8,8),clip=r,alpha=False)
+    rgb=np.frombuffer(detail.samples,dtype=np.uint8).reshape(-1,3);lightness=rgb@np.array([.2126,.7152,.0722])
+    assert 105<lightness.mean()<210, (fixture,'CMYK must preserve the lighter wood and fabric')
+    assert np.percentile(lightness,95)-np.percentile(lightness,5)>3, (fixture,'CMYK must preserve photographic details')
   if mono:
-   margin=36 if paper=='tabloid' else 25.2;w,h=expected
-   sx=(w-2*margin)/1176;sy=(h-2*margin-25.2-16)/916
    for fixture,box in [('Aron',(552,18,648,118)),('amud',(586,184,614,230)),('bimah',(570,514,630,552))]:
     x0,y0,x1,y1=box
     r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
     samples=p.get_pixmap(matrix=fitz.Matrix(4,4),clip=r,alpha=False).samples[::3]
     assert sum(samples)/len(samples)>200, (fixture,'CMYK must preserve light sketch interiors')
-    assert sum(value<220 for value in samples)/len(samples)>.03, (fixture,'CMYK must preserve visible sketch details at print size')
+    drawing=[value for value in samples if value<242]
+    assert drawing and sum(value<220 for value in drawing)/len(drawing)>.03, (fixture,'CMYK must preserve visible sketch details within the artwork, independent of the pale floor behind it')
    floor=fitz.Rect(margin+(550-12)*sx,margin+25.2+(600-50)*sy,margin+(650-12)*sx,margin+25.2+(620-50)*sy)
    floor_values=sorted(p.get_pixmap(matrix=fitz.Matrix(4,4),clip=floor,alpha=False).samples[::3])
    floor_paper=floor_values[int(len(floor_values)*.95)]
@@ -72,6 +86,9 @@ for p in d:
   raw=d.xref_stream(image[0]);assert d.xref_get_key(image[0],'Decode')[1]=='[1 0 1 0 1 0 1 0]'
   assert len(raw)==image[2]*image[3]*4, 'CMYK images must contain exactly four samples per pixel'
   pixels=np.frombuffer(raw,dtype=np.uint8).reshape(-1,4)
+  if not roster and '-design-' in sys.argv[1] and image[1]==0:
+   assert (pixels[:,:3]==255).all(), 'Neutral floor tiles must use black ink only, even in Color'
+   assert (255-pixels[:,3]).max()<=20, 'Floor texture must not print as a heavy ink layer'
   if mono:assert (pixels[:,:3]==255).all(), 'Black and white must not use cyan, magenta or yellow ink'
   maximum_ink=max(maximum_ink,int((1020-pixels.sum(axis=1,dtype=np.int16)).max()));images+=1
  for block in p.get_text('dict')['blocks']:

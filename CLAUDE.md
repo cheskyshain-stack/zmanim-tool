@@ -1712,11 +1712,14 @@ Keep the existing light bookcase frames and pale shelf interiors.
 The open front and lower spine labels face the room; the cabinet back faces the
 wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
 actual book bases and labels, not just the shelf's direction attribute.
-Keep the floor light with the realistic gray-and-cream stone texture in
+Keep the floor a very pale neutral gray, using #fafafa with only .08 opacity of
+the original stone texture in
 assets/seats/light-marble-floor-v1.png. Do not restore drawn marble-vein curves.
+Grayscale the floor texture in both print styles so it has no beige or green cast
+and its neutral raster pixels use only black ink in the CMYK file.
 The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles. Keep the
 original photographic texture without mirrored repeats; the user preferred the
-earlier, more natural floor. Grout is subtle neutral #dcdcdc with .5-unit lines.
+earlier, more natural floor. Grout is subtle neutral #e8e8e8 with .5-unit lines.
 Keep the joints as separate sharp SVG paths, drawn
 between the marble and the room furnishings, rather than inside the image pattern. Center one tile on both axes of SEATS_BOUNDS
 so the cuts at opposite walls match. The texture ships offline and printing
@@ -1742,10 +1745,13 @@ The Aron Kodesh, bimah and amud use light outline sketches derived from their
 original photos, with light gray interiors and defined pencil details instead of
 solid dark fills. Use a paper tone around #e6e6e6 and slightly stronger gray lines
 so the fixtures stand apart from the marble without looking like white cutouts.
-Keep the existing detail, shapes, sizes, floor and Color artwork. Preserve their
+Keep the existing detail, shapes and sizes. Preserve their
 exact silhouettes, proportions and corrected
 round crown tip. Apply the sketch filter to each combined picture; do not stack
-another image grayscale filter inside it. Color keeps the original photographs.
+another image grayscale filter inside it. Color keeps the original photographs,
+with a shared sRGB tone lift (RGB slope .55, intercept .4, alpha unchanged) on
+each combined photo and crown correction so the three fixtures print lighter.
+Keep this same treatment in the screen preview, native print and CMYK PDF.
 Convert vector paint to neutral grays and filter only raster artwork so printed
 names and shelf details stay sharp. Both
 styles wait for the artwork before printing. Turning the switch off restores
