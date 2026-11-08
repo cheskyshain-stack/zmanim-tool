@@ -40,7 +40,7 @@ export async function seatsChartPdfPage(source, paper, plan = {}) {
     }
     // Embedded PDF fonts support Hebrew as well as Latin names.
     if (['text', 'tspan'].includes(clone.localName)) {
-      clone.style.fontFamily = /Noto Sans Hebrew/i.test(style.fontFamily) ? 'SeatsNotoHebrew' : /Noto Sans/i.test(style.fontFamily) ? 'SeatsNoto' : /Arial|sans-serif/i.test(style.fontFamily) ? 'SeatsSans' : 'SeatsSerif';
+      clone.style.fontFamily = /Arial|sans-serif/i.test(style.fontFamily) ? 'SeatsSans' : 'SeatsSerif';
       clone.style.fontWeight = Number(style.fontWeight) >= 600 || style.fontWeight === 'bold' ? 'bold' : 'normal';
     }
     for (const attribute of [...clone.attributes]) if (/^(id|data-|aria-|role|tabindex)/.test(attribute.name) && attribute.name !== 'id') clone.removeAttribute(attribute.name);

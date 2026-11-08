@@ -1,12 +1,4 @@
 const SEATS_CMYK_PROFILE = '/assets/print/FOGRA39L_coated.icc';
-const SEATS_PDF_FONTS = [
-  { url: '/assets/print/LiberationSans-Regular.ttf', family: 'SeatsSans', style: 'normal', weight: '400' },
-  { url: '/assets/print/LiberationSans-Bold.ttf', family: 'SeatsSans', style: 'bold', weight: '700' },
-  { url: '/assets/print/LiberationSerif-Regular.ttf', family: 'SeatsSerif', style: 'normal', weight: '400' },
-  { url: '/assets/print/LiberationSerif-Bold.ttf', family: 'SeatsSerif', style: 'bold', weight: '700' },
-  { url: '/assets/fonts/noto-sans-bold.ttf', family: 'SeatsNoto', style: 'bold', weight: '700' },
-  { url: '/assets/fonts/noto-sans-hebrew-bold.ttf', family: 'SeatsNotoHebrew', style: 'bold', weight: '700' },
-];
 let seatsCmykLibraries;
 
 function seatsPdfScript(src) {
@@ -38,15 +30,16 @@ async function seatsLoadCmykTools() {
     const [lcms, profile, ...fonts] = await Promise.all([
       module.instantiate({ locateFile: () => '/vendor/cmyk/lcms.wasm' }),
       seatsPdfBytes(SEATS_CMYK_PROFILE),
-      ...SEATS_PDF_FONTS.map(font => seatsPdfBytes(font.url)),
+      ...['Sans-Regular', 'Sans-Bold', 'Serif-Regular', 'Serif-Bold'].map(name => seatsPdfBytes('/assets/print/Liberation' + name + '.ttf')),
     ]);
     const input = lcms.cmsCreate_sRGBProfile(), output = lcms.cmsOpenProfileFromMem(profile, profile.length);
     if (!output || lcms.cmsGetColorSpaceASCII(output) !== 'CMYK') throw new Error('The CMYK printing profile is invalid.');
     const transform = lcms.cmsCreateTransform(input, module.TYPE_RGB_8, output, module.TYPE_CMYK_8, module.INTENT_RELATIVE_COLORIMETRIC, module.cmsFLAGS_BLACKPOINTCOMPENSATION);
     lcms.cmsCloseProfile(input); lcms.cmsCloseProfile(output);
     if (!transform) throw new Error('CMYK color conversion is unavailable.');
+    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif'];
     await Promise.all(fonts.map(async (bytes, index) => {
-      const font = SEATS_PDF_FONTS[index], face = new FontFace(font.family, bytes, { weight: font.weight });
+      const face = new FontFace(names[index], bytes, { weight: index % 2 ? '700' : '400' });
       await face.load(); document.fonts.add(face);
     }));
     return { lcms, transform, profile, fonts, jsPDF: window.jspdf.jsPDF };
@@ -157,8 +150,7 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
   for (let index = 0; index < tools.fonts.length; index++) {
     const file = 'seats-font-' + index + '.ttf';
     doc.addFileToVFS(file, seatsPdfBinary(tools.fonts[index]));
-    const font = SEATS_PDF_FONTS[index];
-    doc.addFont(file, font.family, font.style);
+    doc.addFont(file, index < 2 ? 'SeatsSans' : 'SeatsSerif', index % 2 ? 'bold' : 'normal');
   }
   seatsPdfOutputIntent(doc, tools.profile); seatsPdfVectorColors(doc, tools, monochrome);
   doc.setProperties({ title: 'Seating chart', subject: 'CMYK print file, FOGRA39L Coated', creator: 'Bais Medrash of Lakewood Commons' });

@@ -1688,15 +1688,9 @@ clear of the top-left minyan logo; do not reserve extra room height or shrink it
 Keep the whole picture inside the printable page, clear of seat names, and
 preserve its proportions on fixed-size and auto-fit printouts. The asset must
 ship offline too.
-Assigned seat names use Noto Sans Bold (700) on screen and in native and CMYK PDFs.
-Names containing Hebrew use Noto Sans Hebrew Bold for the whole name, including
-mixed English/Hebrew names. Load the self-hosted webfonts before fitting names;
-embed the matching static TTFs in CMYK exports. Keep both OFL licenses.
+Assigned seat names use bold Arial (700) on screen and in native and CMYK PDFs.
 Measure their wrapping and shared font size with the same bold weight so long
-English and Hebrew names stay within their seats, with a 6px minimum for unusually
-long assigned names. CMYK text uses logical Unicode input and visual left-to-right
-PDF glyph ordering so Hebrew words print in the correct direction.
-Keep Open labels and fixture
+English and Hebrew names stay within their seats. Keep Open labels and fixture
 captions at their existing weights. Preserve stored names, assignments and room
 geometry when changing this display style.
 Names and empty seats share one continuous table background in every chart style,
@@ -1742,7 +1736,8 @@ alphabetical name list. `js/seats/cmyk-pdf.js` uses Little CMS with the embedded
 FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
 Black & white option use only K. Keep all page artwork in DeviceCMYK and all
 vector colors in CMYK or gray, with no RGB fallback. Text stays selectable and
-uses embedded Hebrew/Latin fonts. Photos and surface textures are sampled at 300 dpi in small strips to bound
+uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyph
+ordering so Hebrew words print in the correct direction. Photos and surface textures are sampled at 300 dpi in small strips to bound
 phone memory. Tile joints stay vector between the marble and furnishings. Use
 CMYK transparency blending and grayscale soft masks for the furniture overlay
 so grout stays hidden under tables, chairs and fixtures. Keep the existing room geometry and fixture
