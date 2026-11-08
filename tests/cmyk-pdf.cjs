@@ -23,17 +23,27 @@ src=fitz.open(sys.argv[1]); dst=fitz.open(sys.argv[2]); assert len(src)==len(dst
 measurements=[]
 for original,converted in zip(src,dst):
  assert abs(original.rect.width-converted.rect.width)<.01 and abs(original.rect.height-converted.rect.height)<.01
- images=converted.get_images(full=True); assert len(images)==1 and images[0][5]=='DeviceCMYK', images
+ images=converted.get_images(full=True); assert images and all(image[5]=='DeviceCMYK' for image in images)
  assert not converted.get_text(), 'Only this explicit CMYK copy is flattened'
- raw=dst.xref_stream(images[0][0]); a=np.frombuffer(raw,dtype=np.uint8).reshape(-1,4)
- assert ((a[:,:3]==0).all(axis=1)&(a[:,3]==255)).sum()>100,'Solid text uses pure black'
- assert ((a[:,:3]==0).all(axis=1)&(a[:,3]==0)).sum()>100,'White paper uses no ink'
+ placements=converted.get_image_info(xrefs=True)
+ assert abs(sum(fitz.Rect(item['bbox']).get_area() for item in placements)/converted.rect.get_area()-1)<1e-5, 'Image tiles must cover the physical page exactly once'
+ black=white=0
+ for image in images:
+  assert image[2]<=4096 and image[3]<=1024, 'No page-sized print bitmap'
+  a=np.frombuffer(dst.xref_stream(image[0]),dtype=np.uint8).reshape(-1,4)
+  black+=int(((a[:,:3]==0).all(axis=1)&(a[:,3]==255)).sum())
+  white+=int(((a[:,:3]==0).all(axis=1)&(a[:,3]==0)).sum())
+ for item in placements:
+  box=fitz.Rect(item['bbox'])
+  assert abs(item['width']/box.width*72-1200)<.3 and abs(item['height']/box.height*72-1200)<.3, 'Keep 1200 dpi on every paper size'
+ assert black>100, 'Solid text uses pure black'
+ assert white>100, 'White paper uses no ink'
  before=original.get_pixmap(matrix=fitz.Matrix(1,1),alpha=False)
  after=converted.get_pixmap(matrix=fitz.Matrix(1,1),alpha=False)
  b=np.frombuffer(before.samples,dtype=np.uint8).astype(float)
  c=np.frombuffer(after.samples,dtype=np.uint8).astype(float)
  mae=abs(b-c).mean(); assert mae<14, ('Layout or appearance changed',mae)
- measurements.append({'points':list(original.rect)[2:],'pixels':[images[0][2],images[0][3]],'meanPixelDifference':round(mae,3)})
+ measurements.append({'points':list(original.rect)[2:],'tiles':len(placements),'dpi':1200,'meanPixelDifference':round(mae,3)})
 for xref in range(1,dst.xref_length()):
  obj=dst.xref_object(xref)
  assert '/DeviceRGB' not in obj and '/ICCBased' not in obj
@@ -66,7 +76,7 @@ print(json.dumps(measurements))
       await page.locator(button).click();
       await page.locator('#cmyk-pdf-file').setInputFiles(original);
       await page.locator('[data-convert]').click();
-      await page.locator('[data-download]:visible').waitFor({ timeout: 120000 });
+      await page.locator('[data-download]:visible').waitFor({ timeout: 300000 });
       assert.equal(await page.locator('.cmyk-pdf-status').textContent(), 'Your CMYK PDF is ready.');
       if (name === 'chart') await page.screenshot({ path: path.join(output, 'cmyk-dialog-desktop.png') });
       const downloadEvent = page.waitForEvent('download');

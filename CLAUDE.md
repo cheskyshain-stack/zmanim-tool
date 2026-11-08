@@ -372,13 +372,18 @@ ink modes, including saved defaults and a custom colour.
 Browser Print / Save as PDF cannot guarantee CMYK output. The separate **CMYK PDF**
 tool converts an already saved PDF locally using pinned, lazily loaded PDF.js under
 `vendor/pdfjs-6.5.438/`. `cmyk-document.js` writes Flate-compressed DeviceCMYK images
-at up to 300 dpi, preserving physical page sizes and rotation. Neutral pixels use K
+at 1200 dpi using the shared `js/print-quality.js` policy. Both PDF exporters draw
+bounded 4096 by 1024 pixel tiles instead of allocating a page-sized bitmap or
+silently reducing resolution on large paper. Compression is lossless. The generic
+converter preserves physical page sizes and rotation. Neutral pixels use K
 only. This explicit copy flattens text; native printing must retain selectable text.
 For this saved-file converter, do not label native printing as CMYK, claim PDF/X
 compliance, or imply a specific ICC profile. No printer profile was supplied.
 Seats also has a direct, profiled SVG export described in its section below. The file picker never uploads its input.
 Keep conversion separate from HTML rendering: the old html2canvas/jsPDF exporter
 remains disabled. The USB copy keeps native printing without this hosted-only tool.
+Default modern building photos use the existing 1400px source rather than its
+240px thumbnail. Preserve custom images and the original workbook artwork.
 `node --test tests/cmyk-document.mjs` checks ink separations; `node tests/cmyk-pdf.cjs`
 checks actual chart, Netz and Seats PDFs, rotated mixed paper, mobile geometry,
 invalid/encrypted files, cancellation, download, colour spaces and page appearance.
@@ -1762,7 +1767,9 @@ uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyp
 ordering so Hebrew words print in the correct direction. All chart print lettering
 uses solid black, including Color, so small names do not require screened navy
 toner. Keep the existing Arial font, weights and fitting. The editing preview
-retains its existing colors. Photos and surface textures are sampled at 600 dpi in small strips to bound
+retains its existing colors. Plain seating charts and alphabetical lists remain
+fully vector, including their table outlines, fills, pillar hatching and rules.
+Photos and surface textures are sampled at 1200 dpi in small tiles to bound
 phone memory. Tile joints stay vector between the marble and furnishings. Use
 CMYK transparency blending and grayscale soft masks for the furniture overlay
 so grout stays hidden under tables, chairs and fixtures. Keep the existing room geometry and fixture

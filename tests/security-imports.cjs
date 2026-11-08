@@ -71,7 +71,7 @@ const server = http.createServer((req, res) => {
       }
       const formatted='<span class="big"><u>7:35</u></span><br><bdi dir="rtl">שחרית</bdi>';
       check(sanitizeRichText(formatted)===formatted,'formatting lost');
-      check(safeHeaderImage(attr)==='/assets/shul-240.jpg','unsafe image URL');
+      check(safeHeaderImage(attr)==='/assets/shul-1400.jpg','unsafe image URL');
       const photo='data:image/png;base64,iVBORw0KGgo=';
       check(safeHeaderImage(photo)===photo,'raster photo lost');
       for (const bad of [null,{}, {settings:{latitude:attr},sheets:[]},{settings:{},sheets:'bad'}, {settings:{},sheets:[],rules:[{id:'x',name:'x',value:'',condition:{parsha:attack}}]}, JSON.parse('{"settings":{},"sheets":[],"__proto__":{}}')]) {

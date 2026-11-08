@@ -8,7 +8,7 @@ const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.woff2':'font/woff2','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
 });
 const inspect=String.raw`
-import fitz,sys,re,json
+import fitz,sys,re,json,numpy as np
 d=fitz.open(sys.argv[1]);assert d.metadata['format']=='PDF 1.7', 'Declare a PDF version that supports transparency and output profiles'
 mono=sys.argv[2]=='1';paper=sys.argv[3];roster=paper=='roster'
 expected=(612,792) if roster else (1224,792) if paper=='tabloid' else (792,612)
@@ -53,18 +53,27 @@ for p in d:
  assert all(font[1]=='ttf' for font in p.get_fonts()), 'Use embedded fonts, including Hebrew'
  spans=[span for block in p.get_text('dict')['blocks'] for line in block.get('lines',[]) for span in line['spans']]
  assert len({span['color'] for span in spans})==1, 'All printed lettering must use the same solid black as the page heading'
- for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]:
-  assert not re.search(rb'(?<!\w)(?:rg|RG|/DeviceRGB)(?!\w)',d.xref_stream(stream) or b''), 'No RGB vector commands'
+ pattern_streams=[xref for xref in range(1,d.xref_length()) if '/PatternType' in d.xref_object(xref)]
+ for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]+pattern_streams:
+  data=d.xref_stream(stream) or b''
+  assert not re.search(rb'(?<!\w)(?:rg|RG|/DeviceRGB)(?!\w)',data), 'No RGB vector commands'
+  for paint in re.findall(rb'([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+[kK]\b',data):
+   inks=list(map(float,paint))
+   if mono:assert inks[:3]==[0,0,0], 'Monochrome vectors must use black ink only'
+   maximum_ink=max(maximum_ink,sum(inks)*255)
+ for placement in p.get_image_info(xrefs=True):
+  box=fitz.Rect(placement['bbox'])
+  assert abs(placement['width']/box.width*72-1200)<.3 and abs(placement['height']/box.height*72-1200)<.3, 'Sample artwork at 1200 dpi on the actual paper size'
  for image in p.get_images(full=True):
   assert image[5]=='DeviceCMYK', 'Every image must use four CMYK channels'
   if image[0] in seen:continue
   seen.add(image[0])
-  for placement in p.get_image_rects(image[0]):
-   assert abs(image[2]/placement.width*72-600)<.2 and abs(image[3]/placement.height*72-600)<.2, 'Sample artwork at 600 dpi on the actual paper size'
+  assert image[2]<=4096 and image[3]<=1024, 'Keep rendering tiles bounded on phones'
   raw=d.xref_stream(image[0]);assert d.xref_get_key(image[0],'Decode')[1]=='[1 0 1 0 1 0 1 0]'
   assert len(raw)==image[2]*image[3]*4, 'CMYK images must contain exactly four samples per pixel'
-  if mono:assert all(v==255 for channel in [raw[0::4],raw[1::4],raw[2::4]] for v in channel), 'Black and white must not use cyan, magenta or yellow ink'
-  maximum_ink=max(maximum_ink,max((1020-sum(raw[i:i+4]) for i in range(0,len(raw),4)),default=0));images+=1
+  pixels=np.frombuffer(raw,dtype=np.uint8).reshape(-1,4)
+  if mono:assert (pixels[:,:3]==255).all(), 'Black and white must not use cyan, magenta or yellow ink'
+  maximum_ink=max(maximum_ink,int((1020-pixels.sum(axis=1,dtype=np.int16)).max()));images+=1
  for block in p.get_text('dict')['blocks']:
   for line in block.get('lines',[]):
    for span in line['spans']:
@@ -76,7 +85,9 @@ for p in d:
   # A light room floor must stay light after color conversion.
   pix=p.get_pixmap(matrix=fitz.Matrix(1,1),clip=fitz.Rect(p.rect.width*.43,p.rect.height*.58,p.rect.width*.57,p.rect.height*.62),alpha=False)
   assert sum(pix.samples)/len(pix.samples)>200,'Floor must stay light'
-assert images>0 and maximum_ink<=768,('CMYK ink coverage exceeds the printing profile',maximum_ink)
+assert (images>0 if '-design-' in sys.argv[1] else images==0), 'Only illustrated room artwork needs raster tiles'
+if images==0:assert all(page.get_drawings() for page in d), 'Plain charts and roster rules must stay vector'
+assert maximum_ink<=768,('CMYK ink coverage exceeds the printing profile',maximum_ink)
 d[0].get_pixmap(matrix=fitz.Matrix(1.3,1.3),alpha=False).save(sys.argv[1]+'.png')
 print(json.dumps({'pages':len(d),'images':images,'maxInkPercent':round(maximum_ink/255*100,1),'KOnly':mono}))
 `;
@@ -99,7 +110,7 @@ print(json.dumps({'pages':len(d),'images':images,'maxInkPercent':round(maximum_i
     }
     const exportPdf=async(file,mono,paper)=>{
       const raw=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));await page.evaluate(()=>{window.testCmykPdf=null;});
-      await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testCmykPdf||document.querySelector('#seats-notice')?.textContent.includes('could not be'),null,{timeout:120000});assert.match(await page.locator('#seats-notice').textContent(),/CMYK PDF ready/);
+      await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testCmykPdf||document.querySelector('#seats-notice')?.textContent.includes('could not be'),null,{timeout:300000});assert.match(await page.locator('#seats-notice').textContent(),/CMYK PDF ready/);
       const data=await page.evaluate(async()=>{const bytes=new Uint8Array(await window.testCmykPdf.arrayBuffer());let value='';for(let i=0;i<bytes.length;i+=16384)value+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(value);});fs.writeFileSync(file,Buffer.from(data,'base64'));
       const result=JSON.parse(execFileSync('python',['-c',inspect,file,mono?'1':'0',paper],{encoding:'utf8'}));console.log(path.basename(file),result);assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1')),raw,'Exporting must not change chart data');assert.equal(await page.evaluate(()=>window.testBrowserPrints),0,'CMYK export must never fall back to RGB browser printing');for(const popup of context.pages())if(popup!==page)await popup.close();
     };
