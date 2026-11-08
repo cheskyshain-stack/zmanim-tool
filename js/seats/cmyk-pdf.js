@@ -1,5 +1,6 @@
+import { PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT, printRasterSize, printRasterTiles } from '../print-quality.js';
+
 const SEATS_CMYK_PROFILE = '/assets/print/FOGRA39L_coated.icc';
-const SEATS_PDF_DPI = 600;
 let seatsCmykLibraries;
 
 function seatsPdfScript(src) {
@@ -135,7 +136,7 @@ function seatsPdfSubset(svg, keep, keepDefinitions = false) {
   return result;
 }
 
-// Artwork is sampled at 600 dpi in bounded strips. Grout and text stay vector.
+// Artwork uses the shared high-resolution tiles. Grout and text stay vector.
 export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = () => {} } = {}) {
   if (!pages.length) throw new Error('There is nothing to export.');
   const tools = await seatsLoadCmykTools();
@@ -158,6 +159,11 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
   for (let number = 0; number < pages.length; number++) {
     const { svg, size } = pages[number];
     if (number) doc.addPage(size, size[0] > size[1] ? 'landscape' : 'portrait');
+    if (!svg.querySelector('image,filter')) {
+      await doc.svg(svg, { x: 0, y: 0, width: size[0], height: size[1] });
+      progress((number + 1) / pages.length);
+      continue;
+    }
     const text = seatsPdfSubset(svg, node => ['text', 'tspan'].includes(node.localName));
     const art = svg.cloneNode(true), hasFloor = Boolean(art.querySelector('[data-pdf-layer="floor"]'));
     for (const node of art.querySelectorAll('text,[data-pdf-layer="floor"],[data-pdf-layer="grid"]')) node.remove();
@@ -166,27 +172,28 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
       { svg: seatsPdfSubset(svg, node => node.getAttribute('data-pdf-layer') === 'floor', true), alpha: false },
       { svg: art, alpha: true },
     ] : [{ svg: art, alpha: false }];
-    const width = Math.round(size[0] / 72 * SEATS_PDF_DPI), height = Math.round(size[1] / 72 * SEATS_PDF_DPI);
-    const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 128;
+    const { width, height } = printRasterSize(...size);
+    const tileCount = Math.ceil(width / PRINT_TILE_WIDTH) * Math.ceil(height / PRINT_TILE_HEIGHT);
+    const canvas = document.createElement('canvas'); canvas.width = PRINT_TILE_WIDTH; canvas.height = PRINT_TILE_HEIGHT;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     for (let layer = 0; layer < layers.length; layer++) {
       if (layer === 1 && grid) await doc.svg(grid, { x: 0, y: 0, width: size[0], height: size[1] });
       const picture = await seatsPdfImage(layers[layer].svg);
-      for (let top = 0; top < height; top += 128) {
-        const rows = Math.min(128, height - top);
-        context.clearRect(0, 0, width, 128);
-        if (!layers[layer].alpha) { context.fillStyle = '#fff'; context.fillRect(0, 0, width, 128); }
-        context.drawImage(picture, 0, -top, width, height);
-        const rgba = context.getImageData(0, 0, width, rows).data;
+      let tileIndex = 0;
+      for (const tile of printRasterTiles(width, height)) {
+        context.clearRect(0, 0, PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT);
+        if (!layers[layer].alpha) { context.fillStyle = '#fff'; context.fillRect(0, 0, PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT); }
+        context.drawImage(picture, -tile.x, -tile.y, width, height);
+        const rgba = context.getImageData(0, 0, tile.width, tile.height).data;
         const cmyk = seatsPdfCmyk(tools, rgba, monochrome);
         // jsPDF writes an inverted Decode array for every CMYK image.
         for (let byte = 0; byte < cmyk.length; byte++) cmyk[byte] = 255 - cmyk[byte];
         const compressed = await seatsPdfDeflate(cmyk);
-        const alpha = layers[layer].alpha ? await seatsPdfDeflate(Uint8Array.from({ length: width * rows }, (_, pixel) => rgba[pixel * 4 + 3])) : new Uint8Array();
+        const alpha = layers[layer].alpha ? await seatsPdfDeflate(Uint8Array.from({ length: tile.width * tile.height }, (_, pixel) => rgba[pixel * 4 + 3])) : new Uint8Array();
         const image = new Uint8Array(compressed.length + alpha.length + 12), header = new DataView(image.buffer);
-        header.setUint32(0, width); header.setUint32(4, rows); header.setUint32(8, compressed.length); image.set(compressed, 12); image.set(alpha, 12 + compressed.length);
-        doc.addImage(image, 'CMYK', 0, top / height * size[1], size[0], rows / height * size[1], 'cmyk-' + number + '-' + layer + '-' + top);
-        progress((number + (layer + (top + rows) / height) / layers.length) / pages.length);
+        header.setUint32(0, tile.width); header.setUint32(4, tile.height); header.setUint32(8, compressed.length); image.set(compressed, 12); image.set(alpha, 12 + compressed.length);
+        doc.addImage(image, 'CMYK', tile.x / width * size[0], tile.y / height * size[1], tile.width / width * size[0], tile.height / height * size[1], 'cmyk-' + number + '-' + layer + '-' + tileIndex);
+        progress((number + (layer + ++tileIndex / tileCount) / layers.length) / pages.length);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
     }

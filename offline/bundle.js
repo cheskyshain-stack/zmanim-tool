@@ -1820,7 +1820,7 @@ function sanitizeRichText(value) {
 /** The cropper saves raster data URLs. No remote URLs or SVG from a backup. */
 function safeHeaderImage(value, originalChartPicture = false) {
   return typeof value === 'string' && /^data:image\/(?:png|jpeg|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(value)
-    ? value : originalChartPicture ? 'assets/logo-building-icon.png' : 'assets/shul-240.jpg';
+    ? value : originalChartPicture ? 'assets/logo-building-icon.png' : 'assets/shul-1400.jpg';
 }
 
 function backupObject(value) {
@@ -5374,6 +5374,29 @@ function wirePdfButton(root, opts = {}) {
   });
 }
 
+// ==== print-quality.js ====
+const PRINT_RASTER_DPI = 1200;
+const PRINT_TILE_WIDTH = 4096;
+const PRINT_TILE_HEIGHT = 1024;
+
+function printRasterSize(widthPoints, heightPoints) {
+  const width = Math.ceil(widthPoints * PRINT_RASTER_DPI / 72);
+  const height = Math.ceil(heightPoints * PRINT_RASTER_DPI / 72);
+  if (![width, height].every(value => Number.isSafeInteger(value) && value > 0)) throw new Error('This PDF page has an invalid size.');
+  return { width, height };
+}
+
+// Keep each canvas at four megapixels rather than allocating a full 1200 dpi page.
+function printRasterTiles(width, height) {
+  return (function* () {
+    for (let y = 0; y < height; y += PRINT_TILE_HEIGHT) {
+      for (let x = 0; x < width; x += PRINT_TILE_WIDTH) {
+        yield { x, y, width: Math.min(PRINT_TILE_WIDTH, width - x), height: Math.min(PRINT_TILE_HEIGHT, height - y) };
+      }
+    }
+  })();
+}
+
 // ==== ui/cmyk-document.js ====
 // CMYK pixels are written directly into PDF image streams. The browser's canvas
 // and Print / Save as PDF APIs only expose RGB, regardless of print-color-adjust.
@@ -5397,14 +5420,20 @@ function cmykDocument() {
   const objects = [null, null], pages = [];
   const add = body => objects.push(body);
   return {
-    addPage({ width, height, pixelsWide, pixelsHigh, compressed }) {
-      const image = add(new Blob([
-        `<< /Type /XObject /Subtype /Image /Width ${pixelsWide} /Height ${pixelsHigh} /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /FlateDecode /Length ${compressed.byteLength} >>\nstream\n`,
-        compressed, '\nendstream',
-      ]));
-      const contents = `q\n${width} 0 0 ${height} 0 0 cm\n/PrintImage Do\nQ\n`;
+    addPage({ width, height, pixelsWide, pixelsHigh, compressed, tiles = [{ x: 0, y: 0, width: pixelsWide, height: pixelsHigh, compressed }] }) {
+      const resources = [], commands = [];
+      for (const [index, tile] of tiles.entries()) {
+        const image = add(new Blob([
+          `<< /Type /XObject /Subtype /Image /Width ${tile.width} /Height ${tile.height} /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /FlateDecode /Length ${tile.compressed.byteLength} >>\nstream\n`,
+          tile.compressed, '\nendstream',
+        ]));
+        const name = 'PrintImage' + index;
+        resources.push(`/${name} ${image} 0 R`);
+        commands.push(`q\n${tile.width / pixelsWide * width} 0 0 ${tile.height / pixelsHigh * height} ${tile.x / pixelsWide * width} ${(pixelsHigh - tile.y - tile.height) / pixelsHigh * height} cm\n/${name} Do\nQ\n`);
+      }
+      const contents = commands.join('');
       const stream = add(`<< /Length ${contents.length} >>\nstream\n${contents}endstream`);
-      pages.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << /PrintImage ${image} 0 R >> >> /Contents ${stream} 0 R >>`));
+      pages.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << ${resources.join(' ')} >> >> /Contents ${stream} 0 R >>`));
     },
     finish() {
       if (!pages.length) throw new Error('The PDF has no pages.');
@@ -5493,23 +5522,27 @@ async function convertCmykPdf(file, { signal, progress = () => {} }) {
       progress(number, source.numPages);
       const page = await source.getPage(number);
       const physical = page.getViewport({ scale: 1 });
-      // Preserve the paper size and rotation. Cap memory for large paper on phones.
-      const scale = Math.min(300 / 72, Math.sqrt(16000000 / (physical.width * physical.height)));
-      const viewport = page.getViewport({ scale });
+      // Preserve full resolution, paper size and rotation without a page-sized canvas.
+      const viewport = page.getViewport({ scale: PRINT_RASTER_DPI / 72 });
+      const { width, height } = printRasterSize(physical.width, physical.height), tiles = [];
+      const tileCount = Math.ceil(width / PRINT_TILE_WIDTH) * Math.ceil(height / PRINT_TILE_HEIGHT);
       canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width - 1e-7);
-      canvas.height = Math.ceil(viewport.height - 1e-7);
-      if (canvas.width > 16000 || canvas.height > 16000) throw new Error('This PDF page is too large to convert on this device.');
-      const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
-      if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
-      render = page.render({ canvasContext, viewport, background: '#ffffff' });
-      await render.promise;
-      render = null;
-      const compressed = await cmykCanvasData(canvas, signal);
-      totalBytes += compressed.byteLength;
-      if (totalBytes > 150 * 1024 * 1024) throw new Error('The converted PDF is too large. Save fewer pages and try again.');
+      for (const tile of printRasterTiles(width, height)) {
+        signal.throwIfAborted();
+        canvas.width = tile.width; canvas.height = tile.height;
+        const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
+        if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
+        render = page.render({ canvasContext, viewport, transform: [1, 0, 0, 1, -tile.x, -tile.y], background: '#ffffff', intent: 'print' });
+        await render.promise;
+        render = null;
+        const compressed = await cmykCanvasData(canvas, signal);
+        totalBytes += compressed.byteLength;
+        if (totalBytes > 512 * 1024 * 1024) throw new Error('The converted PDF is too large. Save fewer pages and try again.');
+        tiles.push({ ...tile, compressed });
+        progress(number, source.numPages, tiles.length / tileCount);
+      }
       output.addPage({ width: physical.width, height: physical.height,
-        pixelsWide: canvas.width, pixelsHigh: canvas.height, compressed });
+        pixelsWide: width, pixelsHigh: height, tiles });
       canvas.width = canvas.height = 0;
       canvas = null;
       page.cleanup();
@@ -5537,7 +5570,7 @@ function openCmykPdf() {
     <p class="cmyk-pdf-status" role="status" aria-live="polite">Your file stays on this device.</p>
     <progress aria-label="PDF conversion" hidden></progress>
     <div class="cmyk-pdf-actions"><button type="button" data-convert disabled>Convert to CMYK</button><a data-download hidden>Download CMYK PDF</a></div>
-    <details><summary>About the print file</summary><p>Keeps the saved PDF’s page sizes and layout. Pages become CMYK images at up to 300 dpi; text in this copy is flattened. Black and gray use black ink only. Uses standard CMYK without a printer-specific colour profile. Normal browser printing keeps its existing colour settings.</p></details>`;
+    <details><summary>About the print file</summary><p>Keeps the saved PDF’s page sizes and layout. Pages become lossless CMYK images at ${PRINT_RASTER_DPI} dpi; text in this copy is flattened. Black and gray use black ink only. Uses standard CMYK without a printer-specific colour profile. Normal browser printing keeps sharp vector text and its existing colour settings.</p></details>`;
   const picker = dialog.querySelector('input'), convert = dialog.querySelector('[data-convert]');
   const status = dialog.querySelector('[role="status"]'), progress = dialog.querySelector('progress');
   const download = dialog.querySelector('[data-download]');
@@ -5581,10 +5614,10 @@ function openCmykPdf() {
     status.textContent = 'Opening PDF…';
     dialog.querySelector('[data-close]').setAttribute('aria-label', 'Cancel conversion and close');
     try {
-      const blob = await convertCmykPdf(file, { signal: active.signal, progress: (page, total) => {
+      const blob = await convertCmykPdf(file, { signal: active.signal, progress: (page, total, fraction = 0) => {
         status.textContent = `Converting page ${page} of ${total}…`;
         progress.max = total;
-        progress.value = page - 1;
+        progress.value = page - 1 + fraction;
       } });
       if (!dialog.isConnected || active.signal.aborted) return;
       downloadUrl = URL.createObjectURL(blob);
@@ -20789,7 +20822,7 @@ function created(iso) {
 //   onSave(dataUrl | null) - called with a new cropped data: URL, or null if the user
 //   removed the custom photo to go back to the bundled default.
 function renderImageCropper(container, currentDataUrl, onSave) {
-  // Matches assets/shul-240.jpg's own aspect ratio, so a freshly cropped
+  // Matches the building photo's own aspect ratio, so a freshly cropped
   // photo sits in the header the same shape as the default did.
   const ASPECT = 155 / 90;
   const VIEW_W = 240;
@@ -20802,7 +20835,7 @@ function renderImageCropper(container, currentDataUrl, onSave) {
       <div class="crop-current-row">
         <img class="crop-current" src="${safeHeaderImage(currentDataUrl)}" alt="Current header photo">
         <div>
-          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default photo (assets/shul-240.jpg)'}</div>
+          <div class="hint">${currentDataUrl ? 'Custom photo' : 'Default building photo'}</div>
           <label class="file-label">Choose a photo…<input type="file" id="crop-file" accept="image/*" hidden></label>
           ${currentDataUrl ? '<button type="button" id="crop-remove" class="btn-danger">Remove (use default)</button>' : ''}
         </div>

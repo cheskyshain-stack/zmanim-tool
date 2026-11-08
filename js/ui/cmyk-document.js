@@ -20,14 +20,20 @@ export function cmykDocument() {
   const objects = [null, null], pages = [];
   const add = body => objects.push(body);
   return {
-    addPage({ width, height, pixelsWide, pixelsHigh, compressed }) {
-      const image = add(new Blob([
-        `<< /Type /XObject /Subtype /Image /Width ${pixelsWide} /Height ${pixelsHigh} /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /FlateDecode /Length ${compressed.byteLength} >>\nstream\n`,
-        compressed, '\nendstream',
-      ]));
-      const contents = `q\n${width} 0 0 ${height} 0 0 cm\n/PrintImage Do\nQ\n`;
+    addPage({ width, height, pixelsWide, pixelsHigh, compressed, tiles = [{ x: 0, y: 0, width: pixelsWide, height: pixelsHigh, compressed }] }) {
+      const resources = [], commands = [];
+      for (const [index, tile] of tiles.entries()) {
+        const image = add(new Blob([
+          `<< /Type /XObject /Subtype /Image /Width ${tile.width} /Height ${tile.height} /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /FlateDecode /Length ${tile.compressed.byteLength} >>\nstream\n`,
+          tile.compressed, '\nendstream',
+        ]));
+        const name = 'PrintImage' + index;
+        resources.push(`/${name} ${image} 0 R`);
+        commands.push(`q\n${tile.width / pixelsWide * width} 0 0 ${tile.height / pixelsHigh * height} ${tile.x / pixelsWide * width} ${(pixelsHigh - tile.y - tile.height) / pixelsHigh * height} cm\n/${name} Do\nQ\n`);
+      }
+      const contents = commands.join('');
       const stream = add(`<< /Length ${contents.length} >>\nstream\n${contents}endstream`);
-      pages.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << /PrintImage ${image} 0 R >> >> /Contents ${stream} 0 R >>`));
+      pages.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << ${resources.join(' ')} >> >> /Contents ${stream} 0 R >>`));
     },
     finish() {
       if (!pages.length) throw new Error('The PDF has no pages.');

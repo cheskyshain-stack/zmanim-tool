@@ -1,4 +1,5 @@
 import { cmykCanvasData, cmykDocument } from './cmyk-document.js';
+import { PRINT_RASTER_DPI, PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT, printRasterSize, printRasterTiles } from '../print-quality.js';
 
 const CMYK_PDFJS_BASE = '/vendor/pdfjs-6.5.438/';
 let cmykDialogOpen = false;
@@ -46,23 +47,27 @@ export async function convertCmykPdf(file, { signal, progress = () => {} }) {
       progress(number, source.numPages);
       const page = await source.getPage(number);
       const physical = page.getViewport({ scale: 1 });
-      // Preserve the paper size and rotation. Cap memory for large paper on phones.
-      const scale = Math.min(300 / 72, Math.sqrt(16000000 / (physical.width * physical.height)));
-      const viewport = page.getViewport({ scale });
+      // Preserve full resolution, paper size and rotation without a page-sized canvas.
+      const viewport = page.getViewport({ scale: PRINT_RASTER_DPI / 72 });
+      const { width, height } = printRasterSize(physical.width, physical.height), tiles = [];
+      const tileCount = Math.ceil(width / PRINT_TILE_WIDTH) * Math.ceil(height / PRINT_TILE_HEIGHT);
       canvas = document.createElement('canvas');
-      canvas.width = Math.ceil(viewport.width - 1e-7);
-      canvas.height = Math.ceil(viewport.height - 1e-7);
-      if (canvas.width > 16000 || canvas.height > 16000) throw new Error('This PDF page is too large to convert on this device.');
-      const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
-      if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
-      render = page.render({ canvasContext, viewport, background: '#ffffff' });
-      await render.promise;
-      render = null;
-      const compressed = await cmykCanvasData(canvas, signal);
-      totalBytes += compressed.byteLength;
-      if (totalBytes > 150 * 1024 * 1024) throw new Error('The converted PDF is too large. Save fewer pages and try again.');
+      for (const tile of printRasterTiles(width, height)) {
+        signal.throwIfAborted();
+        canvas.width = tile.width; canvas.height = tile.height;
+        const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
+        if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
+        render = page.render({ canvasContext, viewport, transform: [1, 0, 0, 1, -tile.x, -tile.y], background: '#ffffff', intent: 'print' });
+        await render.promise;
+        render = null;
+        const compressed = await cmykCanvasData(canvas, signal);
+        totalBytes += compressed.byteLength;
+        if (totalBytes > 512 * 1024 * 1024) throw new Error('The converted PDF is too large. Save fewer pages and try again.');
+        tiles.push({ ...tile, compressed });
+        progress(number, source.numPages, tiles.length / tileCount);
+      }
       output.addPage({ width: physical.width, height: physical.height,
-        pixelsWide: canvas.width, pixelsHigh: canvas.height, compressed });
+        pixelsWide: width, pixelsHigh: height, tiles });
       canvas.width = canvas.height = 0;
       canvas = null;
       page.cleanup();
@@ -90,7 +95,7 @@ export function openCmykPdf() {
     <p class="cmyk-pdf-status" role="status" aria-live="polite">Your file stays on this device.</p>
     <progress aria-label="PDF conversion" hidden></progress>
     <div class="cmyk-pdf-actions"><button type="button" data-convert disabled>Convert to CMYK</button><a data-download hidden>Download CMYK PDF</a></div>
-    <details><summary>About the print file</summary><p>Keeps the saved PDF’s page sizes and layout. Pages become CMYK images at up to 300 dpi; text in this copy is flattened. Black and gray use black ink only. Uses standard CMYK without a printer-specific colour profile. Normal browser printing keeps its existing colour settings.</p></details>`;
+    <details><summary>About the print file</summary><p>Keeps the saved PDF’s page sizes and layout. Pages become lossless CMYK images at ${PRINT_RASTER_DPI} dpi; text in this copy is flattened. Black and gray use black ink only. Uses standard CMYK without a printer-specific colour profile. Normal browser printing keeps sharp vector text and its existing colour settings.</p></details>`;
   const picker = dialog.querySelector('input'), convert = dialog.querySelector('[data-convert]');
   const status = dialog.querySelector('[role="status"]'), progress = dialog.querySelector('progress');
   const download = dialog.querySelector('[data-download]');
@@ -134,10 +139,10 @@ export function openCmykPdf() {
     status.textContent = 'Opening PDF…';
     dialog.querySelector('[data-close]').setAttribute('aria-label', 'Cancel conversion and close');
     try {
-      const blob = await convertCmykPdf(file, { signal: active.signal, progress: (page, total) => {
+      const blob = await convertCmykPdf(file, { signal: active.signal, progress: (page, total, fraction = 0) => {
         status.textContent = `Converting page ${page} of ${total}…`;
         progress.max = total;
-        progress.value = page - 1;
+        progress.value = page - 1 + fraction;
       } });
       if (!dialog.isConnected || active.signal.aborted) return;
       downloadUrl = URL.createObjectURL(blob);
