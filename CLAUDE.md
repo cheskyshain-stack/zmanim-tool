@@ -1809,7 +1809,19 @@ proportions. `js/seats/pdf-pages.js` captures the current SVG appearance, includ
 initials, Reserved and per-chart Room design, without changing saved names or
 assignments. The name list keeps names unique and table labels grouped, wraps
 long cells and paginates between rows.
-PDFs use Letter for Auto fit or Letter, and 11 x 17 for Tabloid. Retain the original
+Auto fit opens the native printer dialog from the main Print / PDF action and
+fills the paper chosen there, including Legal. Its color control reads Printer
+managed and is disabled; native printing cannot promise a CMYK file. Remember
+the RGB/CMYK choice for when a fixed paper is selected again. Never silently
+generate a Letter-sized PDF for Auto fit. Fixed-size
+PDFs use Letter for Letter, 14 x 8.5 landscape for Legal, and 17 x 11
+landscape for Tabloid. Legal is remembered per chart on this device outside chart
+data, using the same display-choice storage as the PDF colors option. Older shared
+services normalize unknown paper values to Letter, so never send a Legal paper
+patch to them. The effective paper choice must drive the preview's print SVG,
+native @page dimensions, footer/header fitting and both RGB/CMYK PDF page sizes.
+Switching back to the chart's existing paper must also refresh that geometry.
+Keep the usual shared paper behavior for Auto fit, Letter and Tabloid. Retain the original
 browser printing under **Print options > Printer dialog**, and on the name-list page, for
 custom printer paper. That legacy browser path cannot guarantee a CMYK file.
 New tabs open directly from the click for phone compatibility, falling back to a
