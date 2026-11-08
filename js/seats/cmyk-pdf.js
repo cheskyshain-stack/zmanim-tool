@@ -1,7 +1,7 @@
 import { PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT, printRasterSize, printRasterTiles } from '../print-quality.js';
 
 const SEATS_CMYK_PROFILE = '/assets/print/FOGRA39L_coated.icc';
-let seatsCmykLibraries;
+let seatsPdfLibraries, seatsCmykLibraries;
 
 function seatsPdfScript(src) {
   return new Promise((resolve, reject) => {
@@ -24,29 +24,44 @@ async function seatsPdfBytes(url) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-async function seatsLoadCmykTools() {
-  if (!seatsCmykLibraries) seatsCmykLibraries = (async () => {
+async function seatsLoadPdfTools() {
+  if (!seatsPdfLibraries) seatsPdfLibraries = (async () => {
     await seatsPdfScript('/vendor/cmyk/jspdf-4.2.1.umd.min.js');
     await seatsPdfScript('/vendor/cmyk/svg2pdf-2.9.0.umd.min.js');
-    const module = await import('/vendor/cmyk/lcms-1.0.5.js');
-    const [lcms, profile, ...fonts] = await Promise.all([
-      module.instantiate({ locateFile: () => '/vendor/cmyk/lcms.wasm' }),
-      seatsPdfBytes(SEATS_CMYK_PROFILE),
-      ...['Sans-Regular', 'Sans-Bold', 'Serif-Regular', 'Serif-Bold'].map(name => seatsPdfBytes('/assets/print/Liberation' + name + '.ttf')),
+    const fonts = await Promise.all(['Sans-Regular', 'Sans-Bold', 'Serif-Regular', 'Serif-Bold'].map(name => seatsPdfBytes('/assets/print/Liberation' + name + '.ttf')));
+    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif'];
+    await Promise.all(fonts.map(async (bytes, index) => {
+      const face = new FontFace(names[index], bytes, { weight: index % 2 ? '700' : '400' });
+      await face.load(); document.fonts.add(face);
+    }));
+    return { fonts, jsPDF: window.jspdf.jsPDF };
+  })().catch(error => { seatsPdfLibraries = null; throw error; });
+  return seatsPdfLibraries;
+}
+
+async function seatsLoadCmykTools() {
+  if (!seatsCmykLibraries) seatsCmykLibraries = (async () => {
+    const common = await seatsLoadPdfTools(), module = await import('/vendor/cmyk/lcms-1.0.5.js');
+    const [lcms, profile] = await Promise.all([
+      module.instantiate({ locateFile: () => '/vendor/cmyk/lcms.wasm' }), seatsPdfBytes(SEATS_CMYK_PROFILE),
     ]);
     const input = lcms.cmsCreate_sRGBProfile(), output = lcms.cmsOpenProfileFromMem(profile, profile.length);
     if (!output || lcms.cmsGetColorSpaceASCII(output) !== 'CMYK') throw new Error('The CMYK printing profile is invalid.');
     const transform = lcms.cmsCreateTransform(input, module.TYPE_RGB_8, output, module.TYPE_CMYK_8, module.INTENT_RELATIVE_COLORIMETRIC, module.cmsFLAGS_BLACKPOINTCOMPENSATION);
     lcms.cmsCloseProfile(input); lcms.cmsCloseProfile(output);
     if (!transform) throw new Error('CMYK color conversion is unavailable.');
-    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif'];
-    await Promise.all(fonts.map(async (bytes, index) => {
-      const face = new FontFace(names[index], bytes, { weight: index % 2 ? '700' : '400' });
-      await face.load(); document.fonts.add(face);
-    }));
-    return { lcms, transform, profile, fonts, jsPDF: window.jspdf.jsPDF };
+    return { ...common, lcms, transform, profile };
   })().catch(error => { seatsCmykLibraries = null; throw error; });
   return seatsCmykLibraries;
+}
+
+function seatsPdfRgb(rgba, monochrome) {
+  const result = new Uint8Array(rgba.length / 4 * 3);
+  for (let source = 0, target = 0; source < rgba.length; source += 4) {
+    const gray = monochrome ? Math.round(rgba[source] * .2126 + rgba[source + 1] * .7152 + rgba[source + 2] * .0722) : null;
+    result[target++] = gray ?? rgba[source]; result[target++] = gray ?? rgba[source + 1]; result[target++] = gray ?? rgba[source + 2];
+  }
+  return result;
 }
 
 function seatsPdfCmyk(tools, rgba, monochrome) {
@@ -94,13 +109,17 @@ function seatsPdfOutputIntent(doc, profile) {
   });
 }
 
-function seatsPdfVectorColors(doc, tools, monochrome) {
+function seatsPdfVectorColors(doc, tools, monochrome, rgbMode = false) {
   for (const method of ['setTextColor', 'setFillColor', 'setDrawColor']) {
     const original = doc[method];
     doc[method] = function (red, green, blue, black) {
       if (black !== undefined) return original.call(this, red, green, blue, black);
       const rgb = [Number(red), Number(green ?? red), Number(blue ?? red), 255];
       if (!rgb.every(Number.isFinite)) throw new Error('Unsupported PDF text color.');
+      if (rgbMode) {
+        const gray = Math.round(rgb[0] * .2126 + rgb[1] * .7152 + rgb[2] * .0722);
+        return original.call(this, gray, gray, gray);
+      }
       const cmyk = seatsPdfCmyk(tools, new Uint8Array(rgb), monochrome);
       return original.apply(this, [...cmyk].map(value => (value / 255).toFixed(5)));
     };
@@ -108,14 +127,16 @@ function seatsPdfVectorColors(doc, tools, monochrome) {
 }
 
 function seatsPdfRegisterImages(jsPDF) {
-  if (jsPDF.API.processCMYK) return;
-  jsPDF.API.processCMYK = function (data, index, alias) {
-    const header = new DataView(data.buffer, data.byteOffset, 12), length = header.getUint32(8);
-    const result = { width: header.getUint32(0), height: header.getUint32(4), data: seatsPdfBinary(data.subarray(12, 12 + length)), index, alias,
-      colorSpace: 'DeviceCMYK', bitsPerComponent: 8, filter: 'FlateDecode', predictor: 1 };
-    if (data.length > length + 12) result.sMask = seatsPdfBinary(data.subarray(length + 12));
-    return result;
-  };
+  for (const [format, colorSpace] of [['CMYK', 'DeviceCMYK'], ['SEATSRGB', 'DeviceRGB']]) {
+    if (jsPDF.API['process' + format]) continue;
+    jsPDF.API['process' + format] = function (data, index, alias) {
+      const header = new DataView(data.buffer, data.byteOffset, 12), length = header.getUint32(8);
+      const result = { width: header.getUint32(0), height: header.getUint32(4), data: seatsPdfBinary(data.subarray(12, 12 + length)), index, alias,
+        colorSpace, bitsPerComponent: 8, filter: 'FlateDecode', predictor: 1 };
+      if (data.length > length + 12) result.sMask = seatsPdfBinary(data.subarray(length + 12));
+      return result;
+    };
+  }
 }
 
 function seatsPdfImage(svg) {
@@ -137,9 +158,9 @@ function seatsPdfSubset(svg, keep, keepDefinitions = false) {
 }
 
 // Artwork uses the shared high-resolution tiles. Grout and text stay vector.
-export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = () => {} } = {}) {
+async function seatsBuildPdf(pages, { monochrome = false, progress = () => {}, rgbMode = false } = {}) {
   if (!pages.length) throw new Error('There is nothing to export.');
-  const tools = await seatsLoadCmykTools();
+  const tools = await (rgbMode ? seatsLoadPdfTools() : seatsLoadCmykTools());
   seatsPdfRegisterImages(tools.jsPDF);
   const first = pages[0], doc = new tools.jsPDF({ unit: 'pt', format: first.size, orientation: first.size[0] > first.size[1] ? 'landscape' : 'portrait', compress: true, putOnlyUsedFonts: true });
   doc.__private__.setPdfVersion('1.7');
@@ -154,8 +175,10 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
     doc.addFileToVFS(file, seatsPdfBinary(tools.fonts[index]));
     doc.addFont(file, index < 2 ? 'SeatsSans' : 'SeatsSerif', index % 2 ? 'bold' : 'normal');
   }
-  seatsPdfOutputIntent(doc, tools.profile); seatsPdfVectorColors(doc, tools, monochrome);
-  doc.setProperties({ title: 'Seating chart', subject: 'CMYK print file, FOGRA39L Coated', creator: 'Bais Medrash of Lakewood Commons' });
+  if (rgbMode) doc.internal.events.subscribe('putPage', () => { doc.internal.write('/Group << /Type /Group /S /Transparency /CS /DeviceRGB /I true >>'); });
+  else seatsPdfOutputIntent(doc, tools.profile);
+  if (!rgbMode || monochrome) seatsPdfVectorColors(doc, tools, monochrome, rgbMode);
+  doc.setProperties({ title: 'Seating chart - ' + (rgbMode ? 'RGB' : 'CMYK'), subject: rgbMode ? 'Standard RGB print file' : 'CMYK print file, FOGRA39L Coated', creator: 'Bais Medrash of Lakewood Commons' });
   for (let number = 0; number < pages.length; number++) {
     const { svg, size } = pages[number];
     if (number) doc.addPage(size, size[0] > size[1] ? 'landscape' : 'portrait');
@@ -186,14 +209,14 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
         if (!layers[layer].alpha) { context.fillStyle = '#fff'; context.fillRect(0, 0, PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT); }
         context.drawImage(picture, -tile.x, -tile.y, width, height);
         const rgba = context.getImageData(0, 0, tile.width, tile.height).data;
-        const cmyk = seatsPdfCmyk(tools, rgba, monochrome);
+        const pixels = rgbMode ? seatsPdfRgb(rgba, monochrome) : seatsPdfCmyk(tools, rgba, monochrome);
         // jsPDF writes an inverted Decode array for every CMYK image.
-        for (let byte = 0; byte < cmyk.length; byte++) cmyk[byte] = 255 - cmyk[byte];
-        const compressed = await seatsPdfDeflate(cmyk);
+        if (!rgbMode) for (let byte = 0; byte < pixels.length; byte++) pixels[byte] = 255 - pixels[byte];
+        const compressed = await seatsPdfDeflate(pixels);
         const alpha = layers[layer].alpha ? await seatsPdfDeflate(Uint8Array.from({ length: tile.width * tile.height }, (_, pixel) => rgba[pixel * 4 + 3])) : new Uint8Array();
         const image = new Uint8Array(compressed.length + alpha.length + 12), header = new DataView(image.buffer);
         header.setUint32(0, tile.width); header.setUint32(4, tile.height); header.setUint32(8, compressed.length); image.set(compressed, 12); image.set(alpha, 12 + compressed.length);
-        doc.addImage(image, 'CMYK', tile.x / width * size[0], tile.y / height * size[1], tile.width / width * size[0], tile.height / height * size[1], 'cmyk-' + number + '-' + layer + '-' + tileIndex);
+        doc.addImage(image, rgbMode ? 'SEATSRGB' : 'CMYK', tile.x / width * size[0], tile.y / height * size[1], tile.width / width * size[0], tile.height / height * size[1], (rgbMode ? 'rgb-' : 'cmyk-') + number + '-' + layer + '-' + tileIndex);
         progress((number + (layer + ++tileIndex / tileCount) / layers.length) / pages.length);
         await new Promise(resolve => setTimeout(resolve, 0));
       }
@@ -203,3 +226,6 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
   }
   return doc.output('blob');
 }
+
+export function seatsBuildCmykPdf(pages, options = {}) { return seatsBuildPdf(pages, { ...options, rgbMode: false }); }
+export function seatsBuildRgbPdf(pages, options = {}) { return seatsBuildPdf(pages, { ...options, rgbMode: true }); }

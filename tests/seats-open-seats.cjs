@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-open-'));
@@ -44,9 +45,9 @@ print(json.dumps({'pages':1,'Open':opened,'fixedRav':True,'seatNumbers':False}))
   await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;await toggle.check();assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1);assert.equal(await page.evaluate(()=>document.activeElement.id),'open-seats');await labels(true);assert.equal(await raw(),before,'Showing Open must not save or change chart data');
   await page.locator('#seat-A1-1').click();assert.equal(await page.locator('#seat-name-input').inputValue(),'');await page.locator('#seat-name-input').press('Escape');
   const last=plan.tables.at(-1);await page.locator('#seat-'+last.id+'-'+(last.count-1)).click();await page.locator('#seat-name-input').press('Tab');assert.match(await page.locator('.seat-editor-heading h2').textContent(),/^A1/,'Tab wraps past the fixed Rav');await page.locator('#seat-name-input').press('Escape');
-  for(const designed of [false,true]){await page.locator('#room-design').setChecked(designed);await labels(true);for(const color of ['mono','color']){await page.locator('#print-color').selectOption(color);await labels(true);}}
+  for(const designed of [false,true]){await page.locator('#room-design').setChecked(designed);await labels(true);for(const color of ['mono','color']){await openPrintOptions(page);await page.locator('#print-color').selectOption(color);await labels(true);}}
   await page.locator('#short-names').check();await page.locator('#reserved-print').check();await labels(true);assert.equal(await page.locator('#seat-A1-0 .seat-name').textContent(),'Reserved');await page.locator('#reserved-print').uncheck();await page.locator('#short-names').uncheck();
-  await page.locator('#print-color').selectOption(width===375?'mono':'color');
+  await openPrintOptions(page);await page.locator('#print-color').selectOption(width===375?'mono':'color');
   const originalPdf=path.join(output,width+'-open-native.pdf');await page.pdf({path:originalPdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspect,originalPdf,'1','names'],{encoding:'utf8'}).trim());
   await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testOpenPdf,null,{timeout:120000});const data=await page.evaluate(async()=>{const bytes=new Uint8Array(await window.testOpenPdf.arrayBuffer());let result='';for(let i=0;i<bytes.length;i+=16384)result+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(result);});const cmyk=path.join(output,width+'-open-CMYK.pdf');fs.writeFileSync(cmyk,Buffer.from(data,'base64'));console.log(execFileSync('python',['-c',inspect,cmyk,'1','names'],{encoding:'utf8'}).trim());for(const tab of context.pages())if(tab!==page)await tab.close();
   await page.reload();await page.locator('.room-stage').waitFor();assert.equal(await toggle.isChecked(),true);await labels(true);

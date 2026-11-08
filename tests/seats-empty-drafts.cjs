@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-empty-drafts-'));
@@ -32,7 +33,7 @@ const server=http.createServer((request,response)=>{
         await create(page);const currentTitle=await page.locator('#chart-name').inputValue();assert.match(currentTitle,/^Seating plan - /);if(title)assert.equal(currentTitle,title,'Repeated untouched drafts do not consume date suffixes');else title=currentTitle;
         assert.equal(await state(page),null,'Create and cancelling the name chooser do not save an empty device file');
         assert.equal(await page.locator('.saved-label').textContent(),'Not saved yet');assert.ok(await page.getByRole('button',{name:'Save',exact:true}).isDisabled());
-        if(attempt===0){await page.locator('#paper-size').selectOption('tabloid');await page.locator('#print-color').selectOption('color');assert.equal(await state(page),null,'Print preferences alone do not turn an empty draft into a chart');}
+        if(attempt===0){await openPrintOptions(page);await page.locator('#paper-size').selectOption('tabloid');await openPrintOptions(page);await page.locator('#print-color').selectOption('color');assert.equal(await state(page),null,'Print preferences alone do not turn an empty draft into a chart');}
         await home(page);await folder(page);assert.equal(await page.locator('.sharing-local-plan').count(),0);await close(page);await page.reload();await page.getByRole('button',{name:'Create new chart',exact:true}).waitFor();assert.equal(await state(page),null);
       }
       await create(page);await addNames(page,'Synthetic Waiting Person');

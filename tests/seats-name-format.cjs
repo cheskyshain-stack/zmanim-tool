@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-name-format-')),remote=process.env.SEATS_CHECK_ORIGIN;
@@ -43,7 +44,7 @@ print(json.dumps({'pages':1,'formattedNamesPrinted':True}))
   const queued=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-name-uploads-v1')||'[]'));assert.deepEqual(queued[0].names,['Chaim Cohen','דוד לוי']);
   await page.locator('#people-extra-tools').evaluate(node=>node.open=false);await seat('B1',1).click();await page.locator('#seat-name-input').fill('old');await page.locator('.seat-suggestions [data-suggest="'+legacy.id+'"]').click();
   current=await read();const duplicateId=current.tables.find(table=>table.id==='B1').seats[1];assert.notEqual(duplicateId,legacy.id);assert.equal(current.people.find(person=>person.id===duplicateId).name,'Old Mixed Name');assert.equal(current.tables[0].seats[0],legacy.id);
-  for(const paper of ['letter','tabloid']){await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'formatted-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log({width,paper,...JSON.parse(execFileSync('python',['-c',inspect,pdf],{encoding:'utf8'}))});}
+  for(const paper of ['letter','tabloid']){await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'formatted-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log({width,paper,...JSON.parse(execFileSync('python',['-c',inspect,pdf],{encoding:'utf8'}))});}
   await page.screenshot({path:path.join(output,'formatting-'+width+'.png'),fullPage:true});await page.reload();await page.locator('.room-stage').waitFor();current=await read();assert.equal(current.people.find(person=>person.id===sameId).name,'David McDonald');assert.equal(current.tables[0].seats[0],legacy.id);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
  }console.log('PASS: typing, editing an assigned name, manual lists, uploads, duplicate detection, legacy copy preservation, reload, and four one-page native PDFs on phone/desktop.');console.log('Artifacts: '+output);

@@ -1777,11 +1777,24 @@ to the legacy state. Deploy the updated shared service before the new client.
 `tests/seats-print-notes.mjs` and `tests/seats-print-notes.cjs` cover storage,
 concurrent merging, immediate printing, wrapping and unchanged assignments.
 
-Seats **Print / PDF** creates a real CMYK PDF locally, for both the chart and the
-alphabetical name list. `js/seats/cmyk-pdf.js` uses Little CMS with the embedded
+Seats **Print / PDF** offers **PDF colors: CMYK / Standard (RGB)** for both the
+chart and alphabetical name list. Paper, Style, PDF colors, Header & footer,
+Printer dialog and Convert saved PDF belong inside one collapsed **Print options**
+dropdown. Keep the main Print / PDF action visible. The dropdown stays open and
+retains focus/scroll when its settings change, but starts closed on a new page.
+Keep CMYK as the default. Remember the choice
+per chart on this device, outside shared chart data, so it cannot change another
+organizer's printing preference or saved-chart dates. Both formats use the same
+layout, embedded Hebrew/Latin fonts, vector text/rules and lossless 1200 dpi tiled
+artwork. Name downloaded files with -CMYK.pdf or -RGB.pdf, and identify the selected
+format in progress, ready and error messages. Standard RGB exports must work without
+fetching Little CMS or the CMYK profile and must contain RGB artwork and transparency
+groups, without a CMYK output intent. Keep both choices visible on phone and desktop.
+`js/seats/cmyk-pdf.js` shares the PDF writer, fonts and tiling between both formats.
+The CMYK option uses Little CMS with the embedded
 FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
 Black & white option use only K. Keep all page artwork in DeviceCMYK and all
-vector colors in CMYK or gray, with no RGB fallback. Text stays selectable and
+vector colors in CMYK or gray, with no silent RGB fallback. Text stays selectable and
 uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyph
 ordering so Hebrew words print in the correct direction. All chart print lettering
 uses solid black, including Color, so small names do not require screened navy
@@ -1797,7 +1810,7 @@ initials, Reserved and per-chart Room design, without changing saved names or
 assignments. The name list keeps names unique and table labels grouped, wraps
 long cells and paginates between rows.
 PDFs use Letter for Auto fit or Letter, and 11 x 17 for Tabloid. Retain the original
-browser printing under **More > Printer dialog**, and on the name-list page, for
+browser printing under **Print options > Printer dialog**, and on the name-list page, for
 custom printer paper. That legacy browser path cannot guarantee a CMYK file.
 New tabs open directly from the click for phone compatibility, falling back to a
 named download if blocked. Failures remain visible and retryable; never silently

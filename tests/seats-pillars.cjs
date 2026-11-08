@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-pillars-')),remote=process.env.SEATS_CHECK_ORIGIN;
@@ -52,7 +53,7 @@ print(json.dumps({'pages':1,'namesRetained':True,'blockedLabels':2}))
    await page.locator('#chart-view').selectOption('whole');await page.locator('.person-name').filter({hasText:'Waiting Drag Person'}).dragTo(seat('B7',1),{force:true});assert.equal(await raw(),afterTab,'Dragging to a pillar cannot assign a name');
    await page.locator('#chart-view').selectOption('width');
   }
-  for(const paper of ['letter','tabloid']){await page.locator('#paper-size').selectOption(paper);const file=path.join(output,'pillars-'+width+'-'+paper+'.pdf');await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});console.log({width,paper,...JSON.parse(execFileSync('python',['-c',inspect,file],{encoding:'utf8'}))});}
+  for(const paper of ['letter','tabloid']){await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);const file=path.join(output,'pillars-'+width+'-'+paper+'.pdf');await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});console.log({width,paper,...JSON.parse(execFileSync('python',['-c',inspect,file],{encoding:'utf8'}))});}
   await page.screenshot({path:path.join(output,'pillars-'+width+'.png'),fullPage:true});await page.reload();await page.locator('.room-stage').waitFor();assert.equal(await page.locator('.room-stage .blocked-seat[aria-disabled=true]').count(),2);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
  }

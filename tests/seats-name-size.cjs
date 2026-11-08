@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-name-size-'));
@@ -71,7 +72,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       assert.deepEqual(screen.names.sort(),[...renderedNames].sort(),'Full English and Hebrew names stay intact');
       await page.screenshot({path:path.join(output,'names-'+width+'.png'),fullPage:true});
       for(const paper of ['letter','tabloid']){
-        await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
         const printed=await inspect('#seats-print');assert.ok(Math.max(...Object.values(printed.sizes))>=Math.ceil(printed.count*.85));
         const file=path.join(output,'names-'+width+'-'+paper+'.pdf');await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});
         assert.match(execFileSync('pdfinfo',[file],{encoding:'utf8'}),/Pages:\s+1\b/);
