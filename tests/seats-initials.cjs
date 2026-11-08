@@ -43,15 +43,15 @@ print('PASS PDF:',sys.argv[2],round(page.rect.width),round(page.rect.height))
       if(remote){const html=await response.text(),local=fs.readFileSync(path.join(root,'seats/index.html'),'utf8'),pattern=/\.\.\/js\/seats-app\.js\?v=[0-9a-f]+/;assert.equal(html.match(pattern)[0],local.match(pattern)[0]);}
       await page.locator('#seats-name').fill('Synthetic Initials Organizer');await page.locator('#seats-pin').fill('4444');await page.getByRole('button',{name:'Open Seats',exact:true}).click();
       await page.getByRole('button',{name:'View saved charts',exact:true}).click();await page.locator('.sharing-local-plan .saved-page-card[data-id="'+plan.id+'"]').click();
-      const toggle=page.getByRole('switch',{name:'Initials + last name',exact:true}),raw=()=>page.evaluate(key=>localStorage.getItem(key),key);
+      const toggle=page.getByRole('combobox',{name:'Seat labels',exact:true}),raw=()=>page.evaluate(key=>localStorage.getItem(key),key);
       const label=async(table,index,scope='.room-stage')=>page.locator(scope+' [data-table="'+table+'"][data-seat="'+index+'"] .seat-name').evaluate(node=>[...node.querySelectorAll('tspan')].map(line=>line.textContent).join(' '));
-      assert.equal(await toggle.isChecked(),false);assert.equal(await label('A1',0),'Yosef Chuam Cohen');const before=await raw();
+      assert.equal(await toggle.inputValue(),'full');assert.equal(await label('A1',0),'Yosef Chuam Cohen');const before=await raw();
       await page.locator('#show-assigned').check();await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;
-      await toggle.check();assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1,'Switching must preserve the control position');
+      await toggle.selectOption('initials');assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1,'Switching must preserve the control position');
       for(const [table,index,name,short]of cases){assert.equal(await label(table,index),short);assert.match(await page.locator('.room-stage [data-table="'+table+'"][data-seat="'+index+'"]').getAttribute('aria-label'),new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));}
       assert.ok((await page.locator('#people-list').textContent()).includes('Yosef Chuam Cohen'));assert.equal(await raw(),before,'Short names are a display choice, with no chart data changes');
       await page.locator('.room-stage [data-table=A1][data-seat="0"]').click();assert.equal(await page.locator('#seat-name-input').inputValue(),'Yosef Chuam Cohen');await page.locator('#seat-name-input').press('Escape');
-      await page.reload();await page.locator('.room-stage').waitFor();assert.ok(await toggle.isChecked());assert.equal(await label('A1',0),'Y C Cohen');
+      await page.reload();await page.locator('.room-stage').waitFor();assert.equal(await toggle.inputValue(),'initials');assert.equal(await label('A1',0),'Y C Cohen');
       await page.screenshot({path:path.join(output,'short-names-'+width+'.png'),fullPage:true});
       await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});await page.locator('#plan-files').evaluate(node=>{node.open=true;});
       const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download seating list',exact:true}).click();const file=await download;const csv=path.join(output,'names-'+width+'.csv');await file.saveAs(csv);assert.ok(fs.readFileSync(csv,'utf8').includes('Yosef Chuam Cohen'));
@@ -59,10 +59,10 @@ print('PASS PDF:',sys.argv[2],round(page.rect.width),round(page.rect.height))
         await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'short-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
         console.log(execFileSync('python',['-c',inspectPdf,pdf,'short'],{encoding:'utf8'}).trim());
       }
-      const afterPaper=await raw();await toggle.uncheck();assert.equal(await raw(),afterPaper);assert.equal(await label('A1',0),'Yosef Chuam Cohen');
+      const afterPaper=await raw();await toggle.selectOption('full');assert.equal(await raw(),afterPaper);assert.equal(await label('A1',0),'Yosef Chuam Cohen');
       await openPrintOptions(page);await page.locator('#paper-size').selectOption('letter');const pdf=path.join(output,'full-'+width+'-letter.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspectPdf,pdf,'full'],{encoding:'utf8'}).trim());
       const saved=JSON.parse(await raw()).plans.find(p=>p.id===plan.id);assert.deepEqual(saved.people,plan.people);assert.deepEqual(saved.tables,plan.tables);
-      await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();const beforeDraft=await raw();await toggle.check();assert.equal(await raw(),beforeDraft,'Changing display on an empty draft never saves another chart');
+      await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();const beforeDraft=await raw();await toggle.selectOption('initials');assert.equal(await raw(),beforeDraft,'Changing display on an empty draft never saves another chart');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
     }
     console.log('PASS: given-name initials on screen and native PDFs, full editor/list/export names, unchanged chart data, remembered preference, scroll stability and no empty saved copies.');console.log('Artifacts: '+output);

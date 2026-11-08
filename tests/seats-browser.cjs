@@ -409,12 +409,13 @@ const server = http.createServer((req,res) => {
     }
     const beforeReserved=await state();
     const screenNames=await page.locator('.room-stage .table-seat .seat-name').allTextContents();
-    assert.ok(await page.locator('#reserved-print').evaluate(node=>node.closest('.canvas-name-options')?.contains(document.querySelector('#short-names'))),'Name display switches belong together above the chart');
-    await page.locator('#reserved-print').scrollIntoViewIfNeeded();
-    const reservedTop=(await page.locator('#reserved-print').boundingBox()).y;
-    await page.locator('#reserved-print').check();
-    assert.equal(await page.evaluate(()=>document.activeElement.id),'reserved-print');
-    assert.ok(Math.abs((await page.locator('#reserved-print').boundingBox()).y-reservedTop)<1,'Print switch keeps its screen position');
+    const nameModeBefore=await page.locator('#seat-label-mode').inputValue();
+    assert.deepEqual(await page.locator('#seat-label-mode option').evaluateAll(nodes=>nodes.map(node=>node.value)),['full','initials','reserved'],'One field offers all three name modes');
+    await page.locator('#seat-label-mode').scrollIntoViewIfNeeded();await page.locator('#seat-label-mode').focus();
+    const reservedTop=(await page.locator('#seat-label-mode').boundingBox()).y;
+    await page.locator('#seat-label-mode').selectOption('reserved');
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'seat-label-mode');
+    assert.ok(Math.abs((await page.locator('#seat-label-mode').boundingBox()).y-reservedTop)<1,'Print switch keeps its screen position');
     assert.deepEqual(await state(),beforeReserved,'Reserved display must not modify stored names or assignments');
     const previewNames=await page.locator('.room-stage .table-seat.assigned .seat-name').allTextContents();
     assert.ok(previewNames.length>0&&previewNames.every(name=>name==='Reserved'),'The page previews Reserved in every occupied seat');
@@ -423,10 +424,7 @@ const server = http.createServer((req,res) => {
     assert.ok(reservedNames.length>0&&reservedNames.every(name=>name==='Reserved'),'Every occupied printed seat uses Reserved');
     assert.equal(await page.locator('#seats-print .rav-label').textContent(),'Rav');
     assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-print-reserved')),'1');
-    const initialsBeforeReserved=await page.locator('#short-names').isChecked();
-    await page.locator('#short-names').setChecked(!initialsBeforeReserved);
-    assert.deepEqual(await page.locator('.room-stage .table-seat.assigned .seat-name').allTextContents(),previewNames,'Reserved takes precedence over initials on the preview');
-    await page.locator('#short-names').setChecked(initialsBeforeReserved);
+    assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-short-names')),nameModeBefore==='initials'?'1':'0','Reserved remembers the existing initials preference');
     const reservedPlan=beforeReserved.plans.find(plan=>plan.id===beforeReserved.activeId),reservedTable=reservedPlan.tables.find(table=>table.seats.some(Boolean)),reservedSeat=reservedTable.seats.findIndex(Boolean);
     await page.locator('.room-stage [data-table="'+reservedTable.id+'"][data-seat="'+reservedSeat+'"] .seat-area').click();
     assert.equal(await page.locator('#seat-name-input').inputValue(),reservedPlan.people.find(person=>person.id===reservedTable.seats[reservedSeat]).name,'Seat editing keeps the real name while Reserved is shown');
@@ -451,7 +449,7 @@ const server = http.createServer((req,res) => {
       assert.match(execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),/Pages:\s+1\b/);
       await page.emulateMedia({media:'screen'});
     }
-    await page.locator('#reserved-print').uncheck();
+    await page.locator('#seat-label-mode').selectOption(nameModeBefore);
     assert.deepEqual(await page.locator('.room-stage .table-seat .seat-name').allTextContents(),screenNames);
     // The organizer link exists in admin, and is absent from the public homepage.
     await page.goto(origin+'/'); assert.equal(await page.locator('a[href="/seats/"]').count(),0);

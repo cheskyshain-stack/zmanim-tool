@@ -58,7 +58,8 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
         await page.locator('.sharing-site-plan button').first().click();
       }
       await page.waitForFunction(()=>document.querySelector('.saved-label')?.textContent==='Saved to website');
-      assert.equal(await page.locator('.top-actions>button').count(),3,'The main actions are Save, Saved charts and Print');
+      assert.equal(await page.locator('.top-actions>button').count(),2,'Saved charts and Print are the main actions');
+      assert.ok(await page.locator('.editor-status').getByRole('button',{name:'Save',exact:true}).isVisible(),'Save stays available beside the save status');
       assert.equal(await page.getByRole('button',{name:'Share / work together',exact:true}).count(),0);
     }
     const [a,b]=pages;
@@ -409,7 +410,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.doesNotMatch(await historyPage.locator('#chart-history-list').textContent(),/Renamed|Changed A1|Added 1 name|Other Person/);assert.ok(await historyPage.getByRole('button',{name:'Load earlier assignments',exact:true}).isHidden());
     await historyContext.close();
     // The note fields travel with the same shared chart and its independent copies.
-    for (const page of [a,b]) { await openSaved(page);await page.locator('.sharing-site-plan .saved-page-card[data-id="'+remoteId+'"]').click();await openPrintOptions(page);await page.locator('#chart-print-notes summary').click(); }
+    for (const page of [a,b]) { await openSaved(page);await page.locator('.sharing-site-plan .saved-page-card[data-id="'+remoteId+'"]').click();await openPrintOptions(page); }
     await a.locator('#print-header').fill('Shared revised draft');await a.locator('#print-header').press('Tab');
     await b.waitForFunction(()=>document.querySelector('#print-header')?.value==='Shared revised draft');
     await b.locator('#print-footer').fill('Speak to the Gabbaim for a seat.');await b.locator('#print-footer').press('Tab');
