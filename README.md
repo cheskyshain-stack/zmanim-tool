@@ -136,8 +136,8 @@ the chart while the website page scrolls vertically. Whole chart is an optional
 smaller overview. The names panel stays alongside the chart while scrolling.
 Add names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
-The editor groups chart name, save status and Save in one header, with Saved charts
-as its primary navigation action beside Print / PDF. Less frequent chart actions
+The editor groups chart name, save status and Save in one header, with Print / PDF
+as its primary action beside the secondary Saved charts button. Less frequent chart actions
 stay in the top-right menu, which dismisses with Escape, an outside tap or keyboard
 focus leaving it. Mobile controls have at least 44px touch targets and fit narrow
 screens without hiding their labels.
