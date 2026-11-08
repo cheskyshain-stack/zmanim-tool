@@ -163,6 +163,19 @@
 .cal-account button { max-width:100%; white-space:normal; font-size:.72rem; }
 .cal-invite-form { margin-top:1.3rem; }
 .cal-invite-form h3 { margin:0; font:700 1.15rem Georgia,serif; }
+.cal-dialog [data-cal-email-import] { margin:.5rem 0 .5rem .5rem; }
+.cal-inbox-summary { display:grid; gap:.45rem; padding:1rem; border:1px solid #dedccf; border-radius:12px; background:#fff; overflow-wrap:anywhere; }
+.cal-inbox-summary > span { font-size:.85rem; color:#60717d; }
+.cal-inbox-summary dl { margin:.4rem 0; display:grid; gap:.5rem; font-size:.85rem; }
+.cal-inbox-summary dl > div { display:flex; flex-wrap:wrap; justify-content:space-between; gap:.4rem; }
+.cal-inbox-summary dd { margin:0; }
+.cal-inbox-dialog .cal-extra, .cal-inbox-setup, [data-cal-inbox-script] { margin:1rem 0; }
+.cal-inbox-dialog h3 { font:700 1.2rem Georgia,serif; }
+.cal-inbox-dialog ol { padding-inline-start:1.5rem; }
+.cal-inbox-dialog li { margin:.65rem 0; }
+.cal-inbox-dialog textarea { box-sizing:border-box; max-width:100%; width:100%; min-height:100px; padding:.7rem; border:1px solid #cfd3d1; border-radius:8px; }
+.cal-inbox-review-card { margin:.8rem 0; padding:1rem; border:1px solid #dedccf; border-radius:12px; background:#fff; }
+.cal-inbox-review-card pre { white-space:pre-wrap; overflow-wrap:anywhere; font:400 .85rem/1.5 system-ui,sans-serif; }
 .cal-login { max-width:28rem; margin:1.5rem auto; padding:1.5rem; border:1px solid #e0ddcf; border-top:3px solid #a88c47; border-radius:14px; background:#faf7f0; color:#142b46; }
 .cal-login h2 { font:700 1.75rem/1.25 Georgia,serif; margin:.5rem 0; }
 .cal-login > p { font-size:.9rem; line-height:1.6; }

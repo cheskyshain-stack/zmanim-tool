@@ -7,6 +7,7 @@ import { escText, escAttr } from '../util.js';
 import { keepPosition } from './keep-position.js';
 import { createCalendarAnnouncements } from './calendar-announcements.js';
 import { openCalendarActivity } from './calendar-activity.js';
+import { openCalendarEmailImport } from './calendar-email-import.js';
 
 let calendarAnalyticsOpened = false;
 
@@ -469,6 +470,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const historyButton = document.createElement('button'); historyButton.type = 'button'; historyButton.textContent = 'Sign-in history';
     view.el.querySelector('header').after(historyButton);
     historyButton.addEventListener('click', () => { view.close(); openCalendarActivity({ dialog, timeZone: settings.timezone.id }); });
+    if (!previewing()) {
+      const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
+      historyButton.after(inboxButton);
+      inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
+    }
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
       const area = view.el.querySelector('[data-cal-invitation]'); area.hidden = false;
