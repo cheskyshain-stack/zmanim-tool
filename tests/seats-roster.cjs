@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-roster-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
@@ -62,13 +63,13 @@ print(json.dumps({'pages':len(doc),'printedNames':len(names),'fullNamesRetained'
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'The list and long chart titles must fit the viewport');
       const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download CSV',exact:true}).click();const file=await download,csv=path.join(output,'seated-'+width+'.csv');await file.saveAs(csv);
       assert.deepEqual(seatsParseDelimited(fs.readFileSync(csv,'utf8')).slice(1),await rows());
-      await page.evaluate(()=>{window.__rosterPrints=0;window.print=()=>window.__rosterPrints++;});await page.getByRole('button',{name:'Printer dialog',exact:true}).click();assert.equal(await page.evaluate(()=>window.__rosterPrints),1,'The list prints even when a chart name is too long to fit');
+      await page.evaluate(()=>{window.__rosterPrints=0;window.print=()=>window.__rosterPrints++;});await openPrintOptions(page);await page.getByRole('button',{name:'Printer dialog',exact:true}).click();assert.equal(await page.evaluate(()=>window.__rosterPrints),1,'The list prints even when a chart name is too long to fit');
       for(const order of ['first','last']){
         await page.locator('#roster-sort').selectOption(order);const pdf=path.join(output,'list-'+width+'-'+order+'.pdf'),names=(await rows()).map(row=>row[0]);
         await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspectPdf,pdf,JSON.stringify(names)],{encoding:'utf8'}).trim());
       }
       await page.reload();await page.getByRole('heading',{name:'Alphabetical seat list',exact:true}).waitFor();assert.equal(await page.locator('#roster-sort').inputValue(),'last');assert.equal(await raw(),before);
-      await page.getByRole('button',{name:'Back to chart',exact:false}).click();await page.locator('.room-stage').waitFor();assert.ok(await page.getByRole('switch',{name:'Initials + last name',exact:true}).isChecked());assert.match(await page.locator('#seats-page-size').textContent(),/17in 11in/);
+      await page.getByRole('button',{name:'Back to chart',exact:false}).click();await page.locator('.room-stage').waitFor();assert.equal(await page.getByRole('combobox',{name:'Seat labels',exact:true}).inputValue(),'initials');assert.match(await page.locator('#seats-page-size').textContent(),/17in 11in/);
       const saved=JSON.parse(await raw());assert.equal(saved.plans.length,1);assert.equal(saved.activeId,plan.id);assert.deepEqual(saved.plans[0].tables,JSON.parse(before).plans[0].tables);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
     }

@@ -21,15 +21,18 @@ their own events. See [calendar service setup](worker/calendar/README.md).
 
 ## CMYK print PDFs
 
-In Seats, **Print / PDF** creates the chart or alphabetical name list directly as
-a CMYK PDF, with embedded fonts and a FOGRA39L Coated printing profile. Auto fit
-and Letter use Letter paper; choose 11 × 17 for a larger chart. Text remains
-selectable. Black & white uses only black ink. Open the resulting PDF to print it.
-Open **Header & footer** below the Seats print settings to edit the text on each
-chart. It starts with “First Draft” in the top right and “Anyone who would like
-a seat should speak to the Gabbaim.” beneath the room. Leave a field blank to
-hide it. Wording saves with the chart and follows copies and shared edits.
-The original browser printer dialog remains available under More.
+Seats keeps paper, print style, PDF colors, header/footer text, the printer dialog
+and saved-PDF conversion together under **Print options**. Its main **Print / PDF**
+button stays visible when the options are closed. With **Auto fit**, it opens the
+printer dialog and fills the chosen landscape paper, including Legal. Choosing
+**Letter**, **Legal** or **11 × 17** creates a PDF in the selected **CMYK** or
+**Standard (RGB)** color mode. Text stays selectable with embedded fonts, while
+artwork uses lossless images at up to 1200 dpi. CMYK includes a FOGRA39L Coated
+printing profile; black-and-white CMYK uses only black ink.
+The header and footer fields are directly inside Print options. They start with
+“First Draft” in the top right and “Anyone who would like a seat should speak to
+the Gabbaim.” beneath the room. Leave a field blank to hide it. Wording saves
+with the chart and follows copies and shared edits.
 
 For charts, weekly cards and special schedules, use **Print / Save as PDF** first.
 Then open **CMYK PDF**, select the saved file and download its CMYK copy. Seats
@@ -133,19 +136,22 @@ the chart while the website page scrolls vertically. Whole chart is an optional
 smaller overview. The names panel stays alongside the chart while scrolling.
 Add names stays visible, with manual entry, seat lists and backups under
 Add names & other tools. Phone tap-to-assign and page scrolling are retained.
-The chart's Initials + last name switch shows each given-name initial and the full
-surname, for example Yosef Chuam Cohen becomes Y C Cohen. It applies to the chart
-and printouts, with the choice remembered on this device. Lists, editing, exports,
-backups and shared records keep full names. Switching the display does not edit the chart.
-Names are drawn inside the tables; small chairs are on one side facing the Aron.
-The bimah and pillars stay square on screen and on every supported paper size.
-Their artwork is centered within its saved footprint, preserving stored positions
-and assignments while automatic page fitting adjusts the rest of the room.
-Reserved instead of names sits beside Initials + last name and replaces occupied-seat
-names with Reserved on both the chart and its printout, including the Rav's seat.
-Empty seats keep their numbers. The People list, seat editor, saved chart, backups
-and seating-list exports keep the actual names. This display choice is remembered
-on the device and does not edit the shared chart.
+The editor groups chart name, save status and Save in one header, with Saved charts
+as its primary navigation action beside Print / PDF. Less frequent chart actions
+stay in the top-right menu, which dismisses with Escape, an outside tap or keyboard
+focus leaving it. Mobile controls have at least 44px touch targets and fit narrow
+screens without hiding their labels.
+**Seat labels** offers Full names, Initials + last name, or Reserved in one selector.
+Initials keeps given-name initials and the full surname, for example Yosef Chuam
+Cohen becomes Y C Cohen. Reserved replaces occupied table-seat names with Reserved.
+The choice applies to the chart and printouts and is remembered on this device.
+Lists, editing, exports, backups and shared records keep full names. Switching the
+display does not edit the chart. Open seats and Table numbers remain separate
+switches; empty seats are blank unless Open seats is enabled. The fixed Rav label
+stays visible. Names are drawn inside the tables; small chairs are on one side
+facing the Aron. The bimah and pillars stay square on screen and on every supported
+paper size. Their artwork stays centered within its saved footprint, preserving
+stored positions and assignments while automatic page fitting adjusts the room.
 The Room design switch previews illustrated bookcases with framed shelves and varied
 upright, stacked and leaning books. It applies to the chart and printouts and starts
 off. Bookcases face inward: the back run faces the front of the room, the left run
