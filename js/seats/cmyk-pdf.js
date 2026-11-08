@@ -1,4 +1,5 @@
 const SEATS_CMYK_PROFILE = '/assets/print/FOGRA39L_coated.icc';
+const SEATS_PDF_DPI = 600;
 let seatsCmykLibraries;
 
 function seatsPdfScript(src) {
@@ -134,7 +135,7 @@ function seatsPdfSubset(svg, keep, keepDefinitions = false) {
   return result;
 }
 
-// Photos are sampled at 300 dpi. Grout and text stay vector, with furniture above the grout.
+// Artwork is sampled at 600 dpi in bounded strips. Grout and text stay vector.
 export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = () => {} } = {}) {
   if (!pages.length) throw new Error('There is nothing to export.');
   const tools = await seatsLoadCmykTools();
@@ -165,7 +166,7 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
       { svg: seatsPdfSubset(svg, node => node.getAttribute('data-pdf-layer') === 'floor', true), alpha: false },
       { svg: art, alpha: true },
     ] : [{ svg: art, alpha: false }];
-    const width = Math.round(size[0] / 72 * 300), height = Math.round(size[1] / 72 * 300);
+    const width = Math.round(size[0] / 72 * SEATS_PDF_DPI), height = Math.round(size[1] / 72 * SEATS_PDF_DPI);
     const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = 128;
     const context = canvas.getContext('2d', { willReadFrequently: true });
     for (let layer = 0; layer < layers.length; layer++) {

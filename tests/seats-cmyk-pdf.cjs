@@ -51,12 +51,16 @@ for p in d:
     assert paper_tone<=floor_paper-5, (fixture,'CMYK sketches must stay distinct from the marble')
 
  assert all(font[1]=='ttf' for font in p.get_fonts()), 'Use embedded fonts, including Hebrew'
+ spans=[span for block in p.get_text('dict')['blocks'] for line in block.get('lines',[]) for span in line['spans']]
+ assert len({span['color'] for span in spans})==1, 'All printed lettering must use the same solid black as the page heading'
  for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]:
   assert not re.search(rb'(?<!\w)(?:rg|RG|/DeviceRGB)(?!\w)',d.xref_stream(stream) or b''), 'No RGB vector commands'
  for image in p.get_images(full=True):
   assert image[5]=='DeviceCMYK', 'Every image must use four CMYK channels'
   if image[0] in seen:continue
   seen.add(image[0])
+  for placement in p.get_image_rects(image[0]):
+   assert abs(image[2]/placement.width*72-600)<.2 and abs(image[3]/placement.height*72-600)<.2, 'Sample artwork at 600 dpi on the actual paper size'
   raw=d.xref_stream(image[0]);assert d.xref_get_key(image[0],'Decode')[1]=='[1 0 1 0 1 0 1 0]'
   assert len(raw)==image[2]*image[3]*4, 'CMYK images must contain exactly four samples per pixel'
   if mono:assert all(v==255 for channel in [raw[0::4],raw[1::4],raw[2::4]] for v in channel), 'Black and white must not use cyan, magenta or yellow ink'

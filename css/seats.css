@@ -405,6 +405,8 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .saved-charts-footer [data-sharing=signout]{min-height:44px;padding:6px 2px;font-size:11px;font-weight:400;color:#617284;border-color:transparent;background:transparent}
 @media(max-width:700px){.saved-charts-header{padding:19px 18px;gap:11px}.saved-charts-icon{width:39px;height:39px;border-radius:10px}.saved-charts-icon svg{width:25px;height:25px}.saved-charts-title h2{font-size:24px}.saved-charts-title p{font-size:9px;letter-spacing:1px}.saved-charts-body{padding:18px 17px 8px}.saved-charts-tools{gap:12px;margin-bottom:19px}.saved-charts-tools p{font-size:11px;line-height:1.55}.saved-charts-tools .saved-charts-new{font-size:11px;padding:9px 10px;gap:5px}.saved-charts-dialog .saved-charts-list .saved-chart-row{gap:10px;padding:10px 12px}.saved-charts-dialog .saved-charts-list .saved-chart-actions{flex-direction:column;gap:4px}.saved-charts-dialog .saved-charts-list .saved-chart-actions button{min-width:52px}.saved-charts-dialog .saved-charts-footer{padding:7px 18px 10px}}
 .seats-print{display:none}
+/* Solid black lettering avoids screened navy toner in small printed names. */
+#seats-print .room-diagram text{fill:#000}
 .chart-print-notes{width:100%;margin-top:12px;padding:11px 14px;border:1px solid var(--seats-border);border-radius:9px;background:#fff}
 .chart-print-notes>summary{cursor:pointer;font-size:12px;font-weight:600}
 .print-note-fields{display:grid;grid-template-columns:1fr 1.6fr;gap:12px;margin-top:12px}
