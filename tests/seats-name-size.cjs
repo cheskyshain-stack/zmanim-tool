@@ -19,7 +19,7 @@ table_height=collections.Counter(round(r.height,1) for r in frames).most_common(
 frames=[r for r in frames if abs(r.height-table_height)<.2]
 assert len(frames)==int(sys.argv[3]), ('Missing table frames',len(frames))
 pitch=max(r.width for r in frames)/5
-chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16)} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
+chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16),'font':s['font']} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
 fonts=[]
 for r in frames:
  count=round(r.width/pitch)
@@ -27,6 +27,8 @@ for r in frames:
   left,right=r.x0+r.width*i/count,r.x0+r.width*(i+1)/count
   seat=[s for s in chars if s['text'].strip() and left<=(s['bbox'][0]+s['bbox'][2])/2<right and r.y0<=(s['bbox'][1]+s['bbox'][3])/2<=r.y1]
   if ''.join(s['text'] for s in seat)=='Pillar':continue
+  assert all(s['font'] in ['NotoSans-Bold','NotoSansHebrew-Bold'] for s in seat), ('Use the intended embedded Noto font',seat)
+  assert all(s['bbox'][0]>=left-.6 and s['bbox'][2]<=right+.6 and s['bbox'][1]>=r.y0-.6 and s['bbox'][3]<=r.y1+.6 for s in seat), ('Printed glyphs must fit their seat',seat,r)
   assert all(s['bold'] for s in seat), ('An assigned name is not bold in the PDF',seat)
   sizes=[s['size'] for s in seat]
   if sizes: fonts.append(round(max(sizes),2))
@@ -41,7 +43,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(process.env.SEATS_CHECK_PROXY?{proxy:{server:process.env.SEATS_CHECK_PROXY}}:{})});
   try{
     const {seatsCreateState,seatsWriteName,seatsSeatBlocked}=await import('../js/seats/model.js'),sample=seatsCreateState(),plan=sample.plans[0];plan.name='Synthetic name sizing check';
-    const names=['Ari Stone','Eli Hart','Noah Reed','Yosef Cohen','Moshe Levi','David Adler','Shimon Baker','Chaim Miller','Gavriel Green','Yonah Silver','Yehuda Gold','Yisroel Fox','Meir Fields','Yaakov Brooks','Avraham Weiss','Mordechai Stern','Yosef Dovid Rosen','Eliezer Rosenfeld','Shlomo Zalman Klein','Alexander Theodore Montgomery','Christopher Alexander Silverstone','דוד כהן','משה לוי','אליהו דוד ישראלי'];
+    const names=['Ari Stone','Eli Hart','Noah Reed','Yosef Cohen','Moshe Levi','David Adler','Shimon Baker','Chaim Miller','Gavriel Green','Yonah Silver','Yehuda Gold','Yisroel Fox','Meir Fields','Yaakov Brooks','Avraham Weiss','Mordechai Stern','Yosef Dovid Rosen','Eliezer Rosenfeld','Shlomo Zalman Klein','Alexander Theodore Montgomery','Christopher Alexander Silverstone','דוד כהן','משה לוי','אליהו דוד ישראלי','Rabbi משה Cohen'];
     let index=0;for(const table of plan.tables)for(let seat=0;seat<table.count;seat++)if(!seatsSeatBlocked(plan,table.id,seat))seatsWriteName(plan,table.id,seat,names[index++%names.length],{duplicate:true});
     seatsWriteName(plan,'rav-seat',0,'Rav Levi');
     const renderedNames=plan.tables.flatMap(table=>table.seats.filter(Boolean).map(id=>plan.people.find(person=>person.id===id).name));
@@ -57,16 +59,19 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       const before=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));
       const inspect=async selector=>page.locator(selector).evaluate(stage=>{
         const texts=[...stage.querySelectorAll('.table-seat.assigned .seat-name')],sizes={};
-        for(const text of texts){if(getComputedStyle(text).fontWeight!=='700')throw new Error('Assigned names must render in bold');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
+        for(const text of texts){const style=getComputedStyle(text),family=/[\u0590-\u05ff]/.test(text.textContent)?'Noto Sans Hebrew':'Noto Sans';if(!style.fontFamily.startsWith('\"'+family+'\"'))throw new Error('Wrong name font: '+style.fontFamily);if(!document.fonts.check('700 13px \"'+family+'\"',text.textContent))throw new Error('Name font has not loaded');if(style.fontWeight!=='700')throw new Error('Assigned names must render in bold');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
         const names=texts.map(text=>[...text.querySelectorAll('tspan')].map(line=>line.textContent).join(' '));
         const overflow=texts.filter(text=>{
-          const parent=text.closest('.table-seat'),rav=parent.classList.contains('rav-seat'),seat=parent.querySelector(rav?'.shtender-surface':'.seat-area').getBBox(),box=text.getBBox();
+          const parent=text.closest('.table-seat'),rav=parent.classList.contains('rav-seat'),seat=parent.querySelector(rav?'.shtender-surface':'.seat-area').getBBox(),bounds=text.getBBox();
+          const matrix=parent.getScreenCTM().inverse().multiply(text.getScreenCTM());
+          const points=[[bounds.x,bounds.y],[bounds.x+bounds.width,bounds.y+bounds.height]].map(([x,y])=>new DOMPoint(x,y).matrixTransform(matrix));
+          const box={x:points[0].x,y:points[0].y,width:points[1].x-points[0].x,height:points[1].y-points[0].y};
           const padding=rav?0:1;
           return box.x<seat.x-padding-.5||box.x+box.width>seat.x+seat.width+padding+.5||box.y<seat.y-.5||box.y+box.height>seat.y+seat.height+.5;
         }).map(text=>({name:text.textContent,font:text.getAttribute('font-size')}));
         return {count:texts.length,sizes,names,overflow};
       });
-      const screen=await inspect('.room-stage');assert.ok(Math.max(...Object.values(screen.sizes))>=Math.ceil(screen.count*.85));assert.equal(screen.overflow.length,0,JSON.stringify(screen.overflow));
+      const screen=await inspect('.room-stage');assert.ok(Math.max(...Object.values(screen.sizes))>=Math.ceil(screen.count*.85),JSON.stringify(screen));assert.equal(screen.overflow.length,0,JSON.stringify(screen.overflow));
       assert.deepEqual(screen.names.sort(),[...renderedNames].sort(),'Full English and Hebrew names stay intact');
       await page.screenshot({path:path.join(output,'names-'+width+'.png'),fullPage:true});
       for(const paper of ['letter','tabloid']){
@@ -80,6 +85,6 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       const after=await page.evaluate(()=>JSON.parse(localStorage.getItem('lakewood-commons-seats-v1')));assert.deepEqual(after.plans[0].people,JSON.parse(before).plans[0].people);assert.deepEqual(after.plans[0].tables,JSON.parse(before).plans[0].tables);
       assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();
     }
-    console.log('PASS: most assigned names share one font size, long names shrink further, whole English/Hebrew names and assignments survive, and actual Letter/Tabloid PDFs remain one page.');console.log('Artifacts: '+output);
+    console.log('PASS: embedded bold Noto Latin/Hebrew fonts load before fitting, most assigned names share one font size, long names shrink further, whole English/Hebrew names and assignments survive, and actual Letter/Tabloid PDFs remain one page.');console.log('Artifacts: '+output);
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error);server.close();process.exitCode=1;});

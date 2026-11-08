@@ -1,7 +1,7 @@
-export function seatsFitName(name, width, height, measure, maxFont = 13) {
+export function seatsFitName(name, width, height, measure, maxFont = 13, minFont = 7) {
   const words = name.split(/\s+/), available = Math.max(0, width - 6);
   let result;
-  for (let font = maxFont; font >= 7; font -= .5) {
+  for (let font = maxFont; font >= minFont; font -= .5) {
     const lines = [];
     let line = '';
     for (const word of words) {
