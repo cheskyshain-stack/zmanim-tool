@@ -1,7 +1,7 @@
 export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 916 };
 
 export function seatsPrintGeometry(paper, footer = 0) {
-  const tabloid = paper === 'tabloid', width = tabloid ? 17 : 11, height = tabloid ? 11 : 8.5;
+  const tabloid = paper === 'tabloid', width = tabloid ? 17 : paper === 'legal' ? 14 : 11, height = tabloid ? 11 : 8.5;
   const margin = tabloid ? 0.5 : 0.35, header = 0.35, contentWidth = width - margin * 2, contentHeight = height - margin * 2;
   const viewTop = SEATS_PRINT_VIEW.y, viewHeight = SEATS_PRINT_VIEW.height;
   const xScale = viewHeight * contentWidth / (contentHeight - header - footer) / SEATS_PRINT_VIEW.width;

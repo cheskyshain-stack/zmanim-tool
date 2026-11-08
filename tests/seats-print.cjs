@@ -89,8 +89,11 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         await page.locator('.room-stage [data-table="'+table+'"][data-seat="'+index+'"]').click();
         await page.locator('#seat-name-input').fill(name);await page.locator('#seat-name-input').press('Enter');
       }
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption('auto');assert.ok(await page.locator('#pdf-colors').isDisabled());assert.equal(await page.locator('#pdf-colors').inputValue(),'printer');
+      await page.evaluate(()=>{window.autoPrintCalls=0;window.originalAutoPrint=window.print;window.print=()=>window.autoPrintCalls++;});
+      await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.autoPrintCalls===1);await page.evaluate(()=>{window.print=window.originalAutoPrint;});
       let letteringRatio,verticalRatio;
-      const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format})),{name:'auto-letter-browser-zoom',paper:'auto',format:'Letter',zoom:1.25},{name:'auto-tabloid-browser-zoom',paper:'auto',format:'Tabloid',zoom:1.5}];
+      const cases=[{name:'letter',paper:'letter'},{name:'legal',paper:'legal'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format})),{name:'auto-letter-browser-zoom',paper:'auto',format:'Letter',zoom:1.25},{name:'auto-tabloid-browser-zoom',paper:'auto',format:'Tabloid',zoom:1.5}];
       if(width===1440)cases.push({name:'tabloid-on-letter',paper:'tabloid',nativeLetter:true},{name:'letter-larger-margins',paper:'letter',margin:.75,color:true},{name:'tabloid-larger-margins',paper:'tabloid',margin:.75},{name:'auto-tabloid-larger-margins',paper:'auto',format:'Tabloid',margin:.75});
       for(const testCase of cases){
         await openPrintOptions(page);await page.locator('#paper-size').selectOption(testCase.paper);await openPrintOptions(page);await page.locator('#print-color').selectOption(testCase.color?'color':'mono');
@@ -104,7 +107,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
         assert.match(info,/Pages:\s+1\b/,label);
         assert.match(text,/7:30\s+MINYAN/i,label+' wordmark');
         assert.ok(!text.includes(sample.plans[0].name),'Chart names are excluded from '+label);
-        const format=testCase.format||(testCase.paper==='letter'||testCase.nativeLetter?'Letter':'Tabloid');
+        const format=testCase.format||(testCase.paper==='letter'||testCase.nativeLetter?'Letter':testCase.paper==='legal'?'Legal':'Tabloid');
         const dimensions=info.match(/Page size:\s+([\d.]+) x ([\d.]+) pts/).slice(1).map(Number),expected=({Letter:[792,612],Tabloid:[1224,792],Legal:[1008,612],A4:[841.89,595.28],A5:[595.28,419.53]})[format];
         assert.ok(dimensions.every((dimension,index)=>Math.abs(dimension-expected[index])<1.1),label+' '+dimensions);
         for(const [, ,name] of edgeNames)assert.ok(text.includes(name),name+' is missing in '+label);

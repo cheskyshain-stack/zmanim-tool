@@ -28,7 +28,7 @@ async function seatsPdfPicture(url) {
 }
 
 export async function seatsChartPdfPage(source, paper, plan = {}) {
-  const { geometry, headerFont, headerLines, footerLines } = seatsPrintLayout({ ...plan, paper: paper === 'tabloid' ? 'tabloid' : 'letter' });
+  const { geometry, headerFont, headerLines, footerLines } = seatsPrintLayout({ ...plan, paper: ['legal', 'tabloid'].includes(paper) ? paper : 'letter' });
   const page = seatsPdfPage(geometry.width * 72, geometry.height * 72), room = source.cloneNode(true);
   const originals = [source, ...source.querySelectorAll('*')], copies = [room, ...room.querySelectorAll('*')];
   for (let index = 0; index < originals.length; index++) {
