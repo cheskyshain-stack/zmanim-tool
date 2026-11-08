@@ -34,6 +34,10 @@ export function seatsPreparePrint(svg, geometry) {
     if (adaptive && !text.parentElement.classList.contains('print-lettering')) {
       const wrapper = document.createElementNS(svg.namespaceURI, 'g');
       wrapper.setAttribute('class', 'print-lettering' + (vertical ? ' vertical-lettering' : ''));
+      if (text.classList.contains('assigned-seat-name')) {
+        wrapper.classList.add('seat-name-lettering');
+        wrapper.style.setProperty('--seat-name-growth-limit', text.dataset.nameGrowthLimit || '1');
+      }
       text.replaceWith(wrapper); wrapper.append(text);
     }
   }
