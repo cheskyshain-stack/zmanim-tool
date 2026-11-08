@@ -18,6 +18,16 @@ no viewer list or live organizer name. Only open seat editors send reservations;
 browsing a chart leaves its presence unset. The input waits for the service's
 reservation confirmation, and a busy seat cannot be typed into or saved. Draft
 typing remains local until saved with Enter, Tab, Save, or selecting another seat.
+Each selection expires after 30 minutes, even if the browser stays connected.
+Heartbeats, repeated presence messages and reconnection do not extend the page's
+selection deadline. The editor closes and releases the seat without saving or
+clearing its name. Unfinished text stays on that page and returns when the same
+seat is selected again, with the usual conflict check if its saved name changed.
+The service also expires reservations independently, including those from older
+clients. An expired selection must be cleared or changed before that connection
+can reserve the same seat again. Existing reservations without a deadline expire
+when the updated service next handles a message. No chart records are migrated.
+GET /api/info reports seatReservationMinutes: 30 after this service update.
 
 Updates contain individual field and seat changes with their original values.
 Changes to different seats merge; a conflicting change is rejected as a unit.

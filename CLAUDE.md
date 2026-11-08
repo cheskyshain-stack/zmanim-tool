@@ -1805,6 +1805,17 @@ embedded ICC profile, ink coverage, searchable Hebrew/Latin text, page dimension
 roster pagination, phone/desktop output, failure/retry and blocked-popup downloads.
 
 
+Seat edit selections expire after 30 minutes, without changing an assigned name
+or saving unfinished typing. Connection heartbeats, repeated reservation messages
+and reconnecting the same page must not extend its deadline. The editor closes
+and keeps unfinished text on that page for reselecting the seat, retaining its
+original saved-name snapshot so a newer assignment still requires conflict review.
+The service independently ignores expired reservations, including legacy sockets
+without a deadline. Old clients cannot automatically reclaim an expired selection
+until they clear it or change seats. Keep anonymous seat protection and no viewer
+list. `tests/seats-reservations.mjs` and `tests/seats-reservation-timeout.cjs` cover
+the exact deadline, stale clients, two-device release and unfinished drafts.
+
 The chart status box and Saved charts rows show the organizer who last assigned
 a name to a seat. Later renames, room edits, name-list imports, restores and
 opening a chart must not replace that attribution. Keep the normal creation and

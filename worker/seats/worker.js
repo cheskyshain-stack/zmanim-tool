@@ -2,6 +2,7 @@ import { seatsSharedApply, seatsSharedPlan } from '../../js/seats/shared-model.j
 import { seatsDescribeChanges, seatsRecordMetadata } from '../../js/seats/activity.js';
 import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
 import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
+import { SEATS_RESERVATION_MS } from '../../js/seats/reservation.js';
 
 const SEATS_SHARED_SESSION_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
@@ -81,7 +82,7 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30 });
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
@@ -220,10 +221,23 @@ export class SeatsWorkspace {
   }
   send(socket, message) { try { socket.send(JSON.stringify(message)); } catch { /* A disconnected organizer will reconnect. */ } }
   peers() {
-    return this.ctx.getWebSockets().map(socket => ({ socket, ...socket.deserializeAttachment() })).filter(peer => peer.socket.readyState === WebSocket.OPEN && peer.authenticated && peer.expires > Date.now());
+    return this.ctx.getWebSockets().map(socket => ({ socket, ...socket.deserializeAttachment() })).filter(peer => peer.socket.readyState === WebSocket.OPEN && peer.authenticated && peer.expires > Date.now())
+      .map(peer => ({ ...peer, seat: peer.seatExpiresAt > Date.now() ? peer.seat : null }));
   }
   broadcast(message) { for (const peer of this.peers()) this.send(peer.socket, message); }
-  presence() { this.broadcast({ type: 'presence', peers: this.peers().map(({ clientId, name, planId, seat }) => ({ clientId, name, planId, seat })) }); }
+  presence() { this.broadcast({ type: 'presence', at: Date.now(), peers: this.peers().map(({ clientId, name, planId, seat, seatExpiresAt }) => ({ clientId, name, planId, seat, seatExpiresAt })) }); }
+  expireReservations() {
+    let expired = false;
+    for (const { socket } of this.peers()) {
+      const meta = socket.deserializeAttachment();
+      if (!meta.seat || meta.seatExpired || meta.seatExpiresAt > Date.now()) continue;
+      // Retain the expired selection so old clients cannot reclaim it automatically.
+      socket.serializeAttachment({ ...meta, seatExpired: true });
+      this.send(socket, { type: 'reservation-expired', planId: meta.planId, seat: meta.seat });
+      expired = true;
+    }
+    if (expired) this.presence();
+  }
   async webSocketMessage(socket, raw) {
     try {
       if (typeof raw !== 'string' || new TextEncoder().encode(raw).byteLength > SEATS_SHARED_LIMIT) throw new Error('This shared update is too large.');
@@ -233,9 +247,10 @@ export class SeatsWorkspace {
         if (!session || !seatsWorkerId(message.clientId)) { socket.close(1008, 'Sign in again.'); return; }
         clearTimeout(this.authTimers.get(socket)); this.authTimers.delete(socket);
         socket.serializeAttachment({ ...session, authenticated: true, clientId: message.clientId, planId: null, seat: null });
-        this.send(socket, { type: 'ready' }); this.presence(); return;
+        this.send(socket, { type: 'ready' }); this.expireReservations(); this.presence(); return;
       }
       if (!meta?.authenticated || meta.expires <= Date.now()) { socket.close(1008, 'Sign in again.'); return; }
+      this.expireReservations();
       if (message.type === 'ping') { this.send(socket, { type: 'pong' }); return; }
       if (message.type === 'watch') {
         if (!Array.isArray(message.ids) || message.ids.length > 30) throw new Error('Invalid plan list.');
@@ -250,8 +265,13 @@ export class SeatsWorkspace {
       if (message.type === 'presence') {
         const planId = seatsWorkerId(message.planId) ? message.planId : null;
         const seat = typeof message.seat === 'string' && message.seat.length <= 120 ? message.seat : null;
+        const sameSelection = planId && seat && meta.planId === planId && meta.seat === seat;
+        if (sameSelection && !(meta.seatExpiresAt > Date.now())) {
+          this.send(socket, { type: 'reservation-expired', planId, seat }); return;
+        }
         const busy = planId && seat && this.peers().find(peer => peer.socket !== socket && peer.planId === planId && peer.seat === seat);
-        socket.serializeAttachment({ ...meta, planId, seat: busy ? null : seat });
+        socket.serializeAttachment({ ...meta, planId: planId && seat ? planId : null, seat: planId && !busy ? seat : null,
+          seatExpiresAt: planId && seat && !busy ? sameSelection ? meta.seatExpiresAt : Date.now() + SEATS_RESERVATION_MS : null, seatExpired: false });
         if (busy) this.send(socket, { type: 'busy', seat, name: busy.name });
         this.presence(); return;
       }

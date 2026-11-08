@@ -1,0 +1,65 @@
+Publish the prepared 30-minute seat reservation safeguard
+
+The user authorized this fix and publishing it. The website's editor timeout is
+being published by the web chat. Deploy only the existing shared seating Worker.
+Do not rebuild, roll back or republish the website.
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+PR: https://github.com/cheskyshain-stack/zmanim-tool/pull/334
+Tested application commit: 8cf383ac4b2b1cf7c8d57c76c3c9992a20cd062a
+Worker: zmanim-seats
+Cloudflare account: 04b085d9f19ac1ba6d333e0006fc94c1
+Configuration: worker/seats/wrangler.jsonc
+Endpoint: https://zmanim-seats.cheskyshain.workers.dev
+
+GitHub run 42448514810 passed verification, then failed because the repository's
+CLOUDFLARE_API_TOKEN is missing. The web environment also has no Cloudflare login.
+Use Desktop's existing Cloudflare authentication. Do not ask for a token in chat,
+print credentials, or commit one. Keep any existing Desktop changes intact.
+
+1. Fetch the repository and create a separate worktree at the tested commit:
+
+   git fetch origin
+   SEATS_TIMEOUT_WORKTREE="$(mktemp -d /tmp/seats-timeout.XXXXXX)"
+   git worktree add "$SEATS_TIMEOUT_WORKTREE" 8cf383ac4b2b1cf7c8d57c76c3c9992a20cd062a
+   cd "$SEATS_TIMEOUT_WORKTREE"
+
+2. Deploy using the existing authorized Cloudflare account:
+
+   npx --yes wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+
+   Preserve SeatsWorkspace, its v1 migration, the lakewood-commons object name,
+   allowed origin and all saved data. No storage migration, new binding or chart
+   rewrite is needed. Never test by editing a production chart.
+
+3. Verify the capability without displaying the session token or any names:
+
+   node --input-type=module <<'JS'
+   import assert from 'node:assert/strict';
+   const api='https://zmanim-seats.cheskyshain.workers.dev';
+   const headers={Origin:'https://baismedrashoflakewoodcommons.org','Content-Type':'application/json'};
+   const login=await fetch(api+'/api/session',{method:'POST',headers,body:JSON.stringify({pin:'4444',name:'Reservation deployment check'})});
+   assert.equal(login.status,200);
+   const session=await login.json();
+   const response=await fetch(api+'/api/info',{headers:{...headers,Authorization:'Bearer '+session.token}});
+   assert.equal(response.status,200);
+   const info=await response.json();
+   assert.equal(info.seatReservationMinutes,30);
+   assert.equal(info.printNotes,true);
+   assert.equal(info.trash60Days,true);
+   console.log('Verified: 30-minute reservations, chart notes and Trash remain supported.');
+   JS
+
+4. Report success only after deployment and verification pass. Reservations from
+   older tabs without deadlines will stop blocking seats when the updated service
+   handles their next message. Updated tabs ping every 30 seconds. Saved names,
+   seat assignments and dates are untouched. The client closes expired editors
+   and retains unfinished typing on that page for reselecting the same seat.
+
+Validation completed before publication:
+- 58 relevant unit tests, including exact expiry and stale legacy reservations.
+- Full collaboration browser regression in a local Workerd service.
+- Two browsers: exact 30-minute release, no saved-data changes, another organizer
+  can edit, unfinished text returns, newer saved names require conflict review,
+  and a suspended browser cannot save past its selection deadline.
+- Website build, offline bundle syntax and whitespace checks.
