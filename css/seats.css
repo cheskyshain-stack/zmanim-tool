@@ -132,14 +132,14 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .setup-hint{font-size:11px;margin:0 17px 7px;color:var(--seats-muted)}
 .room-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;overscroll-behavior-y:auto;min-width:0;background:#fff;touch-action:pan-x pan-y}
 .room-stage{min-width:100%;max-width:none}
-.room-diagram{display:block;width:100%;height:auto;color:#23354a;--table-fill:#fbf5e8;--object-fill:#f1f3f4}
+.room-diagram{display:block;width:100%;height:auto;color:#23354a;--table-fill:#f1f3f4;--object-fill:#fbf5e8}
 .room-diagram.monochrome{color:#111;--table-fill:#fff;--object-fill:#fff}
 .room-object>.object-surface.cabinet-designed-surface{fill:#fff}
 .cabinet-design{fill:#fff;stroke:currentColor;stroke-width:.8;stroke-linejoin:round;pointer-events:none}
 .cabinet-design .cabinet-frame,.cabinet-design .book-band{fill:none}
 .cabinet-design .book-label-strip{display:none}
 .room-boundary{fill:#fff;stroke:currentColor;stroke-width:3}
-.aron{fill:var(--table-fill);stroke:currentColor;stroke-width:1.5}
+.aron{fill:var(--object-fill);stroke:currentColor;stroke-width:1.5}
 .aron-label,.room-landmark .seat-name{font-family:Georgia,'David Libre',serif;font-weight:600;fill:currentColor}
 .aron-label{font-size:20px}
 .column-label{font:600 13px Georgia,serif;fill:currentColor}
@@ -189,12 +189,13 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .object-surface:not([fill]){fill:var(--object-fill)}
 .shelf-line{stroke:currentColor;stroke-width:.6;fill:none}
 .cabinet-label-bg{fill:#fff;stroke:none}
+.room-diagram:not(.room-design) .cabinet-label-bg{fill:var(--object-fill)}
 .room-opening text{fill:currentColor;font:11px Arial,sans-serif}
 .rear-side-walkway text{font-size:10px;letter-spacing:1px}
 .station-frame{fill:none;stroke:none}
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
 .table-seat.rav-seat{cursor:default}
-.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
+.shtender-surface{fill:var(--object-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
 .room-diagram.monochrome.room-design image{filter:grayscale(1)}
 .room-diagram.monochrome.room-design .fixture-sketch image{filter:none}

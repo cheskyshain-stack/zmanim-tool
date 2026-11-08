@@ -1662,6 +1662,11 @@ do not clear them as a migration. The existing room footprint is retained.
 `tests/seats-open-seats.cjs` verifies these controls, both print paths, phone and
 desktop views, independent preferences and unchanged stored assignments.
 
+The regular Color chart uses cool pale gray (#f1f3f4) tabletops and warm cream
+(#fbf5e8) for the bookcases, bimah, amud, Aron Kodesh and Rav station. Custom
+bookcase label backgrounds share their fixture fill. Black & white stays white.
+These flat fills are independent of the illustrated Room design materials.
+
 Room design is a display switch remembered separately for each chart on this
 device, outside shared chart data. New charts start with it off. Resolve the
 choice from the active chart on every render and print, including folder opens,
