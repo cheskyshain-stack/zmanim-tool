@@ -1759,7 +1759,10 @@ FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
 Black & white option use only K. Keep all page artwork in DeviceCMYK and all
 vector colors in CMYK or gray, with no RGB fallback. Text stays selectable and
 uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyph
-ordering so Hebrew words print in the correct direction. Photos and surface textures are sampled at 300 dpi in small strips to bound
+ordering so Hebrew words print in the correct direction. All chart print lettering
+uses solid black, including Color, so small names do not require screened navy
+toner. Keep the existing Arial font, weights and fitting. The editing preview
+retains its existing colors. Photos and surface textures are sampled at 600 dpi in small strips to bound
 phone memory. Tile joints stay vector between the marble and furnishings. Use
 CMYK transparency blending and grayscale soft masks for the furniture overlay
 so grout stays hidden under tables, chairs and fixtures. Keep the existing room geometry and fixture

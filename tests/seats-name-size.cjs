@@ -19,7 +19,7 @@ table_height=collections.Counter(round(r.height,1) for r in frames).most_common(
 frames=[r for r in frames if abs(r.height-table_height)<.2]
 assert len(frames)==int(sys.argv[3]), ('Missing table frames',len(frames))
 pitch=max(r.width for r in frames)/5
-chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16)} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
+chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16),'color':s['color']} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
 fonts=[]
 for r in frames:
  count=round(r.width/pitch)
@@ -27,6 +27,7 @@ for r in frames:
   left,right=r.x0+r.width*i/count,r.x0+r.width*(i+1)/count
   seat=[s for s in chars if s['text'].strip() and left<=(s['bbox'][0]+s['bbox'][2])/2<right and r.y0<=(s['bbox'][1]+s['bbox'][3])/2<=r.y1]
   if ''.join(s['text'] for s in seat)=='Pillar':continue
+  assert all(s['color']==0 for s in seat), ('Print names in solid black',seat)
   assert all(s['bold'] for s in seat), ('An assigned name is not bold in the PDF',seat)
   sizes=[s['size'] for s in seat]
   if sizes: fonts.append(round(max(sizes),2))
