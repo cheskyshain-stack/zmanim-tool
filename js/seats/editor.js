@@ -1,11 +1,14 @@
 import { escAttr, escText } from '../util.js';
 import { seatsWriteName, seatsItems, seatsSeatBlocked } from './model.js';
+import { SEATS_RESERVATION_MS } from './reservation.js';
 
 export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true, onActivity = () => {}, editStatus = () => '' }) {
   const card = document.createElement('section');
   card.className = 'seat-editor no-print'; card.hidden = true;
   card.setAttribute('aria-label', 'Edit seat'); document.body.appendChild(card);
-  let active = null, copied = '', suggestions = [], highlight = -1;
+  let active = null, copied = '', suggestions = [], highlight = -1, expiryTimer = null;
+  const expiredDrafts = new Map();
+  const draftKey = (tableId, index) => JSON.stringify([getPlan().id, tableId, index]);
   const text = value => escText(value), attr = value => escAttr(value);
   const personAt = (tableId, index) => {
     const plan = getPlan(), table = seatsItems(plan).find(entry => entry.id === tableId);
@@ -23,11 +26,24 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     card.style.top = Math.max(top + 8, Math.min(top + height - card.offsetHeight - 8, below + card.offsetHeight < top + height ? below : above)) + 'px';
   }
   function close() {
+    clearTimeout(expiryTimer);
     active = null; card.hidden = true;
     onActivity(null);
     document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
   }
+  function expire() {
+    if (!active) return;
+    const name = card.querySelector('input').value;
+    if (name !== (JSON.parse(active.original)?.name || '')) expiredDrafts.set(active.draftKey, { name, original: active.original });
+    close();
+    notify('Seat selection released after 30 minutes. Saved names are unchanged. Any unfinished text is kept on this page; select the seat again to continue.');
+  }
+  function expired() {
+    if (!active || Date.now() < active.expiresAt) return false;
+    expire(); return true;
+  }
   function save({ personId = null, duplicate = false, next = 0 } = {}) {
+    if (expired()) return false;
     if (!active) return;
     const unavailable = editStatus(active.tableId, active.index);
     if (unavailable) { notify(unavailable); return false; }
@@ -73,6 +89,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     position();
   }
   function open(tableId, index, initial) {
+    expired();
     const blocked = seatsSeatBlocked(getPlan(), tableId, index);
     if (blocked && !personAt(tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
     if (!canEdit(tableId, index)) return;
@@ -81,9 +98,12 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     if (!table || index < 0 || index >= (table.count ?? 0)) return;
     onSelect(tableId);
     const person = personAt(tableId, index);
-    active = { tableId, index, original: JSON.stringify(person ? { id: person.id, name: person.name } : null) };
-    onActivity({ tableId, index });
-    const name = blocked ? person.name : initial ?? person?.name ?? '';
+    const key = draftKey(tableId, index), draft = expiredDrafts.get(key);
+    active = { tableId, index, draftKey: key, original: draft?.original ?? JSON.stringify(person ? { id: person.id, name: person.name } : null), expiresAt: Date.now() + SEATS_RESERVATION_MS };
+    expiredDrafts.delete(key);
+    expiryTimer = setTimeout(expire, SEATS_RESERVATION_MS);
+    onActivity({ tableId, index, expiresAt: active.expiresAt });
+    const name = blocked ? person.name : initial ?? draft?.name ?? person?.name ?? '';
     card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
     card.hidden = false; position();
     const input = card.querySelector('input'); input.focus({ preventScroll: true });
@@ -98,6 +118,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     if (!blocked) suggest(); sync();
   }
   function sync() {
+    expired();
     document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
     if (!active) return;
     const unavailable = editStatus(active.tableId, active.index), blocked = seatsSeatBlocked(getPlan(), active.tableId, active.index);
@@ -112,6 +133,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     seatNode(active.tableId, active.index)?.classList.add('is-active'); position();
   }
   function copyName(tableId = active?.tableId, index = active?.index) {
+    if (expired()) return;
     const name = active && active.tableId === tableId && active.index === index ? card.querySelector('input').value.trim() : personAt(tableId, index)?.name;
     if (!name) { notify('This seat has no name to copy.'); return; }
     copied = name;
@@ -119,6 +141,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     notify('Name copied. Select another seat and use Paste name or Ctrl+V.');
   }
   function pasteName(tableId = active?.tableId, index = active?.index) {
+    if (expired()) return;
     if (!copied || tableId === undefined) return;
     if (seatsSeatBlocked(getPlan(), tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
     if (!canEdit(tableId, index)) return;
@@ -130,10 +153,11 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     close();
     seatNode(tableId, index)?.focus({ preventScroll: true });
   }
-  card.addEventListener('input', event => { if (event.target.matches('input')) suggest(); });
+  card.addEventListener('input', event => { if (!expired() && event.target.matches('input')) suggest(); });
   card.addEventListener('submit', event => { event.preventDefault(); save(); });
   card.addEventListener('pointerdown', event => { if (event.target.closest('[data-suggest]')) event.preventDefault(); });
   card.addEventListener('click', event => {
+    if (expired()) return;
     const suggestion = event.target.closest('[data-suggest]');
     if (suggestion) return save({ personId: suggestion.dataset.suggest });
     const action = event.target.closest('[data-editor]')?.dataset.editor;
@@ -143,6 +167,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
     if (action === 'paste') pasteName();
   });
   card.addEventListener('keydown', event => {
+    if (expired() || !active) { event.preventDefault(); return; }
     if (event.key === 'Escape') { event.preventDefault(); const target = active; close(); seatNode(target.tableId, target.index)?.focus({ preventScroll: true }); }
     if (!event.target.matches('input')) return;
     if (event.key === 'Tab') { event.preventDefault(); save({ next: event.shiftKey ? -1 : 1 }); }
@@ -157,5 +182,7 @@ export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify,
   window.addEventListener('scroll', position, { passive: true });
   window.addEventListener('resize', position);
   window.visualViewport?.addEventListener('resize', position);
-  return { open, close, sync, flush: save, copy: copyName, paste: pasteName };
+  window.addEventListener('focus', expired);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) expired(); });
+  return { open, close, sync, expire, flush: save, copy: copyName, paste: pasteName };
 }

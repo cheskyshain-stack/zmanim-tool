@@ -893,6 +893,7 @@ function seatsStart(root, auth, updates) {
       sharing?.decorate(root);
       keepPosition(root, () => { workspaceControls.refresh(); zoomControls.refresh(); }); editor.sync();
     },
+    onReservationExpired: () => editor.expire(),
   });
   auth.onLock(() => { editor.flush(); save(); location.reload(); });
   navigation = seatsCreateNavigation({

@@ -12,12 +12,13 @@ export const SEATS_SHARING_KEY = 'lakewood-commons-seats-shared-v1';
 const SEATS_SHARING_SESSION = 'lakewood-commons-seats-online-session';
 const SEATS_NAME_UPLOADS = 'lakewood-commons-seats-name-uploads-v1';
 
-export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, restoreLocal, keepDeletedCopy }) {
+export function seatsCreateSharing({ getState, getLocalPlans = () => getState().plans, canPublish = () => true, updatePlan, recoverPlan, notify, onStatus, onDialogChange = () => {}, onReservationExpired = () => {}, isBusy, activatePage, copyChart, restoreBackup, getRecord, newChart, initialPin, initialName, onSignInRequired, onSignOut, pickNamesFile, useNames, removeLocal, restoreLocal, keepDeletedCopy }) {
   const clientId = crypto.randomUUID(), entries = new Map();
   const dialog = document.createElement('dialog'); dialog.className = 'seats-dialog sharing-dialog no-print'; dialog.setAttribute('aria-labelledby', 'sharing-title'); document.body.appendChild(dialog);
   dialog.addEventListener('close', () => { if (!dialog.open) nameEditor.cancel(); onDialogChange(); });
   let endpoint = '', session = null, socket = null, ready = false, retry = null, heartbeat = null, retryCount = 0, initialized = false;
   let peers = [], activeSeat = null, pendingMessages = [], profile = initialName || '', dialogMode = '', lastMessage = 0;
+  let activeSeatExpiresAt = 0, peerExpiryTimer = null;
   let intent = 'pages', listRequest = 0, historyRequest = 0, openRequest = 0, publishing = false, copyingChart = false, entryPin = initialPin, pendingPublish = null;
   let nameUploads = [], nameFiles = [], sitePlans = [], namesRequest = 0, uploadingNames = false, namesError = '', namesRetry = null, namesRetries = 0;
   const seatActivity = seatsCreateSeatActivity({ request, onChange: id => {
@@ -175,7 +176,22 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
   }
   function send(message) { if (ready && socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message)); }
   function watch() { send({ type: 'watch', ids: [...new Set([...entries.values()].map(entry => entry.remoteId))] }); }
+  function expireSelection() {
+    activeSeat = null; activeSeatExpiresAt = 0;
+    peers = peers.filter(peer => peer.clientId !== clientId);
+    send({ type: 'presence', planId: null, seat: null });
+    onReservationExpired(); changed();
+  }
+  function schedulePeerExpiry() {
+    clearTimeout(peerExpiryTimer);
+    const now = Date.now(), nextExpiry = Math.min(...peers.filter(peer => peer.seat && peer.expiresAt > now).map(peer => peer.expiresAt));
+    if (Number.isFinite(nextExpiry)) peerExpiryTimer = setTimeout(() => {
+      peers = peers.filter(peer => peer.expiresAt > Date.now());
+      schedulePeerExpiry(); changed();
+    }, Math.max(0, nextExpiry - now));
+  }
   function reserveSeat() {
+    if (activeSeat && Date.now() >= activeSeatExpiresAt) { expireSelection(); return; }
     const entry = activeSeat ? entries.get(current()?.id) : null;
     send({ type: 'presence', planId: entry?.remoteId || null, seat: entry ? activeSeat : null });
   }
@@ -223,11 +239,14 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     } else if (message.type === 'plan-deleted') detachDeleted(message.id);
     else if (message.type === 'name-lists-changed' && dialog.open && dialogMode === 'names') refreshNameFiles();
     else if (message.type === 'presence') {
-      peers = (message.peers || []).map(({ clientId, planId, seat }) => ({ clientId, planId, seat }));
+      peers = (message.peers || []).map(({ clientId, planId, seat, seatExpiresAt }) => ({ clientId, planId, seat,
+        expiresAt: Number.isFinite(seatExpiresAt) && Number.isFinite(message.at) ? Date.now() + Math.max(0, seatExpiresAt - message.at) : Infinity }));
+      schedulePeerExpiry();
       const entry = activeSeat && entries.get(current()?.id);
       if (entry && !peers.some(peer => peer.planId === entry.remoteId && peer.seat === activeSeat)) reserveSeat();
       changed();
     }
+    else if (message.type === 'reservation-expired' && activeSeat === message.seat && entries.get(current()?.id)?.remoteId === message.planId) expireSelection();
     else if (message.type === 'busy') notify('That seat is being edited. Choose another seat while it is being saved.');
     else if (message.type === 'error') notify(message.error || 'That shared update could not be saved.');
     else if (message.type === 'plans-changed' && dialog.open && dialogMode === 'pages') refreshSitePages();
@@ -252,7 +271,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     };
     connection.onclose = event => {
       if (socket !== connection) return;
-      ready = false; peers = []; clearInterval(heartbeat);
+      ready = false; peers = []; clearInterval(heartbeat); clearTimeout(peerExpiryTimer);
       for (const entry of entries.values()) { entry.ready = false; for (const operation of entry.queue) delete operation.sent; }
       if (event.code === 1008) { session = null; sessionStorage.removeItem(SEATS_SHARING_SESSION); }
       if (session && session.expires > Date.now()) retry = setTimeout(connect, Math.min(15000, 1000 * 2 ** retryCount++));
@@ -292,7 +311,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     if (!ready || !entry.ready) return 'Saved on this device · Reconnecting';
     return entry.queue.length ? 'Saving to website…' : 'Saved to website';
   }
-  function peersHere() { const id = entries.get(current()?.id)?.remoteId; return id ? peers.filter(peer => peer.clientId !== clientId && peer.planId === id) : []; }
+  function peersHere() { const id = entries.get(current()?.id)?.remoteId; return id ? peers.filter(peer => peer.clientId !== clientId && peer.planId === id && peer.expiresAt > Date.now()) : []; }
   function markup() {
     const entry = entries.get(current()?.id); if (!entry) return '';
     return `<span class="sharing-state${ready ? ' connected' : ''}">${escText(label())}</span><span class="sharing-audit">${seatAssignmentText(seatActivity.read(entry.remoteId), true)}</span>`;
@@ -609,7 +628,7 @@ export function seatsCreateSharing({ getState, getLocalPlans = () => getState().
     linked: id => entries.has(id),
     canUndo: () => Boolean(entries.get(current()?.id)?.undo.length), canRedo: () => Boolean(entries.get(current()?.id)?.redo.length),
     undo: () => undo(), redo: () => undo(true),
-    activity: value => { activeSeat = value ? value.tableId + ':' + value.index : null; peers = peers.filter(peer => peer.clientId !== clientId); reserveSeat(); },
+    activity: value => { activeSeat = value ? value.tableId + ':' + value.index : null; activeSeatExpiresAt = value?.expiresAt || 0; peers = peers.filter(peer => peer.clientId !== clientId); reserveSeat(); },
     flush: () => { if (!isBusy()) { const messages = pendingMessages; pendingMessages = []; messages.forEach(receive); } },
   };
 }
