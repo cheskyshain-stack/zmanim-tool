@@ -239,18 +239,21 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     const messages = editorPage.getByRole('link', { name: 'Schedule messages', exact: true });
     assert.equal(await editorPage.locator('[data-cal-access],[data-cal-view]').count(), 0, 'Editors have no account-management or owner-preview button');
     assert.equal(await messages.getAttribute('href'), '/texts/');
-    assert.equal(await messages.getAttribute('target'), '_blank');
+    assert.equal(await messages.getAttribute('target'), null);
     for (const width of [320, 375, 393, 1440]) {
       await editorPage.setViewportSize({ width, height: 900 });
       assert(await editorPage.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Calendar editor tools fit at ' + width);
       const box = await messages.boundingBox(); assert(box.height >= 44 && box.x >= 0 && box.x + box.width <= width);
       await editorPage.screenshot({ path: path.join(output, 'calendar-editor-tools-' + width + '.png'), fullPage: true });
     }
-    const messagesPopup = editorPage.waitForEvent('popup'); await messages.click();
-    const messagesPage = await messagesPopup; await messagesPage.waitForLoadState(); assert.equal(await messagesPage.title(), 'LC Shul Messages');
-    assert.equal(await messagesPage.locator('a[href^="/admin"]').count(), 0);
-    await messagesPage.close(); await editorPage.setViewportSize({ width: 375, height: 900 });
-    assert.equal(await editorPage.locator('.shul-calendar').count(), 1, 'Schedule messages leaves the calendar available');
+    await messages.click(); await editorPage.locator('.tx-title').waitFor(); assert.equal(await editorPage.title(), 'LC Shul Messages');
+    assert.equal(await editorPage.locator('a').count(), 1);
+    await editorPage.getByRole('link', { name:'Back to calendar', exact:true }).click();
+    await editorPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+    assert.equal(await editorPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), 'editor', 'The calendar round trip keeps the editor session');
+    assert.equal(await editorPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).token), editor);
+    await editorPage.setViewportSize({ width: 375, height: 900 }); await jump(editorPage, '2026-11');
+    assert.equal(await editorPage.locator('[data-cal-access],[data-cal-view]').count(), 0, 'Returning cannot grant main admin controls');
     assert.equal((await call('/api/invitations/claim', 'POST', { token: invite.body.token, password: editorPassword })).status, 401);
     assert.equal((await call('/api/access', 'GET', null, editor)).status, 403);
     assert.equal((await call('/api/activity?days=1', 'GET', null, editor)).status, 403);

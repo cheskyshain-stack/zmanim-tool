@@ -239,9 +239,9 @@
 .cal-reader-page { display:flex; flex-direction:column; height:100dvh; overflow:hidden; overscroll-behavior:none; }
 .cal-reader-page main { box-sizing:border-box; flex:1; min-height:0; max-width:none; margin:0; width:100%; padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
 .cal-reader-page .shul-calendar { border-top:0; }
-.cal-reader-page .is-cal-congregation { --cal-reader-height:calc(100dvh - var(--cal-site-header-height) - env(safe-area-inset-bottom)); }
-.is-cal-congregation { min-width:0; --cal-reader-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); --cal-reader-cell:calc((var(--cal-reader-height) - var(--cal-reader-chrome,112px)) / var(--cal-weeks)); }
-.is-cal-congregation .shul-calendar { box-sizing:border-box; display:flex; flex-direction:column; height:var(--cal-reader-height,100dvh); border-radius:0; }
+.cal-reader-page .is-cal-congregation { --cal-reader-height:calc(100dvh - var(--cal-site-header-height) - env(safe-area-inset-bottom)); --cal-reader-space:min(var(--cal-reader-height),calc(100dvh - var(--cal-site-header-height) - env(safe-area-inset-bottom))); }
+.is-cal-congregation { min-width:0; --cal-reader-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)); --cal-reader-space:var(--cal-reader-height); --cal-reader-cell:calc((var(--cal-reader-space) - var(--cal-reader-chrome,112px)) / var(--cal-weeks)); }
+.is-cal-congregation .shul-calendar { box-sizing:border-box; display:flex; flex-direction:column; height:var(--cal-reader-space,100dvh); border-radius:0; }
 .is-cal-congregation .cal-toolbar { flex:none; gap:8px; padding:4px 16px 14px; width:100%; max-width:720px; box-sizing:border-box; margin-inline:auto; }
 .is-cal-congregation .cal-month-nav { flex:1; min-width:0; gap:6px; }
 .is-cal-congregation .cal-month-nav > div { position:relative; height:48px; }
@@ -269,10 +269,20 @@
 .is-cal-congregation .cal-event-colors { height:3px; }
 .is-cal-congregation .cal-hebrew-day { bottom:2px; right:3px; font-size:11px; line-height:11px; }
 @media (max-height:460px) {
-  .is-cal-congregation .cal-grid .cal-day { padding-bottom:2px; }
+  .is-cal-congregation .cal-grid .cal-day { padding:1px 3px 0; border-width:1px; }
   .is-cal-congregation .cal-hebrew-day { top:4px; bottom:auto; }
-  .is-cal-congregation .cal-facts { visibility:hidden; }
+  .is-cal-congregation .cal-facts { visibility:hidden; margin:0; }
+  .is-cal-congregation .cal-event-total { font-size:clamp(8.5px,calc(var(--cal-reader-cell) * .2),11px); line-height:1.1; }
 }
 @media (max-width:350px) { .cal-reader-heading { padding-inline:12px; } .cal-reader-actions { gap:8px; } .cal-reader-heading button { padding-inline:10px; font-size:13px; } .is-cal-congregation .cal-toolbar { padding-inline:8px; gap:4px; } .is-cal-congregation .cal-month-nav { gap:2px; } }
 @media (max-height:680px) { .cal-reader-heading { padding-block:10px; gap:8px; } .cal-reader-heading h2 { font-size:26px; } .cal-reader-actions { grid-template-columns:44px minmax(0,1fr) 44px; } .cal-reader-heading button, .cal-reader-back { min-height:44px; height:44px; } .is-cal-congregation .cal-toolbar { padding-top:0; padding-bottom:6px; } }
+@media (max-height:460px) {
+  .cal-reader-heading { flex-direction:row; align-items:center; gap:8px; padding:0 8px; }
+  .cal-reader-heading h2 { flex:1; min-width:0; text-align:left; font-size:24px; }
+  .cal-reader-actions { width:auto; max-width:none; margin:0; grid-template-columns:44px auto 44px; gap:4px; }
+  .is-cal-congregation .cal-toolbar { padding:0 8px; }
+  .is-cal-congregation .cal-month-nav > div { height:44px; }
+  .is-cal-congregation .cal-month-title { min-height:44px; }
+}
+@media (max-height:460px) and (max-width:600px) { .cal-reader-heading h2 { font-size:20px; } .cal-reader-heading [data-cal-announcements] > span:first-of-type { display:none; } .cal-reader-heading [data-cal-announcements] { padding-inline:10px; } }
 @media print { .cal-admin-heading, .cal-preview-banner, .shul-calendar, .cal-dialog, .cal-login, .cal-status, .cal-example-note { display:none !important; } }

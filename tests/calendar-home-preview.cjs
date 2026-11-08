@@ -142,6 +142,22 @@ const server = http.createServer((req, res) => {
     await admin.page.locator('[data-cal-options]').click(); await admin.page.locator('[data-cal-view]').selectOption('owner');
     await admin.page.locator('.cal-admin-heading').waitFor(); await admin.context.close();
     checks.push({ adminPreviewRemainsReadOnly:true });
+    for (const role of ['owner','editor']) {
+      const back = await prepare({ role });
+      await back.page.goto(origin + '/admin/calendar/'); await back.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+      await back.page.getByRole('link', { name:'Schedule messages', exact:true }).click(); await back.page.locator('.tx-title').waitFor();
+      assert.equal(await back.page.locator('a').count(), 1);
+      await back.page.getByRole('link', { name:'Back to calendar', exact:true }).click();
+      await back.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+      assert.equal(await back.page.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), role);
+      assert.equal(await back.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0);
+      checks.push({ role, messagesReturnKeepsSession:true }); await back.context.close();
+    }
+    const visitor = await prepare(); await visitor.page.goto(origin + '/texts/'); await visitor.page.locator('.tx-title').waitFor();
+    await visitor.page.getByRole('link', { name:'Back to calendar', exact:true }).click();
+    await visitor.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
+    assert(!visitor.calls.some(call => call.includes('/api/events')), 'The return link cannot bypass calendar sign-in');
+    checks.push({ messagesReturnRequiresSignIn:true }); await visitor.context.close();
     const login = await prepare(); await login.home(); await login.tap(3);
     await login.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
     await login.page.locator('[name=email]').fill('owner@example.test'); await login.page.locator('[name=password]').fill('Synthetic owner password 2026');

@@ -1,5 +1,8 @@
 /* Standalone schedule messages share the congregation site's colors and header. */
 body.is-texts-page { --ink:#142b46; --muted:#64707c; --border:#e4e0d6; --ui-accent:#142b46; background:#faf7f0; color:#142b46; }
+.tx-calendar-back { display:inline-flex; align-items:center; justify-content:center; gap:8px; box-sizing:border-box; min-height:44px; margin-left:auto; padding:9px 13px; border:1px solid #cbb681; border-radius:10px; color:#fff; background:#ffffff08; text-decoration:none; font:600 13px/1.3 Arial,sans-serif; }
+.tx-calendar-back:is(:hover,:active,:focus-visible) { color:#fff; background:#ffffff14; text-decoration:none; }
+.tx-calendar-back:focus-visible { outline:3px solid #cbb681; outline-offset:3px; }
 .is-texts-page #main { display:block; padding:0; margin:0; max-width:none; }
 .is-texts-page .tx-page { box-sizing:border-box; max-width:720px; padding:32px 20px 56px; }
 .is-texts-page .tx-title { margin:0; font:700 36px/1.15 Georgia,serif; color:#142b46; letter-spacing:-.025em; }

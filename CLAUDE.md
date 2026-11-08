@@ -1122,8 +1122,10 @@ After activation, the main admin sign-in and Calendar access screens retain
 Previous device preview backup. It downloads the exact existing local data without
 uploading it or replacing it with shared events. Calendar-only accounts do not see it.
 After signing in on `/admin/calendar/`, calendar accounts can open
-Schedule messages at `/texts/` from the calendar toolbar. Open it in a separate
-tab so their calendar stays available. This link does not grant other admin access.
+Schedule messages at `/texts/` from the calendar toolbar. Open it in the same tab
+so its Back to calendar button can return with the editor's session preserved.
+The return link goes to `/admin/calendar/` and retains server authentication and
+the actual account role. It does not grant other admin access.
 
 New readers can register immediately with their name, email address and their own
 password. The server always assigns viewer access; submitted role fields cannot
@@ -1375,10 +1377,12 @@ scopes this styling to `body.is-texts-page`. Keep dates, editable message text,
 local-only edits, copying and the heading's year-view gesture unchanged. Editing
 help stays in How to edit and copy and remains open across filter redraws.
 
-- **It carries no link of any kind**, no sidebar, nothing back to the admin or out to the
-  congregation's site. That is the whole point: the person who sends the weekly message is not
-  the person who prints the boards, so the address is handed to them on its own. A browser test
-  asserts there are zero `<a>` elements on it. Do not "helpfully" add a back link.
+- **Its only navigation link is Back to calendar**, explicitly requested by the user,
+  returning to `/admin/calendar/`. Keep it in the Shul header with a 44px touch target.
+  Messages itself remains open without a PIN or calendar account. The return destination
+  requires the usual calendar sign-in and keeps the real owner/editor/viewer role.
+  Do not add other admin, site-menu or congregation links. Browser checks assert this
+  single return link and verify the editor can make the round trip without signing in again.
 - The admin's sidebar gets a **Messages** entry, and it is an `<a href="/texts/">` rather than
   a tab, because it leaves the page. Beside it is **Congregation site**, `<a href="/">`, asked for:
   there was no door from the admin to the congregation's own page at all and the only way across

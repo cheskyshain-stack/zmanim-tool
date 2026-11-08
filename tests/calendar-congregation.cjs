@@ -91,6 +91,8 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
             assert(day.countFits, 'The complete event count remains visible');
             assert(day.colors.every(color => color.width > 0 && color.height > 0));
             if (height > 460) assert(day.markers.bottom <= day.hebrew.top - 1, JSON.stringify({ reason:'Event markers clear Hebrew date', month, width, height, day }));
+            else assert(day.english.bottom <= day.markers.top - .5, JSON.stringify({ reason:'Landscape dates clear event markers', month, width, height, day }));
+            assert(day.markers.bottom <= day.cell.bottom - .5, 'Event markers remain inside their date');
           }
           if (day.label) assert(day.label.bottom <= (day.markers?.top || day.hebrew.top) - 1, JSON.stringify({ reason:'Parsha clears event markers and dates', month, width, height, day }));
           for (const fact of day.facts) assert(fact.top >= day.english.bottom && fact.bottom <= (day.markers?.top || day.hebrew.top) - .5, JSON.stringify({ reason:'Holiday labels clear dates and events', month, width, height, day }));
