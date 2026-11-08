@@ -13,7 +13,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       const count = unread(), badge = button.querySelector('[data-cal-announcement-count]');
       badge.textContent = unavailable ? '!' : count;
       badge.hidden = !unavailable && !count;
-      button.setAttribute('aria-label', unavailable ? 'Announcements, unread count unavailable' : count ? `Announcements, ${count} unread` : 'Announcements');
+      const label = button.dataset.calAnnouncementLabel || 'Announcements';
+      button.setAttribute('aria-label', unavailable ? `${label}, unread count unavailable` : count ? `${label}, ${count} unread` : label);
     }
     if (active) {
       active.newButton.hidden = total <= active.latest;
@@ -60,8 +61,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     button = container.querySelector('[data-cal-announcements]');
     button?.addEventListener('click', open); paint();
   }
-  function markup() {
-    return '<button type="button" data-cal-announcements>Announcements <span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>';
+  function markup({ label = 'Announcements', icon = false } = {}) {
+    return `<button type="button" data-cal-announcements data-cal-announcement-label="${escAttr(label)}">${icon ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>' : ''}<span>${escText(label)}</span><span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>`;
   }
   async function open() {
     if (!actor || active) return;
@@ -77,7 +78,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
         cleanup(); active = null; return true;
       },
     });
-    view.title('Announcements'); view.el.classList.add('cal-announcements-dialog');
+    view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
     if (previewing()) view.el.querySelector('.cal-announcement-intro').textContent = 'Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.';
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');

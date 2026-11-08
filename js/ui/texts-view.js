@@ -719,6 +719,7 @@ export function renderTexts(container, state, settings, tables) {
 }
 
 function drawTexts(container, state, settings, tables) {
+  const helpOpen = container.querySelector('[data-tx-help]')?.open === true;
   const messages = [];
   const now = new Date();
   const today = shulNow(now, settings).serial;
@@ -828,16 +829,14 @@ function drawTexts(container, state, settings, tables) {
   container.innerHTML = `
     <div class="tx-page">
       <h1 class="tx-title" title="Triple click to show the whole year">Messages</h1>
+      <p class="tx-lead">Schedule messages to share with the community.</p>
       ${txAll ? `<p class="tx-all">Showing everything for the year ahead, in date order. Triple
         click the heading again for the next ${TX_AHEAD_DAYS} days only.</p>
         <div class="tx-switches">
           <p class="tx-switches-head">Include in messages</p>
           <div class="week-switches tx-kinds">${kinds}</div>
         </div>` : ''}
-      <p class="tx-hint">Every time here is read off the shul's own boards and sheets, so this
-      and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
-      are for this visit only: reload and the times come back fresh, which is the way round that
-      cannot leave an old time in a new message.</p>
+      <details class="tx-help" data-tx-help ${helpOpen ? 'open' : ''}><summary>How to edit and copy</summary><p class="tx-hint">Times come from the shul's schedules. Edit a message, then press Copy. Your changes apply to this visit; refreshing restores the latest schedule.</p></details>
 
       ${shown.map(txCard).join('')}
       ${shown.length ? '' : `<div class="panel"><p>${txAll

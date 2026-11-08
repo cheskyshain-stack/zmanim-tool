@@ -22,6 +22,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
+  const readerCache = new Map(), readerPending = new Map();
+  let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
+  const wheel = { last: 0, distance: 0, moved: false };
   const dialogs = new Set();
   const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
     calendarSession(null); user = null; events = []; signIn(message);
@@ -137,8 +140,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
   function bindViewChoice(scope, close = () => {}) {
     scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
       const next = event.target.value; close(); previewRole = next;
-      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
-      else { announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation }); redraw(); }
+      clearReaderCache();
+      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; }
+      loadEvents();
     });
   }
   async function signOut() {
@@ -157,8 +161,12 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
       const rows = Number(container.style.getPropertyValue('--cal-weeks'));
       const chrome = calendar.getBoundingClientRect().height - calendar.querySelector('tbody').getBoundingClientRect().height;
+      container.style.setProperty('--cal-reader-chrome', `${chrome}px`);
       const rowHeight = Math.min(128, Math.max(72, calendar.clientWidth * 1.35 / 7));
-      const available = (window.visualViewport?.height || innerHeight) - top - bottom;
+      const viewport = window.visualViewport?.height || innerHeight;
+      const available = standalone
+        ? Math.min(container.clientHeight - bottom, viewport - document.querySelector('.cal-editor-header').getBoundingClientRect().height - bottom)
+        : viewport - top - bottom;
       container.style.setProperty('--cal-reader-height', `${Math.max(0, Math.floor(Math.min(available, chrome + rows * rowHeight)))}px`);
     } else container.style.removeProperty('--cal-reader-height');
     // Fit complete Hebrew words to a narrow Shabbos column without breaking them.
@@ -173,6 +181,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     }
     // Holidays can share a cell with other labels and event markers too.
     if (reader()) for (const facts of container.querySelectorAll('.cal-facts')) {
+      facts.classList.remove('is-clipped');
       if (getComputedStyle(facts).visibility === 'hidden') continue;
       const labels = [...facts.children], space = facts.getBoundingClientRect();
       const fits = () => labels.every(label => { const box = label.getBoundingClientRect(); return box.top >= space.top + .5 && box.bottom <= space.bottom - .5; });
@@ -182,6 +191,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
           if (size > 7) label.style.fontSize = `${Math.max(7, size - .25)}px`;
         }
       }
+      facts.classList.toggle('is-clipped', !fits());
     }
   }
   function gridFacts(day) {
@@ -207,7 +217,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
       ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
       ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
-      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<a class="cal-reader-back" href="/" aria-label="Back to congregation page" title="Back to congregation page">‹</a><h3>Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h3><div>${announcements.markup()}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
+      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><a class="cal-reader-back" href="/" aria-label="Back to congregation page" title="Back to congregation page">‹</a>${announcements.markup({ label: 'Notifications', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
@@ -249,6 +259,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       });
     });
     wireDay(container);
+    if (isReader) wireMonthGestures(container.querySelector('.cal-grid-wrap'));
     fitReader(); document.fonts.ready.then(fitReader);
   }
   function chooseMonth() {
@@ -262,32 +273,106 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   async function changeMonth(next, reset = true) {
     if (!monthAllowed(next)) return;
+    // Keep the visible month intact if a quick gesture beats its prefetch.
+    if (reader() && !readerCache.has(next)) {
+      const number = ++requestNumber;
+      try { await readerMonth(next); }
+      catch (error) {
+        if (disposed || number !== requestNumber) return;
+        if (error.status === 401) { calendarSession(null); user = null; events = []; signIn(error.message); return; }
+        note = error.message; busy = false; redraw(); return;
+      }
+      if (disposed || number !== requestNumber) return;
+    }
     month = next; if (reset) selected = month + '-01'; note = ''; await loadEvents();
+  }
+  function clearReaderCache() { cacheEpoch++; cancelAnimationFrame(swipeFrame); swipeFrame = 0; readerCache.clear(); readerPending.clear(); }
+  async function monthEvents(value) {
+    const info = calendarMonth(value, settings, tables);
+    const from = info.days[0].iso < '1900-01-01' ? '1900-01-01' : info.days[0].iso;
+    const to = info.days.at(-1).iso > '2299-12-31' ? '2299-12-31' : info.days.at(-1).iso;
+    const response = await calendarRequest(`/api/events?from=${from}&to=${to}`);
+    if (!Array.isArray(response.events)) throw new Error('The calendar returned an invalid event list.');
+    return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedAt: String(item.updatedAt || '') }));
+  }
+  function readerMonth(value) {
+    const saved = readerCache.get(value);
+    if (saved && performance.now() - saved.at < 30000) return Promise.resolve(saved.events);
+    if (readerPending.has(value)) return readerPending.get(value);
+    const epoch = cacheEpoch;
+    const pending = monthEvents(value).then(values => {
+      if (!disposed && epoch === cacheEpoch) readerCache.set(value, { events: values, at: performance.now() });
+      return values;
+    }).finally(() => { if (readerPending.get(value) === pending) readerPending.delete(value); });
+    readerPending.set(value, pending); return pending;
+  }
+  function prefetchMonths() {
+    if (!reader()) return;
+    const range = calendarReaderMonths(today), allowed = new Set([range.first, today.slice(0, 7), range.last]), epoch = cacheEpoch;
+    for (const value of readerCache.keys()) if (!allowed.has(value)) readerCache.delete(value);
+    for (const value of allowed) if (value !== month) readerMonth(value).catch(error => {
+      if (!disposed && epoch === cacheEpoch && error.status === 401) { calendarSession(null); user = null; events = []; signIn(error.message); }
+    });
+  }
+  function wireMonthGestures(grid) {
+    grid.addEventListener('pointerdown', event => {
+      suppressClickUntil = 0;
+      if (!event.isPrimary) { swipe = null; return; }
+      if (event.isPrimary && event.button === 0) swipe = { id: event.pointerId, x: event.clientX, y: event.clientY, at: performance.now() };
+    }, { passive: true });
+    grid.addEventListener('touchmove', event => {
+      if (!swipe || event.touches.length !== 1 || !event.cancelable) return;
+      const touch = event.touches[0], x = touch.clientX - swipe.x, y = touch.clientY - swipe.y;
+      if (Math.abs(x) > 10 && Math.abs(x) > Math.abs(y) * 1.4) event.preventDefault();
+    }, { passive: false });
+    grid.addEventListener('pointercancel', () => { swipe = null; }, { passive: true });
+    grid.addEventListener('pointerup', event => {
+      const start = swipe; swipe = null;
+      if (!start || start.id !== event.pointerId) return;
+      const x = event.clientX - start.x, y = event.clientY - start.y;
+      if (Math.abs(x) < Math.max(45, grid.clientWidth * .15) || Math.abs(x) < Math.abs(y) * 1.4 || performance.now() - start.at > 1200) return;
+      suppressClickUntil = performance.now() + 500;
+      const next = calendarStepMonth(month, x < 0 ? 1 : -1), epoch = cacheEpoch;
+      // Finish the native touch sequence before replacing its target elements.
+      cancelAnimationFrame(swipeFrame);
+      swipeFrame = requestAnimationFrame(() => { swipeFrame = 0; if (!disposed && user && reader() && epoch === cacheEpoch) changeMonth(next); });
+    }, { passive: true });
+    grid.addEventListener('click', event => {
+      if (event.detail && performance.now() < suppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+    grid.addEventListener('wheel', event => {
+      if (Math.abs(event.deltaX) <= Math.abs(event.deltaY) * 1.4) return;
+      if (event.cancelable) event.preventDefault();
+      const now = performance.now();
+      if (now - wheel.last > 200) { wheel.distance = 0; wheel.moved = false; }
+      wheel.last = now; wheel.distance += event.deltaX * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? grid.clientWidth : 1);
+      if (!wheel.moved && Math.abs(wheel.distance) >= 70) { wheel.moved = true; changeMonth(calendarStepMonth(month, wheel.distance > 0 ? 1 : -1)); }
+    }, { passive: false });
   }
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
     if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
-    busy = true; loadError = ''; events = []; redraw();
-    const info = calendarMonth(month, settings, tables);
+    const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
+    busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
+    if (saved && performance.now() - saved.at < 30000) { prefetchMonths(); return; }
     try {
-      const from = info.days[0].iso < '1900-01-01' ? '1900-01-01' : info.days[0].iso;
-      const to = info.days.at(-1).iso > '2299-12-31' ? '2299-12-31' : info.days.at(-1).iso;
-      const value = await calendarRequest(`/api/events?from=${from}&to=${to}`);
+      const values = await (isReader ? readerMonth(month) : monthEvents(month));
       if (disposed || number !== requestNumber) return;
-      if (!Array.isArray(value.events)) throw new Error('The calendar returned an invalid event list.');
-      events = value.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedAt: String(item.updatedAt || '') }));
+      events = values;
+      if (isReader) prefetchMonths();
     } catch (error) {
       if (disposed || number !== requestNumber) return;
-      if (error.status === 401) { user = null; busy = false; signIn(error.message); return; }
-      note = error.message; loadError = error.message;
+      if (error.status === 401) { calendarSession(null); user = null; busy = false; signIn(error.message); return; }
+      note = error.message; if (!saved) loadError = error.message;
     }
     if (!disposed && number === requestNumber) { busy = false; redraw(); }
   }
   async function saveEvent(item, remove = false) {
     if (congregation) throw new Error('This calendar is for viewing.');
     if (previewing()) throw new Error('Choose Main admin to change events.');
+    clearReaderCache();
     if (endpoint) {
       const result = await calendarRequest('/api/events/' + encodeURIComponent(item.id), { method: remove ? 'DELETE' : 'PUT', body: item });
       events = events.filter(event => event.id !== item.id);
@@ -420,6 +505,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     try { await list(); } catch (error) { status.textContent = error.message; }
   }
   function signIn(error = '') {
+    requestNumber++; clearReaderCache(); busy = false;
     container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
     container.style.removeProperty('--cal-reader-height');
     if (disposed) return;
@@ -455,6 +541,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (now !== today && container.querySelector('.shul-calendar')) {
       today = now;
       if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
+      else if (reader()) loadEvents();
       else redraw();
     }
   };
@@ -479,7 +566,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
   })();
   return () => {
-    disposed = true; requestNumber++; announcements.dispose(); clearInterval(dayTimer);
+    disposed = true; requestNumber++; clearReaderCache(); announcements.dispose(); clearInterval(dayTimer);
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
     container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
