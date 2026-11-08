@@ -462,10 +462,10 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-editor-head .top-actions{grid-area:actions;display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-wrap:nowrap}
 .seats-editor-head .top-actions>button{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:46px;min-width:0;padding:10px 15px;border-radius:8px;font-size:13px;white-space:nowrap}
 .seats-editor-head .page-folder-icon{width:18px;height:18px;margin:0;vertical-align:middle}
-.seats-editor-head .editor-charts-button{background:#fff;border-color:#c8d2dc;color:#142b46}
-.seats-editor-head .editor-charts-button:hover{background:#f3f6f8}
-.seats-editor-head .editor-print-button{background:#142b46;border-color:#142b46;color:#fff}
-.seats-editor-head .editor-print-button:hover{background:#234765}
+.seats-editor-head .editor-charts-button{background:#142b46;border-color:#142b46;color:#fff}
+.seats-editor-head .editor-charts-button:hover{background:#234765}
+.seats-editor-head .editor-print-button{background:#fff;border-color:#c8d2dc;color:#142b46}
+.seats-editor-head .editor-print-button:hover{background:#f3f6f8}
 .seats-editor-head .chart-more{grid-area:more;align-self:start}
 .seats-editor-head .chart-more summary{display:flex;align-items:center;justify-content:center;width:44px;min-height:44px;padding:0;border:1px solid #c8d2dc;border-radius:8px;background:#fff;text-decoration:none;color:#4e657a;list-style:none}
 .seats-editor-head .chart-more summary::-webkit-details-marker{display:none}
