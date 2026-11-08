@@ -214,7 +214,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.classList.toggle('is-cal-congregation', isReader);
     document.body.classList.toggle('cal-reader-page', standalone && isReader);
     container.style.setProperty('--cal-weeks', weeks.length);
-    container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" target="_blank" rel="noopener noreferrer" title="Open Schedule messages in a new tab">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
+    container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" title="Open Schedule messages">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
       ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
       ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
       <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><a class="cal-reader-back" href="/" aria-label="Back to congregation page" title="Back to congregation page">‹</a>${announcements.markup({ label: 'Notifications', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
@@ -549,6 +549,8 @@ export function renderCalendar(container, settings, tables, { standalone = false
   document.addEventListener('visibilitychange', updateToday);
   window.addEventListener('resize', fitReader);
   window.visualViewport?.addEventListener('resize', fitReader);
+  const readerResize = standalone ? new ResizeObserver(() => { if (user && reader()) fitReader(); }) : null;
+  readerResize?.observe(container);
   (async () => {
     try {
       endpoint = await calendarConfig(); if (disposed) return;
@@ -566,6 +568,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
   })();
   return () => {
+    readerResize?.disconnect();
     disposed = true; requestNumber++; clearReaderCache(); announcements.dispose(); clearInterval(dayTimer);
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);

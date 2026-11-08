@@ -8,9 +8,8 @@
 //
 // This is a page rather than a button on each sheet, and that is the point of it: the person
 // who sends the messages is not the person who prints the boards, and the address can be handed
-// to them on its own. It carries no way back into the admin or out to the congregation's site
-// deliberately, so nothing on it invites somebody who was given one link to wander into the
-// rest of the program.
+// to them on its own. Its only return link opens the separately authenticated calendar editor.
+// It does not expose the main admin or grant a calendar role.
 //
 // It asks for no PIN. The admin does, because somebody wandering in there can change the boards;
 // nothing here changes anything, and what it prints is about to be sent to the whole congregation

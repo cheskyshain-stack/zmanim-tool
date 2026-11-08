@@ -34,7 +34,8 @@ const server = http.createServer((req, res) => {
         await page.clock.setFixedTime(new Date(date));
         await page.goto(origin + '/texts/?count=off&verify=' + Date.now());
         await page.locator('.tx-title').waitFor();
-        assert.equal(await page.locator('a').count(), 0, 'Messages stays a standalone page');
+        assert.equal(await page.locator('a').count(), 1, 'Messages has only its calendar return link');
+        assert.equal(await page.locator('[data-calendar-back]').getAttribute('href'), '/admin/calendar/');
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fits this viewport');
       };
       for (const [date, count] of [['2026-10-14T16:00:00Z', 0], ['2026-10-15T16:00:00Z', 1], ['2026-10-18T16:00:00Z', 2], ['2026-10-19T16:00:00Z', 2], ['2026-10-20T16:00:00Z', 1], ['2026-10-27T16:00:00Z', 0]]) {
