@@ -195,7 +195,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .station-frame{fill:none;stroke:none}
 .rav-chair{fill:none;stroke:currentColor;stroke-width:1.4}
 .table-seat.rav-seat{cursor:default}
-.shtender-surface{fill:var(--object-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
+.shtender-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2;vector-effect:none}
 .rav-station.selected>.station-frame,.rav-station:focus-visible>.station-frame{stroke:#2a67a0;stroke-width:2}
 .room-diagram.monochrome.room-design image{filter:grayscale(1)}
 .room-diagram.monochrome.room-design .fixture-sketch image{filter:none}
@@ -204,7 +204,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-design .floor-tile-joints{fill:none;stroke:var(--room-grout);stroke-width:.5;pointer-events:none}
 .room-design .room-boundary{fill:none;stroke:var(--room-boundary);stroke-width:3;stroke-linejoin:round}
 .room-design .table-surface,.room-design .shtender-surface,.room-design .amud-surface,.room-design .room-landmark>.object-surface,.room-design .aron,.room-design .cabinet-designed-surface{fill:var(--room-wood);stroke:var(--room-outline);stroke-width:1.3}
-.room-design .table-surface{fill:var(--room-tabletop)}
+.room-design .table-surface,.room-design .shtender-surface{fill:var(--room-tabletop)}
 .room-design .room-object>.object-surface.cabinet-designed-surface{fill:var(--room-wood)}
 .room-design .table-surface,.room-design .shtender-surface,.room-design .amud-surface,.room-design .room-landmark>.object-surface,.room-design .aron,.room-design .chair-marker,.room-design .rav-chair{filter:var(--room-shadow)}
 .room-design .design-table-edge{fill:var(--room-edge);stroke:var(--room-edge-line);stroke-width:.7;pointer-events:none}
