@@ -81,7 +81,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         assert.equal(geometry.header.height, width >= 760 ? 78 : 64, 'The shared Shul header stays visible');
         assert(Math.abs(geometry.calendar.top - geometry.header.bottom) <= 1 && geometry.calendar.bottom <= height + 1, 'Calendar fits below the Shul header');
         assert(geometry.days.every(day => day.cell.height <= 129), 'Month rows remain compact on tall screens');
-        if (width === 393 && height === 852) assert(geometry.calendar.bottom < height - 150, 'Tall phones do not stretch the month to fill the screen');
+        if (width === 393 && height === 852) assert(geometry.days.every(day => day.cell.height <= 77), 'Tall phones keep compact month rows');
         assert(geometry.controls.every(control => control.height >= 44 && control.left >= 0 && control.right <= width + 1), 'Navigation controls fit and retain 44px touch targets');
         for (const day of geometry.days) {
           assert(day.cell.bottom <= height + 1 && day.cell.right <= width + 1, JSON.stringify({ month, width, height, day }));
@@ -115,7 +115,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await saturday.click(); await page.locator('.cal-dialog .cal-event-card').first().waitFor(); assert.equal(await page.locator('.cal-dialog .cal-event-card').count(), 8);
         assert.deepEqual(await page.locator('.cal-dialog .cal-event-card').evaluateAll(nodes => nodes.map(node => [...node.classList].find(name => name.startsWith('cal-type-')).slice(9))), types, 'Day details automatically group event types');
         await page.keyboard.press('Escape');
-        await page.getByRole('button', { name:/^Announcements/ }).click(); await page.getByText('Example Shul announcement', { exact:true }).waitFor(); await page.keyboard.press('Escape');
+        await page.getByRole('button', { name:/^Notifications/ }).click(); await page.getByText('Example Shul announcement', { exact:true }).waitFor(); await page.keyboard.press('Escape');
         await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Schedule messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
         await page.locator('[data-cal-step="-1"]').click(); await page.locator('[data-cal-day="2026-10-01"]:not([disabled])').waitFor(); assert(await page.locator('[data-cal-step="-1"]').isDisabled());
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();
@@ -135,7 +135,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
           sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify({ token:'c'.repeat(64), expires:new Date('2299-01-01T00:00:00Z').getTime(), user:{ id:'fixture-owner', role:'owner', name:'Example owner', active:true } }));
         });
         await page.goto(origin + '/admin/#calendar'); await page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
-        await page.locator('[data-cal-view]').selectOption('viewer'); await page.locator('.is-cal-congregation').waitFor();
+        await page.locator('[data-cal-view]').selectOption('viewer'); await page.locator('.is-cal-congregation [data-cal-day]:not([disabled])').first().waitFor();
         const preview = await page.locator('.shul-calendar').boundingBox(); assert(preview.y + preview.height <= 901, 'Congregation preview fits below the main admin controls');
         await page.locator('[data-cal-options]').click(); await page.locator('[data-cal-view]').selectOption('owner');
         assert(await page.locator('[data-cal-access]').isVisible()); assert.equal(await page.locator('.is-cal-congregation').count(), 0);

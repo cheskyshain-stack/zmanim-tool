@@ -114,9 +114,9 @@ const server = http.createServer((req, res) => {
       assert(await t.page.locator('body').evaluate(el => el.classList.contains('cal-reader-page')));
       assert(await t.page.locator('.cal-editor-header').isVisible());
       assert.equal(await t.page.locator('[data-cal-view-notice],[data-cal-view],[data-cal-access],[data-cal-add]').count(), 0, 'The congregation screen has no admin controls');
-      await t.page.getByRole('button', { name:'Announcements, 2 unread', exact:true }).waitFor();
-      await t.page.getByRole('button', { name:'Announcements, 2 unread', exact:true }).click();
-      await t.page.getByRole('button', { name:'Announcements, 1 unread', exact:true }).waitFor();
+      await t.page.getByRole('button', { name:'Notifications, 2 unread', exact:true }).waitFor();
+      await t.page.getByRole('button', { name:'Notifications, 2 unread', exact:true }).click();
+      await t.page.getByRole('button', { name:'Notifications, 1 unread', exact:true }).waitFor();
       assert.equal(await t.page.locator('.cal-announcement-compose:not([hidden]),[data-cal-edit-announcement]:not([hidden]),[data-cal-delete-announcement]:not([hidden])').count(), 0);
       assert(!/Preview|Main admin|Choose Main admin/.test(await t.page.locator('.cal-dialog').innerText()));
       await t.page.locator('.cal-announcement-feed').evaluate(feed => { feed.scrollTop = feed.scrollHeight; });
@@ -126,7 +126,7 @@ const server = http.createServer((req, res) => {
       await t.page.waitForFunction(() => document.querySelector('[data-cal-announcement-count]').hidden);
       t.addAnnouncement({ id:'later-unread', sequence:4, text:'Another new update', createdAt:'2026-11-04T12:00:00Z', revision:1 });
       await t.page.evaluate(() => window.dispatchEvent(new Event('focus')));
-      await t.page.getByRole('button', { name:'Announcements, 1 unread', exact:true }).waitFor();
+      await t.page.getByRole('button', { name:'Notifications, 1 unread', exact:true }).waitFor();
       await t.page.locator('[data-cal-options]').click();
       assert(!/Preview|Main admin|View as|Schedule messages/.test(await t.page.locator('.cal-dialog').innerText()));
       assert(t.calls.every(call => call.startsWith('GET ') || ['POST /api/announcements/open','POST /api/announcements/read'].includes(call)), 'Only personal announcement reading is recorded');
@@ -136,7 +136,7 @@ const server = http.createServer((req, res) => {
     await admin.page.goto(origin + '/admin/calendar/'); await admin.page.locator('[data-cal-view]').waitFor();
     await admin.page.locator('[data-cal-view]').selectOption('viewer');
     await admin.page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();
-    await admin.page.getByRole('button', { name:/^Announcements/ }).click();
+    await admin.page.getByRole('button', { name:/^Notifications/ }).click();
     await admin.page.locator('.cal-dialog').waitFor(); await admin.page.keyboard.press('Escape');
     assert(admin.calls.every(call => call.startsWith('GET ')), 'The explicit admin preview still does not write reads or opens');
     await admin.page.locator('[data-cal-options]').click(); await admin.page.locator('[data-cal-view]').selectOption('owner');
