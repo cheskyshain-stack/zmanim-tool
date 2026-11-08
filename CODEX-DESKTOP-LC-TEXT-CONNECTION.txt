@@ -1,0 +1,69 @@
+Complete the Lakewood Commons LC Text email connection
+
+The user authorized connecting ads@neileich.org to the calendar notifications.
+Use the existing authorized shul Cloudflare account on this computer. The cloud
+chat has no Cloudflare login and cannot approve Google mailbox permissions.
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Live site: https://baismedrashoflakewoodcommons.org
+Service: https://zmanim-calendar.cheskyshain.workers.dev
+Configuration: worker/calendar/wrangler.jsonc
+
+1. Fetch the latest main and use an isolated worktree if the current checkout has
+   other work. Read CLAUDE.md and worker/calendar/README.md. Preserve every existing
+   account, invitation, event, announcement, read marker and calendar binding.
+
+2. Confirm the normal Cloudflare login:
+
+   npm ci --prefix worker/calendar
+   worker/calendar/node_modules/.bin/wrangler whoami
+
+   If not authenticated, use the normal wrangler login flow. Do not ask for an API
+   token in chat, change accounts blindly or use a temporary preview account.
+
+3. Deploy and verify only the calendar service:
+
+   node scripts/activate-calendar.mjs
+
+   This preserves the existing owner, verifies emailImport:true and checks that
+   events and the email receiver still reject unauthenticated requests. Do not
+   reset/bootstrap the existing owner. Do not deploy Seats or other Workers.
+   Never create production accounts, events or announcements for a write test.
+
+4. Check /api/info using Origin: https://baismedrashoflakewoodcommons.org. Confirm
+   ready:true, private:true and emailImport:true. Without an import key, POST
+   /api/email-import/receive must return 401 even without an Origin header. Without
+   a calendar session, GET /api/email-import with the allowed Origin must return 401.
+
+5. The real calendar owner must sign in at /admin/calendar/ and choose Calendar
+   access > LC Text connection > Create connection script. Existing messages are
+   included by default, with their original dates. Copy/download the private
+   generated script. Never put it in Git, logs, screenshots or chat messages.
+
+6. In Google as ads@neileich.org, create a NEW Apps Script project at
+   https://script.google.com/home/start. Paste the generated script into the new
+   project's Code.gs file, save, run setupLcTextCalendar and approve Google access.
+   Keep the existing Commons Comments Google project and its trigger intact.
+   Google access requires the mailbox owner's normal interactive sign-in/consent;
+   do not bypass it or copy credentials from another connection.
+
+7. Refresh LC Text connection on the calendar. Report Connected only after Last
+   checked has a recent time. A long historical scan can show Importing earlier
+   messages and resume at the next five-minute trigger. Safely unrecognized or
+   oversized emails appear under Messages needing review instead of auto-posting.
+   Check only real matching messages. Do not send a test email/text or create a
+   synthetic production notification. All calendar content remains sign-in-only.
+
+Matching is fixed to the exact subject
+New text message from Lc Text (848) 356-4187
+and the Google Voice originating phone number 18483564187. The receiver checks
+these again. Google account/help boilerplate is removed, while the SMS wording,
+Hebrew, links and original date are preserved. No AI API key is needed. Stable
+Gmail IDs prevent duplicate retries and restoration of deleted/edited posts.
+
+Local verification, using synthetic records only:
+   node --test tests/calendar-email-import.mjs
+   node tests/calendar-email-import.cjs
+
+Report deployment and Google setup separately. Publishing source or seeing the
+setup button alone does not prove that the mailbox connection is running.

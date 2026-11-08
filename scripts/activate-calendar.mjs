@@ -33,9 +33,11 @@ for (let attempt = 0; attempt < 5; attempt++) {
 }
 if (!info.ok) throw new Error('The calendar service could not be verified. The website connection was left unchanged.');
 const state = await info.json();
-if (!state.private || !state.accounts) throw new Error('The service is not the expected private calendar.');
+if (!state.private || !state.accounts || !state.emailImport) throw new Error('The service is not the expected private calendar with LC Text support.');
 const denied = await fetch(endpoint + '/api/events?from=2026-11-01&to=2026-11-30', { headers: { Origin: origin } });
 if (denied.status !== 401) throw new Error('The calendar must require sign-in before its website connection is enabled.');
+const inboxDenied = await fetch(endpoint + '/api/email-import/receive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ heartbeat: true }) });
+if (inboxDenied.status !== 401) throw new Error('The email receiver must reject requests without its private connection key.');
 let setupFile;
 if (!state.ready) {
   const token = randomBytes(32).toString('hex');

@@ -1196,6 +1196,23 @@ Deploy the calendar service before the client. Keep CALENDAR, CommunityCalendar,
 the lakewood-commons object name and v1 migration. Use only synthetic local records
 for write tests; production verification must not create announcements or accounts.
 
+The LC Text email connection is owner-only under Calendar access. Its client must
+check `emailImport:true` before enabling setup. The Google script is a separate
+project for ads@neileich.org, with only its own five-minute trigger. Keep the existing
+Commons Comments script/trigger unchanged. Match the exact LC Text subject and
+Google Voice originating phone 18483564187 in both Google and the receiver. Only
+the keyed POST `/api/email-import/receive` can omit Origin; all calendar reads and
+other writes keep their original authentication and origin restrictions. Store only
+the integration key hash, never a real owner's session in the script or public data.
+Keep original message wording/dates; remove known Google wrappers, and send uncertain
+extraction to owner review. Stable Gmail-ID receipts prevent duplicates and replay
+after edits, deletion or key rotation. Auto imports mark nobody as read. Keep source
+email metadata private and do not add AI, outbound email or phone push. Google consent
+and authenticated Cloudflare deployment are actual activation requirements; publishing
+source or a setup screen alone must never be reported as an active mailbox connection.
+`tests/calendar-email-import.mjs` and `.cjs` cover extraction, long historical scans,
+lost responses, real server permissions/deduplication and phone/desktop setup.
+
 `tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
 safe text rendering, keyboard viewport, private accounts and server role boundaries.

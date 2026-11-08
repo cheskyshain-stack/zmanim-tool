@@ -141,6 +141,57 @@ posting real or synthetic messages to production. The calendar browser suite use
 local Workerd to test posting, lost responses, independent read counts, pagination,
 cross-session persistence and revoked access.
 
+## LC Text email connection
+
+The owner can open Calendar access > LC Text connection to create a private Google
+Apps Script, rotate its key or disconnect it. Editors, viewers and explicit admin
+previews have no setup controls. The client checks emailImport:true before offering
+setup, so the current calendar continues working while service deployment is pending.
+Run scripts/activate-calendar.mjs on the authorized Cloudflare computer first; see
+CODEX-DESKTOP-LC-TEXT-CONNECTION.txt for activation and the separate Google consent.
+The manual calendar-sync.yml workflow can also deploy only this service if the
+repository has its authorized CLOUDFLARE_API_TOKEN. It never resets the owner or
+creates a production account/event/notification during verification.
+Existing accounts, CALENDAR/CommunityCalendar, object name and v1 migration stay intact.
+
+Use a new Google Apps Script project under ads@neileich.org. Run setupLcTextCalendar
+once and authorize normal Google access. It creates only its own five-minute trigger;
+the existing Commons Comments project/trigger stay intact. The script checks both
+the exact subject New text message from Lc Text (848) 356-4187 and the Google Voice
+originating phone 18483564187. Ads aliases are restricted to recipients of that alias.
+It reads messages without modifying Gmail, excludes Spam/Trash and outgoing replies,
+and can import the matching history first. Long scans resume in bounded runs, with
+fixed search windows, oldest-first pages and a ten-minute overlap. Unconfirmed sends
+retry with their original Gmail IDs. No ChatGPT Gmail connection or AI key is used.
+
+GET/POST/DELETE /api/email-import and GET/POST /api/email-import/review require the
+real calendar owner session. POST setup takes revision and includeExisting; only its
+response contains the generated script/key. GET exposes status only. Store only the
+key hash on the server; key rotation/disconnection immediately blocks the old script.
+Keep generated scripts out of Git/logs and never put calendar login tokens in them.
+
+Only POST /api/email-import/receive accepts requests without Origin, with its separate
+X-Calendar-Inbox-Key. No CORS exception applies to any other path/method. It validates
+the key, mailbox, exact subject, Google Voice phone, source ID and date again. Messages
+are plain text; known Google Voice logo/account/help wrappers are removed. Preserve
+actual wording, Hebrew, links and original email timestamps. Ambiguous, truncated or
+oversized messages wait in an owner-only review list, with manual Post/Skip actions.
+Source email details are never exposed in the congregation announcement response.
+
+Source receipts, announcement ordering/counts and activity are saved atomically.
+Gmail-ID receipts survive key changes, manual edits and deletion tombstones, so retry
+cannot duplicate or restore a notification. Auto imports mark nobody as read. They
+use the existing authenticated feed, read counters, Shul label and edit/delete rules.
+Earlier imported messages retain their real dates and begin unread. Importing does
+not send email, SMS or phone push notifications or change minyan schedules.
+
+Tests use synthetic source emails and isolated Workerd/Google/browser fixtures:
+
+```sh
+node --test tests/calendar-email-import.mjs
+node tests/calendar-email-import.cjs
+```
+
 ## Viewer registration and private sign-in history
 
 POST /api/register accepts {name,email,password} once the owner is set up. It

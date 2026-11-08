@@ -2,6 +2,8 @@ import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
 import { calendarAnnouncementText, calendarAnnouncementView } from '../../js/calendar/announcement-model.js';
 import { requestedRange, civilDate } from '../traffic-calendar.js';
+import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
+import { lcTextCalendarScript } from './gmail-bridge.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -25,7 +27,8 @@ async function passwordHash(password, salt) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
-    if (origin !== env.ALLOWED_ORIGIN) return json({ error: 'Open the calendar from the shul website.' }, 403);
+    const incoming = !origin && request.method === 'POST' && new URL(request.url).pathname === '/api/email-import/receive';
+    if (origin !== env.ALLOWED_ORIGIN && !incoming) return json({ error: 'Open the calendar from the shul website.' }, 403);
     const cors = { 'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN, 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization,Content-Type', Vary: 'Origin' };
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
@@ -33,7 +36,7 @@ export default {
     try { result = await env.CALENDAR.get(env.CALENDAR.idFromName('lakewood-commons')).fetch(request); }
     catch { result = json({ error: 'The calendar is temporarily unavailable. Please try again.' }, 503); }
     const headers = new Headers(result.headers);
-    Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
+    if (!incoming) Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
     return new Response(result.body, { status: result.status, headers });
   },
 };
@@ -55,14 +58,14 @@ export class CommunityCalendar extends DurableObject {
     return json({ schemaVersion: 1, timezone: range.timezone, range, snapshotAt: range.snapshotAt, startedAt,
       coverage: range.until <= startedAt ? 'not-tracked' : range.since < startedAt ? 'partial' : 'complete', counts, byDay });
   }
-  async body(request) {
+  async body(request, maxLength = 24000) {
     if (!request.headers.get('Content-Type')?.startsWith('application/json')) fail('Use a JSON request.');
     const reader = request.body?.getReader(); if (!reader) fail('Enter the requested information.');
     const decoder = new TextDecoder(); let text = '', length = 0;
     while (true) {
       const { value, done } = await reader.read(); if (done) break;
       length += value.byteLength;
-      if (length > 24000) { await reader.cancel(); fail('This event is too long.', 413); }
+      if (length > maxLength) { await reader.cancel(); fail('This request is too long.', 413); }
       text += decoder.decode(value, { stream: true });
     }
     try { const value = JSON.parse(text + decoder.decode()); if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error(); return value; }
@@ -235,9 +238,91 @@ export class CommunityCalendar extends DurableObject {
       catch (error) { return json({ error: error.status ? error.message : 'The calendar request could not be completed.' }, error.status || 500); }
     });
   }
+  emailConnectionView(record) {
+    const { keyHash, ...value } = record || { enabled: false, revision: 0, importedCount: 0, reviewCount: 0 };
+    return { ...value, mailbox: LC_TEXT_MAILBOX, sender: 'Lc Text (848) 356-4187' };
+  }
+  async saveImportedEmail(receipt, text, config) {
+    const storage = this.ctx.storage, id = 'lc-text-' + receipt.digest;
+    const sequence = (await storage.get('announcement-count') || 0) + 1, now = new Date().toISOString();
+    const message = { id, sequence, text, authorId: 'lc-text-import', authorName: 'Shul', revision: 1, createdAt: receipt.receivedAt };
+    const next = { ...config, importedCount: (config.importedCount || 0) + 1, reviewCount: Math.max(0, (config.reviewCount || 0) - (receipt.status === 'review' ? 1 : 0)), lastImportedAt: now };
+    await storage.transaction(async transaction => {
+      await transaction.put({ ['announcement:' + id]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: id,
+        'announcement-count': sequence, ['lc-receipt:' + receipt.digest]: { digest: receipt.digest, receivedAt: receipt.receivedAt, status: 'posted', announcementId: id },
+        'config:email-import': next, ...activityFields(['announcementsPosted'], now) });
+      await transaction.delete('lc-review:' + receipt.digest);
+    });
+    return { accepted: true, posted: true };
+  }
+  async receiveEmail(request) {
+    const storage = this.ctx.storage, config = await storage.get('config:email-import');
+    const key = request.headers.get('X-Calendar-Inbox-Key') || '';
+    if (!config?.enabled || !/^[a-f0-9]{64}$/.test(key) || !equal(await hash(key), config.keyHash)) fail('This inbox connection is not active.', 401);
+    await this.limited(request, 'lc-inbox', 1000);
+    const body = await this.body(request, 128000);
+    if (body.mailbox !== LC_TEXT_MAILBOX) fail('This is not the connected mailbox.', 403);
+    const checked = { ...config, lastCheckedAt: new Date().toISOString(), catchingUp: body.catchingUp === true };
+    if (body.heartbeat === true) { await storage.put('config:email-import', checked); return json({ accepted: true }); }
+    const input = body.message;
+    if (!isLcTextSource(input)) return json({ accepted: true, ignored: true });
+    if (!/^[a-f0-9]{8,100}$/.test(input.sourceId || '') || typeof input.receivedAt !== 'string' || !Number.isFinite(Date.parse(input.receivedAt)) || Date.parse(input.receivedAt) < 0 || Date.parse(input.receivedAt) > Date.now() + 300000 || typeof input.text !== 'string' || input.text.length > 20000) fail('The source email information is invalid.');
+    const digest = await hash(LC_TEXT_MAILBOX + ':' + input.sourceId), old = await storage.get('lc-receipt:' + digest);
+    if (old) return json({ accepted: true, duplicate: true, needsReview: old.status === 'review' });
+    const receipt = { digest, receivedAt: new Date(input.receivedAt).toISOString() };
+    let text;
+    try { text = lcTextWording(input); }
+    catch (error) {
+      if ((config.reviewCount || 0) >= 1000) fail('Review the waiting LC Text messages before importing more.', 409);
+      await storage.put({ ['lc-receipt:' + digest]: { ...receipt, status: 'review' }, ['lc-review:' + digest]: { ...receipt, reason: error.message, text: input.text, sourceId: input.sourceId },
+        'config:email-import': { ...checked, catchingUp: config.catchingUp, reviewCount: (config.reviewCount || 0) + 1 } });
+      return json({ accepted: true, needsReview: true });
+    }
+    return json(await this.saveImportedEmail(receipt, text, { ...checked, catchingUp: config.catchingUp }));
+  }
+  async manageEmail(request, url) {
+    const storage = this.ctx.storage, method = request.method, config = await storage.get('config:email-import');
+    if (url.pathname === '/api/email-import' && method === 'GET') return json({ connection: this.emailConnectionView(config) });
+    if (url.pathname === '/api/email-import' && ['POST', 'DELETE'].includes(method)) {
+      const body = await this.body(request);
+      if (body.revision !== (config?.revision || 0)) fail('This connection changed. Refresh before changing it.', 409);
+      await this.limited(request, 'lc-inbox-setup', 30);
+      const token = method === 'POST' ? random() : '';
+      const next = { ...config, enabled: method === 'POST', revision: (config?.revision || 0) + 1, keyHash: token ? await hash(token) : '',
+        ...(token ? { configuredAt: new Date().toISOString(), lastCheckedAt: null, catchingUp: false } : {}), importedCount: config?.importedCount || 0, reviewCount: config?.reviewCount || 0 };
+      if (method === 'POST' && typeof body.includeExisting !== 'boolean') fail('Choose whether to include earlier messages.');
+      await storage.put('config:email-import', next);
+      return json({ connection: this.emailConnectionView(next), ...(token ? { script: lcTextCalendarScript({ endpoint: url.origin, token, includeExisting: body.includeExisting }) } : {}) });
+    }
+    if (url.pathname === '/api/email-import/review' && method === 'GET') {
+      const after = url.searchParams.get('after');
+      if (after !== null && !/^[a-f0-9]{64}$/.test(after)) fail('Choose a valid review page.');
+      const rows = [...await storage.list({ prefix: 'lc-review:', limit: 21, ...(after ? { startAfter: 'lc-review:' + after } : {}) })].slice(0, 21);
+      return json({ messages: rows.slice(0, 20).map(([, row]) => row), nextAfter: rows.length > 20 ? rows[19][1].digest : null });
+    }
+    const review = /^\/api\/email-import\/review\/([a-f0-9]{64})$/.exec(url.pathname);
+    if (review && method === 'POST') {
+      const body = await this.body(request), key = 'lc-review:' + review[1], receipt = await storage.get('lc-receipt:' + review[1]);
+      if (!['post', 'skip'].includes(body.action)) fail('Choose Post or Skip.');
+      if (!receipt) fail('This message was not found.', 404);
+      if (receipt.status !== 'review') return json({ accepted: true, resolved: true });
+      await this.limited(request, 'lc-inbox-review', 120);
+      if (body.action === 'post') {
+        let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
+        return json(await this.saveImportedEmail(receipt, text, config));
+      }
+      await storage.transaction(async transaction => {
+        await transaction.put({ ['lc-receipt:' + review[1]]: { ...receipt, status: 'skipped' }, 'config:email-import': { ...config, reviewCount: Math.max(0, (config.reviewCount || 0) - 1) } });
+        await transaction.delete(key);
+      });
+      return json({ accepted: true, skipped: true });
+    }
+    return json({ error: 'Inbox page not found.' }, 404);
+  }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true });
+    if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/register' && method === 'POST') {
       if (!await this.ctx.storage.get('config:owner')) fail('The calendar owner must finish setup before registration opens.', 409);
       await this.limited(request, 'register');
@@ -280,7 +365,8 @@ export class CommunityCalendar extends DurableObject {
       await this.ctx.storage.put('user:' + user.id, next); await this.ctx.storage.delete(key);
       return json(await this.session(next, 'invitation-claimed'));
     }
-    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/activity');
+    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/activity' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    if (path === '/api/email-import' || path.startsWith('/api/email-import/')) return this.manageEmail(request, url);
     if (path === '/api/activity' && method === 'GET') return this.activityReport(url);
     if ((path === '/api/access/activity' || path.startsWith('/api/access/activity/')) && method === 'GET') return this.loginActivity(url);
     if (path === '/api/announcements' || path.startsWith('/api/announcements/')) return this.announcements(request, user, url);
