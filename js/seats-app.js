@@ -23,6 +23,7 @@ import { seatsChartName, seatsDatedChartName, seatsCopiedChartName } from './sea
 import { seatsHasContent } from './seats/content.js';
 import { seatsOpenSession } from './seats/session.js';
 import { seatsFitName, seatsCommonNameFont } from './seats/name-layout.js';
+import { SEATS_NAME_FONT, SEATS_HEBREW_NAME_FONT, seatsNameHasHebrew, seatsWaitForNameFonts } from './seats/name-font.js';
 import { seatsSeatingRows, seatsSeatingCsv, seatsRosterRows, seatsRosterCsv } from './seats/roster.js';
 import { seatsCreateNavigation } from './seats/navigation.js';
 import { seatsFormatName } from './seats/name-format.js';
@@ -38,7 +39,7 @@ async function seatsEntry() {
   const updates = seatsCreateUpdates();
   if (await updates.check()) return;
   updates.protect(() => !root.querySelector('#seats-unlock'));
-  const auth = await seatsOpenSession(root);
+  const [auth] = await Promise.all([seatsOpenSession(root), seatsWaitForNameFonts()]);
   window.dispatchEvent(new Event('zmanim-seats-open'));
   seatsStart(root, auth, updates);
 }
@@ -330,15 +331,21 @@ function seatsStart(root, auth, updates) {
     return measure.measureText(text).width;
   }
   function boldNameMeasure(text, font) {
-    measure.font = '700 ' + font + 'px Arial';
+    measure.font = '700 ' + font + 'px "' + SEATS_NAME_FONT + '", Arial, sans-serif';
     return measure.measureText(text).width;
   }
-  function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure) {
-    const { font, lines, fits } = seatsFitName(name, width, height, measureName, maxFont);
+  function hebrewNameMeasure(text, font) {
+    measure.font = '700 ' + font + 'px "' + SEATS_HEBREW_NAME_FONT + '", "' + SEATS_NAME_FONT + '", Arial, sans-serif';
+    return measure.measureText(text).width;
+  }
+  const assignedNameMeasure = name => seatsNameHasHebrew(name) ? hebrewNameMeasure : boldNameMeasure;
+  function nameText(name, x, y, width, height, tableId, maxFont = 13, assigned = false) {
+    const measureName = assigned ? assignedNameMeasure(name) : nameMeasure;
+    const { font, lines, fits } = seatsFitName(name, width, height, measureName, maxFont, assigned ? 6 : 7);
     if (!fits) overflowTables.add(tableId);
     const start = y + height / 2 - (lines.length - 1) * font * 0.55 + font * 0.33;
     const rtl = /[א-ת]/.test(name) && !/[A-Za-z]/.test(name);
-    return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
+    return `<text class="seat-name${assigned && seatsNameHasHebrew(name) ? ' seat-name-hebrew' : ''}" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
   }
   function diagram(interactive = true, printGeometry = null) {
     const current = plan(), designed = roomDesign();
@@ -347,9 +354,15 @@ function seatsStart(root, auth, updates) {
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
     const displayName = name => reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
-    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, boldNameMeasure)));
+    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => {
+      const name = displayName(people.get(id));
+      return seatsFitName(name, table.width * printScale / Math.max(1, table.count), table.height - 4, assignedNameMeasure(name), 13, 6);
+    }));
     const commonFont = seatsCommonNameFont(nameLayouts);
-    const seatName = (name, x, y, width, height, id, maxFont = 13) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), boldNameMeasure);
+    const seatName = (name, x, y, width, height, id, maxFont = 13) => {
+      const displayed = displayName(name);
+      return nameText(displayed, x, y, width * printScale, height, id, Math.min(commonFont, maxFont), true);
+    };
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
@@ -628,6 +641,7 @@ function seatsStart(root, auth, updates) {
       const status = message => { if (screen !== currentScreen || plan().id !== currentId) return; const node = root.querySelector('#seats-notice'); if (node) node.textContent = message; };
       status('Preparing CMYK PDF...');
       try {
+        await seatsWaitForNameFonts();
         await document.fonts.ready;
         if (currentScreen === 'editor' && roomDesign()) await seatsWaitForFixturePictures();
         if (screen !== currentScreen || plan().id !== currentId) { tab?.close(); return; }
@@ -656,6 +670,8 @@ function seatsStart(root, auth, updates) {
       preparingPrint = true;
       const currentId = plan().id, currentScreen = screen;
       try {
+        await seatsWaitForNameFonts();
+        await document.fonts.ready;
         if (screen === 'editor' && roomDesign()) await seatsWaitForFixturePictures();
         if (screen === currentScreen && plan().id === currentId) window.print();
       } catch { alertMessage('Room pictures could not load. Check your connection and try printing again.'); }

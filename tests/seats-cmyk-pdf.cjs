@@ -8,7 +8,8 @@ const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.wasm':'application/wasm','.woff2':'font/woff2','.ttf':'font/ttf','.png':'image/png','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
 });
 const inspect=String.raw`
-import fitz,sys,re,json
+import fitz,sys,re,json,io
+from fontTools.ttLib import TTFont
 d=fitz.open(sys.argv[1]);assert d.metadata['format']=='PDF 1.7', 'Declare a PDF version that supports transparency and output profiles'
 mono=sys.argv[2]=='1';paper=sys.argv[3];roster=paper=='roster'
 expected=(612,792) if roster else (1224,792) if paper=='tabloid' else (792,612)
@@ -18,6 +19,7 @@ profile=int(re.search(r'/DestOutputProfile\s+(\d+)',intent)[1]);assert d.xref_ge
 names=''.join(''.join(p.get_text().split()) for p in d)
 assert 'YosefCohen' in names, 'Assigned names must remain searchable text'
 assert any('\u05d0'<=c<='\u05ea' for c in names), 'Hebrew glyphs must stay in the PDF'
+assert 'משהכהן' in names, 'Hebrew names must keep their correct reading order'
 images=0;maximum_ink=0;seen=set()
 if roster:assert names.count('YosefCohen')==1, 'A person with several seats appears once in the roster'
 for p in d:
@@ -50,6 +52,16 @@ for p in d:
     assert paper_tone<=floor_paper-5, (fixture,'CMYK sketches must stay distinct from the marble')
 
  assert all(font[1]=='ttf' for font in p.get_fonts()), 'Use embedded fonts, including Hebrew'
+ if not roster:
+  fonts={font[3] for font in p.get_fonts()}
+  assert {'SeatsNoto','SeatsNotoHebrew'}<=fonts, ('Embed matching chart name fonts',fonts)
+  for font in p.get_fonts():
+   if font[3] in ['SeatsNoto','SeatsNotoHebrew']:
+    embedded=TTFont(io.BytesIO(d.extract_font(font[0])[3]))
+    assert embedded['name'].getDebugName(6)==('NotoSans-Bold' if font[3]=='SeatsNoto' else 'NotoSansHebrew-Bold'), 'Embed actual Noto glyphs'
+    assert embedded['OS/2'].usWeightClass==700
+  spans=[span for block in p.get_text('dict')['blocks'] for line in block.get('lines',[]) for span in line['spans']]
+  assert any(span['font']=='SeatsNotoHebrew' and 'Cohen' in span['text'] for span in spans), 'Mixed Hebrew/English names must retain their Latin glyphs in the Hebrew font'
  for stream in p.get_contents()+[x[0] for x in p.get_xobjects()]:
   assert not re.search(rb'(?<!\w)(?:rg|RG|/DeviceRGB)(?!\w)',d.xref_stream(stream) or b''), 'No RGB vector commands'
  for image in p.get_images(full=True):
@@ -79,7 +91,7 @@ print(json.dumps({'pages':len(d),'images':images,'maxInkPercent':round(maximum_i
   if(!remote)await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin=remote||'http://127.0.0.1:'+server.address().port;
   const {seatsCreatePlan,seatsWriteName,seatsSeatBlocked}=await import('../js/seats/model.js');
   const plan=seatsCreatePlan('Synthetic CMYK chart');plan.paper='letter';plan.monochrome=false;
-  let assigned=0;for(const table of plan.tables)for(let index=0;index<table.count;index++)if(!seatsSeatBlocked(plan,table.id,index))seatsWriteName(plan,table.id,index,assigned++===0?'Yosef Cohen':assigned===2?'משה כהן':'Guest '+String(assigned).padStart(3,'0'));
+  let assigned=0;for(const table of plan.tables)for(let index=0;index<table.count;index++)if(!seatsSeatBlocked(plan,table.id,index))seatsWriteName(plan,table.id,index,assigned++===0?'Yosef Cohen':assigned===2?'משה כהן':assigned===3?'R משה Cohen':'Guest '+String(assigned).padStart(3,'0'));
   seatsWriteName(plan,plan.tables.find(table=>table.label==='D9').id,0,'Yosef Cohen');
   const seed={version:1,activeId:plan.id,plans:[plan]},browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true,args:['--no-sandbox'],...(remote?{proxy:{server:'http://proxy:8080'}}:{})});
   try{for(const width of [375,1440]){
