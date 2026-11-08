@@ -1662,6 +1662,13 @@ do not clear them as a migration. The existing room footprint is retained.
 `tests/seats-open-seats.cjs` verifies these controls, both print paths, phone and
 desktop views, independent preferences and unchanged stored assignments.
 
+**Table numbers** shows or hides table labels such as A1 and B2 on the chart,
+native printouts and CMYK PDFs. Labels are shown by default. Remember this display
+choice independently for each chart on this device, outside shared chart data.
+Keep the Rav label, accessible seat/table names, editing controls and alphabetical
+list table names available when chart labels are hidden. Never renumber tables or
+change saved names, assignments or geometry for this preference.
+
 The regular Color chart uses warm cream (#fbf5e8) tabletops and cool pale gray
 (#f1f3f4) for the bookcases, bimah, amud and Aron Kodesh. The Rav station follows
 the tables' color and their tabletop material in illustrated Room design. Custom
