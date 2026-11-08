@@ -1732,6 +1732,14 @@ Keep the whole picture inside the printable page, clear of seat names, and
 preserve its proportions on fixed-size and auto-fit printouts. The asset must
 ship offline too.
 Assigned seat names use bold Arial (700) on screen and in native and CMYK PDFs.
+Fixed Legal printouts may fit names up to 16 diagram units instead of the normal
+13, using the actual wider seat width and the same shared-size/long-name fitting.
+Auto fit can grow assigned names uniformly on wider paper by up to 16/13, with
+shared and per-name line-height limits to keep them inside their seats. Apply
+this proportional growth only to the assigned-name lettering wrapper, preserving
+the existing horizontal paper correction. Keep normal Letter sizes, editing text,
+table labels, Open labels and fixture captions unchanged. Check actual native
+Legal and Auto fit PDFs for larger names, uniform sizing and full character bounds.
 Measure their wrapping and shared font size with the same bold weight so long
 English and Hebrew names stay within their seats. Keep Open labels and fixture
 captions at their existing weights. Preserve stored names, assignments and room

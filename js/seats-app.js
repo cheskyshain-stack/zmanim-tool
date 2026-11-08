@@ -345,12 +345,13 @@ function seatsStart(root, auth, updates) {
     measure.font = '700 ' + font + 'px Arial';
     return measure.measureText(text).width;
   }
-  function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure) {
+  function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure, growthLimit = null) {
     const { font, lines, fits } = seatsFitName(name, width, height, measureName, maxFont);
     if (!fits) overflowTables.add(tableId);
     const start = y + height / 2 - (lines.length - 1) * font * 0.55 + font * 0.33;
     const rtl = /[א-ת]/.test(name) && !/[A-Za-z]/.test(name);
-    return `<text class="seat-name" text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
+    const grow = growthLimit === null ? '' : ` data-name-growth-limit="${Math.floor(Math.min(growthLimit, Math.max(1, (height - 3) / (lines.length * font * 1.1))) * 1000) / 1000}"`;
+    return `<text class="seat-name${growthLimit === null ? '' : ' assigned-seat-name'}"${grow} text-anchor="middle" font-size="${font}" direction="${rtl ? 'rtl' : 'ltr'}" style="unicode-bidi:plaintext">${lines.map((line, index) => `<tspan x="${svgNumber(x)}" y="${svgNumber(start + index * font * 1.1)}">${html(line)}</tspan>`).join('')}</text>`;
   }
   function diagram(interactive = true, printGeometry = null) {
     const current = plan(), designed = roomDesign(), labelsVisible = showTableNumbers();
@@ -359,9 +360,17 @@ function seatsStart(root, auth, updates) {
     const wideName = (name, x, y, width, height, id, maxFont) => nameText(name, x, y, width * printScale, height, id, maxFont);
     const people = new Map(current.people.map(person => [person.id, person.name]));
     const displayName = name => reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
-    const nameLayouts = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => seatsFitName(displayName(people.get(id)), table.width * printScale / Math.max(1, table.count), table.height - 4, boldNameMeasure)));
+    const maxNameFont = !interactive && printPaper() === 'legal' ? 16 : 13;
+    const nameAreas = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => ({ name: displayName(people.get(id)), width: table.width * printScale / Math.max(1, table.count), height: table.height - 4 })));
+    const nameLayouts = nameAreas.map(({ name, width, height }) => seatsFitName(name, width, height, boldNameMeasure, maxNameFont));
     const commonFont = seatsCommonNameFont(nameLayouts);
-    const seatName = (name, x, y, width, height, id, maxFont = 13) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), boldNameMeasure);
+    // A shared height limit keeps the usual names uniform while Auto fit uses wider paper.
+    const growthLimits = !interactive && geometry.auto ? nameAreas.flatMap(({ name, width, height }) => {
+      const layout = seatsFitName(name, width, height, boldNameMeasure, commonFont);
+      return layout.fits && layout.font === commonFont ? [Math.max(1, (height - 3) / (layout.lines.length * layout.font * 1.1))] : [];
+    }) : [1];
+    const commonGrowth = Math.min(16 / 13, ...growthLimits);
+    const seatName = (name, x, y, width, height, id, maxFont = maxNameFont) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), boldNameMeasure, commonGrowth);
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
