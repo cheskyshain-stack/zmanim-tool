@@ -176,6 +176,7 @@ export async function seatsBuildCmykPdf(pages, { monochrome = false, progress = 
     const tileCount = Math.ceil(width / PRINT_TILE_WIDTH) * Math.ceil(height / PRINT_TILE_HEIGHT);
     const canvas = document.createElement('canvas'); canvas.width = PRINT_TILE_WIDTH; canvas.height = PRINT_TILE_HEIGHT;
     const context = canvas.getContext('2d', { willReadFrequently: true });
+    context.imageSmoothingQuality = 'high';
     for (let layer = 0; layer < layers.length; layer++) {
       if (layer === 1 && grid) await doc.svg(grid, { x: 0, y: 0, width: size[0], height: size[1] });
       const picture = await seatsPdfImage(layers[layer].svg);

@@ -57,6 +57,7 @@ export async function convertCmykPdf(file, { signal, progress = () => {} }) {
         canvas.width = tile.width; canvas.height = tile.height;
         const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
         if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
+        canvasContext.imageSmoothingQuality = 'high';
         render = page.render({ canvasContext, viewport, transform: [1, 0, 0, 1, -tile.x, -tile.y], background: '#ffffff', intent: 'print' });
         await render.promise;
         render = null;
