@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const fs=require('node:fs'),http=require('node:http'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-table-numbers-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
@@ -45,15 +46,15 @@ print(json.dumps({'labelsShown':shown,'tableLabels':len(expected.intersection(wo
     await toggle.scrollIntoViewIfNeeded();const top=(await toggle.boundingBox()).y;await toggle.uncheck();await labels(false);
     assert.equal(await page.evaluate(()=>document.activeElement.id),'table-numbers');assert.ok(Math.abs((await toggle.boundingBox()).y-top)<1);assert.equal(await raw(),before,'Only the per-chart display preference changes');
     await page.locator('#seat-A1-0').click();assert.equal(await page.locator('#seat-name-input').inputValue(),'Assigned Person');await page.locator('#seat-name-input').press('Escape');assert.equal(await raw(),before);
-    for(const designed of [true,false]){await page.locator('#room-design').setChecked(designed);for(const color of ['mono','color']){await page.locator('#print-color').selectOption(color);await labels(false);}}
+    for(const designed of [true,false]){await page.locator('#room-design').setChecked(designed);for(const color of ['mono','color']){await openPrintOptions(page);await page.locator('#print-color').selectOption(color);await labels(false);}}
     for(const shown of [false,true]){
       await toggle.setChecked(shown);await labels(shown);
       for(const paper of ['letter','tabloid']){
-        await page.locator('#paper-size').selectOption(paper);const file=path.join(output,[width,shown?'shown':'hidden',paper,'native.pdf'].join('-'));
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);const file=path.join(output,[width,shown?'shown':'hidden',paper,'native.pdf'].join('-'));
         await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});execFileSync('python',['-c',inspect,file,shown?'1':'0',JSON.stringify(expected)],{encoding:'utf8'});
       }
       if(width===1440){
-        await page.locator('#paper-size').selectOption('letter');await page.evaluate(()=>window.testPdf=null);const saved=await raw();await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testPdf,null,{timeout:120000});
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption('letter');await page.evaluate(()=>window.testPdf=null);const saved=await raw();await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testPdf,null,{timeout:120000});
         const data=await page.evaluate(async()=>{const bytes=new Uint8Array(await window.testPdf.arrayBuffer());let binary='';for(let i=0;i<bytes.length;i+=16384)binary+=String.fromCharCode(...bytes.subarray(i,i+16384));return btoa(binary);});const file=path.join(output,(shown?'shown':'hidden')+'-CMYK.pdf');fs.writeFileSync(file,Buffer.from(data,'base64'));console.log(execFileSync('python',['-c',inspect,file,shown?'1':'0',JSON.stringify(expected)],{encoding:'utf8'}).trim());assert.equal(await raw(),saved);
       }
     }

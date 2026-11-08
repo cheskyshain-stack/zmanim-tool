@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-chart-names-')),key='lakewood-commons-seats-v1';
@@ -47,7 +48,7 @@ const server=http.createServer((request,response)=>{
       const selectedTitle=await page.locator('#chart-name').evaluate(input=>({focused:document.activeElement===input,start:input.selectionStart,end:input.selectionEnd,length:input.value.length}));
       assert.equal(selectedTitle.focused,true);assert.equal(selectedTitle.start,0);assert.equal(selectedTitle.end,selectedTitle.length,'Using today selects the title for an optional custom edit');
       for(const paper of ['letter','tabloid']){
-        await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
         const file=path.join(output,'dated-title-'+width+'-'+paper+'.pdf');await page.pdf({path:file,preferCSSPageSize:true,printBackground:true});
         const info=execFileSync('pdfinfo',[file],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',file,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
         assert.match(info,/Pages:\s+1\b/);assert.match(text,/7:30\s+MINYAN/i);assert.ok(!text.includes(today),'The saved chart title stays out of the '+paper+' printout');await page.emulateMedia({media:'screen'});

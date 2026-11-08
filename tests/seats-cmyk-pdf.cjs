@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-cmyk-')),remote=process.env.SEATS_CHECK_ORIGIN;
@@ -132,7 +133,7 @@ print(json.dumps({'pages':len(d),'images':images,'maxInkPercent':round(maximum_i
       const result=JSON.parse(execFileSync('python',['-c',inspect,file,mono?'1':'0',paper],{encoding:'utf8'}));console.log(path.basename(file),result);assert.equal(await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1')),raw,'Exporting must not change chart data');assert.equal(await page.evaluate(()=>window.testBrowserPrints),0,'CMYK export must never fall back to RGB browser printing');for(const popup of context.pages())if(popup!==page)await popup.close();
     };
     const cases=width===375?[[true,false,'auto'],[true,true,'letter'],[false,false,'letter'],[false,true,'tabloid']]:[[true,false,'letter'],[true,true,'auto'],[true,true,'tabloid'],[false,false,'letter'],[false,true,'auto'],[false,true,'letter'],[false,true,'tabloid']];
-    for(const [mono,designed,paper]of cases){await page.locator('#print-color').selectOption(mono?'mono':'color');await page.locator('#paper-size').selectOption(paper);await page.locator('#room-design').setChecked(designed);await exportPdf(path.join(output,[width,mono?'mono':'color',designed?'design':'plain',paper].join('-')+'.pdf'),mono,paper);}
+    for(const [mono,designed,paper]of cases){await openPrintOptions(page);await page.locator('#print-color').selectOption(mono?'mono':'color');await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);await page.locator('#room-design').setChecked(designed);await exportPdf(path.join(output,[width,mono?'mono':'color',designed?'design':'plain',paper].join('-')+'.pdf'),mono,paper);}
     await page.locator('#chart-more summary').click();await page.getByRole('button',{name:'Alphabetical seat list',exact:true}).click();await exportPdf(path.join(output,width+'-roster.pdf'),true,'roster');
     await page.evaluate(()=>{window.open=()=>null;});const download=page.waitForEvent('download');await exportPdf(path.join(output,width+'-roster-download.pdf'),true,'roster');assert.match((await download).suggestedFilename(),/-CMYK\.pdf$/);
     assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await context.close();

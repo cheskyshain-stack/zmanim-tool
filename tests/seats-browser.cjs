@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http = require('node:http'), fs = require('node:fs'), path = require('node:path');
 const assert = require('node:assert/strict'), os = require('node:os');
 const {execFileSync} = require('node:child_process');
@@ -377,7 +378,7 @@ const server = http.createServer((req,res) => {
     }
     await page.setViewportSize({width:1440,height:1050});
     for (const paper of ['letter','tabloid']) {
-      await page.locator('#paper-size').selectOption(paper);
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);
       await page.emulateMedia({media:'print'});
       await assertAronCentered('#seats-print');
       const printLayout=await page.evaluate(()=>{
@@ -442,7 +443,7 @@ const server = http.createServer((req,res) => {
     await page.setViewportSize({width:1440,height:1050});
     const hiddenNames=beforeReserved.plans.find(plan=>plan.id===beforeReserved.activeId).people.map(person=>person.name);
     for(const paper of ['letter','tabloid']){
-      await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
       const pdf=path.join(output,'reserved-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
       const text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
       assert.match(text,/Reserved/);assert.doesNotMatch(text,/Reserved instead of names/);

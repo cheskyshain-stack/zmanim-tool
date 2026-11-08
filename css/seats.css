@@ -442,7 +442,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
   .seats-people-mode .room-stage.fits-room>.room-diagram{height:100%}
 }
 .editor-icon{display:inline-block;width:18px;height:18px;flex-shrink:0;pointer-events:none;vertical-align:middle}
-.seats-people-mode .seats-editor-head{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'title actions' 'name print' 'status hint';align-items:center;gap:9px 24px;margin:7px 0 12px}
+.seats-people-mode .seats-editor-head{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:'title actions' 'name name' 'status status' 'print print';align-items:center;gap:9px 24px;margin:7px 0 12px}
 .seats-editor-head .title-line{grid-area:title;gap:12px;flex-wrap:wrap}
 .seats-editor-head .title-line h1{font-size:32px;letter-spacing:-.6px}
 .seats-editor-head .tool-badge{font-size:9px;letter-spacing:1px;padding:5px 8px;border-radius:5px;background:#fffaf1}
@@ -473,7 +473,21 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-editor-print .print-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:min(100%,420px);margin:0;padding:0}
 .seats-editor-print .print-settings label{display:flex;align-items:center;gap:6px;min-width:0;min-height:44px;padding:0 10px;border:1px solid #cdd6df;border-radius:8px;background:#fff;font-size:11px;color:#596d80}
 .seats-editor-print .print-settings select{flex:1;min-width:0;width:100%;min-height:42px;margin:0;padding:8px 18px 8px 4px;border:0;background:transparent;font-size:12px;color:#142b46}
+.seats-editor-print .print-settings .pdf-colors-control{grid-column:1/-1}
+.seats-roster-actions .pdf-colors-control{display:inline-flex;align-items:center;gap:8px;font-size:12px;min-width:0}
+.seats-roster-actions .pdf-colors-control select{min-height:44px;font-size:12px}
 .seats-editor-print+.print-paper-hint{grid-area:hint;width:420px;max-width:100%;margin:0;font-size:10px;line-height:1.5}
+.seats-print-options{grid-area:print;width:100%;min-width:0;margin:0;padding:0 13px;border:1px solid #cdd6df;border-radius:8px;background:#fff}
+.seats-print-options>summary{min-height:44px;padding:12px 0;cursor:pointer;font-size:12px;font-weight:600;color:#142b46}
+.print-options-body{padding:0 0 13px}
+.seats-print-options .print-settings{width:100%;grid-template-columns:repeat(3,minmax(0,1fr))}
+.seats-print-options .print-settings .pdf-colors-control{grid-column:auto}
+.seats-print-options .print-paper-hint{width:100%;margin-top:9px}
+.seats-print-options .chart-print-notes{border:0;border-top:1px solid #e6eaee;border-radius:0;padding:12px 0 0;margin-top:12px}
+.print-extra-tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.print-extra-tools button{min-height:40px;font-size:12px}
+.seats-roster-actions .seats-print-options{flex-basis:100%;max-width:420px}
+@media(max-width:700px){.seats-print-options .print-settings{grid-template-columns:repeat(2,minmax(0,1fr))}.seats-print-options .print-settings .pdf-colors-control{grid-column:1/-1}}
 .seats-editor-workspace{gap:18px}
 .seats-editor-workspace .seats-panel,.seats-editor-workspace .seats-canvas{border-color:#dce2e7;border-radius:12px;box-shadow:0 2px 9px #142b4605}
 .seats-editor-workspace .canvas-heading{display:block;padding:16px 18px 7px}
@@ -516,7 +530,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .seats-editor-people #people-extra-tools{margin-top:12px;padding-top:2px;border-color:#e6eaee}
 .seats-editor-people #people-extra-tools>summary{min-height:44px;padding:10px 0;font-size:12px;color:#3e5d77}
 @media(min-width:1000px){.seats-editor-workspace .canvas-heading{display:flex;align-items:baseline;gap:12px}.seats-editor-workspace .canvas-heading p{margin:0}}
-@media(max-width:999px){.seats-people-mode .seats-editor-head{grid-template-columns:minmax(0,1fr);grid-template-areas:'title' 'name' 'status' 'actions' 'print' 'hint'}.seats-editor-head .top-actions{justify-content:flex-start}.seats-controls.seats-editor-print{justify-content:flex-start}.seats-editor-print+.print-paper-hint{text-align:left}}
+@media(max-width:999px){.seats-people-mode .seats-editor-head{grid-template-columns:minmax(0,1fr);grid-template-areas:'title' 'name' 'status' 'actions' 'print'}.seats-editor-head .top-actions{justify-content:flex-start}.seats-controls.seats-editor-print{justify-content:flex-start}.seats-editor-print+.print-paper-hint{text-align:left}}
 @media(max-width:700px){.seats-people-mode .seats-editor-head{gap:10px;margin:5px 0 13px}.seats-editor-head .title-line{gap:10px}.seats-editor-head .title-line h1{font-size:28px}.seats-editor-head .tool-badge{font-size:8px;padding:4px 6px;letter-spacing:.8px}.seats-editor-head .plan-line{width:100%}.seats-editor-head .top-actions{display:grid;grid-template-columns:44px minmax(0,1fr) minmax(0,1fr) 44px;gap:6px;width:100%}.seats-editor-head .top-actions>button{gap:6px;min-width:0;padding:8px 6px;font-size:12px}.seats-editor-head .editor-save-button>.editor-icon{display:none}.editor-status .sharing-status{row-gap:2px}.editor-status .sharing-audit{font-size:11px}.seats-editor-print .print-settings{width:100%;gap:8px}.seats-editor-print .print-settings label{padding:0 8px;gap:5px}.seats-editor-print+.print-paper-hint{width:100%;text-align:left;font-size:10px}.seats-editor-workspace .canvas-heading{padding:14px 14px 6px}.seats-editor-workspace .canvas-heading h2{font-size:22px}.seats-editor-workspace .canvas-heading p{font-size:11px}.canvas-toolbar{gap:8px;padding:4px 12px 11px}.canvas-toolbar .canvas-buttons{justify-content:space-between;width:100%;gap:5px}.canvas-toolbar .canvas-buttons button{width:42px;min-width:42px;min-height:44px}.canvas-toolbar .canvas-buttons select{min-width:108px;min-height:44px;font-size:12px}.canvas-toolbar .chart-name-switch{min-height:44px;padding:5px 6px}.seats-editor-workspace .seats-editor-people{padding:16px}.seats-editor-people #people-search{font-size:16px}.seats-editor-people .people-sort select{min-height:44px;font-size:14px}.seats-editor-people .people-upload{min-height:44px}.seats-editor-people .people-heading h2{font-size:22px}}
 @media(max-width:360px){.seats-editor-head .top-actions>button .editor-icon,.seats-editor-head .top-actions>button .page-folder-icon{display:none}.seats-editor-head .top-actions>button{font-size:11px}.canvas-toolbar .canvas-buttons{gap:4px}.canvas-toolbar .canvas-buttons button{width:36px;min-width:36px}.canvas-toolbar .canvas-buttons select{min-width:100px}}
 @media print{

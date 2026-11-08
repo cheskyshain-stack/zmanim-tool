@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),net=require('node:net'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {spawn}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-sharing-'));
@@ -408,7 +409,7 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     assert.doesNotMatch(await historyPage.locator('#chart-history-list').textContent(),/Renamed|Changed A1|Added 1 name|Other Person/);assert.ok(await historyPage.getByRole('button',{name:'Load earlier assignments',exact:true}).isHidden());
     await historyContext.close();
     // The note fields travel with the same shared chart and its independent copies.
-    for (const page of [a,b]) { await openSaved(page);await page.locator('.sharing-site-plan .saved-page-card[data-id="'+remoteId+'"]').click();await page.locator('#chart-print-notes summary').click(); }
+    for (const page of [a,b]) { await openSaved(page);await page.locator('.sharing-site-plan .saved-page-card[data-id="'+remoteId+'"]').click();await openPrintOptions(page);await page.locator('#chart-print-notes summary').click(); }
     await a.locator('#print-header').fill('Shared revised draft');await a.locator('#print-header').press('Tab');
     await b.waitForFunction(()=>document.querySelector('#print-header')?.value==='Shared revised draft');
     await b.locator('#print-footer').fill('Speak to the Gabbaim for a seat.');await b.locator('#print-footer').press('Tab');

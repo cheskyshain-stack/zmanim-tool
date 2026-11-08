@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-room-design-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
@@ -174,7 +175,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
     await page.screenshot({path:path.join(output,'design-'+variant+'.png'),fullPage:true});
     await page.locator('.room-stage .room-diagram').screenshot({path:path.join(output,'room-'+variant+'.png')});
     for(const paper of ['auto','letter','tabloid']){
-      await page.locator('#paper-size').selectOption(paper);
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);
       await uniformSeatBackgrounds();
       {
         const screenViewport=page.viewportSize();await page.setViewportSize(paper==='tabloid'?{width:1536,height:960}:{width:989,height:749});

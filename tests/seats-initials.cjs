@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {execFileSync}=require('node:child_process'),{chromium}=require('playwright');
 const root=path.resolve(__dirname,'../dist'),output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-initials-')),remote=process.env.SEATS_CHECK_ORIGIN,key='lakewood-commons-seats-v1';
@@ -55,11 +56,11 @@ print('PASS PDF:',sys.argv[2],round(page.rect.width),round(page.rect.height))
       await page.locator('#people-extra-tools').evaluate(node=>{node.open=true;});await page.locator('#plan-files').evaluate(node=>{node.open=true;});
       const download=page.waitForEvent('download');await page.getByRole('button',{name:'Download seating list',exact:true}).click();const file=await download;const csv=path.join(output,'names-'+width+'.csv');await file.saveAs(csv);assert.ok(fs.readFileSync(csv,'utf8').includes('Yosef Chuam Cohen'));
       for(const paper of ['letter','tabloid']){
-        await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'short-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);const pdf=path.join(output,'short-'+width+'-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
         console.log(execFileSync('python',['-c',inspectPdf,pdf,'short'],{encoding:'utf8'}).trim());
       }
       const afterPaper=await raw();await toggle.uncheck();assert.equal(await raw(),afterPaper);assert.equal(await label('A1',0),'Yosef Chuam Cohen');
-      await page.locator('#paper-size').selectOption('letter');const pdf=path.join(output,'full-'+width+'-letter.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspectPdf,pdf,'full'],{encoding:'utf8'}).trim());
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption('letter');const pdf=path.join(output,'full-'+width+'-letter.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});console.log(execFileSync('python',['-c',inspectPdf,pdf,'full'],{encoding:'utf8'}).trim());
       const saved=JSON.parse(await raw()).plans.find(p=>p.id===plan.id);assert.deepEqual(saved.people,plan.people);assert.deepEqual(saved.tables,plan.tables);
       await page.locator('[data-action=home]').click();await page.getByRole('button',{name:'Create new chart',exact:true}).click();const beforeDraft=await raw();await toggle.check();assert.equal(await raw(),beforeDraft,'Changing display on an empty draft never saves another chart');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));assert.deepEqual(errors,[]);assert.deepEqual(writes,[]);assert.deepEqual(patches,[]);await context.close();

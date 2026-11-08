@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const {execFileSync}=require('node:child_process');
@@ -131,7 +132,7 @@ const server=http.createServer((request,response)=>{
     await page.locator('#chart-view').selectOption('width');
     await page.screenshot({path:path.join(output,'assigned-desktop.png'),fullPage:true});
     for(const paper of ['letter','tabloid']){
-      await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
+      await openPrintOptions(page);await page.locator('#paper-size').selectOption(paper);await page.emulateMedia({media:'print'});
       const pdf=path.join(output,'assign-mode-'+paper+'.pdf');await page.pdf({path:pdf,preferCSSPageSize:true,printBackground:true});
       const info=execFileSync('pdfinfo',[pdf],{encoding:'utf8'}),text=execFileSync('pdftotext',['-raw',pdf,'-'],{encoding:'utf8'}).replace(/\s+/g,' ');
       assert.match(info,/Pages:\s+1\b/);assert.match(info,paper==='letter'?/792 x 612 pts/:/1224 x 792 pts/);

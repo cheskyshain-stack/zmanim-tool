@@ -1,3 +1,4 @@
+const openPrintOptions=require('./helpers/seats-print-options.cjs');
 const http=require('node:http'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),assert=require('node:assert/strict');
 const {chromium}=require('playwright'),{execFileSync}=require('node:child_process');
 const root=path.resolve(__dirname,'../dist'),remote=process.env.SEATS_CHECK_ORIGIN,output=fs.mkdtempSync(path.join(os.tmpdir(),'seats-print-'));
@@ -92,7 +93,7 @@ print(json.dumps({'marginsInches':[round(value,3) for value in margins],'frontWo
       const cases=[{name:'letter',paper:'letter'},{name:'tabloid',paper:'tabloid'},...['Letter','Tabloid','Legal','A4','A5'].map(format=>({name:'auto-'+format.toLowerCase(),paper:'auto',format})),{name:'auto-letter-browser-zoom',paper:'auto',format:'Letter',zoom:1.25},{name:'auto-tabloid-browser-zoom',paper:'auto',format:'Tabloid',zoom:1.5}];
       if(width===1440)cases.push({name:'tabloid-on-letter',paper:'tabloid',nativeLetter:true},{name:'letter-larger-margins',paper:'letter',margin:.75,color:true},{name:'tabloid-larger-margins',paper:'tabloid',margin:.75},{name:'auto-tabloid-larger-margins',paper:'auto',format:'Tabloid',margin:.75});
       for(const testCase of cases){
-        await page.locator('#paper-size').selectOption(testCase.paper);await page.locator('#print-color').selectOption(testCase.color?'color':'mono');
+        await openPrintOptions(page);await page.locator('#paper-size').selectOption(testCase.paper);await openPrintOptions(page);await page.locator('#print-color').selectOption(testCase.color?'color':'mono');
         let override=null;
         if(testCase.margin)override=await page.addStyleTag({content:'@page{margin:'+testCase.margin+'in!important}'});
         const zoomStyle=testCase.zoom?await page.addStyleTag({content:'@media print{html{zoom:'+testCase.zoom+'}}'}):null;
