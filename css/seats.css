@@ -201,6 +201,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .room-diagram.monochrome.room-design .fixture-sketch image{filter:none}
 .room-diagram.room-design{color:var(--room-ink)}
 .room-design .design-room-floor{fill:var(--room-floor);pointer-events:none}
+.room-design .design-floor-texture{filter:grayscale(1)}
 .room-design .floor-tile-joints{fill:none;stroke:var(--room-grout);stroke-width:.5;pointer-events:none}
 .room-design .room-boundary{fill:none;stroke:var(--room-boundary);stroke-width:3;stroke-linejoin:round}
 .room-design .table-surface,.room-design .shtender-surface,.room-design .amud-surface,.room-design .room-landmark>.object-surface,.room-design .aron,.room-design .cabinet-designed-surface{fill:var(--room-wood);stroke:var(--room-outline);stroke-width:1.3}

@@ -9,7 +9,7 @@ const server=http.createServer((req,res)=>{
   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.jpg':'image/jpeg','.png':'image/png'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
 });
 const inspectPdf=String.raw`
-import sys,re,json,fitz
+import sys,re,json,fitz,numpy as np
 page=fitz.open(sys.argv[1]);assert len(page)==1, 'Room design must fit on one page'
 p=page[0];w,h=(792,612) if sys.argv[2]=='letter' else (1224,792)
 assert abs(p.rect.width-w)<.1 and abs(p.rect.height-h)<.1
@@ -20,7 +20,19 @@ if len(sys.argv)>3 and sys.argv[3]=='1':
  margin=36 if sys.argv[2]=='tabloid' else 25.2
  floor=fitz.Rect(margin+(500-12)*(w-2*margin)/1176,margin+25.2+(600-50)*(h-2*margin-25.2-16)/916,margin+(700-12)*(w-2*margin)/1176,margin+25.2+(620-50)*(h-2*margin-25.2-16)/916)
  stone=p.get_pixmap(matrix=fitz.Matrix(3,3),clip=floor,alpha=False).samples
- assert len({stone[i:i+3] for i in range(0,len(stone),3)})>(8 if len(sys.argv)>4 and sys.argv[4]=='1' else 48), 'The open walkway must retain natural marble variation in the native PDF'
+ stone_pixels=np.frombuffer(stone,dtype=np.uint8).reshape(-1,3)
+ assert stone_pixels.mean()>244, 'The floor must print as a very pale neutral, with low ink coverage'
+ assert (stone_pixels.max(axis=1)-stone_pixels.min(axis=1)).max()<=2, 'The floor must not retain a beige or green color cast'
+ assert len(np.unique(stone_pixels,axis=0))>3, 'Keep a faint trace of the original stone rather than an artificial vein pattern'
+ if not (len(sys.argv)>4 and sys.argv[4]=='1'):
+  sx=(w-2*margin)/1176;sy=(h-2*margin-25.2-16)/916
+  for fixture,box in [('Aron',(590,80,610,100)),('amud',(595,212,605,220)),('bimah',(588,540,612,546))]:
+   x0,y0,x1,y1=box
+   r=fitz.Rect(margin+(x0-12)*sx,margin+25.2+(y0-50)*sy,margin+(x1-12)*sx,margin+25.2+(y1-50)*sy)
+   detail=p.get_pixmap(matrix=fitz.Matrix(8,8),clip=r,alpha=False)
+   rgb=np.frombuffer(detail.samples,dtype=np.uint8).reshape(-1,3);lightness=rgb@np.array([.2126,.7152,.0722])
+   assert 105<lightness.mean()<210, (fixture,'Lift the original near-black wood and fabric while retaining visible color detail')
+   assert np.percentile(lightness,95)-np.percentile(lightness,5)>3, (fixture,'Keep photographic details instead of a flat light fill')
  pix=p.get_pixmap(matrix=fitz.Matrix(2,2),alpha=False)
  pixels=pix.samples
  header_ink=sum(1 for y in range(round(margin*2),round((margin+25.2)*2)) for x in range(round(w*.43*2),round(w*.57*2)) if max(pixels[(y*pix.width+x)*3:(y*pix.width+x)*3+3])<205)
@@ -108,7 +120,7 @@ print(json.dumps({'pages':1,'drawings':len(p.get_drawings()),'paper':sys.argv[2]
         const marble=page.locator(scope+' .design-floor-texture');assert.equal(await marble.count(),1);
         const image=await marble.evaluate(async node=>{const picture=new Image();picture.src=node.getAttribute('href');await picture.decode();return [new URL(picture.src).pathname,picture.naturalWidth,picture.naturalHeight];});assert.deepEqual(image,['/assets/seats/light-marble-floor-v1.png',1774,887],'The floor uses realistic stone artwork');
         const grid=await page.locator(scope+' .room-art>.floor-tile-joints').evaluate(group=>{const paths=[...group.querySelectorAll('path')],boxes=paths.map(path=>path.getBBox()),xs=boxes.filter(b=>b.width===0).map(b=>b.x).sort((a,b)=>a-b),ys=boxes.filter(b=>b.height===0).map(b=>b.y).sort((a,b)=>a-b);return {tile:[xs[1]-xs[0],ys[1]-ys[0]],center:[(xs.filter(x=>x<600).at(-1)+xs.find(x=>x>600))/2,(ys.filter(y=>y<515).at(-1)+ys.find(y=>y>515))/2],curves:paths.some(path=>/[CQSTA]/i.test(path.getAttribute('d'))),color:getComputedStyle(group).stroke,width:parseFloat(getComputedStyle(group).strokeWidth)};});
-        assert.deepEqual(grid.tile,[144,72]);assert.deepEqual(grid.center,[600,515],'A rectangular tile stays centered in the room');assert.equal(grid.curves,false,'Only physical grout joints are drawn, with no artificial marble-vein curves');assert.equal(grid.color,'rgb(220, 220, 220)');assert.equal(grid.width,.5,'Tile joints remain fine and understated');
+        assert.deepEqual(grid.tile,[144,72]);assert.deepEqual(grid.center,[600,515],'A rectangular tile stays centered in the room');assert.equal(grid.curves,false,'Only physical grout joints are drawn, with no artificial marble-vein curves');assert.equal(grid.color,'rgb(232, 232, 232)');assert.equal(grid.width,.5,'Tile joints remain fine and understated');
         assert.equal(await marble.evaluate(node=>node.parentElement.querySelectorAll('use').length),0,'Keep the original natural marble without mirrored repeats');
       }
       await page.emulateMedia({media:null});
