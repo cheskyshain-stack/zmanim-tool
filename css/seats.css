@@ -132,7 +132,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .setup-hint{font-size:11px;margin:0 17px 7px;color:var(--seats-muted)}
 .room-scroll{overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;overscroll-behavior-y:auto;min-width:0;background:#fff;touch-action:pan-x pan-y}
 .room-stage{min-width:100%;max-width:none}
-.room-diagram{display:block;width:100%;height:auto;color:#23354a;--table-fill:#f1f3f4;--object-fill:#fbf5e8}
+.room-diagram{display:block;width:100%;height:auto;color:#23354a;--table-fill:#fbf5e8;--object-fill:#f1f3f4}
 .room-diagram.monochrome{color:#111;--table-fill:#fff;--object-fill:#fff}
 .room-object>.object-surface.cabinet-designed-surface{fill:#fff}
 .cabinet-design{fill:#fff;stroke:currentColor;stroke-width:.8;stroke-linejoin:round;pointer-events:none}
