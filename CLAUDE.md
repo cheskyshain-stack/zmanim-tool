@@ -1053,6 +1053,17 @@ the time to the minute, yesterday's show Yesterday, and older messages show only
 the date. Compare local calendar days across daylight-saving changes and refresh
 open message labels on the existing polling/focus cycle. Keep original timestamps
 stored and keep full dates and times in the calendar manager's announcement view.
+Owners and calendar editors can set an optional Added date and time when posting,
+or change it in Edit. Use the shul timezone, preserve unchanged seconds, and reject
+nonexistent or ambiguous local times rather than guessing. Added dates determine
+newest-first list order; retain the original createdAt, sequence, source receipts
+and read markers. Synchronize date changes into open lists and retain unsaved drafts.
+The congregation can retrieve only the last 10 New York calendar days, including
+today. Enforce the same cutoff in feed pagination, edits and unread counts on the
+server; viewers cannot extend it using query parameters. Managers keep full history,
+and their Congregation view applies the same limit. Show the history limit above
+the feed. Use timestamped status snapshots so aging or moving messages can reduce
+unread counts without older responses restoring stale counts.
 The standalone calendar uses the compact navy subpage header, with the same
 left arrow and Home link as Donate, a quiet Community Calendar label and the
 gold-outlined Donate pill with its giving-hand icon on the right, linking to /donate/.
@@ -1193,8 +1204,9 @@ feed. Stop timers and observers on logout or navigation. This feed does not publ
 calendar information or activate the separate phone-notification feature.
 Every announcement displays Shul as its author, including legacy records. Project
 the label in API responses without rewriting old stored author identity. All owners
-and calendar editors can edit any active announcement. Keep its ID, creation date,
-sequence, order and read markers; show its edited time. Use optimistic revisions
+and calendar editors can edit any active announcement. Keep its ID, original creation
+date, sequence and read markers. A separate addedAt controls its displayed date and
+list position. Use optimistic revisions
 and operation IDs so concurrent edits conflict and retries count once. Record edits
 in private activity totals. Sync edited messages into open feeds without losing
 older pages or drafts; skip deleted posts and keep a conflicting edit draft intact.
@@ -1203,7 +1215,8 @@ Deleting requires confirmation and removes the post from every account's feed an
 unread count. Keep a private tombstone and the existing record for recovery, remove
 its ordering entry, and never restore a deleted post when an old submission retries.
 Deletion retries are idempotent. Count deleted posts as seen for every account so
-monotonic read counters remain valid, including late reads and old status responses.
+read markers remain valid, including late reads and old status responses. Bounded
+congregation unread counts exclude expired messages without marking them read.
 An open feed syncs deletion IDs after the status count changes, retaining older
 loaded messages, scroll position and unsent drafts. Viewers cannot delete through
 either the UI or API. Existing events, accounts and sign-in history stay unchanged.

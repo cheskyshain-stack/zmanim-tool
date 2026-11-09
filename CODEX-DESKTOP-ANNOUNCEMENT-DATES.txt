@@ -1,0 +1,52 @@
+Finish publishing editable announcement dates and congregation history
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Client branch: codex/announcement-date-controls
+Worker implementation is already on main in c8d6b37.
+
+The user authorized owners and calendar editors to change an announcement's added
+date/time and move it to that position in the list. The congregation sees the last
+10 New York calendar days, including today. Managers keep full history. Original
+source dates, SMS receipts, account roles and individual read markers are retained.
+
+The cloud workspace has no Cloudflare login. GitHub service deployment run
+42627812641 passed the tests but stopped because CLOUDFLARE_API_TOKEN is absent.
+Use the computer already signed into the shul's Cloudflare account. The tested
+client is held in a draft PR until its server capabilities have been deployed.
+
+1. Fetch origin/codex/announcement-date-controls into a clean checkout or isolated
+   worktree. Read CLAUDE.md and worker/calendar/README.md. Use Node 24.
+
+2. Deploy only the existing zmanim-calendar Worker, preserving CALENDAR,
+   CommunityCalendar, lakewood-commons, v1 and all accounts and integration keys:
+
+   npm ci --prefix worker/calendar --no-audit --no-fund
+   node worker/calendar/node_modules/wrangler/bin/wrangler.js whoami
+   node worker/calendar/node_modules/wrangler/bin/wrangler.js deploy --config worker/calendar/wrangler.jsonc
+   node scripts/verify-announcement-dates.mjs
+
+   The verifier performs only unauthenticated GETs. It must find
+   announcementDateEditing:true and announcementHistoryDays:10, while private
+   reads remain HTTP 401. Production verification must not create messages/accounts.
+
+3. After the verifier passes, publish the tested client by marking its PR ready
+   and merging it. Resolve any intervening changes without replacing others' work:
+
+   gh pr ready codex/announcement-date-controls
+   gh pr merge codex/announcement-date-controls --squash
+
+4. Wait for Publish the site, then verify actual live assets from the release
+   checkout (build locally first if it has no stamped version map):
+
+   python build-offline.py
+   node scripts/build-schedule-api.mjs
+   node scripts/verify-announcement-dates.mjs --site
+
+   If the live asset version has not propagated, wait and repeat only the verifier.
+   Do not claim this feature is live until both service and client checks pass.
+
+Validation already completed in the cloud workspace includes real local Workerd
+accounts, legacy date-index backfill, date-only edits, duplicate edit retries,
+cursor pagination and deletion, boundary-day history, unread preservation, SMS and
+email imports, and real Chromium date editing at phone and desktop widths with a
+different device timezone. No Tasker settings or source sender keys were changed.

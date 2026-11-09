@@ -654,7 +654,8 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     }
     assert.equal(requests.slice(previewRequestStart).filter(request => /\/api\//.test(request.url) && ['POST', 'PUT', 'DELETE'].includes(request.method)).length, 0, 'Owner previews never write or record announcement opens/read markers');
     assert.deepEqual((await call('/api/activity?days=1', 'GET', null, owner)).body.counts, previewBefore);
-    assert.deepEqual((await call('/api/announcements/status', 'GET', null, owner)).body, previewReads);
+    const afterPreviewReads = (await call('/api/announcements/status', 'GET', null, owner)).body;
+    assert.deepEqual({ ...afterPreviewReads, snapshotAt: null }, { ...previewReads, snapshotAt: null }, 'Previewing leaves every announcement count and permission unchanged');
     assert.equal(await ownerPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), 'owner');
     await ownerPage.locator('[data-cal-options]').click();
     await ownerPage.locator('[data-cal-view]').selectOption('owner');
