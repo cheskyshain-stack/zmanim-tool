@@ -30,4 +30,4 @@
 .cmyk-pdf-dialog details { margin-top: 1.25rem; color: #59616a; font-size: .875rem; }
 .cmyk-pdf-dialog summary { cursor: pointer; min-height: 32px; }
 .cmyk-pdf-dialog [hidden] { display: none !important; }
-@media print { .cmyk-pdf-dialog, .cmyk-pdf-button { display: none !important; } }
+@media print { .cmyk-pdf-dialog { display: none !important; } }

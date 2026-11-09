@@ -128,7 +128,7 @@ print(json.dumps(measurements))
     await page.locator('.sharing-local-plan .saved-page-card[data-id="' + plan.id + '"]').click(); await settle();
     await openPrintOptions(page);
     assert(!requests.some(r => r.url.includes('pdfjs')), 'PDF.js stays unloaded until a file is selected in Seats');
-    await convert('chart', chart);
+    fs.writeFileSync(path.join(output, 'chart.pdf'), chart);
     const controlsFit = async () => {
       const boxes = await page.locator('[data-action="cmyk-pdf"]').evaluateAll(nodes => nodes.map(node => {
         const b = node.getBoundingClientRect(); return { left: b.left, right: b.right, height: b.height, width: innerWidth };
@@ -163,6 +163,7 @@ print(json.dumps(measurements))
     await page.waitForTimeout(250);
     assert.equal(await page.locator('dialog.cmyk-pdf-dialog').count(), 0);
     await page.setViewportSize({ width: 1440, height: 1000 });
+    await convert('chart', chart);
     await convert('netz', netz);
     await page.setViewportSize({ width: 320, height: 812 }); await controlsFit();
     await page.locator('[data-action="cmyk-pdf"]').click();
