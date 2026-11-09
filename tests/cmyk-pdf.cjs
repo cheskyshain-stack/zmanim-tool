@@ -63,6 +63,7 @@ print(json.dumps(measurements))
     const requests = [], errors = [];
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') ? route.continue() : route.abort());
     await context.addInitScript(() => {
+      if (!['http:', 'https:'].includes(location.protocol)) return;
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
       localStorage.setItem('zmanim-nocount', '1');
       localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, sheet: 'vasikinboth', design: 'new', margin: .2, marginDefault: .15 }));
@@ -70,6 +71,8 @@ print(json.dumps(measurements))
     context.on('request', req => requests.push({ url: req.url(), method: req.method() }));
     context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
     const sourcePage = await context.newPage(), page = await context.newPage();
+    await sourcePage.evaluate(() => document.readyState);
+    assert.deepEqual(errors, [], 'Fixture setup must also work on the initial blank pages');
     const settle = async (target = page) => { await target.evaluate(() => document.fonts.ready); await target.waitForTimeout(200); };
     const convert = async (name, source, button = '[data-action="cmyk-pdf"]') => {
       const original = path.join(output, name + '.pdf'), converted = path.join(output, name + '-CMYK.pdf');
@@ -120,7 +123,7 @@ print(json.dumps(measurements))
     const { seatsCreateState, seatsWriteName } = await import('../js/seats/model.js');
     const sample = seatsCreateState(), plan = sample.plans[0];
     plan.paper = 'letter'; plan.name = 'Synthetic CMYK test'; seatsWriteName(plan, 'A1', 0, 'Print Test');
-    await context.addInitScript(sample => { if (!localStorage.getItem('lakewood-commons-seats-v1')) localStorage.setItem('lakewood-commons-seats-v1', JSON.stringify(sample)); }, sample);
+    await context.addInitScript(sample => { if (!['http:', 'https:'].includes(location.protocol)) return; if (!localStorage.getItem('lakewood-commons-seats-v1')) localStorage.setItem('lakewood-commons-seats-v1', JSON.stringify(sample)); }, sample);
     await page.goto(origin + '/seats/');
     await page.locator('#seats-name').fill('Synthetic Test'); await page.locator('#seats-pin').fill('4444');
     await page.getByRole('button', { name: 'Open Seats', exact: true }).click();
