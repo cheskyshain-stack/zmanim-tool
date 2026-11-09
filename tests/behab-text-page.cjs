@@ -19,7 +19,7 @@ const server = http.createServer((req, res) => {
   const browser = await chromium.launch({ executablePath: '/usr/bin/chromium', args: ['--no-sandbox'] });
   const checks = [], errors = [];
   try {
-    for (const width of [375, 1440]) {
+    for (const width of [320, 375, 393, 1440]) {
       const context = await browser.newContext({ viewport: { width, height: 950 } });
       await context.addInitScript(() => {
         localStorage.setItem('zmanim-nocount', '1');
@@ -37,6 +37,15 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.locator('a').count(), 1, 'Messages has only its calendar return link');
         assert.equal(await page.locator('[data-calendar-back]').getAttribute('href'), '/admin/calendar/');
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fits this viewport');
+        const header = await page.locator('.tx-site-header').evaluate(element => {
+          const box = node => { const r = node.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height }; };
+          return { bounds:box(element), photo:box(element.querySelector('img')), back:box(element.querySelector('a')), title:box(document.querySelector('.tx-title')), text:element.innerText, pictureReady:element.querySelector('img').complete && element.querySelector('img').naturalWidth > 0 };
+        });
+        assert(header.pictureReady && header.photo.width === 54 && header.photo.height === 35, 'The original building picture is visible');
+        assert(!header.text.includes('Bais Medrash'), 'The long shul name does not crowd the header');
+        assert(header.photo.left >= 16 && header.back.right <= width - 16 && header.photo.right + 12 <= header.back.left, 'Photo and return button have space beside each other');
+        for (const control of [header.photo, header.back]) assert(control.top >= header.bounds.top + 6 && control.bottom <= header.bounds.bottom - 6, 'Header contents stay inside the navy bar');
+        assert(header.back.height >= 44 && header.title.top >= header.bounds.bottom + 16, 'The touch target fits above the page title');
       };
       for (const [date, count] of [['2026-10-14T16:00:00Z', 0], ['2026-10-15T16:00:00Z', 1], ['2026-10-18T16:00:00Z', 2], ['2026-10-19T16:00:00Z', 2], ['2026-10-20T16:00:00Z', 1], ['2026-10-27T16:00:00Z', 0]]) {
         await open(date); assert.equal(await cards().count(), count, date + ': four-day window');
