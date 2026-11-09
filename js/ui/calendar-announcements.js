@@ -72,14 +72,14 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     const openingId = crypto.randomUUID(); let openingRecorded = false;
     let editing = null, syncingEdits = null, knownEditCount = 0;
     let observer;
-    const view = dialog('<p class="cal-announcement-intro">Updates for everyone with calendar access.</p><form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>', {
+    const intro = previewing() ? '<p class="cal-announcement-intro">Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.</p>' : '';
+    const view = dialog(intro + '<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>', {
       onClose: () => {
         if (posting || deleting || editing?.saving || (textarea.value.trim() || editing && editing.field.value !== editing.original) && !confirm('Discard your unsaved announcement changes?')) return false;
         cleanup(); active = null; return true;
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
-    if (previewing()) view.el.querySelector('.cal-announcement-intro').textContent = 'Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.';
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
@@ -93,14 +93,12 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
     }
     function card(message) {
-      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(message.createdAt)}">${escText(whenDate(message.createdAt))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span><span class="cal-announcement-edited" ${message.updatedAt ? '' : 'hidden'}>${message.updatedAt ? 'Edited ' + escText(whenDate(message.updatedAt)) : ''}</span></header><p dir="auto">${escText(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(message.createdAt))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(message.createdAt))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
+      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(message.createdAt)}">${escText(whenDate(message.createdAt))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${escText(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(message.createdAt))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(message.createdAt))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
     }
     const messageNode = key => [...feed.querySelectorAll('[data-announcement-id]')].find(node => node.dataset.announcementId === key);
     function paintMessage(message) {
       const node = messageNode(message.id); if (!node) return;
       node.querySelector(':scope > p').textContent = message.text;
-      const edited = node.querySelector('.cal-announcement-edited'); edited.hidden = !message.updatedAt;
-      edited.textContent = message.updatedAt ? 'Edited ' + whenDate(message.updatedAt) : '';
     }
     function applyEdits(values) {
       const scrollTop = feed.scrollTop;

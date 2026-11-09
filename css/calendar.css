@@ -33,7 +33,6 @@
 .cal-dialog .cal-announcement-delete[hidden] { display:none; }
 .cal-announcement-edit-form { margin-top:1rem; }
 .cal-announcement-edit-form textarea { white-space:pre-wrap; }
-.cal-announcement-edited { color:#63717b; font-size:.7rem; }
 .cal-announcement-end { display:block; height:1px; }
 .cal-activity-account { margin:1rem 0; padding:1rem; border:1px solid #dedfd9; border-radius:10px; overflow-wrap:anywhere; }
 .cal-activity-account header { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:.4rem; }
