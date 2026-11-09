@@ -141,6 +141,27 @@ posting real or synthetic messages to production. The calendar browser suite use
 local Workerd to test posting, lost responses, independent read counts, pagination,
 cross-session persistence and revoked access.
 
+## Announcement dates and congregation history
+
+Announcement managers can set optional `addedAt` timestamps on POST and PUT. The
+server validates canonical UTC timestamps and rejects future dates beyond clock
+tolerance. `createdAt` retains the original source/arrival time. IDs, sequences,
+source receipts and per-account reads survive date edits. Edits use the existing
+revision and operation ID checks, including date-only changes and retries.
+
+Messages sort newest first by `addedAt || createdAt`, with sequence as a stable
+tie-breaker. The derived date index is backfilled from the existing sequence index
+once, without resetting the Durable Object or changing legacy records. Date cursor
+pagination uses `nextCursor` and `?cursor=`; old numeric pagination remains supported.
+
+Viewer accounts can retrieve only the last 10 New York calendar days, including
+today. Managers keep full history; `?view=congregation` applies the same recent view
+without granting permissions. The cutoff applies to feeds, updates and unread
+counts. Moving a post out of that window removes it from open congregation lists
+without deleting it. Status snapshots let counts change safely as messages age or
+move dates. Verify `announcementDateEditing:true` and `announcementHistoryDays:10`
+before publishing a date-editing client. Production checks must not create data.
+
 ## LC Text email connection
 
 The owner can open Calendar access > LC Text connection to create a private Google

@@ -22,6 +22,8 @@ jobs:
         run: node --test tests/calendar-model.mjs tests/calendar-announcements.mjs tests/calendar-email-import.mjs
       - name: Install the pinned calendar deployment tool
         run: npm ci --prefix worker/calendar --no-audit --no-fund
+      - name: Verify announcement dates and congregation history with isolated local records
+        run: node tests/calendar-announcement-dates.cjs
       - name: Deploy only the existing calendar service
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -48,7 +50,8 @@ jobs:
           }
           assert.equal(response.status,200);
           const info=await response.json();
-          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','loginHistory','selfRegistration','activityStatistics','emailImport'])assert.equal(info[field],true,field);
+          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','announcementDateEditing','loginHistory','selfRegistration','activityStatistics','emailImport'])assert.equal(info[field],true,field);
+          assert.equal(info.announcementHistoryDays,10);
           for(const path of ['/api/events?from=2026-11-01&to=2026-11-30','/api/announcements','/api/email-import','/api/email-import/review']){
             const denied=await fetch(endpoint+path,{headers});assert.equal(denied.status,401,path);await denied.body?.cancel();
           }

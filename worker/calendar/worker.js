@@ -1,7 +1,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
-import { calendarAnnouncementText, calendarAnnouncementView } from '../../js/calendar/announcement-model.js';
-import { requestedRange, civilDate } from '../traffic-calendar.js';
+import { calendarAnnouncementText, calendarAnnouncementView, calendarAnnouncementDate, calendarAnnouncementAddedAt, CALENDAR_ANNOUNCEMENT_HISTORY_DAYS } from '../../js/calendar/announcement-model.js';
+import { requestedRange, civilDate, shiftDate, midnight } from '../traffic-calendar.js';
 import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
 import { lcTextCalendarScript } from './gmail-bridge.js';
 
@@ -17,6 +17,8 @@ const userView = user => ({ id: user.id, name: user.name, email: user.email, rol
 const identifier = value => /^[a-zA-Z0-9_-]{8,100}$/.test(value || '');
 const activityTypes = ['signIns', 'registrations', 'eventsCreated', 'eventsEdited', 'eventsDeleted', 'announcementsPosted', 'announcementsEdited', 'announcementsDeleted', 'announcementOpens'];
 const activityFields = (types, at = new Date().toISOString()) => ({ ['activity:' + at + ':' + crypto.randomUUID()]: { at, types } });
+const announcementDatePrefix = 'announcement-date-order:';
+const announcementDateKey = message => announcementDatePrefix + calendarAnnouncementDate(message) + ':' + String(message.sequence).padStart(16, '0');
 async function passwordHash(password, salt) {
   if (typeof password !== 'string' || password.length < 12 || password.length > 200) fail('Use a password with 12 to 200 characters.');
   const key = await crypto.subtle.importKey('raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']);
@@ -46,6 +48,18 @@ export class CommunityCalendar extends DurableObject {
     super(ctx, env); this.ctx = ctx; this.env = env;
     ctx.blockConcurrencyWhile(async () => {
       if (!await ctx.storage.get('config:activity-start')) await ctx.storage.put('config:activity-start', new Date().toISOString());
+      if (!await ctx.storage.get('config:announcement-date-index')) {
+        let after;
+        do {
+          const rows = await ctx.storage.list({ prefix: 'announcement-order:', limit: 100, ...(after ? { startAfter: after } : {}) });
+          if (!rows.size) break;
+          const records = await ctx.storage.get([...rows.values()].map(id => 'announcement:' + id));
+          const entries = Object.fromEntries([...records.values()].filter(message => !message.deletedAt).map(message => [announcementDateKey(message), message.id]));
+          if (Object.keys(entries).length) await ctx.storage.put(entries);
+          after = [...rows.keys()].at(-1);
+        } while (after);
+        await ctx.storage.put('config:announcement-date-index', 1);
+      }
     });
   }
   async activityReport(url) {
@@ -118,18 +132,27 @@ export class CommunityCalendar extends DurableObject {
     const entries = [...rows.values()].slice(0, 50);
     return json({ entries, nextBefore: rows.size > 50 ? entries.at(-1).sequence : null });
   }
-  async announcementStatus(user) {
+  announcementHistorySince(user, url) {
+    return user.role === 'viewer' || url?.searchParams.get('view') === 'congregation'
+      ? new Date(midnight(shiftDate(civilDate(Date.now()), 1 - CALENDAR_ANNOUNCEMENT_HISTORY_DAYS))).toISOString() : null;
+  }
+  async announcementStatus(user, url) {
     const total = await this.ctx.storage.get('announcement-count') || 0;
     const prefix = 'announcement-read:' + user.id + ':';
     const read = await this.ctx.storage.list({ prefix }), deleted = await this.ctx.storage.list({ prefix: 'announcement-deleted:' });
     const seen = new Set([...read.keys()].map(key => key.slice(prefix.length)));
     for (const key of deleted.keys()) seen.add(key.slice('announcement-deleted:'.length));
     const admin = ['owner', 'editor'].includes(user.role);
-    return { total, unread: Math.max(0, total - seen.size), deletedCount: deleted.size, editCount: await this.ctx.storage.get('announcement-edit-count') || 0, canPost: admin, canDelete: admin, canEdit: admin };
+    const historySince = this.announcementHistorySince(user, url);
+    const unread = historySince ? [...(await this.ctx.storage.list({ prefix: announcementDatePrefix, start: announcementDatePrefix + historySince })).values()].filter(id => !seen.has(id)).length : Math.max(0, total - seen.size);
+    this.statusTime = Math.max(Date.now(), (this.statusTime || 0) + 1);
+    return { total, unread, deletedCount: deleted.size, editCount: await this.ctx.storage.get('announcement-edit-count') || 0, canPost: admin, canDelete: admin, canEdit: admin,
+      dateEditing: true, chronological: true, historyDays: historySince ? CALENDAR_ANNOUNCEMENT_HISTORY_DAYS : null, historySince, snapshotAt: new Date(this.statusTime).toISOString() };
   }
   async announcements(request, user, url) {
-    const storage = this.ctx.storage, method = request.method;
-    if (url.pathname === '/api/announcements/status' && method === 'GET') return json(await this.announcementStatus(user));
+    const storage = this.ctx.storage, method = request.method, status = () => this.announcementStatus(user, url);
+    const historySince = this.announcementHistorySince(user, url);
+    if (url.pathname === '/api/announcements/status' && method === 'GET') return json(await status());
     if (url.pathname === '/api/announcements/updates' && method === 'GET') {
       const after = url.searchParams.get('after') || '0';
       if (!/^\d+$/.test(after) || !Number.isSafeInteger(Number(after))) fail('Choose a valid announcement update.');
@@ -137,7 +160,10 @@ export class CommunityCalendar extends DurableObject {
       const rows = await storage.list({ prefix, startAfter: prefix + String(Number(after)).padStart(16, '0'), limit: 101 });
       const batch = [...rows].slice(0, 100), ids = [...new Set(batch.map(([, id]) => id))];
       const records = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
-      return json({ messages: [...records.values()].filter(message => !message.deletedAt).map(calendarAnnouncementView),
+      const values = [...records.values()].filter(message => !message.deletedAt);
+      const read = await storage.list({ prefix: 'announcement-read:' + user.id + ':' });
+      return json({ messages: values.filter(message => !historySince || calendarAnnouncementDate(message) >= historySince).map(message => ({ ...calendarAnnouncementView(message), read: read.has('announcement-read:' + user.id + ':' + message.id) })),
+        hiddenIds: values.filter(message => historySince && calendarAnnouncementDate(message) < historySince).map(message => message.id),
         nextAfter: rows.size > 100 ? Number(batch.at(-1)[0].slice(prefix.length)) : null,
         editCount: await storage.get('announcement-edit-count') || 0 });
     }
@@ -147,7 +173,7 @@ export class CommunityCalendar extends DurableObject {
       const key = 'activity-open:' + user.id + ':' + body.id;
       const recorded = await storage.get(key);
       if (!recorded) await this.limited(request, 'announcement-open', 120);
-      const page = new URL('/api/announcements', url);
+      const page = new URL('/api/announcements' + url.search, url);
       const response = await this.announcements(new Request(page, { headers: request.headers }), user, page);
       if (!recorded) await storage.put({ [key]: true, ...activityFields(['announcementOpens']) });
       return response;
@@ -165,18 +191,22 @@ export class CommunityCalendar extends DurableObject {
       const body = await this.body(request, old.authorId === 'shul-sms-import' ? 128000 : 24000);
       if (typeof body.operationId !== 'string' || !identifier(body.operationId)) fail('Reload the announcement editor and try again.');
       let text; try { text = calendarAnnouncementText(body.text, old.authorId === 'shul-sms-import' ? 16000 : 4000); } catch (error) { fail(error.message); }
+      let addedAt; try { addedAt = body.addedAt === undefined ? calendarAnnouncementDate(old) : calendarAnnouncementAddedAt(body.addedAt); } catch (error) { fail(error.message); }
       if (old.lastEditId === body.operationId) {
-        if (old.updatedBy !== user.id || old.text !== text) fail('This edit was already saved with different information.', 409);
-        return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
+        if (old.updatedBy !== user.id || old.text !== text || calendarAnnouncementDate(old) !== addedAt) fail('This edit was already saved with different information.', 409);
+        return json({ message: calendarAnnouncementView(old), ...await status() });
       }
       if (body.revision !== (old.revision || 1)) fail('This announcement changed. Cancel and reopen Edit before saving.', 409);
-      if (text === old.text) return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
+      if (text === old.text && addedAt === calendarAnnouncementDate(old)) return json({ message: calendarAnnouncementView(old), ...await status() });
       await this.limited(request, 'announcement-write', 60);
       const now = new Date().toISOString(), editSequence = (await storage.get('announcement-edit-count') || 0) + 1;
-      const message = { ...old, text, authorName: 'Shul', revision: (old.revision || 1) + 1, updatedAt: now, updatedBy: user.id, lastEditId: body.operationId };
-      await storage.put({ [key]: message, 'announcement-edit-count': editSequence,
-        ['announcement-edit-order:' + String(editSequence).padStart(16, '0')]: id, ...activityFields(['announcementsEdited'], now) });
-      return json({ message: calendarAnnouncementView(message), ...await this.announcementStatus(user) });
+      const message = { ...old, text, addedAt, authorName: 'Shul', revision: (old.revision || 1) + 1, updatedAt: now, updatedBy: user.id, lastEditId: body.operationId };
+      await storage.transaction(async transaction => {
+        await transaction.delete(announcementDateKey(old));
+        await transaction.put({ [key]: message, [announcementDateKey(message)]: id, 'announcement-edit-count': editSequence,
+          ['announcement-edit-order:' + String(editSequence).padStart(16, '0')]: id, ...activityFields(['announcementsEdited'], now) });
+      });
+      return json({ message: calendarAnnouncementView(message), ...await status() });
     }
     if (removal && method === 'DELETE') {
       if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can delete announcements.', 403);
@@ -189,9 +219,10 @@ export class CommunityCalendar extends DurableObject {
         await storage.transaction(async transaction => {
           await transaction.put({ [key]: { ...message, ...deletion }, ['announcement-deleted:' + id]: deletion, ...activityFields(['announcementsDeleted'], deletion.deletedAt) });
           await transaction.delete('announcement-order:' + String(message.sequence).padStart(16, '0'));
+          await transaction.delete(announcementDateKey(message));
         });
       }
-      return json({ removed: true, id, ...await this.announcementStatus(user) });
+      return json({ removed: true, id, ...await status() });
     }
     if (url.pathname === '/api/announcements/read' && method === 'POST') {
       const body = await this.body(request);
@@ -199,7 +230,7 @@ export class CommunityCalendar extends DurableObject {
       const ids = [...new Set(body.ids)], messages = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
       if (ids.some(id => !messages.has('announcement:' + id))) fail('An announcement was not found.', 404);
       if (ids.length) await storage.put(Object.fromEntries(ids.map(id => ['announcement-read:' + user.id + ':' + id, messages.get('announcement:' + id).sequence])));
-      return json(await this.announcementStatus(user));
+      return json(await status());
     }
     if (url.pathname !== '/api/announcements') return json({ error: 'Announcement page not found.' }, 404);
     if (method === 'POST') {
@@ -207,28 +238,39 @@ export class CommunityCalendar extends DurableObject {
       const body = await this.body(request);
       if (typeof body.id !== 'string' || !identifier(body.id)) fail('Reload the announcement form and try again.');
       let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
+      let addedAt; try { addedAt = body.addedAt === undefined ? null : calendarAnnouncementAddedAt(body.addedAt); } catch (error) { fail(error.message); }
       const key = 'announcement:' + body.id, old = await storage.get(key);
       if (old) {
         if (old.deletedAt) fail('This announcement was deleted. Create a new post to share a new update.', 409);
-        if (old.authorId !== user.id || old.text !== text) fail('This announcement was already posted with different text. Refresh the feed.', 409);
-        return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
+        if (old.authorId !== user.id || old.text !== text || addedAt && calendarAnnouncementDate(old) !== addedAt) fail('This announcement was already posted with different information. Refresh the feed.', 409);
+        return json({ message: calendarAnnouncementView(old), ...await status() });
       }
       await this.limited(request, 'announcement-write', 60);
       const sequence = (await storage.get('announcement-count') || 0) + 1;
-      const message = { id: body.id, sequence, text, authorId: user.id, authorName: 'Shul', revision: 1, createdAt: new Date().toISOString() };
+      const message = { id: body.id, sequence, text, authorId: user.id, authorName: 'Shul', revision: 1, createdAt: new Date().toISOString(), ...(addedAt ? { addedAt } : {}) };
       await storage.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
+        [announcementDateKey(message)]: body.id,
         ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt) });
-      return json({ message: calendarAnnouncementView(message), ...await this.announcementStatus(user) }, 201);
+      return json({ message: calendarAnnouncementView(message), ...await status() }, 201);
     }
     if (method === 'GET') {
       const before = url.searchParams.get('before');
       if (before !== null && (!/^[1-9]\d*$/.test(before) || !Number.isSafeInteger(Number(before)))) fail('Choose a valid announcement page.');
-      const rows = await storage.list({ prefix: 'announcement-order:', reverse: true, limit: 31,
-        ...(before === null ? {} : { end: 'announcement-order:' + before.padStart(16, '0') }) });
+      let cursor = url.searchParams.get('cursor');
+      if (cursor !== null && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z:\d{16}$/.test(cursor)) fail('Choose a valid announcement page.');
+      if (before !== null && cursor === null) {
+        const id = await storage.get('announcement-order:' + before.padStart(16, '0'));
+        const previous = id && await storage.get('announcement:' + id);
+        if (!previous) fail('This announcement page changed. Reload the feed.', 409);
+        cursor = announcementDateKey(previous).slice(announcementDatePrefix.length);
+      }
+      const rows = historySince && cursor && cursor < historySince ? new Map() : await storage.list({ prefix: announcementDatePrefix, reverse: true, limit: 31,
+        ...(historySince ? { start: announcementDatePrefix + historySince } : {}), ...(cursor ? { end: announcementDatePrefix + cursor } : {}) });
       const ids = [...rows.values()].slice(0, 30), records = ids.length ? await storage.get(ids.map(id => 'announcement:' + id)) : new Map();
       const read = await storage.list({ prefix: 'announcement-read:' + user.id + ':' });
       const messages = ids.map(id => ({ ...calendarAnnouncementView(records.get('announcement:' + id)), read: read.has('announcement-read:' + user.id + ':' + id) }));
-      return json({ messages, nextBefore: rows.size > 30 ? messages.at(-1).sequence : null, ...await this.announcementStatus(user) });
+      return json({ messages, nextBefore: rows.size > 30 ? messages.at(-1).sequence : null,
+        nextCursor: rows.size > 30 ? [...rows.keys()][29].slice(announcementDatePrefix.length) : null, ...await status() });
     }
     return json({ error: 'Announcement page not found.' }, 404);
   }
@@ -280,6 +322,7 @@ export class CommunityCalendar extends DurableObject {
     const message = { id, sequence, text: body.text, authorId: 'shul-sms-import', authorName: 'Shul', revision: 1, createdAt: new Date(body.receivedAt).toISOString() };
     await storage.transaction(async transaction => {
       await transaction.put({ ['announcement:' + id]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: id,
+        [announcementDateKey(message)]: id,
         'announcement-count': sequence, [receiptKey]: { bodyHash, announcementId: id, receivedAt: now },
         'config:sms-import': { ...config, importedCount: (config.importedCount || 0) + 1, lastCheckedAt: now, lastImportedAt: now },
         ...activityFields(['announcementsPosted'], now) });
@@ -293,6 +336,7 @@ export class CommunityCalendar extends DurableObject {
     const next = { ...config, importedCount: (config.importedCount || 0) + 1, reviewCount: Math.max(0, (config.reviewCount || 0) - (receipt.status === 'review' ? 1 : 0)), lastImportedAt: now };
     await storage.transaction(async transaction => {
       await transaction.put({ ['announcement:' + id]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: id,
+        [announcementDateKey(message)]: id,
         'announcement-count': sequence, ['lc-receipt:' + receipt.digest]: { digest: receipt.digest, receivedAt: receipt.receivedAt, status: 'posted', announcementId: id },
         'config:email-import': next, ...activityFields(['announcementsPosted'], now) });
       await transaction.delete('lc-review:' + receipt.digest);
@@ -365,7 +409,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
