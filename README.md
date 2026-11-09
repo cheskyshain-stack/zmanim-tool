@@ -67,8 +67,9 @@ Existing saved charts retain their own geometry, names and assignments. The new
 default does not migrate or overwrite them. Both original and current untouched
 room drafts stay out of Saved charts. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
 five seats as the standard size. Table labels appear above the table surfaces.
-Tables use 48 units per seat, about 12% wider than the original 43. Names use a
-shared font size chosen to fit most assigned seats, with only the longest names
+Tables use 48 units per seat, about 12% wider than the original 43. Names use
+regular Liberation Serif, matching the lighter printed Bimah style, on screen
+and in every print format. A shared font size fits most assigned seats, with only the longest names
 shrinking further. Names wrap between whole words; exceptionally long names
 still show the fit warning so their table can be enlarged before printing.
 Standard tables are 40 units high. The middle columns and rear rows keep 48-unit

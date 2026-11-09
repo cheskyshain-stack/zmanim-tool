@@ -20,7 +20,7 @@ table_height=collections.Counter(round(r.height,1) for r in frames).most_common(
 frames=[r for r in frames if abs(r.height-table_height)<.2]
 assert len(frames)==int(sys.argv[3]), ('Missing table frames',len(frames))
 pitch=max(r.width for r in frames)/5
-chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16),'color':s['color']} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
+chars=[{'size':s['size'],'bbox':c['bbox'],'text':c['c'],'bold':bool(s['flags']&16),'serif':bool(s['flags']&4),'color':s['color']} for b in p.get_text('rawdict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] for c in s['chars']]
 ink=next(s['color'] for b in p.get_text('dict')['blocks'] if 'lines' in b for l in b['lines'] for s in l['spans'] if '7:30' in s['text'])
 fonts=[]
 for r in frames:
@@ -30,7 +30,7 @@ for r in frames:
   seat=[s for s in chars if s['text'].strip() and left<=(s['bbox'][0]+s['bbox'][2])/2<right and r.y0<=(s['bbox'][1]+s['bbox'][3])/2<=r.y1]
   if ''.join(s['text'] for s in seat)=='Pillar':continue
   assert all(s['color']==ink for s in seat), ('Print names in solid black',seat)
-  assert all(s['bold'] for s in seat), ('An assigned name is not bold in the PDF',seat)
+  assert all(s['serif'] and not s['bold'] for s in seat), ('Assigned names must use the regular serif in the PDF',seat)
   assert all(s['bbox'][0]>=left-.6 and s['bbox'][2]<=right+.6 and s['bbox'][1]>=r.y0-.6 and s['bbox'][3]<=r.y1+.6 for s in seat), ('Name clipped or overlapping a neighboring seat',r,seat)
   sizes=[s['size'] for s in seat]
   if sizes: fonts.append(round(max(sizes),2))
@@ -63,7 +63,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       const before=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));
       const inspect=async selector=>page.locator(selector).evaluate(stage=>{
         const texts=[...stage.querySelectorAll('.table-seat.assigned .seat-name')],sizes={};
-        for(const text of texts){if(!getComputedStyle(text).fontFamily.startsWith('Arial'))throw new Error('Assigned names must use the original Arial font');if(getComputedStyle(text).fontWeight!=='700')throw new Error('Assigned names must render in bold');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
+        for(const text of texts){if(!getComputedStyle(text).fontFamily.includes('Liberation Serif'))throw new Error('Assigned names must use Liberation Serif');if(getComputedStyle(text).fontWeight!=='400')throw new Error('Assigned names must render at regular weight');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
         const names=texts.map(text=>[...text.querySelectorAll('tspan')].map(line=>line.textContent).join(' '));
         const overflow=texts.filter(text=>{
           const parent=text.closest('.table-seat'),rav=parent.classList.contains('rav-seat'),seat=parent.querySelector(rav?'.shtender-surface':'.seat-area').getBBox(),box=text.getBBox();
@@ -72,6 +72,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
         }).map(text=>({name:text.textContent,font:text.getAttribute('font-size')}));
         return {count:texts.length,sizes,names,overflow};
       });
+      assert.equal(await page.evaluate(()=>[...document.fonts].find(face=>face.family.includes('Liberation Serif')&&face.weight==='400')?.status),'loaded','The full Latin/Hebrew webfont is loaded');
       const screen=await inspect('.room-stage');assert.ok(Math.max(...Object.values(screen.sizes))>=Math.ceil(screen.count*.85));assert.equal(screen.overflow.length,0,JSON.stringify(screen.overflow));
       assert.deepEqual(screen.names.sort(),[...renderedNames].sort(),'Full English and Hebrew names stay intact');
       await page.screenshot({path:path.join(output,'names-'+width+'.png'),fullPage:true});

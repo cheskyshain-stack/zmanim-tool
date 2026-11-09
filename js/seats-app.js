@@ -38,7 +38,9 @@ async function seatsEntry() {
   const updates = seatsCreateUpdates();
   if (await updates.check()) return;
   updates.protect(() => !root.querySelector('#seats-unlock'));
+  const nameFontReady = document.fonts.load('400 13px "Liberation Serif"', 'Aaאב').catch(() => {});
   const auth = await seatsOpenSession(root);
+  await nameFontReady;
   window.dispatchEvent(new Event('zmanim-seats-open'));
   seatsStart(root, auth, updates);
 }
@@ -341,8 +343,8 @@ function seatsStart(root, auth, updates) {
     measure.font = font + 'px Arial';
     return measure.measureText(text).width;
   }
-  function boldNameMeasure(text, font) {
-    measure.font = '700 ' + font + 'px Arial';
+  function seatNameMeasure(text, font) {
+    measure.font = '400 ' + font + 'px "Liberation Serif",serif';
     return measure.measureText(text).width;
   }
   function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure, growthLimit = null) {
@@ -362,15 +364,15 @@ function seatsStart(root, auth, updates) {
     const displayName = name => reservedPrint ? 'Reserved' : shortNames ? seatsInitialsName(name) : name;
     const maxNameFont = !interactive && printPaper() === 'legal' ? 16 : 13;
     const nameAreas = current.tables.flatMap(table => table.seats.filter(id => people.has(id)).map(id => ({ name: displayName(people.get(id)), width: table.width * printScale / Math.max(1, table.count), height: table.height - 4 })));
-    const nameLayouts = nameAreas.map(({ name, width, height }) => seatsFitName(name, width, height, boldNameMeasure, maxNameFont));
+    const nameLayouts = nameAreas.map(({ name, width, height }) => seatsFitName(name, width, height, seatNameMeasure, maxNameFont));
     const commonFont = seatsCommonNameFont(nameLayouts);
     // A shared height limit keeps the usual names uniform while Auto fit uses wider paper.
     const growthLimits = !interactive && geometry.auto ? nameAreas.flatMap(({ name, width, height }) => {
-      const layout = seatsFitName(name, width, height, boldNameMeasure, commonFont);
+      const layout = seatsFitName(name, width, height, seatNameMeasure, commonFont);
       return layout.fits && layout.font === commonFont ? [Math.max(1, (height - 3) / (layout.lines.length * layout.font * 1.1))] : [];
     }) : [1];
     const commonGrowth = Math.min(16 / 13, ...growthLimits);
-    const seatName = (name, x, y, width, height, id, maxFont = maxNameFont) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), boldNameMeasure, commonGrowth);
+    const seatName = (name, x, y, width, height, id, maxFont = maxNameFont) => nameText(displayName(name), x, y, width * printScale, height, id, Math.min(commonFont, maxFont), seatNameMeasure, commonGrowth);
     const controls = entry => interactive ? `id="room-item-${attr(entry.id)}" data-item="${attr(entry.id)}" role="button" tabindex="0" aria-label="${attr('Table ' + entry.label + (entry.count === null ? ', seats not set' : ', ' + seatsUsableCount(current, entry) + ' seats'))}"` : '';
     const tables = current.tables.map(table => {
       const count = table.count ?? 0, width = table.width / Math.max(1, count);
