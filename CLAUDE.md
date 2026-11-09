@@ -1213,6 +1213,16 @@ source or a setup screen alone must never be reported as an active mailbox conne
 `tests/calendar-email-import.mjs` and `.cjs` cover extraction, long historical scans,
 lost responses, real server permissions/deduplication and phone/desktop setup.
 
+The owner also has a Shul SMS connection under Calendar access. Only its keyed
+POST `/api/sms-import/receive` may omit Origin, alongside the email receiver.
+Preserve exact SMS text up to 16,000 characters and never expose source phone
+numbers or integration keys in the feed. Stable receipts survive edits, deletion
+and key rotation; imports mark nobody as read. Normal manual posts keep their
+4,000-character limit. Deploy `smsImport:true` before the setup client and retain
+all existing calendar bindings and accounts. See `tests/calendar-sms-import.cjs`
+and `CODEX-DESKTOP-SHUL-SMS-CONNECTION.txt`; local browser/write tests use synthetic
+records and production verification must not create announcements or accounts.
+
 `tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
 safe text rendering, keyboard viewport, private accounts and server role boundaries.

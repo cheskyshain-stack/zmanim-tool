@@ -27,7 +27,7 @@ async function passwordHash(password, salt) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
-    const incoming = !origin && request.method === 'POST' && new URL(request.url).pathname === '/api/email-import/receive';
+    const incoming = !origin && request.method === 'POST' && ['/api/email-import/receive', '/api/sms-import/receive'].includes(new URL(request.url).pathname);
     if (origin !== env.ALLOWED_ORIGIN && !incoming) return json({ error: 'Open the calendar from the shul website.' }, 403);
     const cors = { 'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN, 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization,Content-Type', Vary: 'Origin' };
@@ -162,9 +162,9 @@ export class CommunityCalendar extends DurableObject {
       const id = removal[1]; if (!identifier(id)) fail('Choose a valid announcement.');
       const key = 'announcement:' + id, old = await storage.get(key);
       if (!old || old.deletedAt) fail('That announcement was not found.', 404);
-      const body = await this.body(request);
+      const body = await this.body(request, old.authorId === 'shul-sms-import' ? 128000 : 24000);
       if (typeof body.operationId !== 'string' || !identifier(body.operationId)) fail('Reload the announcement editor and try again.');
-      let text; try { text = calendarAnnouncementText(body.text); } catch (error) { fail(error.message); }
+      let text; try { text = calendarAnnouncementText(body.text, old.authorId === 'shul-sms-import' ? 16000 : 4000); } catch (error) { fail(error.message); }
       if (old.lastEditId === body.operationId) {
         if (old.updatedBy !== user.id || old.text !== text) fail('This edit was already saved with different information.', 409);
         return json({ message: calendarAnnouncementView(old), ...await this.announcementStatus(user) });
@@ -241,6 +241,50 @@ export class CommunityCalendar extends DurableObject {
   emailConnectionView(record) {
     const { keyHash, ...value } = record || { enabled: false, revision: 0, importedCount: 0, reviewCount: 0 };
     return { ...value, mailbox: LC_TEXT_MAILBOX, sender: 'Lc Text (848) 356-4187' };
+  }
+  smsConnectionView(record) {
+    const { keyHash, ...value } = record || { enabled: false, revision: 0, importedCount: 0 };
+    return value;
+  }
+  async manageSms(request, url) {
+    const storage = this.ctx.storage, config = await storage.get('config:sms-import');
+    if (request.method === 'GET') return json({ connection: this.smsConnectionView(config) });
+    if (!['POST', 'DELETE'].includes(request.method)) return json({ error: 'SMS connection page not found.' }, 404);
+    const body = await this.body(request);
+    if (body.revision !== (config?.revision || 0)) fail('This connection changed. Refresh before changing it.', 409);
+    await this.limited(request, 'sms-inbox-setup', 30);
+    const token = request.method === 'POST' ? random() : '';
+    const next = { ...config, enabled: !!token, keyHash: token ? await hash(token) : '', revision: (config?.revision || 0) + 1,
+      importedCount: config?.importedCount || 0, ...(token ? { configuredAt: new Date().toISOString(), lastCheckedAt: null } : {}) };
+    await storage.put('config:sms-import', next);
+    return json({ connection: this.smsConnectionView(next), ...(token ? { key: token, endpoint: url.origin } : {}) });
+  }
+  async receiveSms(request) {
+    const storage = this.ctx.storage, config = await storage.get('config:sms-import');
+    const key = request.headers.get('X-Calendar-SMS-Key') || '';
+    if (!config?.enabled || !/^[a-f0-9]{64}$/.test(key) || !equal(await hash(key), config.keyHash)) fail('This SMS connection is not active.', 401);
+    const body = await this.body(request, 128000), now = new Date().toISOString();
+    if (body.check === true) {
+      await storage.put('config:sms-import', { ...config, lastCheckedAt: now });
+      return json({ accepted: true, ready: true });
+    }
+    if (typeof body.id !== 'string' || !identifier(body.id) || typeof body.text !== 'string' || !body.text.trim() || body.text.length > 16000 || body.text.includes('\u0000') || typeof body.receivedAt !== 'string' || !Number.isFinite(Date.parse(body.receivedAt)) || Date.parse(body.receivedAt) < 0 || Date.parse(body.receivedAt) > Date.now() + 300000) fail('The SMS information is invalid.');
+    const digest = await hash('shul-sms:' + body.id), receiptKey = 'sms-receipt:' + digest;
+    const bodyHash = await hash(body.text), previous = await storage.get(receiptKey);
+    if (previous) {
+      if (previous.bodyHash !== bodyHash) fail('This SMS was already received with different original text.', 409);
+      return json({ accepted: true, posted: true, duplicate: true, announcementId: previous.announcementId });
+    }
+    await this.limited(request, 'sms-inbox', 1000);
+    const id = 'shul-sms-' + digest, sequence = (await storage.get('announcement-count') || 0) + 1;
+    const message = { id, sequence, text: body.text, authorId: 'shul-sms-import', authorName: 'Shul', revision: 1, createdAt: new Date(body.receivedAt).toISOString() };
+    await storage.transaction(async transaction => {
+      await transaction.put({ ['announcement:' + id]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: id,
+        'announcement-count': sequence, [receiptKey]: { bodyHash, announcementId: id, receivedAt: now },
+        'config:sms-import': { ...config, importedCount: (config.importedCount || 0) + 1, lastCheckedAt: now, lastImportedAt: now },
+        ...activityFields(['announcementsPosted'], now) });
+    });
+    return json({ accepted: true, posted: true, duplicate: false, announcementId: id }, 201);
   }
   async saveImportedEmail(receipt, text, config) {
     const storage = this.ctx.storage, id = 'lc-text-' + receipt.digest;
@@ -321,8 +365,9 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
+    if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
       if (!await this.ctx.storage.get('config:owner')) fail('The calendar owner must finish setup before registration opens.', 409);
       await this.limited(request, 'register');
@@ -365,7 +410,8 @@ export class CommunityCalendar extends DurableObject {
       await this.ctx.storage.put('user:' + user.id, next); await this.ctx.storage.delete(key);
       return json(await this.session(next, 'invitation-claimed'));
     }
-    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/activity' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/activity' || path === '/api/sms-import' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    if (path === '/api/sms-import') return this.manageSms(request, url);
     if (path === '/api/email-import' || path.startsWith('/api/email-import/')) return this.manageEmail(request, url);
     if (path === '/api/activity' && method === 'GET') return this.activityReport(url);
     if ((path === '/api/access/activity' || path.startsWith('/api/access/activity/')) && method === 'GET') return this.loginActivity(url);
