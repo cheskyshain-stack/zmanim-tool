@@ -139,14 +139,14 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       if (editing?.id === key) { editing.field.focus(); return; }
       if (editing && editing.field.value !== editing.original && !confirm('Discard your unsaved announcement changes?')) return;
       closeEditor(); const message = messages.get(key), node = messageNode(key); if (!message || !node) return;
-      node.insertAdjacentHTML('beforeend', `<form class="cal-form cal-announcement-edit-form"><label>Edit announcement<textarea name="text" rows="4" maxlength="4000" required>${escText(message.text)}</textarea></label><p class="cal-error" role="status"></p><div class="cal-form-actions"><button class="cal-primary" type="submit">Save changes</button><button type="button" data-cal-cancel-edit>Cancel</button></div></form>`);
+      node.insertAdjacentHTML('beforeend', `<form class="cal-form cal-announcement-edit-form"><label>Edit announcement<textarea name="text" rows="4" maxlength="${message.authorId === 'shul-sms-import' ? 16000 : 4000}" required>${escText(message.text)}</textarea></label><p class="cal-error" role="status"></p><div class="cal-form-actions"><button class="cal-primary" type="submit">Save changes</button><button type="button" data-cal-cancel-edit>Cancel</button></div></form>`);
       const editor = node.querySelector('.cal-announcement-edit-form'), field = editor.elements.text, error = editor.querySelector('[role=status]');
       const state = editing = { id: key, original: message.text, revision: message.revision || 1, field, saving: false, operation: null };
       editor.querySelector('[data-cal-cancel-edit]').addEventListener('click', () => { if (!state.saving) closeEditor(); });
       editor.addEventListener('submit', async event => {
         event.preventDefault(); if (state.saving || !current()) return;
         try {
-          const text = calendarAnnouncementText(field.value);
+          const text = calendarAnnouncementText(field.value, message.authorId === 'shul-sms-import' ? 16000 : 4000);
           if (!state.operation || state.operation.text !== text) state.operation = { operationId: crypto.randomUUID(), text, revision: state.revision };
           state.saving = true; field.disabled = true; editor.querySelectorAll('button').forEach(button => { button.disabled = true; }); error.textContent = 'Saving…';
           const value = await calendarRequest('/api/announcements/' + encodeURIComponent(key), { method: 'PUT', body: state.operation });

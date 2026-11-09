@@ -192,6 +192,35 @@ node --test tests/calendar-email-import.mjs
 node tests/calendar-email-import.cjs
 ```
 
+## Shul SMS connection
+
+Calendar access offers the owner a separate Shul SMS connection. GET/POST/DELETE
+/api/sms-import require the real owner session. Creating or replacing a key returns
+it once; the service stores only its SHA-256 hash. Status never exposes the key or
+hash. Rotation and disconnection preserve every receipt and existing announcement.
+
+Only keyed POST /api/sms-import/receive may omit Origin, alongside the existing
+email receiver. Its X-Calendar-SMS-Key grants ingestion only, without a calendar
+session, read permission or account management. All other routes retain origin
+and role checks. A {check:true} request verifies the connection without posting.
+Messages carry {id,text,receivedAt}. Preserve exact text, including Hebrew, CRLF,
+quotes and up to 16,000 characters; no AI filtering, trimming or inferred fields.
+Ordinary manual announcements retain their 4,000-character limit. SMS imports
+can be edited up to 16,000 characters by existing calendar admins.
+
+Stable source-ID receipts and announcement updates commit atomically. A changed
+payload for the same source ID conflicts; valid retries reuse the receipt even
+after an edit or deletion. Auto imports mark nobody as read, retain original
+arrival timestamps, use author Shul and exclude source phone numbers and private
+credentials from the feed. Keep all existing bindings and the v1 migration.
+
+Deploy smsImport:true before publishing the setup client. The cloud workspace and
+existing GitHub deployment lack Cloudflare authorization; use the authorized
+computer and CODEX-DESKTOP-SHUL-SMS-CONNECTION.txt. Do not claim connected until
+the owner creates its key and connects it in Shul SMS. Local write tests use only
+synthetic records: node tests/calendar-sms-import.cjs checks Workerd and real
+Chromium at phone and desktop widths. Never create synthetic production posts.
+
 ## Viewer registration and private sign-in history
 
 POST /api/register accepts {name,email,password} once the owner is set up. It

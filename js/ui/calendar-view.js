@@ -8,6 +8,7 @@ import { keepPosition } from './keep-position.js';
 import { createCalendarAnnouncements } from './calendar-announcements.js';
 import { openCalendarActivity } from './calendar-activity.js';
 import { openCalendarEmailImport } from './calendar-email-import.js';
+import { openCalendarSmsImport } from './calendar-sms-import.js';
 
 let calendarAnalyticsOpened = false;
 
@@ -474,6 +475,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
       historyButton.after(inboxButton);
       inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
+      const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
+      inboxButton.after(smsButton);
+      smsButton.addEventListener('click', () => { view.close(); openCalendarSmsImport({ dialog, timeZone: settings.timezone.id }); });
     }
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
