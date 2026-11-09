@@ -3988,7 +3988,7 @@ function calendarAnnouncementText(value, maximum = CALENDAR_ANNOUNCEMENT_LENGTH)
 function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
   let actor = null, timer = null, button = null, active = null;
   let total = 0, readCount = 0, deletedCount = 0, editCount = 0, canPost = false, canDelete = false, canEdit = false, unavailable = false;
-  let dateEditing = false, historySince = null, historyDays = null, snapshotAt = '';
+  let dateEditing = false, historySince = null, snapshotAt = '';
   const dayFormat = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone });
   const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone });
   const timeFormat = new Intl.DateTimeFormat('en-US', { timeStyle: 'short', timeZone });
@@ -4021,8 +4021,6 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       active.form.querySelectorAll('input,textarea,button').forEach(control => { if (previewing()) control.disabled = true; });
       active.form.querySelector('[data-cal-added-date]').hidden = !dateEditing;
       active.form.elements.addedAt.disabled = !dateEditing || previewing();
-      active.history.hidden = !historyDays;
-      active.history.textContent = historyDays ? `Showing the last ${historyDays} days.` : '';
       active.expire();
       active.feed.querySelectorAll('[data-cal-delete-announcement]').forEach(control => { control.hidden = !canDelete; if (previewing()) control.disabled = true; });
       active.feed.querySelectorAll('[data-cal-edit-announcement]').forEach(control => { control.hidden = !canEdit; if (previewing()) control.disabled = true; });
@@ -4033,7 +4031,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     if (value.snapshotAt && value.snapshotAt < snapshotAt) return;
     if (value.snapshotAt) {
       snapshotAt = value.snapshotAt; total = value.total; readCount = value.total - value.unread;
-      dateEditing = value.dateEditing === true; historySince = value.historySince || null; historyDays = value.historyDays || null;
+      dateEditing = value.dateEditing === true; historySince = value.historySince || null;
     } else {
       total = Math.max(total, value.total); readCount = Math.max(readCount, value.total - value.unread);
     }
@@ -4058,7 +4056,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     document.removeEventListener('visibilitychange', visible); window.removeEventListener('focus', visible);
     active?.cleanup(); active?.view.el.calDispose(); active = null;
     total = readCount = deletedCount = editCount = 0; canPost = canDelete = canEdit = unavailable = false;
-    dateEditing = false; historySince = historyDays = null; snapshotAt = '';
+    dateEditing = false; historySince = null; snapshotAt = '';
   }
   function start(user, { previewRole = '', readOnly = false } = {}) {
     const role = readOnly ? 'viewer' : previewRole || user.role, preview = !!previewRole;
@@ -4083,7 +4081,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     let editing = null, syncingEdits = null, knownEditCount = 0;
     let observer;
     const intro = previewing() ? '<p class="cal-announcement-intro">Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.</p>' : '';
-    const view = dialog(intro + `<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><div data-cal-added-date hidden><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></div><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><p class="cal-form-note" data-cal-announcement-history hidden></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>`, {
+    const view = dialog(intro + `<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><div data-cal-added-date hidden><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></div><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>`, {
       onClose: () => {
         if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
         cleanup(); active = null; return true;
@@ -4248,7 +4246,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       }
       clearTimeout(pendingTimer); pendingTimer = setTimeout(markRead, 250);
     }, { threshold: 1 });
-    active = { view, latest: 0, form, feed, newButton, history: view.el.querySelector('[data-cal-announcement-history]'), expire, observe, cleanup, syncDeleted, syncEdits }; paint();
+    active = { view, latest: 0, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits }; paint();
     async function load(append = false) {
       if (!current() || loading) return;
       if (!append && editing) {

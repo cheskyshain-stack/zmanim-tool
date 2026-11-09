@@ -1061,8 +1061,8 @@ and read markers. Synchronize date changes into open lists and retain unsaved dr
 The congregation can retrieve only the last 10 New York calendar days, including
 today. Enforce the same cutoff in feed pagination, edits and unread counts on the
 server; viewers cannot extend it using query parameters. Managers keep full history,
-and their Congregation view applies the same limit. Show the history limit above
-the feed. Use timestamped status snapshots so aging or moving messages can reduce
+and their Congregation view applies the same limit. End the list at that cutoff.
+Use timestamped status snapshots so aging or moving messages can reduce
 unread counts without older responses restoring stale counts.
 The standalone calendar uses the compact navy subpage header, with the same
 left arrow and Home link as Donate, a quiet Community Calendar label and the

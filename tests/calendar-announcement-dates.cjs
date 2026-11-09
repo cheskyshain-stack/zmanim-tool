@@ -74,7 +74,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
    try{
     const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
-    await congregant.getByText('Showing the last 10 days.',{exact:true}).waitFor();
+    assert.equal(await congregant.getByText('Showing the last 10 days.',{exact:true}).count(),0);
     while(await congregant.locator('[data-cal-older-announcements]').isVisible()){
      await congregant.locator('[data-cal-older-announcements]').click();await congregant.waitForFunction(()=>!document.querySelector('[data-cal-older-announcements]').disabled);
     }
