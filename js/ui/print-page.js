@@ -1,4 +1,3 @@
-import { cmykButtonHtml, wireCmykButton } from './cmyk-pdf.js';
 import { clearCombinedChartPrint } from './combined-chart-print.js';
 
 // Printing.
@@ -17,11 +16,10 @@ import { clearCombinedChartPrint } from './combined-chart-print.js';
 /** The one print button a screen carries. Plain window.print(): everything on the screen
  *  is what goes to the dialog, and the choosing happens there. */
 export function printButtonHtml(id = 'print-btn') {
-  return `<button type="button" class="btn-primary print-btn" id="${id}">Print</button>${cmykButtonHtml()}`;
+  return `<button type="button" class="btn-primary print-btn" id="${id}">Print</button>`;
 }
 
 export function wirePrintButton(root, id = 'print-btn') {
-  wireCmykButton(root);
   root.querySelector(`#${id}`)?.addEventListener('click', () => window.print());
 }
 

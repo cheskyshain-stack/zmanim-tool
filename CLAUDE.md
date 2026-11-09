@@ -369,8 +369,11 @@ directly, preserving PDF text; CSS grayscale filters rasterize the tables and te
 `tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
 ink modes, including saved defaults and a custom colour.
 
-Browser Print / Save as PDF cannot guarantee CMYK output. The separate **CMYK PDF**
-tool converts an already saved PDF locally using pinned, lazily loaded PDF.js under
+CMYK controls belong only in Seats. Public charts, weekly pages, the luach, special
+schedules and other admin tools keep ordinary browser printing without a CMYK
+button, converter import or converter stylesheet. Browser Print / Save as PDF
+cannot guarantee CMYK output. In Seats, **Print options > Convert saved PDF**
+converts an already saved PDF locally using pinned, lazily loaded PDF.js under
 `vendor/pdfjs-6.5.438/`. `cmyk-document.js` writes Flate-compressed DeviceCMYK images
 at 1200 dpi using the shared `js/print-quality.js` policy. Both PDF exporters draw
 bounded 4096 by 1024 pixel tiles instead of allocating a page-sized bitmap or
@@ -385,7 +388,8 @@ remains disabled. The USB copy keeps native printing without this hosted-only to
 Default modern building photos use the existing 1400px source rather than its
 240px thumbnail. Preserve custom images and the original workbook artwork.
 `node --test tests/cmyk-document.mjs` checks ink separations; `node tests/cmyk-pdf.cjs`
-checks actual chart, Netz and Seats PDFs, rotated mixed paper, mobile geometry,
+checks the absence of CMYK outside Seats, conversion of saved chart/Netz/Seats
+PDFs from the seating tool, rotated mixed paper, mobile geometry,
 invalid/encrypted files, cancellation, download, colour spaces and page appearance.
 
 The Chanukah morning block uses a light neutral 4% gray (`#f5f5f5`). Draw it as

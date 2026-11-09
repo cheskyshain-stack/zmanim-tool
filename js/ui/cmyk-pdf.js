@@ -4,18 +4,7 @@ import { PRINT_RASTER_DPI, PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT, printRasterSize,
 const CMYK_PDFJS_BASE = '/vendor/pdfjs-6.5.438/';
 let cmykDialogOpen = false;
 
-// Keep the USB copy's native printing. PDF.js is loaded only for a selected file
-// on the hosted website, never on ordinary visits or over file://.
-export function cmykButtonHtml() {
-  return location.protocol === 'file:' ? '' : '<button type="button" class="cmyk-pdf-button no-print" data-cmyk-pdf>CMYK PDF</button>';
-}
-
-export function wireCmykButton(root) {
-  root.querySelectorAll('[data-cmyk-pdf]').forEach(button => {
-    button.addEventListener('click', () => openCmykPdf());
-  });
-}
-
+// The seating planner loads PDF.js only after a saved file is selected.
 export async function convertCmykPdf(file, { signal, progress = () => {} }) {
   if (!globalThis.CompressionStream) throw new Error('Please use a current version of Chrome, Edge, Firefox or Safari.');
   if (!file.size || file.size > 50 * 1024 * 1024) throw new Error('Choose a PDF smaller than 50 MB.');
