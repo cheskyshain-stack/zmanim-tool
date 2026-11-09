@@ -1049,8 +1049,9 @@ They show role-specific controls but disable writes. Announcement previews use
 GET, do not count opens or mark posts read, and cannot post, edit or delete.
 Switching previews ignores pending responses from the previous announcement view.
 The standalone calendar uses the compact navy subpage header, with the same
-left arrow and Home link as Donate, a quiet Community Calendar label and no
-building photo or homepage navigation. Keep its 64px height at phone and desktop
+left arrow and Home link as Donate, a quiet Community Calendar label and the
+gold-outlined Donate pill with its giving-hand icon on the right, linking to /donate/.
+It has no building photo or homepage navigation. Keep its 64px height at phone and desktop
 widths, plus safe-area padding. The former in-calendar back button is Refresh: it
 reloads events and notification counts immediately without changing the selected
 month or date, bypasses the short cache, and retains visible events on failure.

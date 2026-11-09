@@ -185,6 +185,11 @@
 .cal-site-back:hover { text-decoration:underline; }
 .cal-site-back:focus-visible { outline:3px solid #cbb681; outline-offset:2px; }
 .cal-site-title { flex:1 1 0; min-width:0; margin:0; color:#b7c4dd; font-size:.85rem; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cal-site-donate { display:inline-flex; align-items:center; flex:none; gap:.3rem; padding:.42rem .7rem; margin-block:-.42rem; border:1px solid rgba(209,173,95,.7); border-radius:999px; background:rgba(209,173,95,.1); color:#f3ecdc; text-decoration:none; font-size:.85rem; font-weight:600; line-height:1; transition:background .18s ease,border-color .18s ease; }
+.cal-site-donate svg { width:.95rem; height:.95rem; flex:none; }
+.cal-site-donate:hover { background:rgba(209,173,95,.22); border-color:#d1ad5f; }
+.cal-site-donate:active { background:rgba(209,173,95,.3); border-color:#d1ad5f; }
+.cal-site-donate:focus-visible { outline:3px solid #cbb681; outline-offset:2px; }
 .cal-editor-body main { max-width:78rem; margin:0 auto; }
 @media (min-width:1550px) { .cal-chip-type { display:inline; } }
 @media (min-width:901px) and (max-width:1250px) { .cal-content { grid-template-columns:minmax(0,1fr); } .cal-day-panel { border-left:0; border-top:1px solid #e3dfd3; } }
