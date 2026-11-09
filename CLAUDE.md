@@ -1048,14 +1048,19 @@ Previews retain the real owner session and do not grant or change account roles.
 They show role-specific controls but disable writes. Announcement previews use
 GET, do not count opens or mark posts read, and cannot post, edit or delete.
 Switching previews ignores pending responses from the previous announcement view.
-Congregation viewing keeps the shared navy Shul header and original building photo,
-with the same desktop name and navigation as Home. Use the dynamic viewport height
+The standalone calendar uses the compact navy subpage header, with the same
+left arrow and Home link as Donate, a quiet Community Calendar label and no
+building photo or homepage navigation. Keep its 64px height at phone and desktop
+widths, plus safe-area padding. The former in-calendar back button is Refresh: it
+reloads events and notification counts immediately without changing the selected
+month or date, bypasses the short cache, and retains visible events on failure.
+Use the dynamic viewport height
 and safe-area insets; distribute the month into equal, compact rows without page
 scrolling. Rows prefer 1.35 times their column width, between 72px and 128px, and
 shrink further when needed to keep the whole month within the remaining screen.
 Do not stretch the month to the bottom of a tall phone. Keep Back to the congregation homepage,
 the Community Calendar title on its own row, followed by Notifications with its
-bell and unread badge, Back and More. Keep month arrows and Today below that row.
+bell and unread badge, Refresh and More. Keep month arrows and Today below that row.
 Put the color key, account and Sign out in More. Day details and notifications open dialogs,
 not extra sections below the month. The owner preview uses the same congregation UI.
 Readers browse only the previous, current and next month in the shul's timezone.

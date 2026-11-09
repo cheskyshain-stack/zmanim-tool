@@ -180,17 +180,11 @@
 .cal-login > p { font-size:.9rem; line-height:1.6; }
 .cal-editor-body { --cal-site-header-height:calc(64px + env(safe-area-inset-top)); background:#faf7f0; margin:0; font-family:system-ui,sans-serif; }
 .cal-editor-header { box-sizing:border-box; flex:none; height:var(--cal-site-header-height); background:#142b46; color:#fff; padding:env(safe-area-inset-top) max(20px,env(safe-area-inset-right)) 0 max(20px,env(safe-area-inset-left)); border-bottom:2px solid #cbb681; }
-.cal-site-header-inner { display:flex; align-items:center; height:100%; max-width:1080px; margin:auto; }
-.cal-site-brand { display:flex; align-items:center; gap:12px; min-height:44px; color:#fff; text-decoration:none; }
-.cal-site-brand img { width:54px; height:35px; object-fit:cover; border-radius:6px; }
-.cal-site-brand strong, .cal-site-nav { display:none; }
-.cal-site-brand:focus-visible, .cal-site-nav a:focus-visible { outline:3px solid #cbb681; outline-offset:3px; }
-@media (min-width:760px) {
-  .cal-editor-body { --cal-site-header-height:calc(78px + env(safe-area-inset-top)); }
-  .cal-site-brand strong { display:block; font:600 14px Georgia,serif; }
-  .cal-site-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
-  .cal-site-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
-}
+.cal-subpage-nav { display:flex; align-items:center; gap:16px; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; }
+.cal-site-back { display:inline-flex; align-items:center; box-sizing:border-box; min-height:44px; flex:none; padding:.4rem .55rem; margin:-.4rem -.55rem; border-radius:8px; color:#f3ecdc; text-decoration:none; font-size:16px; font-weight:600; }
+.cal-site-back:hover { text-decoration:underline; }
+.cal-site-back:focus-visible { outline:3px solid #cbb681; outline-offset:2px; }
+.cal-site-title { flex:1 1 0; min-width:0; margin:0; color:#b7c4dd; font-size:.85rem; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .cal-editor-body main { max-width:78rem; margin:0 auto; }
 @media (min-width:1550px) { .cal-chip-type { display:inline; } }
 @media (min-width:901px) and (max-width:1250px) { .cal-content { grid-template-columns:minmax(0,1fr); } .cal-day-panel { border-left:0; border-top:1px solid #e3dfd3; } }
@@ -243,9 +237,9 @@
 .cal-reader-heading [data-cal-announcements] svg { flex:none; color:#997d3a; }
 .cal-reader-heading .cal-unread-count { margin-left:0; font-size:11px; }
 .cal-reader-heading [data-cal-options] { padding:0; font-size:1.5rem; }
-.cal-reader-back { display:flex; align-items:center; justify-content:center; box-sizing:border-box; height:48px; color:#142b46; background:#fff; border:1px solid #dfddd3; text-decoration:none; font:400 2rem/1 system-ui,sans-serif; border-radius:12px; }
-.cal-reader-back:hover { border-color:#a88c47; background:#f1eadb; }
-.cal-reader-back:focus-visible { outline:3px solid #9e7b31; outline-offset:-3px; }
+.cal-reader-heading .cal-reader-refresh { padding:0; }
+.cal-reader-refresh svg { width:20px; height:20px; }
+.cal-reader-refresh[aria-disabled="true"] { opacity:.5; cursor:default; }
 .cal-reader-status { flex:none; margin:0; padding:6px; font-size:12px; }
 .cal-reader-status:empty { display:none; }
 .cal-reader-page { display:flex; flex-direction:column; height:100dvh; overflow:hidden; overscroll-behavior:none; }
@@ -287,7 +281,7 @@
   .is-cal-congregation .cal-event-total { font-size:clamp(8.5px,calc(var(--cal-reader-cell) * .2),11px); line-height:1.1; }
 }
 @media (max-width:350px) { .cal-reader-heading { padding-inline:12px; } .cal-reader-actions { gap:8px; } .cal-reader-heading button { padding-inline:10px; font-size:13px; } .is-cal-congregation .cal-toolbar { padding-inline:8px; gap:4px; } .is-cal-congregation .cal-month-nav { gap:2px; } }
-@media (max-height:680px) { .cal-reader-heading { padding-block:10px; gap:8px; } .cal-reader-heading h2 { font-size:26px; } .cal-reader-actions { grid-template-columns:44px minmax(0,1fr) 44px; } .cal-reader-heading button, .cal-reader-back { min-height:44px; height:44px; } .is-cal-congregation .cal-toolbar { padding-top:0; padding-bottom:6px; } }
+@media (max-height:680px) { .cal-reader-heading { padding-block:10px; gap:8px; } .cal-reader-heading h2 { font-size:26px; } .cal-reader-actions { grid-template-columns:44px minmax(0,1fr) 44px; } .cal-reader-heading button { min-height:44px; height:44px; } .is-cal-congregation .cal-toolbar { padding-top:0; padding-bottom:6px; } }
 @media (max-height:460px) {
   .cal-reader-heading { flex-direction:row; align-items:center; gap:8px; padding:0 8px; }
   .cal-reader-heading h2 { flex:1; min-width:0; text-align:left; font-size:24px; }

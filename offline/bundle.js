@@ -4408,7 +4408,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
-  let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
+  let disposed = false, requestNumber = 0, busy = false, refreshing = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const readerCache = new Map(), readerPending = new Map();
   let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
   const wheel = { last: 0, distance: 0, moved: false };
@@ -4604,7 +4604,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" title="Open Schedule messages">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
       ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
       ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
-      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><a class="cal-reader-back" href="/" aria-label="Back to congregation page" title="Back to congregation page">‹</a>${announcements.markup({ label: 'Notifications', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
+      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><button type="button" class="cal-reader-refresh" data-cal-refresh aria-label="Refresh calendar" title="Refresh calendar" aria-busy="${refreshing}" aria-disabled="${busy || refreshing}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>${announcements.markup({ label: 'Notifications', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
@@ -4624,6 +4624,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
+    container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
     announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
@@ -4736,14 +4737,21 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       if (!wheel.moved && Math.abs(wheel.distance) >= 70) { wheel.moved = true; changeMonth(calendarStepMonth(month, wheel.distance > 0 ? 1 : -1)); }
     }, { passive: false });
   }
-  async function loadEvents() {
+  async function refreshCalendar() {
+    if (busy || refreshing || !user) return;
+    refreshing = true; note = '';
+    try { await Promise.all([loadEvents({ force: true }), announcements.refresh()]); }
+    finally { refreshing = false; if (!disposed && user && reader()) redraw(); }
+  }
+  async function loadEvents({ force = false } = {}) {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
     if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
+    if (force) clearReaderCache();
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
-    if (saved && performance.now() - saved.at < 30000) { prefetchMonths(); return; }
+    if (!force && saved && performance.now() - saved.at < 30000) { prefetchMonths(); return; }
     try {
       const values = await (isReader ? readerMonth(month) : monthEvents(month));
       if (disposed || number !== requestNumber) return;
@@ -4752,6 +4760,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     } catch (error) {
       if (disposed || number !== requestNumber) return;
       if (error.status === 401) { calendarSession(null); user = null; busy = false; signIn(error.message); return; }
+      if (force && saved) readerCache.set(month, saved);
       note = error.message; if (!saved) loadError = error.message;
     }
     if (!disposed && number === requestNumber) { busy = false; redraw(); }

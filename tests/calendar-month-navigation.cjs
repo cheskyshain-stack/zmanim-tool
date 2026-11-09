@@ -17,7 +17,7 @@ const server = http.createServer((req,res) => {
   const origin = process.env.CALENDAR_NAV_ORIGIN || 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({executablePath:process.env.CHROME_BIN || '/usr/bin/chromium',headless:true});
   const errors=[], checks=[], calls=[], finished=[];
-  let revision=1, blocked=false, revoked=false, delay=900;
+  let revision=1, blocked=false, revoked=false, delay=900, announcementChecks=0;
   const context=await browser.newContext({viewport:{width:393,height:852},hasTouch:true,isMobile:true,serviceWorkers:'block'});
   try {
     await context.addInitScript(() => {
@@ -44,6 +44,7 @@ const server = http.createServer((req,res) => {
         }
         await route.fulfill({headers,contentType:'application/json',body:JSON.stringify({events})});finished.push(middle);return;
       }
+      if(url.pathname==='/api/announcements/status')announcementChecks++;
       const body=url.pathname==='/api/session'?{user:{id:'fixture-reader',role:'viewer',name:'Example reader',active:true}}:{total:0,unread:0,deletedCount:0,editCount:0,messages:[],nextBefore:null};
       return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(body)});
     });
@@ -118,6 +119,20 @@ const server = http.createServer((req,res) => {
     await page.locator('.cal-dialog').getByText('Fixture update 2',{exact:true}).waitFor();await page.keyboard.press('Escape');
     assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Background refresh keeps the month populated');
     checks.push({backgroundRefresh:true,updatedEvents:true});
+    const selectedBeforeRefresh=await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'), requestsBeforeRefresh=calls.length, notificationsBeforeRefresh=announcementChecks;
+    revision=3;
+    await page.getByRole('button',{name:'Refresh calendar',exact:true}).click();
+    await page.locator('[data-cal-refresh][aria-busy="false"]').waitFor();
+    assert(calls.length>requestsBeforeRefresh,'Manual refresh bypasses a fresh 30-second event cache');
+    assert(announcementChecks>notificationsBeforeRefresh,'Manual refresh also checks notification counts');
+    assert.match(await month(),/December/);
+    assert.equal(await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'),selectedBeforeRefresh);
+    assert.equal(await page.evaluate(()=>document.activeElement.hasAttribute('data-cal-refresh')),true,'Refresh retains keyboard focus');
+    await page.locator('[data-cal-day="2026-12-15"]').click();
+    await page.locator('.cal-dialog').getByText('Fixture update 3',{exact:true}).waitFor();await page.keyboard.press('Escape');
+    for(let step=0;finished.length<calls.length&&step<50;step++)await page.waitForTimeout(30);
+    assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Manual refresh retains the visible calendar');
+    checks.push({manualRefresh:true,bypassesFreshCache:true,notificationsRefreshed:true,selectionAndFocusPreserved:true});
     await page.screenshot({path:path.join(output,'congregation.png'),fullPage:true});
     blocked=true;await page.evaluate(()=>window.advanceCalendarCacheClock());
     await page.locator('[data-cal-step="-1"]').click();
@@ -125,6 +140,16 @@ const server = http.createServer((req,res) => {
     assert.match(await month(),/November/);assert(await page.locator('[data-cal-day="2026-11-15"] .cal-event-total').isVisible());
     assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'A failed background refresh keeps cached events visible');
     checks.push({failedRefreshPreservesCalendar:true});
+    for(let attempt=0;attempt<2;attempt++){
+      const before=calls.length;
+      await page.getByRole('button',{name:'Refresh calendar',exact:true}).click();
+      await page.locator('[data-cal-refresh][aria-busy="false"]').waitFor();
+      assert(calls.length>before,'Retrying an offline refresh still requests fresh events');
+      assert(await page.locator('[data-cal-day="2026-11-15"] .cal-event-total').isVisible());
+      assert.match(await page.locator('.cal-reader-status').innerText(),/Synthetic offline response/);
+    }
+    assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Repeated failed manual refreshes retain visible events');
+    checks.push({repeatedOfflineRefreshPreservesCalendar:true});
     blocked=false;revoked=true;await page.evaluate(()=>window.advanceCalendarCacheClock());await page.locator('[data-cal-step="1"]').click();
     await page.getByRole('heading',{name:'Calendar sign in',exact:true}).waitFor();
     await page.waitForTimeout(delay+50);

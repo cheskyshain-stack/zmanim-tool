@@ -62,7 +62,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         const geometry = await page.evaluate(() => {
           const box = element => { const r = element.getBoundingClientRect(); return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
           return { width:innerWidth, height:innerHeight, visualHeight:visualViewport?.height, readerHeight:document.querySelector('.is-cal-congregation').style.getPropertyValue('--cal-reader-height'), pageWidth:document.documentElement.scrollWidth, pageHeight:document.documentElement.scrollHeight,
-            header:box(document.querySelector('.cal-editor-header')), calendar:box(document.querySelector('.shul-calendar')), controls:[...document.querySelectorAll('.cal-reader-heading button,.cal-reader-back,.cal-month-nav button,.cal-toolbar > button')].map(box),
+            header:box(document.querySelector('.cal-editor-header')), calendar:box(document.querySelector('.shul-calendar')), controls:[...document.querySelectorAll('.cal-reader-heading button,.cal-site-back,.cal-month-nav button,.cal-toolbar > button')].map(box),
             days:[...document.querySelectorAll('[data-cal-day]')].map(button => {
               const parsha = button.querySelector('.cal-parsha'), words = [];
               if (parsha && getComputedStyle(parsha).visibility !== 'hidden') {
@@ -78,8 +78,14 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
             }) };
         });
         assert(geometry.pageWidth <= width && geometry.pageHeight <= height, JSON.stringify({ month, width, height, reason:'Page does not scroll', visual:geometry.visualHeight, readerHeight:geometry.readerHeight, pageWidth:geometry.pageWidth, pageHeight:geometry.pageHeight, calendar:geometry.calendar }));
-        assert.equal(geometry.header.height, width >= 760 ? 78 : 64, 'The shared Shul header stays visible');
-        assert(Math.abs(geometry.calendar.top - geometry.header.bottom) <= 1 && geometry.calendar.bottom <= height + 1, 'Calendar fits below the Shul header');
+        assert.equal(geometry.header.height, 64, 'The compact subpage header matches the other pages');
+        assert.equal(await page.locator('.cal-site-back').innerText(), '← Home');
+        assert.equal(await page.locator('.cal-site-back').getAttribute('href'), '/');
+        assert.equal(await page.locator('.cal-editor-header img').count(), 0);
+        assert.equal(await page.locator('.cal-site-title').innerText(), 'Community Calendar');
+        assert.equal(await page.locator('.cal-reader-heading a').count(), 0, 'The Home link lives in the page header');
+        assert(await page.getByRole('button', { name:'Refresh calendar', exact:true }).isVisible());
+        assert(Math.abs(geometry.calendar.top - geometry.header.bottom) <= 1 && geometry.calendar.bottom <= height + 1, 'Calendar fits below the subpage header');
         assert(geometry.days.every(day => day.cell.height <= 129), 'Month rows remain compact on tall screens');
         if (width === 393 && height === 852) assert(geometry.days.every(day => day.cell.height <= 77), 'Tall phones keep compact month rows');
         assert(geometry.controls.every(control => control.height >= 44 && control.left >= 0 && control.right <= width + 1), 'Navigation controls fit and retain 44px touch targets');
@@ -121,7 +127,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Schedule messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
         await page.locator('[data-cal-step="-1"]').click(); await page.locator('[data-cal-day="2026-10-01"]:not([disabled])').waitFor(); assert(await page.locator('[data-cal-step="-1"]').isDisabled());
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();
-        await page.getByRole('link', { name:'Back to congregation page' }).click(); await page.locator('.luach-coming-soon-card').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
+        await page.getByRole('link', { name:'Back to Home' }).click(); await page.locator('.luach-coming-soon-card').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
         assert(await page.getByRole('button', { name:'Community calendar, coming soon' }).isDisabled());
         assert.equal(await page.locator('.luach-coming-soon-card').evaluate(card => getComputedStyle(card).backgroundColor), 'rgb(236, 238, 239)');
         for (const width of [320,375,393,1440]) { await page.setViewportSize({ width, height:900 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await page.screenshot({ path:path.join(output, 'home-coming-soon-' + width + '.png'), fullPage:true }); }
