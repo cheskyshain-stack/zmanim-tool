@@ -4088,6 +4088,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
+    if (actor.role === 'viewer') view.el.classList.add('cal-announcement-reader');
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');

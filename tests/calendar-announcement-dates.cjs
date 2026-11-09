@@ -75,6 +75,29 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
     assert.equal(await congregant.getByText('Showing the last 10 days.',{exact:true}).count(),0);
+    const readerDialog = congregant.locator('.cal-announcement-reader');
+    for (const [width, height] of [[375, 650], [393, 852], [740, 350]]) {
+     await congregant.setViewportSize({ width, height });
+     const geometry = await readerDialog.evaluate(dialog => {
+      const box = dialog.getBoundingClientRect();
+      const header = dialog.querySelector('.cal-dialog-header').getBoundingClientRect();
+      const close = dialog.querySelector('[data-cal-close]');
+      const closeTop = close.getBoundingClientRect().top;
+      const feed = dialog.querySelector('.cal-announcement-feed');
+      const list = feed.getBoundingClientRect();
+      feed.scrollTop = 100;
+      const scrolled = feed.scrollTop > 0;
+      const fixedClose = close.getBoundingClientRect().top === closeTop;
+      feed.scrollTop = 0;
+      return { top: box.top, left: box.left, right: innerWidth - box.right, bottom: innerHeight - box.bottom,
+       headerGap: list.top - header.bottom, listHeight: list.height, outerOverflow: dialog.scrollHeight - dialog.clientHeight,
+       closeHeight: close.getBoundingClientRect().height, scrolled, fixedClose };
+     });
+     const { top, left, right, bottom, headerGap, listHeight, outerOverflow, closeHeight, scrolled, fixedClose } = geometry;
+     assert(top >= 12 && left >= 12 && right >= 12 && bottom >= 12 && bottom <= 24, JSON.stringify({ width, height, ...geometry }));
+     assert(headerGap <= 12 && listHeight > height * .48 && outerOverflow <= 1 && closeHeight >= 44 && scrolled && fixedClose, JSON.stringify({ width, height, ...geometry }));
+    }
+    await congregant.setViewportSize({ width: 393, height: 900 });
     while(await congregant.locator('[data-cal-older-announcements]').isVisible()){
      await congregant.locator('[data-cal-older-announcements]').click();await congregant.waitForFunction(()=>!document.querySelector('[data-cal-older-announcements]').disabled);
     }
