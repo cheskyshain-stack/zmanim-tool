@@ -1048,6 +1048,11 @@ Previews retain the real owner session and do not grant or change account roles.
 They show role-specific controls but disable writes. Announcement previews use
 GET, do not count opens or mark posts read, and cannot post, edit or delete.
 Switching previews ignores pending responses from the previous announcement view.
+Congregation announcement timestamps use the shul's timezone: today's messages show
+the time to the minute, yesterday's show Yesterday, and older messages show only
+the date. Compare local calendar days across daylight-saving changes and refresh
+open message labels on the existing polling/focus cycle. Keep original timestamps
+stored and keep full dates and times in the calendar manager's announcement view.
 The standalone calendar uses the compact navy subpage header, with the same
 left arrow and Home link as Donate, a quiet Community Calendar label and the
 gold-outlined Donate pill with its giving-hand icon on the right, linking to /donate/.

@@ -21,8 +21,8 @@ const server = http.createServer((req, res) => {
   const user = role => ({ id:'synthetic-' + role, role, name:'Example ' + role, active:true });
   const session = role => ({ token:'d'.repeat(64), expires:Date.parse('2299-01-01T00:00:00Z'), user:user(role) });
   try {
-    const prepare = async ({ width = 393, touch = false, role = null, loginRole = 'owner' } = {}) => {
-      const context = await browser.newContext({ viewport:{ width, height:900 }, hasTouch:touch, isMobile:touch });
+    const prepare = async ({ width = 393, touch = false, role = null, loginRole = 'owner', timezoneId = 'UTC' } = {}) => {
+      const context = await browser.newContext({ viewport:{ width, height:900 }, hasTouch:touch, isMobile:touch, timezoneId });
       const calls = [], messages = [], read = new Set();
       const announcementStatus = () => ({ total:messages.length, unread:messages.filter(message => !read.has(message.id)).length, deletedCount:0, editCount:0, canPost:true, canEdit:true, canDelete:true });
       const addAnnouncement = message => { messages.unshift(message); if (message.read) read.add(message.id); };
@@ -154,6 +154,33 @@ const server = http.createServer((req, res) => {
       assert(!/Preview|Main admin|View as|Schedule messages/.test(await t.page.locator('.cal-dialog').innerText()));
       assert(t.calls.every(call => call.startsWith('GET ') || ['POST /api/announcements/open','POST /api/announcements/read'].includes(call)), 'Only personal announcement reading is recorded');
       checks.push({ role, actualRolePreserved:true, congregationOnly:true, unreadOnly:true, readPersistsOnReload:true, laterPostIsUnread:true }); await t.context.close();
+    }
+    for (const scenario of [
+      { name:'New York midnight', now:'2026-11-07T04:59:00Z', tomorrow:'2026-11-07T05:01:00Z', today:'2026-11-06T15:35:00Z', yesterday:'2026-11-06T04:45:00Z', older:'2026-11-04T19:02:00Z', time:'10:35 AM', date:'Nov 4, 2026', yesterdayDate:'Nov 5, 2026' },
+      { name:'Daylight saving starts', now:'2026-03-09T04:05:00Z', today:'2026-03-09T04:01:00Z', yesterday:'2026-03-08T05:30:00Z', older:'2026-03-07T18:00:00Z', time:'12:01 AM', date:'Mar 7, 2026' },
+      { name:'Daylight saving ends', now:'2026-11-02T04:30:00Z', today:'2026-11-02T04:01:00Z', yesterday:'2026-10-31T16:00:00Z', older:'2026-10-30T18:00:00Z', time:'11:01 PM', date:'Oct 30, 2026' },
+      { name:'New year', now:'2027-01-01T05:05:00Z', today:'2027-01-01T05:01:00Z', yesterday:'2026-12-31T17:00:00Z', older:'2026-12-30T18:00:00Z', time:'12:01 AM', date:'Dec 30, 2026' }
+    ]) {
+      const t = await prepare({ role:'viewer', touch:true, timezoneId:'Asia/Jerusalem' });
+      await t.page.clock.setFixedTime(new Date(scenario.now));
+      for (const [index,kind] of ['today','yesterday','older'].entries()) t.addAnnouncement({ id:'date-' + kind, sequence:index + 1, text:kind + ' update', createdAt:scenario[kind], revision:1, read:true });
+      await t.page.goto(origin + '/admin/calendar/?preview=congregation'); await t.page.locator('.cal-reader-heading').waitFor();
+      await t.page.getByRole('button', { name:/^Notifications/ }).click();
+      const timestamp = kind => t.page.locator('[data-announcement-id="date-' + kind + '"] > header > time');
+      await timestamp('today').waitFor();
+      assert.equal(await timestamp('today').innerText(), scenario.time, scenario.name);
+      assert.equal(await timestamp('yesterday').innerText(), 'Yesterday', scenario.name);
+      assert.equal(await timestamp('older').innerText(), scenario.date, scenario.name);
+      assert.equal(await timestamp('today').getAttribute('datetime'), scenario.today, 'Original timestamps stay intact');
+      if (scenario.tomorrow) {
+        await t.page.clock.setFixedTime(new Date(scenario.tomorrow));
+        await t.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await t.page.waitForFunction(() => document.querySelector('[data-announcement-id="date-today"] time')?.textContent === 'Yesterday');
+        assert.equal(await timestamp('yesterday').innerText(), scenario.yesterdayDate);
+      }
+      checks.push({ announcementDates:scenario.name, shulTimezone:true, sameDayMinutes:true, yesterdayOnly:true, olderDateOnly:true, midnightRollover:!!scenario.tomorrow });
+      await t.page.screenshot({ path:path.join(output, 'announcement-dates-' + scenario.name.replaceAll(' ', '-') + '.png'), fullPage:true });
+      await t.context.close();
     }
     const admin = await prepare({ role:'owner' });
     await admin.page.goto(origin + '/admin/calendar/'); await admin.page.locator('[data-cal-view]').waitFor();

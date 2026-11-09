@@ -5,9 +5,23 @@ import { escText, escAttr } from '../util.js';
 export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
   let actor = null, timer = null, button = null, active = null;
   let total = 0, readCount = 0, deletedCount = 0, editCount = 0, canPost = false, canDelete = false, canEdit = false, unavailable = false;
+  const dayFormat = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone });
+  const dateFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeZone });
+  const timeFormat = new Intl.DateTimeFormat('en-US', { timeStyle: 'short', timeZone });
+  const fullFormat = new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone });
   const unread = () => Math.max(0, total - readCount);
   const matches = value => actor === value;
   const previewing = () => actor?.preview === true;
+  function localDay(date) {
+    const parts = Object.fromEntries(dayFormat.formatToParts(date).map(({ type, value }) => [type, value]));
+    return Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day)) / 86400000;
+  }
+  function whenDate(value) {
+    const date = new Date(value);
+    if (actor?.role !== 'viewer') return fullFormat.format(date);
+    const age = localDay(new Date()) - localDay(date);
+    return age === 0 ? timeFormat.format(date) : age === 1 ? 'Yesterday' : dateFormat.format(date);
+  }
   function paint() {
     if (button?.isConnected) {
       const count = unread(), badge = button.querySelector('[data-cal-announcement-count]');
@@ -22,6 +36,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       active.form.querySelectorAll('textarea,button').forEach(control => { if (previewing()) control.disabled = true; });
       active.feed.querySelectorAll('[data-cal-delete-announcement]').forEach(control => { control.hidden = !canDelete; if (previewing()) control.disabled = true; });
       active.feed.querySelectorAll('[data-cal-edit-announcement]').forEach(control => { control.hidden = !canEdit; if (previewing()) control.disabled = true; });
+      active.feed.querySelectorAll('.cal-announcement-message > header > time').forEach(time => { time.textContent = whenDate(time.dateTime); });
     }
   }
   function status(value) {
@@ -88,9 +103,6 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); }
     function notice(text, error = false, source = '') {
       messageStatus.textContent = text; messageStatus.classList.toggle('cal-error', error); messageStatus.dataset.source = source;
-    }
-    function whenDate(value) {
-      return new Intl.DateTimeFormat('en-US', { dateStyle: 'medium', timeStyle: 'short', timeZone }).format(new Date(value));
     }
     function card(message) {
       return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(message.createdAt)}">${escText(whenDate(message.createdAt))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${escText(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(message.createdAt))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(message.createdAt))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
