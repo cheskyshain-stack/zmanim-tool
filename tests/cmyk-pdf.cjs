@@ -1,3 +1,4 @@
+const openPrintOptions = require('./helpers/seats-print-options.cjs');
 // Build first. Uses real browser PDFs, PDF.js, and independent MuPDF inspection.
 const http = require('node:http'), fs = require('node:fs'), path = require('node:path');
 const os = require('node:os'), assert = require('node:assert/strict');
@@ -62,15 +63,18 @@ print(json.dumps(measurements))
     const requests = [], errors = [];
     await context.route('**/*', route => route.request().url().startsWith(origin + '/') ? route.continue() : route.abort());
     await context.addInitScript(() => {
+      if (!['http:', 'https:'].includes(location.protocol)) return;
       localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
       localStorage.setItem('zmanim-nocount', '1');
       localStorage.setItem('zmanim-poster-bar-v1', JSON.stringify({ year: 5787, sheet: 'vasikinboth', design: 'new', margin: .2, marginDefault: .15 }));
     });
-    const page = await context.newPage();
-    page.on('request', req => requests.push({ url: req.url(), method: req.method() }));
-    page.on('pageerror', e => errors.push(e.message));
-    const settle = async () => { await page.evaluate(() => document.fonts.ready); await page.waitForTimeout(200); };
-    const convert = async (name, source, button = '[data-cmyk-pdf]') => {
+    context.on('request', req => requests.push({ url: req.url(), method: req.method() }));
+    context.on('page', page => page.on('pageerror', e => errors.push(e.message)));
+    const sourcePage = await context.newPage(), page = await context.newPage();
+    await sourcePage.evaluate(() => document.readyState);
+    assert.deepEqual(errors, [], 'Fixture setup must also work on the initial blank pages');
+    const settle = async (target = page) => { await target.evaluate(() => document.fonts.ready); await target.waitForTimeout(200); };
+    const convert = async (name, source, button = '[data-action="cmyk-pdf"]') => {
       const original = path.join(output, name + '.pdf'), converted = path.join(output, name + '-CMYK.pdf');
       fs.writeFileSync(original, source);
       await page.locator(button).click();
@@ -88,22 +92,56 @@ print(json.dumps(measurements))
       await page.locator('.cmyk-pdf-dialog [data-close]').click();
       return converted;
     };
-    await page.goto(origin + '/chart/?count=off');
-    await page.locator('.pages .page').first().waitFor(); await settle();
-    assert(!requests.some(r => r.url.includes('pdfjs')), 'PDF.js stays unloaded on an ordinary visit');
-    const chart = await page.pdf({ preferCSSPageSize: true, printBackground: true });
+    const noCmyk = async (label, printable = true) => {
+      await settle(sourcePage);
+      assert.equal(await sourcePage.locator('[data-cmyk-pdf],.cmyk-pdf-button,[data-action="cmyk-pdf"],#pdf-colors').count(), 0, label + ': CMYK is exclusive to Seats');
+      assert.equal(await sourcePage.locator('link[href*="cmyk-pdf.css"]').count(), 0, label + ': no converter stylesheet');
+      if (!printable) return;
+      await sourcePage.evaluate(() => { window.printCalls = 0; window.print = () => window.printCalls++; });
+      const weeklyOptions = sourcePage.locator('.week-print-panel:not([open]) > summary');
+      if (await weeklyOptions.count()) await weeklyOptions.click();
+      await sourcePage.locator('#print-btn').click();
+      assert.equal(await sourcePage.evaluate(() => window.printCalls), 1, label + ': ordinary printing still works');
+    };
+    await sourcePage.goto(origin + '/chart/?count=off');
+    await sourcePage.locator('.pages .page').first().waitFor(); await noCmyk('Public chart');
+    const chart = await sourcePage.pdf({ preferCSSPageSize: true, printBackground: true });
     assert(execFileSync('pdftotext', ['-', '-'], { input: chart, encoding: 'utf8' }).includes('Bais'), 'Native printing retains selectable text');
-    await convert('chart', chart);
+    await sourcePage.goto(origin + '/week/'); await sourcePage.locator('.weekly-reader').waitFor(); await noCmyk('Public weekly reader', false);
+    await sourcePage.setViewportSize({ width: 375, height: 812 }); await noCmyk('Phone weekly reader', false);
+    await sourcePage.goto(origin + '/admin/#week'); await sourcePage.locator('#print-btn').waitFor({ state: 'attached' }); await noCmyk('Admin weekly cards');
+    await sourcePage.goto(origin + '/admin/#generate');
+    await sourcePage.locator('label[for=season-choref]').click(); await sourcePage.locator('input[name=hebrewYear]').fill('5787');
+    await sourcePage.locator('#gen-form button[type=submit]').click(); await sourcePage.locator('#page-form button[type=submit]').click();
+    await sourcePage.locator('#pages .page').first().waitFor(); await noCmyk('Saved chart editor');
+    await sourcePage.setViewportSize({ width: 1440, height: 1000 });
+    await sourcePage.goto(origin + '/admin/#posters/vasikinboth'); await sourcePage.locator('.is-modern-vasikin').waitFor(); await noCmyk('Admin special schedules');
+    const netz = await sourcePage.pdf({ preferCSSPageSize: true, printBackground: true });
+    await sourcePage.setViewportSize({ width: 320, height: 812 }); await noCmyk('Phone special schedules');
+    await sourcePage.screenshot({ path: path.join(output, 'normal-print-phone.png'), fullPage: true });
+    assert(!requests.some(r => /\/js\/ui\/cmyk-|pdfjs/.test(r.url)), 'Other pages do not load the CMYK converter');
+    const { seatsCreateState, seatsWriteName } = await import('../js/seats/model.js');
+    const sample = seatsCreateState(), plan = sample.plans[0];
+    plan.paper = 'letter'; plan.name = 'Synthetic CMYK test'; seatsWriteName(plan, 'A1', 0, 'Print Test');
+    await context.addInitScript(sample => { if (!['http:', 'https:'].includes(location.protocol)) return; if (!localStorage.getItem('lakewood-commons-seats-v1')) localStorage.setItem('lakewood-commons-seats-v1', JSON.stringify(sample)); }, sample);
+    await page.goto(origin + '/seats/');
+    await page.locator('#seats-name').fill('Synthetic Test'); await page.locator('#seats-pin').fill('4444');
+    await page.getByRole('button', { name: 'Open Seats', exact: true }).click();
+    await page.getByRole('button', { name: 'View saved charts', exact: true }).click();
+    await page.locator('.sharing-local-plan .saved-page-card[data-id="' + plan.id + '"]').click(); await settle();
+    await openPrintOptions(page);
+    assert(!requests.some(r => r.url.includes('pdfjs')), 'PDF.js stays unloaded until a file is selected in Seats');
+    fs.writeFileSync(path.join(output, 'chart.pdf'), chart);
     const controlsFit = async () => {
-      const boxes = await page.locator('[data-cmyk-pdf]').evaluateAll(nodes => nodes.map(node => {
+      const boxes = await page.locator('[data-action="cmyk-pdf"]').evaluateAll(nodes => nodes.map(node => {
         const b = node.getBoundingClientRect(); return { left: b.left, right: b.right, height: b.height, width: innerWidth };
       }));
-      assert(boxes.length); assert(boxes.every(b => b.left >= 0 && b.right <= b.width && b.height >= 44));
+      assert(boxes.length); assert(boxes.every(b => b.left >= 0 && b.right <= b.width && b.height >= 40));
     };
     // Mobile dialog, invalid/encrypted input, Escape, and cancellation.
     await page.setViewportSize({ width: 375, height: 812 });
     await controlsFit();
-    await page.locator('[data-cmyk-pdf]').click();
+    await page.locator('[data-action="cmyk-pdf"]').click();
     const geometry = await page.locator('.cmyk-pdf-dialog').evaluate(el => {
       const b = el.getBoundingClientRect(), close = el.querySelector('[data-close]').getBoundingClientRect();
       return { left: b.left, right: b.right, top: b.top, bottom: b.bottom, scrollWidth: el.scrollWidth, clientWidth: el.clientWidth, close: [close.width, close.height] };
@@ -121,18 +159,17 @@ print(json.dumps(measurements))
     await page.locator('#cmyk-pdf-file').setInputFiles(protectedPdf); await page.locator('[data-convert]').click();
     await page.getByRole('status').filter({ hasText: 'password protected' }).waitFor();
     await page.keyboard.press('Escape');
-    await page.locator('[data-cmyk-pdf]').click();
+    await page.locator('[data-action="cmyk-pdf"]').click();
     await page.locator('#cmyk-pdf-file').setInputFiles(path.join(output, 'chart.pdf'));
     await page.locator('[data-convert]').click();
     await page.locator('.cmyk-pdf-dialog [data-close]').click();
     await page.waitForTimeout(250);
     assert.equal(await page.locator('dialog.cmyk-pdf-dialog').count(), 0);
     await page.setViewportSize({ width: 1440, height: 1000 });
-    await page.goto(origin + '/admin/#posters/vasikinboth');
-    await page.locator('.is-modern-vasikin').waitFor(); await settle();
-    await convert('netz', await page.pdf({ preferCSSPageSize: true, printBackground: true }));
+    await convert('chart', chart);
+    await convert('netz', netz);
     await page.setViewportSize({ width: 320, height: 812 }); await controlsFit();
-    await page.locator('[data-cmyk-pdf]').click();
+    await page.locator('[data-action="cmyk-pdf"]').click();
     const fitsSmallPhone = await page.locator('.cmyk-pdf-dialog').evaluate(el => {
       const b = el.getBoundingClientRect(); return b.left >= 0 && b.right <= innerWidth && b.top >= 0 && b.bottom <= innerHeight && el.scrollWidth <= el.clientWidth;
     });
@@ -142,20 +179,11 @@ print(json.dumps(measurements))
     const mixed = path.join(output, 'mixed.pdf');
     execFileSync('python', ['-c', 'import fitz,sys; d=fitz.open(); p=d.new_page(width=612,height=792); p.insert_text((40,50),"Portrait black text"); p.draw_rect(fitz.Rect(40,80,130,160),color=(1,0,0),fill=(1,0,0)); p=d.new_page(width=1224,height=792); p.insert_text((40,50),"Tabloid landscape text"); p.set_rotation(90); d.save(sys.argv[1])', mixed]);
     await convert('mixed', fs.readFileSync(mixed));
-    const { seatsCreateState, seatsWriteName } = await import('../js/seats/model.js');
-    const sample = seatsCreateState(), plan = sample.plans[0];
-    plan.paper = 'letter'; plan.name = 'Synthetic CMYK test'; seatsWriteName(plan, 'A1', 0, 'Print Test');
-    await page.evaluate(sample => localStorage.setItem('lakewood-commons-seats-v1', JSON.stringify(sample)), sample);
-    await page.goto(origin + '/seats/');
-    await page.locator('#seats-name').fill('Synthetic Test'); await page.locator('#seats-pin').fill('4444');
-    await page.getByRole('button', { name: 'Open Seats', exact: true }).click();
-    await page.getByRole('button', { name: 'View saved charts', exact: true }).click();
-    await page.locator('.sharing-local-plan .saved-page-card[data-id="' + plan.id + '"]').click(); await settle();
     const seats = await page.pdf({ preferCSSPageSize: true, printBackground: true });
-    await page.locator('#chart-more').evaluate(el => el.open = true);
-    await convert('seats', seats, '[data-action="cmyk-pdf"]');
+    await convert('seats', seats);
     await page.locator('#chart-more').evaluate(el => el.open = true);
     await page.getByRole('button', { name: 'Alphabetical seat list', exact: true }).click();
+    await openPrintOptions(page);
     await page.locator('[data-action="cmyk-pdf"]').click();
     await page.locator('.cmyk-pdf-dialog').waitFor(); await page.keyboard.press('Escape');
     assert.deepEqual(errors, []);

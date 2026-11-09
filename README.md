@@ -21,20 +21,22 @@ their own events. See [calendar service setup](worker/calendar/README.md).
 
 ## CMYK print PDFs
 
-In Seats, **Print / PDF** creates the chart or alphabetical name list directly as
-a CMYK PDF, with embedded fonts and a FOGRA39L Coated printing profile. Auto fit
-and Letter use Letter paper; choose 11 × 17 for a larger chart. Text remains
-selectable. Black & white uses only black ink. Open the resulting PDF to print it.
-Open **Header & footer** below the Seats print settings to edit the text on each
-chart. It starts with “First Draft” in the top right and “Anyone who would like
-a seat should speak to the Gabbaim.” beneath the room. Leave a field blank to
-hide it. Wording saves with the chart and follows copies and shared edits.
-The original browser printer dialog remains available under More.
+CMYK printing is available only in Seats. Other charts, weekly cards and special
+schedules use their normal **Print / Save as PDF** controls.
 
-For charts, weekly cards and special schedules, use **Print / Save as PDF** first.
-Then open **CMYK PDF**, select the saved file and download its CMYK copy. Seats
-also retains this tool as **Convert saved PDF**. This saved-file converter preserves
-page sizes and layout, uses generic CMYK at up to 300 dpi, and flattens text.
+In Seats, open **Print options** to choose paper, style and **CMYK / Standard (RGB)**.
+Fixed Letter, Legal and 11 × 17 choices create a PDF with selectable text and
+embedded fonts. CMYK uses a FOGRA39L Coated profile, with black-and-white output
+using only black ink. Auto fit opens the browser printer dialog and uses the
+paper selected there, including Legal.
+
+The same Print options panel contains editable **Header & footer** text. It starts
+with “First Draft” in the top right and “Anyone who would like a seat should speak
+to the Gabbaim.” beneath the room. Leave a field blank to hide it. Wording saves
+with the chart and follows copies and shared edits.
+
+Seats also has **Convert saved PDF** under Print options. This saved-file converter
+preserves page sizes and layout, uses generic CMYK at 1200 dpi, and flattens text.
 
 Both conversions run on your device. The direct Seats export uses a standard
 coated-paper profile, rather than a profile supplied for a particular printer.

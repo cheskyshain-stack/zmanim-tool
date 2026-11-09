@@ -5630,277 +5630,6 @@ function wirePdfButton(root, opts = {}) {
   });
 }
 
-// ==== print-quality.js ====
-const PRINT_RASTER_DPI = 1200;
-const PRINT_TILE_WIDTH = 4096;
-const PRINT_TILE_HEIGHT = 1024;
-
-function printRasterSize(widthPoints, heightPoints) {
-  const width = Math.ceil(widthPoints * PRINT_RASTER_DPI / 72);
-  const height = Math.ceil(heightPoints * PRINT_RASTER_DPI / 72);
-  if (![width, height].every(value => Number.isSafeInteger(value) && value > 0)) throw new Error('This PDF page has an invalid size.');
-  return { width, height };
-}
-
-// Keep each canvas at four megapixels rather than allocating a full 1200 dpi page.
-function printRasterTiles(width, height) {
-  return (function* () {
-    for (let y = 0; y < height; y += PRINT_TILE_HEIGHT) {
-      for (let x = 0; x < width; x += PRINT_TILE_WIDTH) {
-        yield { x, y, width: Math.min(PRINT_TILE_WIDTH, width - x), height: Math.min(PRINT_TILE_HEIGHT, height - y) };
-      }
-    }
-  })();
-}
-
-// ==== ui/cmyk-document.js ====
-// CMYK pixels are written directly into PDF image streams. The browser's canvas
-// and Print / Save as PDF APIs only expose RGB, regardless of print-color-adjust.
-function cmykPixels(rgba) {
-  const out = new Uint8Array(rgba.length);
-  for (let i = 0; i < rgba.length; i += 4) {
-    const alpha = rgba[i + 3];
-    const r = Math.round(rgba[i] * alpha / 255 + 255 - alpha);
-    const g = Math.round(rgba[i + 1] * alpha / 255 + 255 - alpha);
-    const b = Math.round(rgba[i + 2] * alpha / 255 + 255 - alpha);
-    const max = Math.max(r, g, b);
-    out[i] = max ? 255 - Math.round(r * 255 / max) : 0;
-    out[i + 1] = max ? 255 - Math.round(g * 255 / max) : 0;
-    out[i + 2] = max ? 255 - Math.round(b * 255 / max) : 0;
-    out[i + 3] = 255 - max;
-  }
-  return out;
-}
-
-function cmykDocument() {
-  const objects = [null, null], pages = [];
-  const add = body => objects.push(body);
-  return {
-    addPage({ width, height, pixelsWide, pixelsHigh, compressed, tiles = [{ x: 0, y: 0, width: pixelsWide, height: pixelsHigh, compressed }] }) {
-      const resources = [], commands = [];
-      for (const [index, tile] of tiles.entries()) {
-        const image = add(new Blob([
-          `<< /Type /XObject /Subtype /Image /Width ${tile.width} /Height ${tile.height} /ColorSpace /DeviceCMYK /BitsPerComponent 8 /Filter /FlateDecode /Length ${tile.compressed.byteLength} >>\nstream\n`,
-          tile.compressed, '\nendstream',
-        ]));
-        const name = 'PrintImage' + index;
-        resources.push(`/${name} ${image} 0 R`);
-        commands.push(`q\n${tile.width / pixelsWide * width} 0 0 ${tile.height / pixelsHigh * height} ${tile.x / pixelsWide * width} ${(pixelsHigh - tile.y - tile.height) / pixelsHigh * height} cm\n/${name} Do\nQ\n`);
-      }
-      const contents = commands.join('');
-      const stream = add(`<< /Length ${contents.length} >>\nstream\n${contents}endstream`);
-      pages.push(add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << ${resources.join(' ')} >> >> /Contents ${stream} 0 R >>`));
-    },
-    finish() {
-      if (!pages.length) throw new Error('The PDF has no pages.');
-      objects[0] = '<< /Type /Catalog /Pages 2 0 R >>';
-      objects[1] = `<< /Type /Pages /Count ${pages.length} /Kids [${pages.map(id => `${id} 0 R`).join(' ')}] >>`;
-      const parts = [new Uint8Array([37, 80, 68, 70, 45, 49, 46, 55, 10, 37, 226, 227, 207, 211, 10])];
-      const offsets = [0];
-      let position = parts[0].length;
-      objects.forEach((body, index) => {
-        offsets.push(position);
-        const object = new Blob([`${index + 1} 0 obj\n`, body, '\nendobj\n']);
-        parts.push(object);
-        position += object.size;
-      });
-      parts.push(`xref\n0 ${offsets.length}\n0000000000 65535 f \n${offsets.slice(1).map(n => `${String(n).padStart(10, '0')} 00000 n \n`).join('')}trailer\n<< /Size ${offsets.length} /Root 1 0 R >>\nstartxref\n${position}\n%%EOF\n`);
-      return new Blob(parts, { type: 'application/pdf' });
-    },
-  };
-}
-
-async function cmykCanvasData(canvas, signal) {
-  const stream = new CompressionStream('deflate');
-  const compressed = new Response(stream.readable).arrayBuffer();
-  // Handle either side's rejection even when cancellation interrupts the writer.
-  compressed.catch(() => {});
-  const writer = stream.writable.getWriter();
-  try {
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    for (let y = 0; y < canvas.height; y += 64) {
-      signal.throwIfAborted();
-      const rows = Math.min(64, canvas.height - y);
-      await writer.write(cmykPixels(ctx.getImageData(0, y, canvas.width, rows).data));
-    }
-    await writer.close();
-    return await compressed;
-  } catch (error) {
-    await writer.abort(error).catch(() => {});
-    throw error;
-  }
-}
-
-// ==== ui/cmyk-pdf.js ====
-const CMYK_PDFJS_BASE = '/vendor/pdfjs-6.5.438/';
-let cmykDialogOpen = false;
-
-// Keep the USB copy's native printing. PDF.js is loaded only for a selected file
-// on the hosted website, never on ordinary visits or over file://.
-function cmykButtonHtml() {
-  return location.protocol === 'file:' ? '' : '<button type="button" class="cmyk-pdf-button no-print" data-cmyk-pdf>CMYK PDF</button>';
-}
-
-function wireCmykButton(root) {
-  root.querySelectorAll('[data-cmyk-pdf]').forEach(button => {
-    button.addEventListener('click', () => openCmykPdf());
-  });
-}
-
-async function convertCmykPdf(file, { signal, progress = () => {} }) {
-  if (!globalThis.CompressionStream) throw new Error('Please use a current version of Chrome, Edge, Firefox or Safari.');
-  if (!file.size || file.size > 50 * 1024 * 1024) throw new Error('Choose a PDF smaller than 50 MB.');
-  signal.throwIfAborted();
-  const pdfjsUrl = CMYK_PDFJS_BASE + 'legacy/build/pdf.min.mjs';
-  const pdfjs = await import(pdfjsUrl);
-  signal.throwIfAborted();
-  pdfjs.GlobalWorkerOptions.workerSrc = CMYK_PDFJS_BASE + 'legacy/build/pdf.worker.min.mjs';
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  signal.throwIfAborted();
-  const loading = pdfjs.getDocument({
-    data: bytes, isEvalSupported: false, enableXfa: false,
-    cMapUrl: CMYK_PDFJS_BASE + 'cmaps/', cMapPacked: true,
-    standardFontDataUrl: CMYK_PDFJS_BASE + 'standard_fonts/',
-    wasmUrl: CMYK_PDFJS_BASE + 'wasm/',
-    // PDF.js loads the embedded page resources only, with no interactive viewer.
-    useWorkerFetch: false,
-  });
-  let render = null, canvas = null;
-  const abort = () => { render?.cancel(); loading.destroy().catch(() => {}); };
-  signal.addEventListener('abort', abort, { once: true });
-  try {
-    const source = await loading.promise;
-    if (source.numPages > 100) throw new Error('Choose a PDF with 100 pages or fewer.');
-    const output = cmykDocument();
-    let totalBytes = 0;
-    for (let number = 1; number <= source.numPages; number++) {
-      signal.throwIfAborted();
-      progress(number, source.numPages);
-      const page = await source.getPage(number);
-      const physical = page.getViewport({ scale: 1 });
-      // Preserve full resolution, paper size and rotation without a page-sized canvas.
-      const viewport = page.getViewport({ scale: PRINT_RASTER_DPI / 72 });
-      const { width, height } = printRasterSize(physical.width, physical.height), tiles = [];
-      const tileCount = Math.ceil(width / PRINT_TILE_WIDTH) * Math.ceil(height / PRINT_TILE_HEIGHT);
-      canvas = document.createElement('canvas');
-      for (const tile of printRasterTiles(width, height)) {
-        signal.throwIfAborted();
-        canvas.width = tile.width; canvas.height = tile.height;
-        const canvasContext = canvas.getContext('2d', { willReadFrequently: true });
-        if (!canvasContext) throw new Error('There is not enough memory to convert this PDF. Try a smaller file.');
-        canvasContext.imageSmoothingQuality = 'high';
-        render = page.render({ canvasContext, viewport, transform: [1, 0, 0, 1, -tile.x, -tile.y], background: '#ffffff', intent: 'print' });
-        await render.promise;
-        render = null;
-        const compressed = await cmykCanvasData(canvas, signal);
-        totalBytes += compressed.byteLength;
-        if (totalBytes > 512 * 1024 * 1024) throw new Error('The converted PDF is too large. Save fewer pages and try again.');
-        tiles.push({ ...tile, compressed });
-        progress(number, source.numPages, tiles.length / tileCount);
-      }
-      output.addPage({ width: physical.width, height: physical.height,
-        pixelsWide: width, pixelsHigh: height, tiles });
-      canvas.width = canvas.height = 0;
-      canvas = null;
-      page.cleanup();
-    }
-    signal.throwIfAborted();
-    return output.finish();
-  } finally {
-    signal.removeEventListener('abort', abort);
-    if (canvas) canvas.width = canvas.height = 0;
-    await loading.destroy().catch(() => {});
-  }
-}
-
-function openCmykPdf() {
-  if (cmykDialogOpen) return;
-  cmykDialogOpen = true;
-  const previousFocus = document.activeElement;
-  const dialog = document.createElement('dialog');
-  dialog.className = 'cmyk-pdf-dialog no-print';
-  dialog.setAttribute('aria-labelledby', 'cmyk-pdf-title');
-  dialog.innerHTML = `<div class="cmyk-pdf-heading"><h2 id="cmyk-pdf-title">CMYK print PDF</h2><button type="button" data-close aria-label="Close">×</button></div>
-    <p>First use <strong>Print / Save as PDF</strong>. Then choose that saved PDF here to make a CMYK copy for your printer.</p>
-    <label for="cmyk-pdf-file">Saved PDF</label>
-    <input id="cmyk-pdf-file" type="file" accept="application/pdf,.pdf">
-    <p class="cmyk-pdf-status" role="status" aria-live="polite">Your file stays on this device.</p>
-    <progress aria-label="PDF conversion" hidden></progress>
-    <div class="cmyk-pdf-actions"><button type="button" data-convert disabled>Convert to CMYK</button><a data-download hidden>Download CMYK PDF</a></div>
-    <details><summary>About the print file</summary><p>Keeps the saved PDF’s page sizes and layout. Pages become lossless CMYK images at ${PRINT_RASTER_DPI} dpi; text in this copy is flattened. Black and gray use black ink only. Uses standard CMYK without a printer-specific colour profile. Normal browser printing keeps sharp vector text and its existing colour settings.</p></details>`;
-  const picker = dialog.querySelector('input'), convert = dialog.querySelector('[data-convert]');
-  const status = dialog.querySelector('[role="status"]'), progress = dialog.querySelector('progress');
-  const download = dialog.querySelector('[data-download]');
-  let controller = null, downloadUrl = null;
-  const resetDownload = () => {
-    if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-    downloadUrl = null;
-    download.hidden = true;
-    download.removeAttribute('href');
-  };
-  const close = () => {
-    controller?.abort();
-    resetDownload();
-    dialog.close();
-    dialog.remove();
-    cmykDialogOpen = false;
-    if (previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
-  };
-  dialog.querySelector('[data-close]').addEventListener('click', close);
-  dialog.addEventListener('cancel', event => { event.preventDefault(); close(); });
-  dialog.addEventListener('click', event => {
-    if (event.target === dialog) {
-      const box = dialog.getBoundingClientRect();
-      if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) close();
-    }
-  });
-  picker.addEventListener('change', () => {
-    resetDownload();
-    convert.disabled = !picker.files.length;
-    status.textContent = 'Your file stays on this device.';
-  });
-  convert.addEventListener('click', async () => {
-    const file = picker.files[0];
-    if (!file) return;
-    resetDownload();
-    controller = new AbortController();
-    const active = controller;
-    convert.disabled = picker.disabled = true;
-    progress.hidden = false;
-    progress.removeAttribute('value');
-    status.textContent = 'Opening PDF…';
-    dialog.querySelector('[data-close]').setAttribute('aria-label', 'Cancel conversion and close');
-    try {
-      const blob = await convertCmykPdf(file, { signal: active.signal, progress: (page, total, fraction = 0) => {
-        status.textContent = `Converting page ${page} of ${total}…`;
-        progress.max = total;
-        progress.value = page - 1 + fraction;
-      } });
-      if (!dialog.isConnected || active.signal.aborted) return;
-      downloadUrl = URL.createObjectURL(blob);
-      download.href = downloadUrl;
-      download.download = file.name.replace(/\.pdf$/i, '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '-').slice(0, 120) + '-CMYK.pdf';
-      download.hidden = false;
-      status.textContent = 'Your CMYK PDF is ready.';
-      download.focus({ preventScroll: true });
-    } catch (error) {
-      if (active.signal.aborted) return;
-      status.textContent = error.name === 'PasswordException' ? 'This PDF is password protected. Save an unlocked copy and try again.'
-        : error.name === 'InvalidPDFException' ? 'This file could not be read as a PDF. Choose the PDF saved from Print.'
-        : error.message || 'The PDF could not be converted. Try a smaller file.';
-    } finally {
-      if (dialog.isConnected) {
-        progress.hidden = true;
-        convert.disabled = picker.disabled = false;
-        dialog.querySelector('[data-close]').setAttribute('aria-label', 'Close');
-      }
-      controller = null;
-    }
-  });
-  document.body.appendChild(dialog);
-  dialog.showModal();
-}
-
 // ==== ui/print-page.js ====
 // Printing.
 //
@@ -5918,11 +5647,10 @@ function openCmykPdf() {
 /** The one print button a screen carries. Plain window.print(): everything on the screen
  *  is what goes to the dialog, and the choosing happens there. */
 function printButtonHtml(id = 'print-btn') {
-  return `<button type="button" class="btn-primary print-btn" id="${id}">Print</button>${cmykButtonHtml()}`;
+  return `<button type="button" class="btn-primary print-btn" id="${id}">Print</button>`;
 }
 
 function wirePrintButton(root, id = 'print-btn') {
-  wireCmykButton(root);
   root.querySelector(`#${id}`)?.addEventListener('click', () => window.print());
 }
 
@@ -11294,7 +11022,7 @@ function renderSheet(container, state, sheet, onChange) {
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
       ${chartPrintLayoutHtml(printLayout, Boolean(companion))}
-      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>${cmykButtonHtml()}
+      <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
     </div>
     <div id="chart-layout-panel" class="panel no-print">
       <div class="panel-body">
@@ -11335,7 +11063,6 @@ function renderSheet(container, state, sheet, onChange) {
   useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
-  wireCmykButton(container);
   container.querySelector('#chart-print-layout').addEventListener('change', event => {
     rememberChartPrintLayout(event.target.value);
     keepPosition(container, () => renderSheet(container, state, sheet, onChange));
