@@ -1420,7 +1420,10 @@ and listed in `DIST_TREES`.
 
 The standalone Messages page uses the shared Shul photo/header, cream background,
 navy Georgia headings, gold-edged cards and navy Copy buttons. `css/messages.css`
-scopes this styling to `body.is-texts-page`. Keep dates, editable message text,
+scopes this styling to `body.is-texts-page`. Its compact header shows only the
+54px by 35px building photo and Back to calendar, with both contained on one row
+and a 44px return target. Keep its header layout in messages.css, independent of
+calendar.css; calendar header changes must not break Messages. Keep dates, editable message text,
 local-only edits, copying and the heading's year-view gesture unchanged. Editing
 help stays in How to edit and copy and remains open across filter redraws.
 
