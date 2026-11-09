@@ -4,7 +4,17 @@ const root=path.resolve(__dirname,'..'),runtime=path.join(root,'worker/calendar'
 const {build}=require(require.resolve('esbuild',{paths:[runtime]}));
 const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',{paths:[runtime]}));
 (async()=>{
- const origin='http://127.0.0.1:8999',setupToken=randomBytes(32).toString('hex');
+ let origin='http://127.0.0.1:8999',endpoint='',server;
+ const setupToken=randomBytes(32).toString('hex');
+ if(process.env.CALENDAR_DATE_BROWSER==='1'){
+  server=require('node:http').createServer((req,res)=>{
+   if(req.url.split('?')[0]==='/data/calendar.json'){res.setHeader('Content-Type','application/json');return res.end(JSON.stringify({endpoint}));}
+   let file=path.resolve(root,'dist','.'+decodeURIComponent(req.url.split('?')[0]));if(!file.startsWith(path.join(root,'dist')+path.sep))return res.writeHead(403).end();
+   if(fs.existsSync(file)&&fs.statSync(file).isDirectory())file=path.join(file,'index.html');if(!fs.existsSync(file))return res.writeHead(404).end();
+   res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css','.json':'application/json','.woff2':'font/woff2','.jpg':'image/jpeg'})[path.extname(file)]||'application/octet-stream');res.end(fs.readFileSync(file));
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));origin='http://127.0.0.1:'+server.address().port;
+ }
  const bundle=await build({entryPoints:[path.join(runtime,'worker.js')],bundle:true,format:'esm',platform:'browser',write:false,external:['cloudflare:workers']});
  const options={name:'announcement-dates-test',modules:true,compatibilityDate:'2026-10-01',isolatedResourcePersistencePath:fs.mkdtempSync(path.join(os.tmpdir(),'announcement-migration-')),bindings:{ALLOWED_ORIGIN:origin,BOOTSTRAP_SHA256:createHash('sha256').update(setupToken).digest('hex')},durableObjects:{CALENDAR:{className:'CommunityCalendar',useSQLite:true}}};
  const legacy={id:'legacy-existing-01',sequence:1,text:'Existing announcement before the date index',authorId:'previous-author',createdAt:new Date(Date.now()-20*86400000).toISOString()};
@@ -12,7 +22,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
  await backend.ready;const seeded=await backend.dispatchFetch('https://fixture.test/');assert.equal(await seeded.text(),'seeded');
  await backend.setOptions(convertV4MiniflareOptions({...options,script:bundle.outputFiles[0].text}));
  try {
-  const endpoint=(await backend.ready).origin;
+  endpoint=(await backend.ready).origin;
   const call=async(route,method='GET',body,token)=>{
    const response=await backend.dispatchFetch(endpoint+route,{method,headers:{Origin:origin,...(body?{'Content-Type':'application/json'}:{}),...(token?{Authorization:'Bearer '+token}:{})},...(body?{body:JSON.stringify(body)}:{})});
    return {status:response.status,body:await response.json()};
@@ -58,6 +68,38 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
   await call('/api/announcements/'+beforeDelete.messages.at(-1).id,'DELETE',null,owner.token);
   const afterDelete=(await call('/api/announcements?cursor='+encodeURIComponent(beforeDelete.nextCursor),'GET',null,owner.token)).body;assert(afterDelete.messages.length>0,'A frozen date cursor survives deletion of its last row');
   const info=(await call('/api/info')).body;assert.equal(info.announcementDateEditing,true);assert.equal(info.announcementHistoryDays,10);
+  if(server){
+   const {chromium}=require('playwright'),{calendarAnnouncementLocalTime}=await import('../js/calendar/announcement-model.js');
+   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true}),errors=[],output=fs.mkdtempSync(path.join(os.tmpdir(),'announcement-date-browser-'));
+   try{
+    const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
+    const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
+    await congregant.getByText('Showing the last 10 days.',{exact:true}).waitFor();
+    while(await congregant.locator('[data-cal-older-announcements]').isVisible()){
+     await congregant.locator('[data-cal-older-announcements]').click();await congregant.waitForFunction(()=>!document.querySelector('[data-cal-older-announcements]').disabled);
+    }
+    assert.equal(await congregant.locator('[data-announcement-id="'+legacy.id+'"]').count(),0);
+    assert.equal(await congregant.locator('[data-cal-edit-announcement]:visible').count(),0);
+    await manager.locator('[data-cal-older-announcements]').click();await manager.locator('[data-announcement-id="'+legacy.id+'"]').waitFor();
+    const row=manager.locator('[data-announcement-id="'+legacy.id+'"]');
+    await row.locator('[data-cal-edit-announcement]').click();
+    const dateInput=row.locator('input[name=addedAt]');assert.equal(await dateInput.inputValue(),calendarAnnouncementLocalTime(legacy.createdAt,'America/New_York'));
+    const movedLocal=calendarAnnouncementLocalTime(new Date(Date.now()-60000).toISOString(),'America/New_York');
+    await dateInput.fill(movedLocal);
+    for(const width of [320,393,1440]){await manager.setViewportSize({width,height:900});await dateInput.scrollIntoViewIfNeeded();const geometry=await dateInput.evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,pageWidth:document.documentElement.scrollWidth,width:innerWidth};});assert(geometry.pageWidth<=width&&geometry.right<=width&&geometry.left>=0&&geometry.height>=44,JSON.stringify(geometry));await manager.screenshot({path:path.join(output,'date-editor-'+width+'.png'),fullPage:true});}
+    await row.getByRole('button',{name:'Save changes',exact:true}).click();await row.locator('.cal-announcement-edit-form').waitFor({state:'detached'});
+    assert.equal((await manager.locator('[data-announcement-id]').all()).length,37);
+    assert.equal(await manager.locator('[data-announcement-id]').nth(1).getAttribute('data-announcement-id'),legacy.id,'Date edit repositions the saved row');
+    assert.equal((await call('/api/announcements','GET',null,owner.token)).body.messages.find(value=>value.id===legacy.id).createdAt,legacy.createdAt);
+    await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor();
+    assert.equal(await congregant.locator('[data-announcement-id]').nth(1).getAttribute('data-announcement-id'),legacy.id,'An edited date inserts a newly recent message into the open congregation feed');
+    await row.locator('[data-cal-edit-announcement]').click();await row.locator('input[name=addedAt]').fill(calendarAnnouncementLocalTime(legacy.createdAt,'America/New_York'));
+    await row.getByRole('button',{name:'Save changes',exact:true}).click();await row.locator('.cal-announcement-edit-form').waitFor({state:'detached'});
+    await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor({state:'detached'});
+    assert.equal(await manager.locator('[data-announcement-id="'+legacy.id+'"]').count(),1,'Backdating retains the manager archive');
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({browserDates:true,phoneAndDesktop:true,dateMovesRow:true,viewerWindowEnforced:true,openFeedReorders:true,originalTimestampPreserved:true,output}));
+   }finally{await browser.close();}
+  }
   console.log('Passed real server date edits, owner/editor/viewer boundaries, chronological pagination, date cutoff, unread preservation, idempotency and cursor deletion checks.');
- }finally{await backend.dispose();}
+ }finally{await backend.dispose();server?.close();}
 })().catch(error=>{console.error(error);process.exitCode=1;});
