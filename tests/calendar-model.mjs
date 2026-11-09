@@ -4,11 +4,24 @@ import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
+import { calendarSessionExpiration } from '../worker/calendar/session-expiration.js';
 
 const read = async name => JSON.parse(await readFile(new URL('../data/' + name + '.json', import.meta.url), 'utf8'));
 const [published, parshaChutz, parshaEY, parshaNames, specialDays] = await Promise.all(['published', 'parsha_chutz', 'parsha_ey', 'parsha_names', 'special_days'].map(read));
 const settings = resolveSettings(published.settings), tables = { parshaChutz, parshaEY, parshaNames, specialDays };
 const event = fields => calendarEvent({ title: 'Synthetic Kiddush', type: 'kiddush', date: '2026-11-07', ...fields });
+
+test('new sessions expire at the first New York 3 a.m. after a full week', () => {
+  for (const [signedIn, expires] of [
+    ['2026-11-09T07:59:59.999Z', '2026-11-16T08:00:00.000Z'],
+    ['2026-11-09T08:00:00.000Z', '2026-11-16T08:00:00.000Z'],
+    ['2026-11-09T08:00:00.001Z', '2026-11-17T08:00:00.000Z'],
+    ['2026-03-01T06:30:00.000Z', '2026-03-08T07:00:00.000Z'],
+    ['2026-10-25T06:30:00.000Z', '2026-11-01T08:00:00.000Z'],
+  ]) {
+    assert.equal(new Date(calendarSessionExpiration(Date.parse(signedIn))).toISOString(), expires, signedIn);
+  }
+});
 
 test('calendar offers the requested categories and preserves older event types', () => {
   assert.deepEqual(CALENDAR_TYPES.map(type => type.label), ['Shalom Zachor', 'Kiddush', 'Vort', 'Aufruf', 'Chasuna', 'Bar mitzva shabbos', 'Bar mitzva dessert', 'Custom']);

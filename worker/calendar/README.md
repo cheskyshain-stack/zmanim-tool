@@ -28,8 +28,9 @@ receive viewer access. Viewers can read the calendar and announcements but canno
 change events, post announcements or manage accounts. No calendar role grants
 schedule-settings, seating-plan or GitHub access.
 Passwords use salted PBKDF2-SHA256 with 100,000 iterations, the supported Workerd
-limit. New bearer sessions last seven days from sign-in and are stored hashed on
-the server. The browser remembers new sessions across tab and browser closes.
+limit. New bearer sessions expire at the first 3 a.m. in New York at or after
+seven full days from sign-in. Tokens are stored hashed on the server. The browser
+remembers new sessions across tab and browser closes.
 Existing sessions keep their original expiration. Signing out removes the saved
 session and invalidates its token on the server.
 Removing or resetting an editor immediately invalidates their sessions. Reset also

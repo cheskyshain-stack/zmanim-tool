@@ -4,6 +4,7 @@ import { calendarAnnouncementText, calendarAnnouncementView, calendarAnnouncemen
 import { requestedRange, civilDate, shiftDate, midnight } from '../traffic-calendar.js';
 import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
 import { lcTextCalendarScript } from './gmail-bridge.js';
+import { calendarSessionExpiration } from './session-expiration.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -103,7 +104,7 @@ export class CommunityCalendar extends DurableObject {
     return user;
   }
   async session(user, type = 'sign-in') {
-    const time = Date.now(), token = random(), expires = time + 7 * 86400000;
+    const time = Date.now(), token = random(), expires = calendarSessionExpiration(time);
     const now = new Date(time).toISOString(), key = 'login-stats:' + user.id, old = await this.ctx.storage.get(key);
     const count = (old?.count || 0) + 1;
     await this.ctx.storage.put({ ['session:' + await hash(token)]: { userId: user.id, version: user.version, expires },
