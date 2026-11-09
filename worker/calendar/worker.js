@@ -103,14 +103,15 @@ export class CommunityCalendar extends DurableObject {
     return user;
   }
   async session(user, type = 'sign-in') {
-    const token = random(), expires = Date.now() + 2 * 86400000;
-    const now = new Date().toISOString(), key = 'login-stats:' + user.id, old = await this.ctx.storage.get(key);
+    const time = Date.now(), token = random(), expires = time + 7 * 86400000;
+    const now = new Date(time).toISOString(), key = 'login-stats:' + user.id, old = await this.ctx.storage.get(key);
     const count = (old?.count || 0) + 1;
     await this.ctx.storage.put({ ['session:' + await hash(token)]: { userId: user.id, version: user.version, expires },
       [key]: { count, firstAt: old?.firstAt || now, lastAt: now },
       ['login-history:' + user.id + ':' + String(count).padStart(16, '0')]: { sequence: count, at: now, type },
       ...activityFields(type === 'account-created' && user.role === 'viewer' ? ['signIns', 'registrations'] : ['signIns'], now) });
-    await this.ctx.storage.setAlarm(expires);
+    const alarm = await this.ctx.storage.getAlarm(), nextCleanup = time + 86400000;
+    if (alarm === null || alarm > nextCleanup) await this.ctx.storage.setAlarm(nextCleanup);
     return { token, expires, user: userView(user) };
   }
   async loginActivity(url) {

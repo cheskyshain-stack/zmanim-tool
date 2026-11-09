@@ -25,8 +25,8 @@ const editorPassword = 'Synthetic calendar editor password 2026';
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless: true });
-  const context = async width => {
-    const ctx = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true });
+  const context = async (width, storageState) => {
+    const ctx = await browser.newContext({ viewport: { width, height: 900 }, acceptDownloads: true, storageState });
     await ctx.addInitScript(() => {
       try {
         localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at: Date.now() }));
@@ -190,6 +190,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal((await call('/api/access/activity', 'GET', null, owner)).body.users[0].signInCount, 1, 'Session checks and failed sign-ins are not successful logins');
     const ownerLog = await call('/api/access/activity/' + session.user.id, 'GET', null, owner);
     assert.equal(ownerLog.body.entries.length, 1); assert.equal(ownerLog.body.entries[0].type, 'account-created');
+    assert.equal(session.expires - Date.parse(ownerLog.body.entries[0].at), 7 * 86400000, 'The server issues sessions for exactly seven days');
     assert(!/password|salt|token/.test(JSON.stringify(ownerLog.body)));
     for (const fields of [{ name: '', email: 'reader@example.test' }, { name: 'Reader', email: '' }, { name: 'Reader', email: 'not-an-email' }]) {
       assert.equal((await call('/api/register', 'POST', { ...fields, password: ownerPassword })).status, 400);
@@ -203,6 +204,16 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await viewerPage.getByRole('button', { name: 'Create account', exact: true }).click(); await viewerPage.locator('.shul-calendar').waitFor();
     let viewerSession = await viewerPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')));
     assert.equal(viewerSession.user.role, 'viewer');
+    const reopened = await context(375, await viewerCtx.storageState());
+    const reopenedPage = await reopened.newPage();
+    await reopenedPage.clock.setFixedTime(new Date(viewerSession.expires - 86400000));
+    await reopenedPage.goto(origin + '/admin/calendar/?preview=congregation');
+    await reopenedPage.locator('.shul-calendar').waitFor();
+    assert.equal(await reopenedPage.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).token), viewerSession.token, 'The browser restores the same session on day six');
+    await reopenedPage.clock.setFixedTime(new Date(viewerSession.expires));
+    await reopenedPage.reload();
+    await reopenedPage.getByRole('heading', { name: 'Calendar sign in', exact: true }).waitFor();
+    await reopened.close();
     assert.equal(await viewerPage.locator('[data-cal-add],[data-cal-edit],[data-cal-delete],[data-cal-access],[data-cal-view]').count(), 0);
     assert.equal((await call('/api/events?from=2026-11-01&to=2026-11-30', 'GET', null, viewerSession.token)).status, 200);
     assert.equal((await call('/api/events/' + crypto.randomUUID(), 'PUT', { title: 'Forbidden' }, viewerSession.token)).status, 403);
@@ -224,7 +235,9 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal((await call('/api/announcements', 'POST', { id: crypto.randomUUID(), text: 'Old editor token' }, promoted.body.token)).status, 401);
     const viewerReturn = await call('/api/session', 'POST', { email: 'viewer@example.test', password: viewerPassword });
     viewerSession = viewerReturn.body; assert.equal(viewerSession.user.role, 'viewer');
-    await viewerPage.evaluate(value => sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify(value)), viewerSession);
+    await viewerPage.evaluate(value => {
+      for (const storage of [sessionStorage, localStorage]) storage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify(value));
+    }, viewerSession);
     await viewerPage.reload(); await viewerPage.locator('.shul-calendar').waitFor();
     assert.equal(await ownerPage.getByRole('link', { name: 'Schedule messages', exact: true }).getAttribute('href'), '/texts/');
     assert.equal((await call('/api/setup', 'POST', { setupToken, name: 'Second owner', email: 'second@example.test', password: ownerPassword })).status, 409);
@@ -283,9 +296,15 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal(await viewerPage.locator('[data-cal-edit-announcement]:visible').count(), 0);
     assert.equal(await viewerPage.locator('[data-cal-delete-announcement]:visible').count(), 0, 'Viewers have no delete control');
     await viewerPage.keyboard.press('Escape');
+    const viewerOtherTab = await viewerCtx.newPage();
+    await viewerOtherTab.goto(origin + '/admin/calendar/?preview=congregation');
+    await viewerOtherTab.locator('.shul-calendar').waitFor();
     await viewerPage.locator('[data-cal-options]').click();
     await viewerPage.getByRole('button', { name: 'Sign out', exact: true }).click();
     await viewerPage.getByRole('heading', { name: 'Calendar sign in', exact: true }).waitFor();
+    await viewerOtherTab.getByRole('heading', { name: 'Calendar sign in', exact: true }).waitFor();
+    assert.equal(await viewerPage.evaluate(() => localStorage.getItem('lakewood-commons-calendar-session-v1')), null);
+    assert.equal((await call('/api/session', 'GET', null, viewerSession.token)).status, 401, 'Signing out revokes the remembered session');
     assert.equal(await viewerPage.locator('.cal-grid,.cal-announcement-message').count(), 0);
     await viewerCtx.close();
     assert.equal((await call('/api/announcements/status', 'GET', null, owner)).body.unread, 1, 'Your own post is already read');

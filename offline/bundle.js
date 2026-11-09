@@ -3674,16 +3674,44 @@ async function calendarConfig() {
   return calendarEndpoint;
 }
 
+function storedCalendarSession(storage) {
+  try { return JSON.parse(window[storage].getItem(CALENDAR_SESSION_KEY) || 'null'); }
+  catch { return null; }
+}
+
+function validCalendarSession(session) {
+  return session?.expires > Date.now() && /^[a-f0-9]{64}$/.test(session.token || '') ? session : null;
+}
+
 function calendarSession(value) {
-  if (value !== undefined) {
-    try { value ? sessionStorage.setItem(CALENDAR_SESSION_KEY, JSON.stringify(value)) : sessionStorage.removeItem(CALENDAR_SESSION_KEY); }
-    catch { throw new Error('Allow session storage to sign in to the calendar.'); }
-    return value;
-  }
+  const current = storedCalendarSession('sessionStorage');
+  if (value === undefined) return validCalendarSession(current);
+  const saved = value ? JSON.stringify(value) : null;
+  try { saved ? sessionStorage.setItem(CALENDAR_SESSION_KEY, saved) : sessionStorage.removeItem(CALENDAR_SESSION_KEY); }
+  catch { if (saved) throw new Error('Allow session storage to sign in to the calendar.'); }
   try {
-    const session = JSON.parse(sessionStorage.getItem(CALENDAR_SESSION_KEY) || 'null');
-    return session?.expires > Date.now() && /^[a-f0-9]{64}$/.test(session.token || '') ? session : null;
-  } catch { return null; }
+    if (saved) localStorage.setItem(CALENDAR_SESSION_KEY, saved);
+    else if (current?.token && storedCalendarSession('localStorage')?.token === current.token) localStorage.removeItem(CALENDAR_SESSION_KEY);
+  } catch { /* Storage restrictions still allow a session in this tab. */ }
+  return value;
+}
+
+function restoreCalendarSession() {
+  const current = calendarSession();
+  if (current) return current;
+  const remembered = validCalendarSession(storedCalendarSession('localStorage'));
+  if (!remembered) return null;
+  // Pin requests in this tab to this account, even if another tab signs in later.
+  try { sessionStorage.setItem(CALENDAR_SESSION_KEY, JSON.stringify(remembered)); }
+  catch { return null; }
+  return remembered;
+}
+
+function calendarSessionWasCleared(event) {
+  if (event.key !== CALENDAR_SESSION_KEY || event.newValue !== null || !event.oldValue) return false;
+  const token = storedCalendarSession('sessionStorage')?.token;
+  try { return !!token && event.storageArea === localStorage && JSON.parse(event.oldValue)?.token === token; }
+  catch { return false; }
 }
 
 async function calendarRequest(path, { method = 'GET', body, signal } = {}) {
@@ -3696,7 +3724,7 @@ async function calendarRequest(path, { method = 'GET', body, signal } = {}) {
   let value;
   try { value = await response.json(); } catch { throw new Error('The calendar service returned an unreadable response. Try again.'); }
   if (!response.ok) {
-    if (response.status === 401 && method === 'GET') calendarSession(null);
+    if (response.status === 401 && method === 'GET' && token && storedCalendarSession('sessionStorage')?.token === token) calendarSession(null);
     throw Object.assign(new Error(value.error || 'The calendar request could not be completed.'), { status: response.status });
   }
   return value;
@@ -5015,7 +5043,12 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     });
   }
   const storageListener = event => {
-    if (endpoint || disposed || event.key !== 'lakewood-commons-calendar-preview-v1') return;
+    if (disposed) return;
+    if (endpoint) {
+      if (calendarSessionWasCleared(event)) { calendarSession(null); user = null; events = []; signIn(); }
+      return;
+    }
+    if (event.key !== 'lakewood-commons-calendar-preview-v1') return;
     try { events = calendarReadPreview(); storageError = ''; note = 'Calendar updated from another tab.'; } catch (error) { storageError = error.message; }
     redraw();
   };
@@ -5039,8 +5072,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     try {
       endpoint = await calendarConfig(); if (disposed) return;
       if (endpoint) {
-        if (setupToken || inviteToken || !calendarSession()) { signIn(); return; }
-        try { user = (await calendarRequest('/api/session')).user; }
+        const session = setupToken || inviteToken ? null : restoreCalendarSession();
+        if (!session) { signIn(); return; }
+        try {
+          const result = await calendarRequest('/api/session');
+          if (disposed || calendarSession()?.token !== session.token) return;
+          user = result.user;
+        }
         catch (error) { signIn(error.message); return; }
         await loadEvents();
       } else if (standalone) {

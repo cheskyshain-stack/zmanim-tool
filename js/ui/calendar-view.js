@@ -1,6 +1,6 @@
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
-import { calendarConfig, calendarRequest, calendarSession } from '../calendar/api.js';
+import { calendarConfig, calendarRequest, calendarSession, calendarSessionWasCleared, restoreCalendarSession } from '../calendar/api.js';
 import { shulNow } from '../zmanim/solar.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { escText, escAttr } from '../util.js';
@@ -550,7 +550,12 @@ export function renderCalendar(container, settings, tables, { standalone = false
     });
   }
   const storageListener = event => {
-    if (endpoint || disposed || event.key !== 'lakewood-commons-calendar-preview-v1') return;
+    if (disposed) return;
+    if (endpoint) {
+      if (calendarSessionWasCleared(event)) { calendarSession(null); user = null; events = []; signIn(); }
+      return;
+    }
+    if (event.key !== 'lakewood-commons-calendar-preview-v1') return;
     try { events = calendarReadPreview(); storageError = ''; note = 'Calendar updated from another tab.'; } catch (error) { storageError = error.message; }
     redraw();
   };
@@ -574,8 +579,13 @@ export function renderCalendar(container, settings, tables, { standalone = false
     try {
       endpoint = await calendarConfig(); if (disposed) return;
       if (endpoint) {
-        if (setupToken || inviteToken || !calendarSession()) { signIn(); return; }
-        try { user = (await calendarRequest('/api/session')).user; }
+        const session = setupToken || inviteToken ? null : restoreCalendarSession();
+        if (!session) { signIn(); return; }
+        try {
+          const result = await calendarRequest('/api/session');
+          if (disposed || calendarSession()?.token !== session.token) return;
+          user = result.user;
+        }
         catch (error) { signIn(error.message); return; }
         await loadEvents();
       } else if (standalone) {
