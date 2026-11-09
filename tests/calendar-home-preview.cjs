@@ -102,6 +102,29 @@ const server = http.createServer((req, res) => {
       checks.push({ touch, singleAndDoubleInert:true, slowTapsInert:true, cancelResets:true, tripleOpens:true, signInRequired:true });
       await t.context.close();
     }
+    for (const touch of [false, true]) {
+      const t = await prepare({ touch, role:'viewer', width:touch ? 393 : 1440 });
+      const openCalendar = async () => { await t.page.goto(origin + '/admin/calendar/?preview=congregation'); await t.page.locator('.cal-reader-heading').waitFor(); };
+      const tapHeader = async count => {
+        const b = await t.page.locator('.cal-site-title').boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
+        for (let i = 0; i < count; i++) touch ? await t.page.touchscreen.tap(x,y) : await t.page.mouse.click(x,y);
+      };
+      await openCalendar(); await tapHeader(2);
+      assert.equal(new URL(t.page.url()).pathname, '/admin/calendar/', 'One or two header taps stay in the calendar');
+      await t.page.getByRole('link', { name:'Donate', exact:true }).click();
+      await t.page.waitForURL('**/donate/'); await t.page.getByText('Choose a campaign', { exact:true }).waitFor();
+      await openCalendar(); await tapHeader(2);
+      await t.page.getByRole('link', { name:'Back to Home', exact:true }).click();
+      await t.page.waitForURL(origin + '/'); await t.page.locator('[data-calendar-preview]').waitFor();
+      await openCalendar();
+      await t.page.evaluate(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at:Date.now() })));
+      await tapHeader(3); await t.page.waitForURL(origin + '/admin/');
+      await t.page.getByRole('heading', { name:'Admin home', exact:true }).waitFor();
+      assert.equal(await t.page.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), 'viewer', 'The navigation gesture does not change the calendar account role');
+      assert(t.calls.every(call => call.startsWith('GET ')), 'Header navigation makes no calendar writes');
+      checks.push({ touch, calendarHeaderTripleOpensAdmin:true, singleAndDoubleInert:true, homeAndDonateWork:true, calendarRolePreserved:true });
+      await t.context.close();
+    }
     for (const role of ['owner','editor','viewer']) {
       const t = await prepare({ role });
       t.addAnnouncement({ id:'already-read', sequence:1, text:'Previously read update', createdAt:'2026-11-01T12:00:00Z', revision:1, read:true });

@@ -1051,6 +1051,10 @@ Switching previews ignores pending responses from the previous announcement view
 The standalone calendar uses the compact navy subpage header, with the same
 left arrow and Home link as Donate, a quiet Community Calendar label and the
 gold-outlined Donate pill with its giving-hand icon on the right, linking to /donate/.
+Three quick taps or clicks on the navy header's title or empty space open /admin/
+through the shared wireSecretDoor handler. Home and Donate keep their ordinary
+link actions. Keep the header text unselectable and suppress double-tap zoom so
+the gesture works on phones. Admin and calendar access checks remain in place.
 It has no building photo or homepage navigation. Keep its 64px height at phone and desktop
 widths, plus safe-area padding. The former in-calendar back button is Refresh: it
 reloads events and notification counts immediately without changing the selected

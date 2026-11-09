@@ -179,7 +179,7 @@
 .cal-login h2 { font:700 1.75rem/1.25 Georgia,serif; margin:.5rem 0; }
 .cal-login > p { font-size:.9rem; line-height:1.6; }
 .cal-editor-body { --cal-site-header-height:calc(64px + env(safe-area-inset-top)); background:#faf7f0; margin:0; font-family:system-ui,sans-serif; }
-.cal-editor-header { box-sizing:border-box; flex:none; height:var(--cal-site-header-height); background:#142b46; color:#fff; padding:env(safe-area-inset-top) max(20px,env(safe-area-inset-right)) 0 max(20px,env(safe-area-inset-left)); border-bottom:2px solid #cbb681; }
+.cal-editor-header { box-sizing:border-box; flex:none; height:var(--cal-site-header-height); background:#142b46; color:#fff; padding:env(safe-area-inset-top) max(20px,env(safe-area-inset-right)) 0 max(20px,env(safe-area-inset-left)); border-bottom:2px solid #cbb681; touch-action:manipulation; user-select:none; }
 .cal-subpage-nav { display:flex; align-items:center; gap:16px; height:100%; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif; }
 .cal-site-back { display:inline-flex; align-items:center; box-sizing:border-box; min-height:44px; flex:none; padding:.4rem .55rem; margin:-.4rem -.55rem; border-radius:8px; color:#f3ecdc; text-decoration:none; font-size:16px; font-weight:600; }
 .cal-site-back:hover { text-decoration:underline; }
