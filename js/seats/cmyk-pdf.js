@@ -28,8 +28,8 @@ async function seatsLoadPdfTools() {
   if (!seatsPdfLibraries) seatsPdfLibraries = (async () => {
     await seatsPdfScript('/vendor/cmyk/jspdf-4.2.1.umd.min.js');
     await seatsPdfScript('/vendor/cmyk/svg2pdf-2.9.0.umd.min.js');
-    const fonts = await Promise.all(['Sans-Regular', 'Sans-Bold', 'Serif-Regular', 'Serif-Bold'].map(name => seatsPdfBytes('/assets/print/Liberation' + name + '.ttf')));
-    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif'];
+    const fonts = await Promise.all(['LiberationSans-Regular', 'LiberationSans-Bold', 'LiberationSerif-Regular', 'LiberationSerif-Bold', 'SeatsSerif-Regular'].map(name => seatsPdfBytes('/assets/print/' + name + '.ttf')));
+    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif', 'SeatsNames'];
     await Promise.all(fonts.map(async (bytes, index) => {
       const face = new FontFace(names[index], bytes, { weight: index % 2 ? '700' : '400' });
       await face.load(); document.fonts.add(face);
@@ -173,7 +173,7 @@ async function seatsBuildPdf(pages, { monochrome = false, progress = () => {}, r
   for (let index = 0; index < tools.fonts.length; index++) {
     const file = 'seats-font-' + index + '.ttf';
     doc.addFileToVFS(file, seatsPdfBinary(tools.fonts[index]));
-    doc.addFont(file, index < 2 ? 'SeatsSans' : 'SeatsSerif', index % 2 ? 'bold' : 'normal');
+    doc.addFont(file, index === 4 ? 'SeatsNames' : index < 2 ? 'SeatsSans' : 'SeatsSerif', index % 2 ? 'bold' : 'normal');
   }
   if (rgbMode) doc.internal.events.subscribe('putPage', () => { doc.internal.write('/Group << /Type /Group /S /Transparency /CS /DeviceRGB /I true >>'); });
   else seatsPdfOutputIntent(doc, tools.profile);

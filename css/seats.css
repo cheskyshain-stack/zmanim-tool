@@ -1,4 +1,4 @@
-@font-face{font-family:'Liberation Serif';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/liberation-serif-400.woff2') format('woff2')}
+@font-face{font-family:'Seats Serif';font-style:normal;font-weight:450;font-display:swap;src:url('../assets/fonts/seats-serif-450.woff2') format('woff2')}
 @font-face{font-family:'David Libre';font-style:normal;font-weight:400;font-display:swap;src:url('../assets/fonts/david-libre-400.woff2') format('woff2')}
 :root{--seats-navy:#142b46;--seats-gold:#b39754;--seats-cream:#faf7f0;--seats-border:#d9dde1;--seats-muted:#637080;--seats-page-width:10.5in;--seats-page-height:8in}
 *{box-sizing:border-box}
@@ -149,7 +149,7 @@ body.seats-app{margin:0;background:var(--seats-cream);color:var(--seats-navy);fo
 .table-surface{fill:var(--table-fill);stroke:currentColor;stroke-width:1.2}
 .table-label{font:600 11px Georgia,'David Libre',serif;fill:currentColor;pointer-events:none}
 .table-seat .seat-area{fill:transparent;stroke:none}
-.table-seat .seat-name{fill:currentColor;font-family:'Liberation Serif',serif;font-weight:400;pointer-events:none}
+.table-seat .seat-name{fill:currentColor;font-family:'Seats Serif',serif;font-weight:450;pointer-events:none}
 .table-seat .empty-seat{font:11px Arial,sans-serif;fill:#737373;pointer-events:none}
 .table-seat.blocked-seat[aria-disabled=true]{cursor:default}
 .table-seat .blocked-seat-label{font:9px Arial,sans-serif;fill:#777;pointer-events:none}

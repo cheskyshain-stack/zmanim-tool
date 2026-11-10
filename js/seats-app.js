@@ -38,7 +38,7 @@ async function seatsEntry() {
   const updates = seatsCreateUpdates();
   if (await updates.check()) return;
   updates.protect(() => !root.querySelector('#seats-unlock'));
-  const nameFontReady = document.fonts.load('400 13px "Liberation Serif"', 'Aaאב').catch(() => {});
+  const nameFontReady = document.fonts.load('450 13px "Seats Serif"', 'Aaאב').catch(() => {});
   const auth = await seatsOpenSession(root);
   await nameFontReady;
   window.dispatchEvent(new Event('zmanim-seats-open'));
@@ -344,7 +344,7 @@ function seatsStart(root, auth, updates) {
     return measure.measureText(text).width;
   }
   function seatNameMeasure(text, font) {
-    measure.font = '400 ' + font + 'px "Liberation Serif",serif';
+    measure.font = '450 ' + font + 'px "Seats Serif",serif';
     return measure.measureText(text).width;
   }
   function nameText(name, x, y, width, height, tableId, maxFont = 13, measureName = nameMeasure, growthLimit = null) {
