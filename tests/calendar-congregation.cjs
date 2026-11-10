@@ -53,7 +53,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
       const page = await context.newPage();
       page.on('pageerror', error => errors.push(error.message));
       page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
-      await page.clock.setFixedTime(new Date(month + '-15T17:00:00Z'));
+      await page.clock.setFixedTime(new Date(month + (month === '2026-11' ? '-10' : '-15') + 'T17:00:00Z'));
       await page.goto(origin + '/admin/calendar/');
       await page.locator('[data-cal-day]:not([disabled])').first().waitFor();
       for (const [width, height] of [[320,568],[375,640],[393,852],[768,1024],[1440,900],[844,390]]) {
@@ -66,8 +66,11 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
           const second = getComputedStyle(grid.querySelector('tbody td:nth-child(2)'));
           const inside = getComputedStyle(grid.querySelector('td:not(.cal-outside):not(.cal-shabbos)')).backgroundColor;
           const outside = [...grid.querySelectorAll('td.cal-outside')].map(cell => getComputedStyle(cell).backgroundColor);
+          const badge = grid.querySelector('.is-today .cal-english-day');
+          const digits = document.createRange(); digits.selectNodeContents(badge);
           return { width:innerWidth, height:innerHeight, visualHeight:visualViewport?.height, readerHeight:document.querySelector('.is-cal-congregation').style.getPropertyValue('--cal-reader-height'), pageWidth:document.documentElement.scrollWidth, pageHeight:document.documentElement.scrollHeight,
             gridEdges:[gridStyle.borderLeftWidth,gridStyle.borderRightWidth].map(parseFloat), edgeColors:[gridStyle.borderLeftColor,gridStyle.borderRightColor], dividerWidth:parseFloat(first.borderRightWidth) + parseFloat(second.borderLeftWidth), dividerColor:first.borderRightColor, inside, outside,
+            todayBadge:box(badge), todayDigits:box(digits),
             header:box(document.querySelector('.cal-editor-header')), calendar:box(document.querySelector('.shul-calendar')), controls:[...document.querySelectorAll('.cal-reader-heading button,.cal-site-back,.cal-month-nav button,.cal-toolbar > button')].map(box),
             days:[...document.querySelectorAll('[data-cal-day]')].map(button => {
               const parsha = button.querySelector('.cal-parsha'), words = [];
@@ -87,6 +90,9 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         assert(geometry.dividerWidth > 0 && geometry.gridEdges.every(edge => edge === geometry.dividerWidth), 'Both grid edges match the divider width');
         assert(geometry.edgeColors.every(color => color === geometry.dividerColor), 'Both grid edges match the divider color');
         assert(geometry.outside.every(color => color === 'rgb(229, 233, 238)' && color !== geometry.inside), 'Other-month cells use a gray background, including Shabbos');
+        const { todayBadge, todayDigits } = geometry;
+        assert(Math.abs(todayBadge.width - todayBadge.height) < .25 && todayDigits.left - todayBadge.left >= 2 && todayBadge.right - todayDigits.right >= 2 && todayDigits.top >= todayBadge.top && todayDigits.bottom <= todayBadge.bottom,
+          JSON.stringify({ month, width, height, reason:'Today badge is circular with space around both digits', todayBadge, todayDigits }));
         assert.equal(geometry.header.height, 64, 'The compact subpage header matches the other pages');
         assert.equal(await page.locator('.cal-site-back').innerText(), '← Home');
         assert.equal(await page.locator('.cal-site-back').getAttribute('href'), '/');
@@ -127,7 +133,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         assert.equal(await page.locator('[name=month]').getAttribute('min'), '2026-10'); assert.equal(await page.locator('[name=month]').getAttribute('max'), '2026-12');
         await page.locator('[name=month]').fill('2027-01'); await page.locator('.cal-dialog form').evaluate(form => form.dispatchEvent(new Event('submit', { cancelable:true, bubbles:true })));
         await page.getByText('Choose last month, this month or next month.', { exact:true }).waitFor(); await page.keyboard.press('Escape');
-        await page.locator('[data-cal-today]').click(); await page.locator('[data-cal-day="2026-11-15"]:not([disabled])').waitFor();
+        await page.locator('[data-cal-today]').click(); await page.locator('[data-cal-day="2026-11-10"]:not([disabled])').waitFor();
         const saturday = page.locator('td.cal-shabbos:not(.cal-outside) [data-cal-day]').first();
         await saturday.click(); await page.locator('.cal-dialog .cal-event-card').first().waitFor(); assert.equal(await page.locator('.cal-dialog .cal-event-card').count(), 8);
         assert.deepEqual(await page.locator('.cal-dialog .cal-event-card').evaluateAll(nodes => nodes.map(node => [...node.classList].find(name => name.startsWith('cal-type-')).slice(9))), types, 'Day details automatically group event types');
