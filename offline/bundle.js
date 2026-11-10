@@ -4500,7 +4500,6 @@ async function openCalendarPhoneReminders(dialog, publicKey) {
     status.textContent = 'On iPhone or iPad, add the calendar to your Home Screen and open it from its icon. On Android, open it in Chrome.';
     return;
   }
-  const permissionHelp = 'Allow notifications for this site in your browser’s site permissions.';
   try {
     const registered = await navigator.serviceWorker.register(workerPath);
     const registration = registered.active ? registered : await navigator.serviceWorker.ready;
@@ -4510,25 +4509,44 @@ async function openCalendarPhoneReminders(dialog, publicKey) {
     function paint(message = '') {
       button.textContent = enabled ? 'Turn off phone reminders' : 'Turn on phone reminders';
       button.disabled = false;
-      status.textContent = message || (Notification.permission === 'denied' ? permissionHelp : enabled ? 'Phone reminders are on for this device.' : '');
+      status.textContent = message || (Notification.permission === 'denied' ? 'Your browser reports that notifications for this site are blocked.' : enabled ? 'Phone reminders are on for this device.' : '');
     }
     paint();
     button.addEventListener('click', async () => {
       button.disabled = true;
+      let failure = 'Couldn’t turn off phone reminders.';
       try {
         if (enabled) {
+          status.textContent = 'Turning off phone reminders…';
           await removePhoneReminder(subscription);
           enabled = false;
           try { await subscription.unsubscribe(); subscription = null; } catch { /* The server has already turned off reminders. */ }
         } else {
-          if (!subscription || Notification.permission !== 'granted') {
-            subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: browserKey(publicKey) });
+          if (Notification.permission !== 'granted') {
+            failure = 'Couldn’t request notification permission.';
+            status.textContent = 'Waiting for notification permission. Choose Allow if your browser asks.';
+            const permission = await Notification.requestPermission();
+            if (!view.el.isConnected) return;
+            if (permission !== 'granted') {
+              paint(permission === 'denied'
+                ? 'The browser still blocks notifications. Reset this site’s notification permission in your browser, then try again.'
+                : 'Notification permission is still pending. Tap Turn on phone reminders and choose Allow when your browser asks.');
+              return;
+            }
+            if (!subscription && navigator.userActivation?.isActive === false) {
+              paint('Notifications are allowed. Tap Turn on phone reminders once more to finish.');
+              return;
+            }
           }
+          failure = 'The browser couldn’t register this phone for notifications.';
+          status.textContent = 'Registering this phone for reminders…';
+          subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: browserKey(publicKey) });
+          failure = 'The calendar couldn’t save reminders for this phone.';
           const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { subscription: subscription.toJSON() } });
           enabled = result.enabled;
         }
         paint();
-      } catch (error) { paint(error.name === 'NotAllowedError' ? permissionHelp : error.message); }
+      } catch (error) { paint(`${failure} ${error.message || ''}`.trim()); }
     });
   } catch (error) { status.textContent = error.message; }
 }

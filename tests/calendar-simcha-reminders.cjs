@@ -44,9 +44,11 @@ async function checkPhoneControls(site, owner, viewer, device) {
         localStorage.setItem('zmanim-nocount', '1');
         sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify(session));
         let current = null;
+        window.calendarPushAttempts = 0;
         const registration = { active: true, pushManager: { getSubscription: async () => current,
           subscribe: async () => {
-            if (Notification.permission === 'denied') throw new DOMException('Permission denied', 'NotAllowedError');
+            window.calendarPushAttempts++;
+            if (window.failCalendarPush) throw new DOMException('Push registration denied', 'NotAllowedError');
             return current = { endpoint: device.endpoint, toJSON: () => device, unsubscribe: async () => { current = null; return true; } };
           } } };
         navigator.serviceWorker.register = async () => registration;
@@ -68,12 +70,29 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await notifications.getByRole('button', { name: 'Phone reminders', exact: true }).click();
     await notifications.waitFor({ state: 'detached' });
     const turnOn = reader.getByRole('button', { name: 'Turn on phone reminders' });
-    const blocked = reader.getByText('Allow notifications for this site in your browser’s site permissions.');
-    await blocked.waitFor();
+    await reader.getByText('Your browser reports that notifications for this site are blocked.').waitFor();
     await turnOn.click();
-    await blocked.waitFor();
+    await reader.getByText('The browser still blocks notifications.', { exact: false }).waitFor();
+    assert.equal(await reader.evaluate(() => window.calendarPushAttempts), 0);
+
+    await setNotificationPermission('prompt');
+    await reader.evaluate(() => {
+      Object.defineProperty(navigator, 'userActivation', { configurable: true, value: { isActive: false } });
+      Notification.requestPermission = () => new Promise(resolve => { window.answerCalendarPermission = resolve; });
+    });
+    await turnOn.click();
+    await reader.getByText('Waiting for notification permission.', { exact: false }).waitFor();
+    assert(await turnOn.isDisabled());
     await setNotificationPermission('granted');
     await reader.waitForFunction(() => Notification.permission === 'granted');
+    await reader.evaluate(() => window.answerCalendarPermission('granted'));
+    await reader.getByText('Notifications are allowed. Tap Turn on phone reminders once more to finish.').waitFor();
+    assert.equal(await reader.evaluate(() => window.calendarPushAttempts), 0);
+
+    await reader.evaluate(() => { delete navigator.userActivation; window.failCalendarPush = true; });
+    await turnOn.click();
+    await reader.getByText('The browser couldn’t register this phone for notifications. Push registration denied').waitFor();
+    await reader.evaluate(() => { window.failCalendarPush = false; });
     await turnOn.click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
