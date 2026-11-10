@@ -45,17 +45,34 @@ async function checkPhoneControls(site, owner, viewer, device) {
         sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify(session));
         let current = null;
         const registration = { active: true, pushManager: { getSubscription: async () => current,
-          subscribe: async () => current = { endpoint: device.endpoint, toJSON: () => device, unsubscribe: async () => { current = null; return true; } } } };
+          subscribe: async () => {
+            if (Notification.permission === 'denied') throw new DOMException('Permission denied', 'NotAllowedError');
+            return current = { endpoint: device.endpoint, toJSON: () => device, unsubscribe: async () => { current = null; return true; } };
+          } } };
         navigator.serviceWorker.register = async () => registration;
         navigator.serviceWorker.getRegistration = async () => registration;
       }, { session, device });
       return context.newPage();
     };
     const reader = await pageAs(viewer);
+    const pageCdp = await reader.context().newCDPSession(reader);
+    const browserCdp = await browser.newBrowserCDPSession();
+    const { targetInfo } = await pageCdp.send('Target.getTargetInfo');
+    const setNotificationPermission = setting => browserCdp.send('Browser.setPermission', {
+      permission: { name: 'notifications' }, setting, origin: new URL(site).origin, browserContextId: targetInfo.browserContextId,
+    });
+    await setNotificationPermission('denied');
     await reader.goto(site + '/admin/calendar/?preview=congregation');
     await reader.getByRole('button', { name: 'Calendar options' }).click();
     await reader.getByRole('button', { name: 'Phone reminders', exact: true }).click();
-    await reader.getByRole('button', { name: 'Turn on phone reminders' }).click();
+    const turnOn = reader.getByRole('button', { name: 'Turn on phone reminders' });
+    const blocked = reader.getByText('Allow notifications for this site in your browser’s site permissions.');
+    await blocked.waitFor();
+    await turnOn.click();
+    await blocked.waitFor();
+    await setNotificationPermission('granted');
+    await reader.waitForFunction(() => Notification.permission === 'granted');
+    await turnOn.click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();

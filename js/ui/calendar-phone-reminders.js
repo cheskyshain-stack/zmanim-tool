@@ -25,16 +25,17 @@ export async function openCalendarPhoneReminders(dialog, publicKey) {
     status.textContent = 'On iPhone or iPad, add the calendar to your Home Screen and open it from its icon. On Android, open it in Chrome.';
     return;
   }
+  const permissionHelp = 'Allow notifications for this site in your browser’s site permissions.';
   try {
     const registered = await navigator.serviceWorker.register(workerPath);
     const registration = registered.active ? registered : await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     let enabled = subscription && (await calendarRequest('/api/phone-reminders/status', { method: 'POST', body: { endpoint: subscription.endpoint } })).enabled;
     if (!view.el.isConnected) return;
-    function paint() {
+    function paint(message = '') {
       button.textContent = enabled ? 'Turn off phone reminders' : 'Turn on phone reminders';
-      button.disabled = !enabled && Notification.permission === 'denied';
-      status.textContent = enabled ? 'Phone reminders are on for this device.' : button.disabled ? 'Allow calendar notifications in your browser settings, then reopen this panel.' : '';
+      button.disabled = false;
+      status.textContent = message || (Notification.permission === 'denied' ? permissionHelp : enabled ? 'Phone reminders are on for this device.' : '');
     }
     paint();
     button.addEventListener('click', async () => {
@@ -45,12 +46,14 @@ export async function openCalendarPhoneReminders(dialog, publicKey) {
           enabled = false;
           try { await subscription.unsubscribe(); subscription = null; } catch { /* The server has already turned off reminders. */ }
         } else {
-          subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: browserKey(publicKey) });
+          if (!subscription || Notification.permission !== 'granted') {
+            subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: browserKey(publicKey) });
+          }
           const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { subscription: subscription.toJSON() } });
           enabled = result.enabled;
         }
         paint();
-      } catch (error) { paint(); if (!status.textContent || enabled) status.textContent = error.message; }
+      } catch (error) { paint(error.name === 'NotAllowedError' ? permissionHelp : error.message); }
     });
   } catch (error) { status.textContent = error.message; }
 }
