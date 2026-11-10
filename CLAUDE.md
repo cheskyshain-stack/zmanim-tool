@@ -1793,11 +1793,16 @@ clear of the top-left minyan logo; do not reserve extra room height or shrink it
 Keep the whole picture inside the printable page, clear of seat names, and
 preserve its proportions on fixed-size and auto-fit printouts. The asset must
 ship offline too.
-Assigned seat names use regular Liberation Serif (400) on screen and in native,
-RGB and CMYK PDFs, matching the lighter Bimah-style preview approved by the user.
-The self-hosted WOFF2 is a lossless conversion of the existing embedded PDF font,
-including all Latin and Hebrew glyphs. Load it before starting the editor so
-canvas fitting and the first visible names use the same metrics.
+Assigned seat names retain the approved Liberation Serif letter shapes with a
+very slight weight increase. The Seats Serif face has weight 450 and strengthens
+the original outlines by just 0.004em. `scripts/build-seats-name-font.py` generates
+the renamed OFL derivative from the shipped regular font using FreeType, keeping
+all advance widths, glyph order, Unicode mappings and hinting. Its WOFF2 serves
+the screen/native print; its matching TTF embeds as SeatsNames in RGB/CMYK PDFs.
+Render the stronger outlines directly from the font so native PDFs keep a single
+selectable text layer. The original serif faces remain for other lettering.
+Load the name face before starting the editor so canvas fitting and the first
+visible names use the same metrics. Keep the existing size, spacing and fitting.
 Fixed Legal printouts may fit names up to 16 diagram units instead of the normal
 13, using the actual wider seat width and the same shared-size/long-name fitting.
 Auto fit can grow assigned names uniformly on wider paper by up to 16/13, with
@@ -1806,7 +1811,7 @@ this proportional growth only to the assigned-name lettering wrapper, preserving
 the existing horizontal paper correction. Keep normal Letter sizes, editing text,
 table labels, Open labels and fixture captions unchanged. Check actual native
 Legal and Auto fit PDFs for larger names, uniform sizing and full character bounds.
-Measure their wrapping and shared font size with the same regular serif so long
+Measure their wrapping and shared font size with the same name face so long
 English and Hebrew names stay within their seats. Keep Open labels and fixture
 captions at their existing weights. Preserve stored names, assignments and room
 geometry when changing this display style.
@@ -1872,7 +1877,7 @@ vector colors in CMYK or gray, with no silent RGB fallback. Text stays selectabl
 uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyph
 ordering so Hebrew words print in the correct direction. All chart print lettering
 uses solid black, including Color, so small names do not require screened navy
-toner. Keep the regular Liberation Serif seat names and fitting; other lettering
+toner. Keep the subtly strengthened serif seat names and fitting; other lettering
 retains its current fonts and weights. The editing preview retains its existing
 colors. Plain seating charts and alphabetical lists remain
 fully vector, including their table outlines, fills, pillar hatching and rules.

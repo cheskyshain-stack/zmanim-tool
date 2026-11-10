@@ -63,7 +63,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
       const before=await page.evaluate(()=>localStorage.getItem('lakewood-commons-seats-v1'));
       const inspect=async selector=>page.locator(selector).evaluate(stage=>{
         const texts=[...stage.querySelectorAll('.table-seat.assigned .seat-name')],sizes={};
-        for(const text of texts){if(!getComputedStyle(text).fontFamily.includes('Liberation Serif'))throw new Error('Assigned names must use Liberation Serif');if(getComputedStyle(text).fontWeight!=='400')throw new Error('Assigned names must render at regular weight');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
+        for(const text of texts){if(!getComputedStyle(text).fontFamily.includes('Seats Serif'))throw new Error('Assigned names must use the subtly strengthened serif');if(getComputedStyle(text).fontWeight!=='450')throw new Error('Assigned names must render at the subtle 450 weight');const size=text.getAttribute('font-size');sizes[size]=(sizes[size]||0)+1;}
         const names=texts.map(text=>[...text.querySelectorAll('tspan')].map(line=>line.textContent).join(' '));
         const overflow=texts.filter(text=>{
           const parent=text.closest('.table-seat'),rav=parent.classList.contains('rav-seat'),seat=parent.querySelector(rav?'.shtender-surface':'.seat-area').getBBox(),box=text.getBBox();
@@ -72,7 +72,7 @@ print(json.dumps({'assigned':len(fonts),'sameSize':max(sizes.values()),'sizes':d
         }).map(text=>({name:text.textContent,font:text.getAttribute('font-size')}));
         return {count:texts.length,sizes,names,overflow};
       });
-      assert.equal(await page.evaluate(()=>[...document.fonts].find(face=>face.family.includes('Liberation Serif')&&face.weight==='400')?.status),'loaded','The full Latin/Hebrew webfont is loaded');
+      assert.equal(await page.evaluate(()=>[...document.fonts].find(face=>face.family.includes('Seats Serif')&&face.weight==='450')?.status),'loaded','The full Latin/Hebrew webfont is loaded');
       const screen=await inspect('.room-stage');assert.ok(Math.max(...Object.values(screen.sizes))>=Math.ceil(screen.count*.85));assert.equal(screen.overflow.length,0,JSON.stringify(screen.overflow));
       assert.deepEqual(screen.names.sort(),[...renderedNames].sort(),'Full English and Hebrew names stay intact');
       await page.screenshot({path:path.join(output,'names-'+width+'.png'),fullPage:true});
