@@ -4103,14 +4103,14 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
     timer = setInterval(refresh, 30000); refresh();
   }
-  function bind(container) {
+  function bind(container, openPhoneReminders) {
     button = container.querySelector('[data-cal-announcements]');
-    button?.addEventListener('click', open); paint();
+    button?.addEventListener('click', () => open(openPhoneReminders)); paint();
   }
   function markup({ label = 'Announcements', icon = false } = {}) {
     return `<button type="button" data-cal-announcements data-cal-announcement-label="${escAttr(label)}">${icon ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>' : ''}<span>${escText(label)}</span><span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>`;
   }
-  async function open() {
+  async function open(openPhoneReminders) {
     if (!actor || active) return;
     const id = actor;
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
@@ -4126,7 +4126,18 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
-    if (actor.role === 'viewer') view.el.classList.add('cal-announcement-reader');
+    if (actor.role === 'viewer') {
+      view.el.classList.add('cal-announcement-reader');
+      if (openPhoneReminders) {
+        const setup = document.createElement('button');
+        setup.type = 'button'; setup.textContent = 'Phone reminders'; setup.disabled = previewing();
+        view.el.querySelector('.cal-dialog-header').after(setup);
+        setup.addEventListener('click', () => {
+          view.close();
+          if (!view.el.isConnected) openPhoneReminders();
+        });
+      }
+    }
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
@@ -4715,13 +4726,15 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
     calendarSession(null); user = null; events = []; signIn();
   }
-  const phoneReminderButton = () => standalone && reminderPublicKey && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
+  const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
+  const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey);
+  const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
     signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton());
-    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); openCalendarPhoneReminders(dialog, reminderPublicKey); });
+    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function openDay(date, remindToPost = false) {
@@ -4823,11 +4836,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
     const adminActions = container.querySelector('.cal-admin-actions');
     adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton());
-    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => openCalendarPhoneReminders(dialog, reminderPublicKey));
+    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', showPhoneReminders);
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
-    announcements.bind(container);
+    announcements.bind(container, isReader && phoneRemindersAvailable() ? showPhoneReminders : undefined);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {

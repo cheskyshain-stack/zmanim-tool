@@ -63,8 +63,10 @@ async function checkPhoneControls(site, owner, viewer, device) {
     });
     await setNotificationPermission('denied');
     await reader.goto(site + '/admin/calendar/?preview=congregation');
-    await reader.getByRole('button', { name: 'Calendar options' }).click();
-    await reader.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await reader.getByRole('button', { name: /^Notifications/ }).click();
+    const notifications = reader.getByRole('dialog', { name: 'Notifications' });
+    await notifications.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await notifications.waitFor({ state: 'detached' });
     const turnOn = reader.getByRole('button', { name: 'Turn on phone reminders' });
     const blocked = reader.getByText('Allow notifications for this site in your browser’s site permissions.');
     await blocked.waitFor();
@@ -92,6 +94,12 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await manager.getByRole('dialog', { name: 'Day details' }).getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
     await manager.getByRole('button', { name: 'Post an announcement' }).click();
     await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
+    await manager.keyboard.press('Escape');
+    await manager.locator('[data-cal-view]').selectOption('viewer');
+    await manager.getByRole('button', { name: /^Notifications/ }).click();
+    const previewSetup = manager.getByRole('dialog', { name: 'Notifications' }).getByRole('button', { name: 'Phone reminders', exact: true });
+    await previewSetup.waitFor();
+    assert(await previewSetup.isDisabled(), 'View as Congregation shows the setup without changing device settings');
   } finally { await browser.close(); }
 }
 
