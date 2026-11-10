@@ -5,6 +5,7 @@ import { requestedRange, civilDate, shiftDate, midnight } from '../traffic-calen
 import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
 import { lcTextCalendarScript } from './gmail-bridge.js';
 import { calendarSessionExpiration } from './session-expiration.js';
+import { pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, runSimchaReminders, scheduleCalendarAlarm, simchaReminderAt } from './simcha-reminders.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -47,6 +48,7 @@ export default {
 export class CommunityCalendar extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env); this.ctx = ctx; this.env = env;
+    this.reminderKeys = reminderKeys(env.CALENDAR_REMINDER_VAPID);
     ctx.blockConcurrencyWhile(async () => {
       if (!await ctx.storage.get('config:activity-start')) await ctx.storage.put('config:activity-start', new Date().toISOString());
       if (!await ctx.storage.get('config:announcement-date-index')) {
@@ -92,7 +94,7 @@ export class CommunityCalendar extends DurableObject {
     const next = old?.until > now ? old : { count: 0, until: now + 15 * 60000 };
     if (next.count >= limit) fail('Too many attempts. Try again in 15 minutes.', 429);
     await this.ctx.storage.put(key, { ...next, count: next.count + 1 });
-    await this.ctx.storage.setAlarm(now + 2 * 86400000);
+    await scheduleCalendarAlarm(this.ctx.storage, now + 86400000);
   }
   async signedIn(request, owner = false) {
     const token = request.headers.get('Authorization')?.replace(/^Bearer /, '');
@@ -111,9 +113,39 @@ export class CommunityCalendar extends DurableObject {
       [key]: { count, firstAt: old?.firstAt || now, lastAt: now },
       ['login-history:' + user.id + ':' + String(count).padStart(16, '0')]: { sequence: count, at: now, type },
       ...activityFields(type === 'account-created' && user.role === 'viewer' ? ['signIns', 'registrations'] : ['signIns'], now) });
-    const alarm = await this.ctx.storage.getAlarm(), nextCleanup = time + 86400000;
-    if (alarm === null || alarm > nextCleanup) await this.ctx.storage.setAlarm(nextCleanup);
-    return { token, expires, user: userView(user) };
+    await scheduleCalendarAlarm(this.ctx.storage, time + 86400000);
+    return { token, expires, ...this.sessionInfo(user) };
+  }
+  sessionInfo(user) {
+    return { user: userView(user), ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey } : {}) };
+  }
+  async phoneReminders(request, user, path) {
+    const method = request.method, statusOnly = path === '/api/phone-reminders/status' && method === 'POST';
+    if (!statusOnly && (path !== '/api/phone-reminders' || !['PUT', 'DELETE'].includes(method))) fail('Phone reminder setting not found.', 404);
+    if (!this.reminderKeys && method !== 'DELETE') fail('Phone reminders are not available yet.', 503);
+    const body = await this.body(request, 4096);
+    const subscription = method === 'PUT' ? pushSubscription(body.subscription) : null;
+    const endpoint = method === 'PUT' ? subscription?.endpoint : pushEndpoint(body.endpoint);
+    if (!endpoint) fail('Use a supported browser to enable phone reminders.');
+    const key = await reminderDeviceKey(endpoint), storage = this.ctx.storage;
+    if (statusOnly) {
+      const device = await storage.get(key);
+      return json({ enabled: device?.userId === user.id && device.version === user.version });
+    }
+    await this.limited(request, 'phone-reminders:' + user.id, 30);
+    await storage.transaction(async transaction => {
+      const current = await transaction.get(key);
+      if (method === 'DELETE') {
+        if (current?.userId === user.id) await transaction.delete(key);
+        return;
+      }
+      if (current?.userId !== user.id) {
+        const devices = await transaction.list({ prefix: 'simcha-phone:' });
+        if ([...devices.values()].filter(device => device.userId === user.id && device.version === user.version).length >= 5) fail('Turn off reminders on another device before adding this one.', 409);
+      }
+      await transaction.put(key, { id: crypto.randomUUID(), userId: user.id, version: user.version, subscription, lastSent: current?.lastSent || '' });
+    });
+    return json({ enabled: method === 'PUT' });
   }
   async loginActivity(url) {
     const storage = this.ctx.storage;
@@ -411,7 +443,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -462,7 +494,8 @@ export class CommunityCalendar extends DurableObject {
     if (path === '/api/activity' && method === 'GET') return this.activityReport(url);
     if ((path === '/api/access/activity' || path.startsWith('/api/access/activity/')) && method === 'GET') return this.loginActivity(url);
     if (path === '/api/announcements' || path.startsWith('/api/announcements/')) return this.announcements(request, user, url);
-    if (path === '/api/session' && method === 'GET') return json({ user: userView(user) });
+    if (path === '/api/phone-reminders' || path === '/api/phone-reminders/status') return this.phoneReminders(request, user, path);
+    if (path === '/api/session' && method === 'GET') return json(this.sessionInfo(user));
     if (path === '/api/session' && method === 'DELETE') {
       await this.ctx.storage.delete('session:' + await hash(request.headers.get('Authorization').slice(7)));
       return json({ signedOut: true });
@@ -530,21 +563,33 @@ export class CommunityCalendar extends DurableObject {
       }
       if (!old && (await this.ctx.storage.list({ prefix: 'event:', limit: 2000 })).size >= 2000) fail('Remove unused or past events before adding more. This calendar has reached its event limit.', 409);
       let fields;
-      try { fields = calendarEvent(body); } catch (error) { fail(error.message); }
+      try { fields = calendarEvent({ ...body, reminder: body.reminder ?? old?.reminder }); } catch (error) { fail(error.message); }
       const event = { ...fields, id: entry[1], revision: (old?.revision || 0) + 1,
         createdAt: old?.createdAt || now, createdBy: old?.createdBy || user.id, updatedAt: now, updatedBy: user.id };
-      await this.ctx.storage.put({ [key]: event, ...activityFields([old ? 'eventsEdited' : 'eventsCreated'], now) });
+      await this.ctx.storage.transaction(async transaction => {
+        const current = await transaction.get(key);
+        if ((current?.revision || 0) !== body.revision || await transaction.get('deleted-event:' + entry[1])) fail('This event changed in another session. Reload the month before saving.', 409);
+        await transaction.put({ [key]: event, ...activityFields([old ? 'eventsEdited' : 'eventsCreated'], now) });
+        const reminderAt = this.reminderKeys ? simchaReminderAt(event) : Infinity;
+        if (reminderAt > Date.now()) await scheduleCalendarAlarm(transaction, reminderAt);
+      });
       return json({ event }, old ? 200 : 201);
     }
     return json({ error: 'Calendar page not found.' }, 404);
   }
   async alarm() {
-    const now = Date.now();
-    for (const prefix of ['session:', 'attempt:', 'invite:']) {
-      const rows = await this.ctx.storage.list({ prefix });
-      const expired = [...rows].filter(([, value]) => (value.expires || value.until) <= now).map(([key]) => key);
-      for (let i = 0; i < expired.length; i += 100) await this.ctx.storage.delete(expired.slice(i, i + 100));
+    const now = Date.now(), storage = this.ctx.storage;
+    let cleanup = await storage.get('config:calendar-cleanup') || 0;
+    if (cleanup <= now) {
+      for (const prefix of ['session:', 'attempt:', 'invite:']) {
+        const rows = await storage.list({ prefix });
+        const expired = [...rows].filter(([, value]) => (value.expires || value.until) <= now).map(([key]) => key);
+        for (let i = 0; i < expired.length; i += 100) await storage.delete(expired.slice(i, i + 100));
+      }
+      cleanup = now + 86400000;
+      await storage.put('config:calendar-cleanup', cleanup);
     }
-    await this.ctx.storage.setAlarm(now + 86400000);
+    const next = this.reminderKeys ? await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, now) : Infinity;
+    await scheduleCalendarAlarm(storage, Math.min(cleanup, next));
   }
 }

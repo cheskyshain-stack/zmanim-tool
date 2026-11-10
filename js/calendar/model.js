@@ -61,8 +61,10 @@ export function calendarEvent(value) {
   if (endDate === date && time && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
+  const reminder = text('reminder', 10);
+  if (reminder && !['day-of', 'day-before'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
-    location: text('location', 200), description: text('description', 4000), revision };
+    location: text('location', 200), description: text('description', 4000), ...(reminder ? { reminder } : {}), revision };
 }
 
 export function calendarEventDetails(event) {

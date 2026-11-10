@@ -275,7 +275,7 @@ maskable versions with all artwork inside the central 80%-diameter safe circle,
 and manifest icon URLs versioned when changing artwork. Leave the original
 Zmanim/admin icons and application identities intact.
 
-All manifests carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
+The print-capable apps carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
 and that pair is load-bearing, not a leftover. Android reads `display_override`, so Chrome
 installs the site as a real app: no Chrome badge on the icon, and the launcher gets the
 maskable icon instead of zooming and cropping the plain one. Safari does not implement
@@ -285,6 +285,8 @@ Collapsing the two into a plain `"display": "standalone"` would take printing aw
 every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
 CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
 be run in a persistent profile or the only answer you get is `in-incognito`.
+The private Calendar uses standalone on iPhone as well so its Home Screen app
+can receive opt-in phone reminders. It has no print action. Keep its separate identity.
 The public HTML `theme-color` remains cream (`#faf7f0`) for browser tabs and older
 installed app copies. The manifest `theme_color` is navy (`#142b46`), with the cream
 `background_color` retained. Keep the public head's `color-scheme: light` and the
