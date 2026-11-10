@@ -268,12 +268,14 @@
 .is-cal-congregation .cal-toolbar > button { padding:.45rem .6rem; font-size:.75rem; border-radius:12px; background:#f4eedf; border-color:#dfd2ad; }
 .is-cal-congregation .cal-content { display:block; flex:1; min-height:0; }
 .is-cal-congregation .cal-grid-wrap { height:100%; touch-action:pan-y pinch-zoom; user-select:none; }
-.is-cal-congregation .cal-grid { display:flex; flex-direction:column; height:100%; }
+.is-cal-congregation .cal-grid { box-sizing:border-box; display:flex; flex-direction:column; height:100%; border-inline:2px solid #e5e7e6; }
 .is-cal-congregation .cal-grid thead { display:block; flex:none; }
 .is-cal-congregation .cal-grid tr { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); min-height:0; }
 .is-cal-congregation .cal-grid th { box-sizing:border-box; padding:3px 0; height:20px; font-size:9px; }
 .is-cal-congregation .cal-grid tbody { display:grid; grid-template-rows:repeat(var(--cal-weeks),minmax(0,1fr)); flex:1; min-height:0; }
 .is-cal-congregation .cal-grid td { height:auto; min-height:0; min-width:0; }
+.is-cal-congregation .cal-grid td.cal-outside { background:#e5e9ee; }
+.is-cal-congregation .cal-outside .cal-day { opacity:.7; }
 .is-cal-congregation .cal-grid .cal-day { box-sizing:border-box; gap:0; height:100%; min-height:0; padding:2px 3px 13px; }
 .is-cal-congregation .cal-date-numbers { min-height:clamp(14px,calc(var(--cal-reader-cell) * .21),28px); }
 .is-cal-congregation .cal-english-day { min-width:clamp(14px,calc(var(--cal-reader-cell) * .21),28px); height:clamp(14px,calc(var(--cal-reader-cell) * .21),28px); font-size:clamp(12px,calc(var(--cal-reader-cell) * .19),18px); line-height:1; }

@@ -61,7 +61,13 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await page.evaluate(async () => { await document.fonts.ready; await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))); });
         const geometry = await page.evaluate(() => {
           const box = element => { const r = element.getBoundingClientRect(); return { left:r.left, top:r.top, right:r.right, bottom:r.bottom, width:r.width, height:r.height }; };
+          const grid = document.querySelector('.cal-grid'), gridStyle = getComputedStyle(grid);
+          const first = getComputedStyle(grid.querySelector('tbody td:first-child'));
+          const second = getComputedStyle(grid.querySelector('tbody td:nth-child(2)'));
+          const inside = getComputedStyle(grid.querySelector('td:not(.cal-outside):not(.cal-shabbos)')).backgroundColor;
+          const outside = [...grid.querySelectorAll('td.cal-outside')].map(cell => getComputedStyle(cell).backgroundColor);
           return { width:innerWidth, height:innerHeight, visualHeight:visualViewport?.height, readerHeight:document.querySelector('.is-cal-congregation').style.getPropertyValue('--cal-reader-height'), pageWidth:document.documentElement.scrollWidth, pageHeight:document.documentElement.scrollHeight,
+            gridEdges:[gridStyle.borderLeftWidth,gridStyle.borderRightWidth].map(parseFloat), edgeColors:[gridStyle.borderLeftColor,gridStyle.borderRightColor], dividerWidth:parseFloat(first.borderRightWidth) + parseFloat(second.borderLeftWidth), dividerColor:first.borderRightColor, inside, outside,
             header:box(document.querySelector('.cal-editor-header')), calendar:box(document.querySelector('.shul-calendar')), controls:[...document.querySelectorAll('.cal-reader-heading button,.cal-site-back,.cal-month-nav button,.cal-toolbar > button')].map(box),
             days:[...document.querySelectorAll('[data-cal-day]')].map(button => {
               const parsha = button.querySelector('.cal-parsha'), words = [];
@@ -78,6 +84,9 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
             }) };
         });
         assert(geometry.pageWidth <= width && geometry.pageHeight <= height, JSON.stringify({ month, width, height, reason:'Page does not scroll', visual:geometry.visualHeight, readerHeight:geometry.readerHeight, pageWidth:geometry.pageWidth, pageHeight:geometry.pageHeight, calendar:geometry.calendar }));
+        assert(geometry.dividerWidth > 0 && geometry.gridEdges.every(edge => edge === geometry.dividerWidth), 'Both grid edges match the divider width');
+        assert(geometry.edgeColors.every(color => color === geometry.dividerColor), 'Both grid edges match the divider color');
+        assert(geometry.outside.every(color => color === 'rgb(229, 233, 238)' && color !== geometry.inside), 'Other-month cells use a gray background, including Shabbos');
         assert.equal(geometry.header.height, 64, 'The compact subpage header matches the other pages');
         assert.equal(await page.locator('.cal-site-back').innerText(), '← Home');
         assert.equal(await page.locator('.cal-site-back').getAttribute('href'), '/');
