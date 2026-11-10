@@ -155,13 +155,15 @@ export function renderCalendar(container, settings, tables, { standalone = false
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
     calendarSession(null); user = null; events = []; signIn();
   }
-  const phoneReminderButton = () => standalone && reminderPublicKey && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
+  const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
+  const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey);
+  const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
     signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton());
-    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); openCalendarPhoneReminders(dialog, reminderPublicKey); });
+    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function openDay(date, remindToPost = false) {
@@ -263,11 +265,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
     const adminActions = container.querySelector('.cal-admin-actions');
     adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton());
-    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => openCalendarPhoneReminders(dialog, reminderPublicKey));
+    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', showPhoneReminders);
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
-    announcements.bind(container);
+    announcements.bind(container, isReader && phoneRemindersAvailable() ? showPhoneReminders : undefined);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {
