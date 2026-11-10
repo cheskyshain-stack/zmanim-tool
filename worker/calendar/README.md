@@ -37,6 +37,34 @@ Removing or resetting an editor immediately invalidates their sessions. Reset al
 disables their old password until the new invitation is claimed. The owner account
 cannot be removed through the account-management screen.
 
+## Simcha phone reminders
+
+Calendar managers can choose No reminder, Morning of the simcha or Morning before
+the simcha. Alerts use 9 a.m. New York time. A Shabbos simcha always uses Friday
+morning. The calendar sends at most one alert per opted-in device each morning.
+The alert opens the simcha date. For the manager who added the event, it includes
+a prompt to post an announcement. Details stay in the signed-in calendar.
+
+Readers use Calendar options, then Phone reminders, to turn alerts on or off for
+their device. Managers have the same control in the standalone calendar. Android
+can opt in through Chrome. On iPhone or iPad, open the calendar as a Home Screen
+web app before allowing notifications.
+
+Enable this in production by deploying the Worker, then setting the encrypted
+`CALENDAR_REMINDER_VAPID` secret on that same Worker. Check `wrangler secret list`
+first and retain any existing key. For the first activation, generate the private
+P-256 JWK directly into Wrangler's stdin:
+
+```sh
+node --input-type=module -e "import {generateKeyPairSync} from 'node:crypto'; process.stdout.write(JSON.stringify(generateKeyPairSync('ec',{namedCurve:'prime256v1'}).privateKey.export({format:'jwk'})))" | node worker/calendar/node_modules/wrangler/bin/wrangler.js secret put CALENDAR_REMINDER_VAPID --config worker/calendar/wrangler.jsonc
+```
+
+Keep the private JWK out of shell output, files, and Git. Confirm `phoneReminders`
+is true in `/api/info` and the private reminder endpoints still reject anonymous
+requests before publishing the client. Use synthetic subscriptions for automated
+tests (`node --test tests/calendar-simcha-reminders.cjs`). `CALENDAR_REMINDER_BROWSER=1`
+also exercises the settings and event form in Chrome against the local Worker.
+
 All calendar events and account-management endpoints require a server session. There is no public
 event endpoint in this phase. CORS is limited to the shul's origin. Writes validate
 event types, real dates, time order and text lengths, take ownership from the session,

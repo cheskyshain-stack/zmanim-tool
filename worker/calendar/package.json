@@ -2,5 +2,10 @@
   "name": "lakewood-commons-calendar-service",
   "private": true,
   "type": "module",
-  "devDependencies": { "wrangler": "4.152.0" }
+  "devDependencies": {
+    "wrangler": "4.152.0"
+  },
+  "dependencies": {
+    "@block65/webcrypto-web-push": "2.0.0"
+  }
 }

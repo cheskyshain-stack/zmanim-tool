@@ -327,5 +327,5 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     retry.addEventListener('click', () => { markRead(); syncDeleted(); syncEdits(); load(); });
     await load();
   }
-  return { start, stop, bind, markup, refresh, dispose: stop };
+  return { start, stop, bind, markup, open, refresh, dispose: stop };
 }

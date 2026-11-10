@@ -1,6 +1,7 @@
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession, calendarSessionWasCleared, restoreCalendarSession } from '../calendar/api.js';
+import { calendarReminderDate } from '../calendar/reminder-date.js';
 import { shulNow } from '../zmanim/solar.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { escText, escAttr } from '../util.js';
@@ -9,6 +10,7 @@ import { createCalendarAnnouncements } from './calendar-announcements.js';
 import { openCalendarActivity } from './calendar-activity.js';
 import { openCalendarEmailImport } from './calendar-email-import.js';
 import { openCalendarSmsImport } from './calendar-sms-import.js';
+import { openCalendarPhoneReminders, turnOffCalendarPhoneReminders } from './calendar-phone-reminders.js';
 
 let calendarAnalyticsOpened = false;
 
@@ -17,12 +19,13 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false } = {}) {
+export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderPost = false } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
+  let reminderPublicKey = '';
   let disposed = false, requestNumber = 0, busy = false, refreshing = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const readerCache = new Map(), readerPending = new Map();
   let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
@@ -148,13 +151,34 @@ export function renderCalendar(container, settings, tables, { standalone = false
     });
   }
   async function signOut() {
+    try { await turnOffCalendarPhoneReminders(); } catch { /* Sign-out still ends the session. */ }
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
     calendarSession(null); user = null; events = []; signIn();
   }
+  const phoneReminderButton = () => standalone && reminderPublicKey && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
+    const signOutButton = view.el.querySelector('[data-cal-signout]');
+    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton());
+    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); openCalendarPhoneReminders(dialog, reminderPublicKey); });
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
+  }
+  function openDay(date, remindToPost = false) {
+    const view = dialog(dayHtml(date)); view.title('Day details'); wireDay(view.el, view.close);
+    if (remindToPost && !reader() && canAdd()) {
+      view.el.insertAdjacentHTML('beforeend', '<button type="button" data-cal-post-reminder>Post an announcement</button>');
+      view.el.querySelector('[data-cal-post-reminder]').addEventListener('click', () => { view.close(); announcements.open(); });
+    }
+  }
+  async function openCalendarSession(session) {
+    user = session.user; reminderPublicKey = session.reminderPublicKey || '';
+    const target = reminderDate;
+    reminderDate = '';
+    const requested = Number.isFinite(calendarSerial(target)) && dateAllowed(target);
+    if (requested) { month = target.slice(0, 7); selected = target; }
+    await loadEvents();
+    if (requested && !disposed && user === session.user) openDay(target, reminderPost);
   }
   function fitReader() {
     if (disposed) return;
@@ -237,6 +261,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
+    const adminActions = container.querySelector('.cal-admin-actions');
+    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton());
+    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => openCalendarPhoneReminders(dialog, reminderPublicKey));
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
@@ -246,9 +273,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelectorAll('[data-cal-day]').forEach(button => {
       button.addEventListener('click', () => {
         selected = button.dataset.calDay; redraw();
-        if (reader() || matchMedia('(max-width: 700px)').matches) {
-          const view = dialog(dayHtml(selected)); view.title('Day details'); wireDay(view.el, view.close);
-        }
+        if (reader() || matchMedia('(max-width: 700px)').matches) openDay(selected);
       });
       button.addEventListener('keydown', event => {
         const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7,
@@ -406,6 +431,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
       <p class="cal-form-hebrew" lang="he" dir="rtl"></p>
       <div class="cal-form-row" data-cal-times><label>Starts (optional)<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
+      ${reminderPublicKey && !previewing() ? `<label>Phone reminder<select name="reminder"><option value="">No reminder</option><option value="day-of" ${original.reminder === 'day-of' ? 'selected' : ''}>Morning of the simcha</option><option value="day-before" ${original.reminder === 'day-before' ? 'selected' : ''}>Morning before the simcha</option></select></label><p class="cal-form-note" data-cal-reminder-note></p>` : ''}
       <details class="cal-extra"><summary>More options</summary><label>Last date (for a multi-day event)<input name="endDate" type="date" min="${original.date}" max="2299-12-31" value="${original.endDate !== original.date ? original.endDate : ''}"></label></details>
       <p class="cal-form-note">Times use ${calEscape(settings.timezone.id.replaceAll('_', ' '))}. Calendar entries do not change the minyan schedule.</p>
       ${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin to save changes.</p>' : ''}<p role="status" class="cal-error" aria-live="polite"></p><div class="cal-form-actions"><button type="submit" class="cal-primary" ${previewing() ? 'disabled' : ''}>${item ? 'Save changes' : 'Save event'}</button><button type="button" data-cal-cancel>Cancel</button>${item ? `<button type="button" data-cal-remove-event ${previewing() ? 'disabled' : ''}>Delete event</button>` : ''}</div></form>`,
@@ -422,8 +448,13 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const value = form.elements.date.value;
       view.el.querySelector('.cal-form-hebrew').textContent = Number.isFinite(calendarSerial(value)) ? hebrewLabel(value) : '';
       form.elements.endDate.min = value;
+      if (form.elements.reminder) {
+        const reminder = calendarReminderDate(value, form.elements.reminder.value);
+        form.querySelector('[data-cal-reminder-note]').textContent = reminder ? `${calFullDate(reminder)} at 9:00 a.m. New York time. Shabbos reminders go out Friday morning.` : 'This goes to people who turned on phone reminders.';
+      }
     };
     updateDate(); form.elements.date.addEventListener('change', updateDate);
+    form.elements.reminder?.addEventListener('change', updateDate);
     view.el.querySelector('[data-cal-cancel]').addEventListener('click', view.close);
     view.el.querySelector('[data-cal-remove-event]')?.addEventListener('click', async () => {
       if (saving || previewing() || !confirm('Delete this event from the calendar?')) return;
@@ -442,6 +473,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       try {
         const fields = Object.fromEntries(new FormData(form));
         const next = { ...original, ...calendarEvent({ ...fields, ...calendarDetailsFields(fields.details, original), allDay: false, revision: original.revision }) };
+        if (form.elements.reminder) next.reminder = fields.reminder;
         saving = true; form.querySelector('[type=submit]').disabled = true; status.textContent = 'Saving…';
         await saveEvent(next); saving = false; initial = new URLSearchParams(new FormData(form)).toString(); view.close();
         selected = next.date; note = 'Event saved.';
@@ -545,7 +577,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
         if (creating && fields.password !== fields.confirmation) throw new Error('The passwords do not match.');
         delete fields.confirmation;
         const session = await calendarRequest(setupToken ? '/api/setup' : inviteToken ? '/api/invitations/claim' : registering ? '/api/register' : '/api/session', { method: 'POST', body: { ...fields, ...(setupToken ? { setupToken } : {}), ...(inviteToken ? { token: inviteToken } : {}) } });
-        calendarSession(session); user = session.user; setupToken = inviteToken = ''; registering = false; await loadEvents();
+        calendarSession(session); setupToken = inviteToken = ''; registering = false; await openCalendarSession(session);
       } catch (issue) { status.textContent = issue.message; button.disabled = false; }
     });
   }
@@ -584,10 +616,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
         try {
           const result = await calendarRequest('/api/session');
           if (disposed || calendarSession()?.token !== session.token) return;
-          user = result.user;
+          await openCalendarSession(result);
         }
         catch (error) { signIn(error.message); return; }
-        await loadEvents();
       } else if (standalone) {
         container.innerHTML = '<section class="cal-login"><h2>Calendar editor access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
       } else {

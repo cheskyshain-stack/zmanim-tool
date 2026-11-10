@@ -24,6 +24,8 @@ jobs:
         run: npm ci --prefix worker/calendar --no-audit --no-fund
       - name: Verify announcement dates and congregation history with isolated local records
         run: node tests/calendar-announcement-dates.cjs
+      - name: Verify phone reminder scheduling and permissions with synthetic devices
+        run: node --test tests/calendar-simcha-reminders.cjs
       - name: Deploy only the existing calendar service
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -5,6 +5,7 @@ import { resolveSettings } from '../js/settings.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 import { calendarSessionExpiration } from '../worker/calendar/session-expiration.js';
+import { calendarReminderDate } from '../js/calendar/reminder-date.js';
 
 const read = async name => JSON.parse(await readFile(new URL('../data/' + name + '.json', import.meta.url), 'utf8'));
 const [published, parshaChutz, parshaEY, parshaNames, specialDays] = await Promise.all(['published', 'parsha_chutz', 'parsha_ey', 'parsha_names', 'special_days'].map(read));
@@ -21,6 +22,17 @@ test('new sessions expire at the first New York 3 a.m. after a full week', () =>
   ]) {
     assert.equal(new Date(calendarSessionExpiration(Date.parse(signedIn))).toISOString(), expires, signedIn);
   }
+});
+
+test('simcha reminders can be the morning of or before, with Shabbos always on Friday', () => {
+  assert.equal(calendarReminderDate('2026-11-12', 'day-of'), '2026-11-12');
+  assert.equal(calendarReminderDate('2026-11-12', 'day-before'), '2026-11-11');
+  assert.equal(calendarReminderDate('2026-11-14', 'day-of'), '2026-11-13');
+  assert.equal(calendarReminderDate('2026-11-14', 'day-before'), '2026-11-13');
+  assert.equal(calendarReminderDate('2027-01-01', 'day-before'), '2026-12-31');
+  assert.equal(calendarReminderDate('2026-11-14', ''), '');
+  assert.equal(event({ reminder: 'day-before' }).reminder, 'day-before');
+  assert.throws(() => event({ reminder: 'late-night' }), /Choose a valid phone reminder/);
 });
 
 test('calendar offers the requested categories and preserves older event types', () => {

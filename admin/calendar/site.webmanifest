@@ -6,7 +6,7 @@
   "start_url": "/admin/calendar/",
   "scope": "/admin/calendar/",
   "display_override": ["standalone"],
-  "display": "browser",
+  "display": "standalone",
   "background_color": "#faf7f0",
   "theme_color": "#142b46",
   "lang": "en",
