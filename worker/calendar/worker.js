@@ -5,7 +5,8 @@ import { requestedRange, civilDate, shiftDate, midnight } from '../traffic-calen
 import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
 import { lcTextCalendarScript } from './gmail-bridge.js';
 import { calendarSessionExpiration } from './session-expiration.js';
-import { pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, runSimchaReminders, scheduleCalendarAlarm, simchaReminderAt } from './simcha-reminders.js';
+import { calendarReminderSchedule, DEFAULT_CALENDAR_REMINDER_SCHEDULE } from '../../js/calendar/reminder-date.js';
+import { pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, runSimchaReminders, scheduleCalendarAlarm } from './simcha-reminders.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -117,35 +118,55 @@ export class CommunityCalendar extends DurableObject {
     return { token, expires, ...this.sessionInfo(user) };
   }
   sessionInfo(user) {
-    return { user: userView(user), ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey } : {}) };
+    return { user: userView(user), ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey, reminderSchedules: true } : {}) };
   }
   async phoneReminders(request, user, path) {
     const method = request.method, statusOnly = path === '/api/phone-reminders/status' && method === 'POST';
-    if (!statusOnly && (path !== '/api/phone-reminders' || !['PUT', 'DELETE'].includes(method))) fail('Phone reminder setting not found.', 404);
+    const scheduleOnly = path === '/api/phone-reminders/schedule' && method === 'PUT';
+    if (!statusOnly && !scheduleOnly && (path !== '/api/phone-reminders' || !['PUT', 'DELETE'].includes(method))) fail('Phone reminder setting not found.', 404);
     if (!this.reminderKeys && method !== 'DELETE') fail('Phone reminders are not available yet.', 503);
     const body = await this.body(request, 4096);
-    const subscription = method === 'PUT' ? pushSubscription(body.subscription) : null;
-    const endpoint = method === 'PUT' ? subscription?.endpoint : pushEndpoint(body.endpoint);
+    const enrolling = method === 'PUT' && !scheduleOnly;
+    const subscription = enrolling ? pushSubscription(body.subscription) : null;
+    const endpoint = enrolling ? subscription?.endpoint : pushEndpoint(body.endpoint);
     if (!endpoint) fail('Use a supported browser to enable phone reminders.');
     const key = await reminderDeviceKey(endpoint), storage = this.ctx.storage;
     if (statusOnly) {
       const device = await storage.get(key);
-      return json({ enabled: device?.userId === user.id && device.version === user.version });
+      const enabled = device?.userId === user.id && device.version === user.version;
+      return json({ enabled, ...(enabled ? { schedule: device.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE } : {}) });
     }
     await this.limited(request, 'phone-reminders:' + user.id, 30);
-    await storage.transaction(async transaction => {
+    let schedule;
+    if (scheduleOnly) {
+      try { schedule = calendarReminderSchedule(body.schedule); } catch (error) { fail(error.message); }
+    }
+    const result = await storage.transaction(async transaction => {
       const current = await transaction.get(key);
       if (method === 'DELETE') {
         if (current?.userId === user.id) await transaction.delete(key);
-        return;
+        return { enabled: false };
       }
-      if (current?.userId !== user.id) {
+      const sameDevice = current?.userId === user.id && current.version === user.version;
+      const now = Date.now();
+      if (scheduleOnly) {
+        if (!sameDevice) fail('Turn on reminders for this phone before setting times.', 403);
+        if (schedule.revision !== (current.reminderSchedule?.revision || 0)) fail('The reminder times changed in another tab. Reopen them before saving.', 409);
+        const updated = { ...schedule, revision: schedule.revision + 1, effectiveAt: now };
+        await transaction.put(key, { ...current, id: crypto.randomUUID(), reminderSchedule: updated });
+        await scheduleCalendarAlarm(transaction, now + 1000);
+        return { schedule: updated };
+      }
+      if (!sameDevice) {
         const devices = await transaction.list({ prefix: 'simcha-phone:' });
         if ([...devices.values()].filter(device => device.userId === user.id && device.version === user.version).length >= 5) fail('Turn off reminders on another device before adding this one.', 409);
       }
-      await transaction.put(key, { id: crypto.randomUUID(), userId: user.id, version: user.version, subscription, lastSent: current?.lastSent || '' });
+      const retained = sameDevice ? current : {};
+      await transaction.put(key, { ...retained, id: crypto.randomUUID(), userId: user.id, version: user.version, subscription, enabledAt: retained.enabledAt ?? now });
+      await scheduleCalendarAlarm(transaction, now + 1000);
+      return { enabled: true, schedule: retained.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE };
     });
-    return json({ enabled: method === 'PUT' });
+    return json(result);
   }
   async loginActivity(url) {
     const storage = this.ctx.storage;
@@ -443,7 +464,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -494,7 +515,7 @@ export class CommunityCalendar extends DurableObject {
     if (path === '/api/activity' && method === 'GET') return this.activityReport(url);
     if ((path === '/api/access/activity' || path.startsWith('/api/access/activity/')) && method === 'GET') return this.loginActivity(url);
     if (path === '/api/announcements' || path.startsWith('/api/announcements/')) return this.announcements(request, user, url);
-    if (path === '/api/phone-reminders' || path === '/api/phone-reminders/status') return this.phoneReminders(request, user, path);
+    if (path === '/api/phone-reminders' || path === '/api/phone-reminders/status' || path === '/api/phone-reminders/schedule') return this.phoneReminders(request, user, path);
     if (path === '/api/session' && method === 'GET') return json(this.sessionInfo(user));
     if (path === '/api/session' && method === 'DELETE') {
       await this.ctx.storage.delete('session:' + await hash(request.headers.get('Authorization').slice(7)));
@@ -566,12 +587,15 @@ export class CommunityCalendar extends DurableObject {
       try { fields = calendarEvent({ ...body, reminder: body.reminder ?? old?.reminder }); } catch (error) { fail(error.message); }
       const event = { ...fields, id: entry[1], revision: (old?.revision || 0) + 1,
         createdAt: old?.createdAt || now, createdBy: old?.createdBy || user.id, updatedAt: now, updatedBy: user.id };
+      if (event.reminder) {
+        const sameSchedule = old?.reminder === event.reminder && old.type === event.type && old.date === event.date;
+        event.reminderChangedAt = sameSchedule ? old.reminderChangedAt || 0 : Date.parse(now);
+      }
       await this.ctx.storage.transaction(async transaction => {
         const current = await transaction.get(key);
         if ((current?.revision || 0) !== body.revision || await transaction.get('deleted-event:' + entry[1])) fail('This event changed in another session. Reload the month before saving.', 409);
         await transaction.put({ [key]: event, ...activityFields([old ? 'eventsEdited' : 'eventsCreated'], now) });
-        const reminderAt = this.reminderKeys ? simchaReminderAt(event) : Infinity;
-        if (reminderAt > Date.now()) await scheduleCalendarAlarm(transaction, reminderAt);
+        if (this.reminderKeys && event.reminder) await scheduleCalendarAlarm(transaction, Date.now() + 1000);
       });
       return json({ event }, old ? 200 : 201);
     }
