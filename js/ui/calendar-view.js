@@ -34,7 +34,6 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
     calendarSession(null); user = null; events = []; signIn(message);
   } });
-  container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
 
   function previewBackupMarkup() {
     return standalone ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
@@ -622,30 +621,55 @@ export function renderCalendar(container, settings, tables, { standalone = false
   window.visualViewport?.addEventListener('resize', fitReader);
   const readerResize = standalone ? new ResizeObserver(() => { if (user && reader()) fitReader(); }) : null;
   readerResize?.observe(container);
-  (async () => {
+  const retryConnection = () => {
+    if (container.querySelector('[data-cal-connection-retry]')) startCalendar();
+  };
+  async function startCalendar() {
+    const opening = ++requestNumber;
+    const current = () => !disposed && opening === requestNumber;
+    container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
     try {
-      endpoint = await calendarConfig(); if (disposed) return;
+      endpoint = await calendarConfig(); if (!current()) return;
       if (endpoint) {
         const session = setupToken || inviteToken ? null : restoreCalendarSession();
         if (!session) { signIn(); return; }
+        const checkSession = () => calendarRequest('/api/session', { signal: AbortSignal.timeout(8000) });
+        let result;
         try {
-          const result = await calendarRequest('/api/session');
-          if (disposed || calendarSession()?.token !== session.token) return;
-          await openCalendarSession(result);
+          result = await checkSession();
+        } catch (error) {
+          if (!current() || error.status && error.status < 500 && error.status !== 408) throw error;
+          await new Promise(resolve => setTimeout(resolve, 400));
+          if (!current()) return;
+          if (!calendarSession()) { signIn(); return; }
+          result = await checkSession();
         }
-        catch (error) { signIn(error.message); return; }
+        if (!current()) return;
+        const active = calendarSession();
+        if (!active) { signIn(); return; }
+        if (active.token !== session.token) { startCalendar(); return; }
+        await openCalendarSession(result);
       } else if (standalone) {
         container.innerHTML = '<section class="cal-login"><h2>Calendar editor access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
       } else {
         try { events = calendarReadPreview(); } catch (error) { storageError = error.message; }
         draw();
       }
-    } catch (error) { if (!disposed) container.innerHTML = `<h2>Calendar</h2><p class="cal-error" role="alert">${calEscape(error.message)}</p>`; }
-  })();
+    } catch (error) {
+      if (!current()) return;
+      if (error.status === 401) { signIn(error.message); return; }
+      const message = endpoint ? 'Couldn’t check your saved sign-in. Try again in a moment.' : error.message;
+      container.innerHTML = `<section class="cal-login"><h2>Calendar connection</h2><p class="cal-error" role="alert">${calEscape(message)}</p><button type="button" data-cal-connection-retry>Try again</button></section>`;
+      container.querySelector('[data-cal-connection-retry]').addEventListener('click', retryConnection);
+    }
+  }
+  window.addEventListener('online', retryConnection);
+  startCalendar();
   return () => {
     readerResize?.disconnect();
     disposed = true; requestNumber++; clearReaderCache(); announcements.dispose(); clearInterval(dayTimer);
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
+    window.removeEventListener('online', retryConnection);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
     container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
     container.style.removeProperty('--cal-reader-height'); dialogs.forEach(el => el.calDispose());
