@@ -266,7 +266,6 @@
 .cal-reader-heading [data-cal-options] { padding:0; font-size:1.5rem; }
 .cal-reader-heading .cal-reader-refresh { padding:0; }
 .cal-reader-refresh svg { width:20px; height:20px; }
-.cal-reader-refresh[aria-disabled="true"] { opacity:.5; cursor:default; }
 .cal-reader-status { flex:none; margin:0; padding:6px; font-size:12px; }
 .cal-reader-status:empty { display:none; }
 .cal-reader-page { display:flex; flex-direction:column; height:100dvh; overflow:hidden; overscroll-behavior:none; }

@@ -1081,9 +1081,9 @@ through the shared wireSecretDoor handler. Home and Donate keep their ordinary
 link actions. Keep the header text unselectable and suppress double-tap zoom so
 the gesture works on phones. Admin and calendar access checks remain in place.
 It has no building photo or homepage navigation. Keep its 64px height at phone and desktop
-widths, plus safe-area padding. The former in-calendar back button is Refresh: it
-reloads events and notification counts immediately without changing the selected
-month or date, bypasses the short cache, and retains visible events on failure.
+widths, plus safe-area padding. The Refresh button reloads the page so it can fetch
+published website changes, fresh events and unread message counts. After the saved
+session is validated, restore the month, selected date and owner Congregation preview.
 Use the dynamic viewport height
 and safe-area insets; distribute the month into equal, compact rows without page
 scrolling. Rows prefer 1.35 times their column width, between 72px and 128px, and

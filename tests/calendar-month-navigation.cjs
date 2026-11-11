@@ -17,7 +17,7 @@ const server = http.createServer((req,res) => {
   const origin = process.env.CALENDAR_NAV_ORIGIN || 'http://127.0.0.1:' + server.address().port;
   const browser = await chromium.launch({executablePath:process.env.CHROME_BIN || '/usr/bin/chromium',headless:true});
   const errors=[], checks=[], calls=[], finished=[];
-  let revision=1, blocked=false, revoked=false, delay=900, announcementChecks=0;
+  let revision=1, blocked=false, revoked=false, delay=900, announcementChecks=0, role='viewer';
   const context=await browser.newContext({viewport:{width:393,height:852},hasTouch:true,isMobile:true,serviceWorkers:'block'});
   try {
     await context.addInitScript(() => {
@@ -45,7 +45,7 @@ const server = http.createServer((req,res) => {
         await route.fulfill({headers,contentType:'application/json',body:JSON.stringify({events})});finished.push(middle);return;
       }
       if(url.pathname==='/api/announcements/status')announcementChecks++;
-      const body=url.pathname==='/api/session'?{user:{id:'fixture-reader',role:'viewer',name:'Example reader',active:true}}:{total:0,unread:0,deletedCount:0,editCount:0,messages:[],nextBefore:null};
+      const body=url.pathname==='/api/session'?{user:{id:'fixture-reader',role,name:'Example reader',active:true}}:{total:0,unread:0,deletedCount:0,editCount:0,messages:[],nextBefore:null};
       return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(body)});
     });
     const page=await context.newPage();page.on('pageerror',error=>errors.push(error.message));
@@ -119,43 +119,67 @@ const server = http.createServer((req,res) => {
     await page.locator('.cal-dialog').getByText('Fixture update 2',{exact:true}).waitFor();await page.keyboard.press('Escape');
     assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Background refresh keeps the month populated');
     checks.push({backgroundRefresh:true,updatedEvents:true});
-    const selectedBeforeRefresh=await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'), requestsBeforeRefresh=calls.length, notificationsBeforeRefresh=announcementChecks;
-    revision=3;
-    await page.getByRole('button',{name:'Refresh calendar',exact:true}).click();
-    await page.locator('[data-cal-refresh][aria-busy="false"]').waitFor();
-    assert(calls.length>requestsBeforeRefresh,'Manual refresh bypasses a fresh 30-second event cache');
-    assert(announcementChecks>notificationsBeforeRefresh,'Manual refresh also checks notification counts');
-    assert.match(await month(),/December/);
-    assert.equal(await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'),selectedBeforeRefresh);
-    assert.equal(await page.evaluate(()=>document.activeElement.hasAttribute('data-cal-refresh')),true,'Refresh retains keyboard focus');
-    await page.locator('[data-cal-day="2026-12-15"]').click();
-    await page.locator('.cal-dialog').getByText('Fixture update 3',{exact:true}).waitFor();await page.keyboard.press('Escape');
-    for(let step=0;finished.length<calls.length&&step<50;step++)await page.waitForTimeout(30);
-    assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Manual refresh retains the visible calendar');
-    checks.push({manualRefresh:true,bypassesFreshCache:true,notificationsRefreshed:true,selectionAndFocusPreserved:true});
-    await page.screenshot({path:path.join(output,'congregation.png'),fullPage:true});
     blocked=true;await page.evaluate(()=>window.advanceCalendarCacheClock());
     await page.locator('[data-cal-step="-1"]').click();
     await page.locator('.cal-reader-status').filter({hasText:'Synthetic offline response'}).waitFor();
     assert.match(await month(),/November/);assert(await page.locator('[data-cal-day="2026-11-15"] .cal-event-total').isVisible());
     assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'A failed background refresh keeps cached events visible');
-    checks.push({failedRefreshPreservesCalendar:true});
-    for(let attempt=0;attempt<2;attempt++){
-      const before=calls.length;
-      await page.getByRole('button',{name:'Refresh calendar',exact:true}).click();
-      await page.locator('[data-cal-refresh][aria-busy="false"]').waitFor();
-      assert(calls.length>before,'Retrying an offline refresh still requests fresh events');
-      assert(await page.locator('[data-cal-day="2026-11-15"] .cal-event-total').isVisible());
-      assert.match(await page.locator('.cal-reader-status').innerText(),/Synthetic offline response/);
+    checks.push({failedBackgroundRefreshPreservesCalendar:true});
+    blocked=false;
+    await page.locator('[data-cal-step="1"]').click();
+    await page.locator('[data-cal-day="2026-12-14"]').click();
+    await page.getByRole('heading',{name:'Day details',exact:true}).waitFor();await page.keyboard.press('Escape');
+    const selectedBeforeRefresh=await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'), requestsBeforeRefresh=calls.length, notificationsBeforeRefresh=announcementChecks;
+    const pageUrl=page.url();
+    async function reloadCalendar() {
+      const refresh=page.getByRole('button',{name:'Refresh calendar',exact:true});
+      await refresh.focus();
+      await Promise.all([
+        page.waitForEvent('framenavigated',frame=>frame===page.mainFrame()),
+        page.waitForResponse(response=>response.request().isNavigationRequest()&&response.url()===page.url()&&response.ok()),
+        refresh.press('Enter')
+      ]);
+      await page.waitForLoadState('domcontentloaded');
     }
-    assert.deepEqual(await page.evaluate(()=>window.calendarEmptyFrames),[],'Repeated failed manual refreshes retain visible events');
-    checks.push({repeatedOfflineRefreshPreservesCalendar:true});
-    blocked=false;revoked=true;await page.evaluate(()=>window.advanceCalendarCacheClock());await page.locator('[data-cal-step="1"]').click();
+    revision=3;
+    await page.evaluate(()=>{window.beforeCalendarRefresh=true;});
+    await reloadCalendar();
+    await page.locator('[data-cal-day="2026-12-15"]:not([disabled]) .cal-event-total').waitFor();
+    assert.equal(page.url(),pageUrl,'A refresh keeps the same URL');
+    assert.equal(await page.evaluate(()=>window.beforeCalendarRefresh),undefined,'The refresh button reloads the calendar document');
+    assert.equal(await page.evaluate(()=>history.state?.calendarRefresh),undefined,'View restoration is consumed once');
+    assert(calls.length>requestsBeforeRefresh,'A new calendar page fetches fresh events');
+    assert(announcementChecks>notificationsBeforeRefresh,'A new calendar page checks unread messages');
+    assert.match(await month(),/December/);
+    assert.equal(await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'),selectedBeforeRefresh);
+    assert.equal(await page.evaluate(()=>document.activeElement.hasAttribute('data-cal-refresh')),true,'Refresh retains keyboard focus');
+    await page.locator('[data-cal-day="2026-12-15"]').click();
+    await page.locator('.cal-dialog').getByText('Fixture update 3',{exact:true}).waitFor();await page.keyboard.press('Escape');
+    checks.push({documentReload:true,freshEvents:true,messagesRefreshed:true,selectionAndFocusPreserved:true});
+    await page.screenshot({path:path.join(output,'congregation.png'),fullPage:true});
+    blocked=true;
+    await reloadCalendar();
+    await page.locator('.cal-reader-status').filter({hasText:'Synthetic offline response'}).waitFor();
+    assert.match(await month(),/December/,'Keep the selected month if the events request fails');
+    blocked=false;
+    await reloadCalendar();
+    await page.locator('[data-cal-day="2026-12-15"]:not([disabled]) .cal-event-total').waitFor();
+    checks.push({reloadRecoversFromEventFetchFailure:true});
+    revoked=true;
+    await reloadCalendar();
     await page.getByRole('heading',{name:'Calendar sign in',exact:true}).waitFor();
     await page.waitForTimeout(delay+50);
     assert.equal(await page.locator('[data-cal-day],.cal-event-card').count(),0,'Expired access clears visible cached events');
     assert.equal(await page.evaluate(()=>sessionStorage.getItem('lakewood-commons-calendar-session-v1')),null);
     checks.push({expiredAccessClearsCache:true});
+    revoked=false;role='owner';
+    await page.goto(origin+'/admin/calendar/');
+    await page.getByRole('combobox',{name:'View calendar as'}).selectOption('viewer');
+    await page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();
+    await reloadCalendar();
+    await page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();
+    assert.equal(await page.locator('[data-cal-add],[data-cal-access]').count(),0,'The owner remains in Congregation preview after reloading');
+    checks.push({ownerPreviewRestored:true});
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'checks.json'),JSON.stringify({checks,errors,calls},null,2));
     console.log(JSON.stringify({passed:true,checks,errors,output}));
