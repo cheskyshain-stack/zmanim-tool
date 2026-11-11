@@ -38,6 +38,7 @@ const main = document.getElementById('main');
  *  default. */
 let weekShowing = null;
 let candleDialogCleanup = null;
+let chartViewCleanup = null;
 
 /** Reload this tab after it has sat open a full day, so a page left running on a kiosk or a
  *  phone that is never actually closed eventually picks up fresh data - a republished
@@ -970,7 +971,7 @@ function renderChartPage(published) {
   // confine: the congregation is shown the chart that is up now and no other. Three taps
   // on the chart itself opens the rest, which is also what lets the week view out of the
   // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
-  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
+  chartViewCleanup = renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true, highlightCurrentWeek: true });
 }
 
 /** Campaigns come first; each owns its payment choices and recipient details. */
@@ -1378,6 +1379,7 @@ function stampPage(where) {
 }
 
 function route(published, { preserveWeekShowing = false } = {}) {
+  chartViewCleanup?.(); chartViewCleanup = null;
   donationScrollCleanup?.();
   donationOpeningCleanup?.();
   candleDialogCleanup?.();

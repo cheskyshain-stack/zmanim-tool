@@ -352,6 +352,17 @@ by its matching weekday page 1, and so on. Each physical chart is 1056 by 816px
 Molad note and explanation attribute. Keep print controls and screen scaling off
 paper. Previously stored combined-layout preferences must not restore those removed
 choices. The legacy combined renderer remains internal; no live chart picker uses it.
+The congregation's `/chart/` enables `highlightCurrentWeek` on the chart browser.
+Show a gold This week badge, light row bands and a pointer in each page's right
+margin. Draw them outside `.pages`, as a screen-only sibling, without modifying
+the printable tables or their cells. Leave the standing Weekday Shacharis panel
+unshaded. Follow the shul's clock, Website preview and the existing end-of-week
+rule from the last printed Shabbos minyan. If the week has no row in the displayed
+chart, omit the indicator rather than marking a later week. Resize/font changes
+must keep pointers centered; navigation must dispose timers and observers.
+Admin/saved charts do not enable it. `tests/chart-current-week.cjs` measures phone
+and desktop alignment, holiday gaps, previews, automatic rollover and identical
+native print/PDF pixels with the screen decoration present and removed.
 Chart location underlines use a text-relative 0.1em offset so they stay close to the
 digits when a crowded chart shrinks. Keep each location underline continuous.
 
