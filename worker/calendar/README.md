@@ -48,6 +48,8 @@ device. The default is 9 a.m. New York time on the event date, or Friday for a
 Shabbos event. A device can set one rule for all simchas, then override individual
 categories. Each rule has a same-day or day-before time and an optional separate
 Friday time. Settings are private to the signed-in account and device subscription.
+The All the same switch shows one shared time or the full seven-category list.
+Individual rules stay saved while the shared time is selected.
 Android can opt in through Chrome. On iPhone or iPad, open the calendar as a Home
 Screen web app before allowing notifications.
 
