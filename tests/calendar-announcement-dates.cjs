@@ -70,14 +70,20 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
   const info=(await call('/api/info')).body;assert.equal(info.announcementDateEditing,true);assert.equal(info.announcementHistoryDays,10);
   if(server){
    const {chromium}=require('playwright'),{calendarAnnouncementLocalTime}=await import('../js/calendar/announcement-model.js');
-   const browser=await chromium.launch({executablePath:'/usr/bin/chromium',headless:true}),errors=[],output=fs.mkdtempSync(path.join(os.tmpdir(),'announcement-date-browser-'));
+   const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true}),errors=[],output=fs.mkdtempSync(path.join(os.tmpdir(),'announcement-date-browser-'));
    try{
     const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
     assert.equal(await congregant.getByText('Showing the last 10 days.',{exact:true}).count(),0);
     const readerDialog = congregant.locator('.cal-announcement-reader');
+    const readerFeed = readerDialog.locator('.cal-announcement-feed');
+    const readerCards = readerFeed.locator('[data-announcement-id]');
+    const atBottom = () => readerFeed.evaluate(feed => feed.scrollHeight - feed.clientHeight - feed.scrollTop <= 2);
+    assert.equal(await readerCards.last().getAttribute('data-announcement-id'),fresh.id,'The newest message is last');
+    assert(await atBottom(),'The reader opens at the newest message');
     for (const [width, height] of [[375, 650], [393, 852], [740, 350]]) {
      await congregant.setViewportSize({ width, height });
+     await congregant.waitForFunction(() => parseFloat(document.querySelector('.cal-announcement-reader').style.getPropertyValue('--cal-dialog-height')) === (window.visualViewport?.height || innerHeight) - 32);
      const geometry = await readerDialog.evaluate(dialog => {
       const box = dialog.getBoundingClientRect();
       const header = dialog.querySelector('.cal-dialog-header').getBoundingClientRect();
@@ -98,9 +104,16 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
      assert(headerGap <= 12 && listHeight > height * .48 && outerOverflow <= 1 && closeHeight >= 44 && scrolled && fixedClose, JSON.stringify({ width, height, ...geometry }));
     }
     await congregant.setViewportSize({ width: 393, height: 900 });
-    while(await congregant.locator('[data-cal-older-announcements]').isVisible()){
-     await congregant.locator('[data-cal-older-announcements]').click();await congregant.waitForFunction(()=>!document.querySelector('[data-cal-older-announcements]').disabled);
-    }
+    const older = readerFeed.getByRole('button',{name:'Load older messages',exact:true});
+    await older.scrollIntoViewIfNeeded();
+    const anchorId = await readerCards.first().getAttribute('data-announcement-id');
+    const anchor = readerFeed.locator(`[data-announcement-id="${anchorId}"]`);
+    const anchorOffset = () => anchor.evaluate(node=>node.getBoundingClientRect().top-node.closest('.cal-announcement-feed').getBoundingClientRect().top);
+    const offset = await anchorOffset();
+    await older.click();
+    await older.waitFor({state:'hidden'});
+    assert.notEqual(await readerCards.first().getAttribute('data-announcement-id'),anchorId,'Older messages are added above the first page');
+    assert(Math.abs(await anchorOffset()-offset)<=2,'Prepending keeps the old message in the same place');
     assert.equal(await congregant.locator('[data-announcement-id="'+legacy.id+'"]').count(),0);
     assert.equal(await congregant.locator('[data-cal-edit-announcement]:visible').count(),0);
     await manager.locator('[data-cal-older-announcements]').click();await manager.locator('[data-announcement-id="'+legacy.id+'"]').waitFor();
@@ -115,11 +128,28 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     assert.equal(await manager.locator('[data-announcement-id]').nth(1).getAttribute('data-announcement-id'),legacy.id,'Date edit repositions the saved row');
     assert.equal((await call('/api/announcements','GET',null,owner.token)).body.messages.find(value=>value.id===legacy.id).createdAt,legacy.createdAt);
     await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor();
-    assert.equal(await congregant.locator('[data-announcement-id]').nth(1).getAttribute('data-announcement-id'),legacy.id,'An edited date inserts a newly recent message into the open congregation feed');
+    assert.equal(await readerCards.nth(-2).getAttribute('data-announcement-id'),legacy.id,'An edited date inserts a newly recent message near the bottom');
     await row.locator('[data-cal-edit-announcement]').click();await row.locator('input[name=addedAt]').fill(calendarAnnouncementLocalTime(legacy.createdAt,'America/New_York'));
     await row.getByRole('button',{name:'Save changes',exact:true}).click();await row.locator('.cal-announcement-edit-form').waitFor({state:'detached'});
     await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor({state:'detached'});
     assert.equal(await manager.locator('[data-announcement-id="'+legacy.id+'"]').count(),1,'Backdating retains the manager archive');
+    await readerFeed.evaluate(feed=>{feed.scrollTop=feed.scrollHeight;});
+    const followed = await post(null,'A message arriving while at the latest');
+    await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));
+    await readerFeed.locator(`[data-announcement-id="${followed.id}"]`).waitFor();
+    assert.equal(await readerCards.last().getAttribute('data-announcement-id'),followed.id);
+    assert(await atBottom(),'A new message follows the bottom while the reader is there');
+    await readerFeed.evaluate(feed=>{feed.scrollTop=80;});
+    const reading = await readerFeed.evaluate(feed=>feed.scrollTop);
+    const whileReading = await post(null,'A message arriving while reading history');
+    await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));
+    const showNew = readerDialog.getByRole('button',{name:'Show new messages',exact:true});
+    await showNew.waitFor();
+    assert.equal(await readerFeed.evaluate(feed=>feed.scrollTop),reading,'New arrivals leave the reader’s position alone');
+    await showNew.click();
+    await readerFeed.locator(`[data-announcement-id="${whileReading.id}"]`).waitFor();
+    assert.equal(await readerCards.last().getAttribute('data-announcement-id'),whileReading.id);
+    assert(await atBottom(),'Show new messages returns to the latest message');
     assert.deepEqual(errors,[]);console.log(JSON.stringify({browserDates:true,phoneAndDesktop:true,dateMovesRow:true,viewerWindowEnforced:true,openFeedReorders:true,originalTimestampPreserved:true,output}));
    }finally{await browser.close();}
   }

@@ -551,7 +551,6 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     const firstAfterEmpty = await call('/api/announcements', 'POST', { id: crypto.randomUUID(), text: 'First update after an empty feed' }, owner);
     assert.equal(firstAfterEmpty.body.message.sequence, 36);
     await deletionPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await deletionPage.locator('[data-cal-new-announcements]:visible').click();
     await deletionPage.getByText('First update after an empty feed', { exact: true }).waitFor();
     await deletionCtx.close();
     const ownForm = await fillEvent(editorPage, 'Synthetic editor wedding', 'wedding', '2026-11-11');
