@@ -5,7 +5,7 @@ import { requestedRange, civilDate, shiftDate, midnight } from '../traffic-calen
 import { LC_TEXT_MAILBOX, isLcTextSource, lcTextWording } from '../../js/calendar/lc-text.js';
 import { lcTextCalendarScript } from './gmail-bridge.js';
 import { calendarSessionExpiration } from './session-expiration.js';
-import { calendarReminderSchedule, DEFAULT_CALENDAR_REMINDER_SCHEDULE } from '../../js/calendar/reminder-date.js';
+import { calendarReminderSchedule, calendarSupportsReminderSchedule, DEFAULT_CALENDAR_REMINDER_SCHEDULE } from '../../js/calendar/reminder-date.js';
 import { nextSimchaReminder, pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, reminderRegistrationExpired, runSimchaReminders, scheduleCalendarAlarm, sendCalendarPush } from './simcha-reminders.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
@@ -609,6 +609,7 @@ export class CommunityCalendar extends DurableObject {
       if (!old && (await this.ctx.storage.list({ prefix: 'event:', limit: 2000 })).size >= 2000) fail('Remove unused or past events before adding more. This calendar has reached its event limit.', 409);
       let fields;
       try { fields = calendarEvent({ ...body, reminder: body.reminder ?? old?.reminder }); } catch (error) { fail(error.message); }
+      if (!old && body.reminder == null && this.reminderKeys && calendarSupportsReminderSchedule(fields.type)) fields.reminder = 'schedule';
       const event = { ...fields, id: entry[1], revision: (old?.revision || 0) + 1,
         createdAt: old?.createdAt || now, createdBy: old?.createdBy || user.id, updatedAt: now, updatedBy: user.id };
       if (event.reminder) {

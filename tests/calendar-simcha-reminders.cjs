@@ -166,12 +166,31 @@ async function checkPhoneControls(site, owner, viewer, device) {
     const form = manager.getByRole('dialog', { name: 'Add an event' });
     await form.getByLabel('Details').fill('Synthetic Shabbos simcha');
     await form.getByLabel('Date', { exact: true }).fill('2090-12-02');
-    assert.equal(await form.getByLabel('Phone reminder').inputValue(), 'schedule');
+    assert.equal(await form.locator('select[name=reminder]').count(), 0);
+    const note = form.locator('[data-cal-reminder-note]');
+    const category = form.locator('select[name=type]');
+    await category.selectOption('custom');
+    assert(await note.isHidden());
+    await category.selectOption('kiddush');
     await form.getByText('Default reminder is Friday, December 1, 2090 at 9:00 a.m. New York time.', { exact: false }).waitFor();
-    await form.getByRole('button', { name: 'Save event' }).click();
+    const [newEvent] = await Promise.all([
+      manager.waitForResponse(response => response.url().includes('/api/events/') && response.request().method() === 'PUT'),
+      form.getByRole('button', { name: 'Save event' }).click(),
+    ]);
+    assert.equal((await newEvent.json()).event.reminder, 'schedule');
     await form.waitFor({ state: 'detached' });
     await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
-    await manager.getByRole('dialog', { name: 'Day details' }).getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
+    const day = manager.getByRole('dialog', { name: 'Day details' });
+    await day.getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
+    await day.locator('[data-cal-edit=test-simcha]').click();
+    const edit = manager.getByRole('dialog', { name: 'Edit event' });
+    const [updatedEvent] = await Promise.all([
+      manager.waitForResponse(response => response.url().endsWith('/api/events/test-simcha') && response.request().method() === 'PUT'),
+      edit.getByRole('button', { name: 'Save changes' }).click(),
+    ]);
+    assert.equal((await updatedEvent.json()).event.reminder, 'schedule', 'Resaving an existing simcha applies phone reminder settings');
+    await edit.waitFor({ state: 'detached' });
+    await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
     await manager.getByRole('button', { name: 'Post an announcement' }).click();
     await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
     await manager.keyboard.press('Escape');
@@ -255,6 +274,13 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
       endpoint = (await backend.ready).origin;
       await checkPhoneControls(host, owner, viewer, device);
     }
+    const newSimcha = { ...legacy, title: 'New simcha without a reminder choice', revision: 0 };
+    const defaulted = await call('/api/events/default-simcha', 'PUT', newSimcha, owner.token);
+    assert.equal(defaulted.status, 201);
+    assert.equal(defaulted.body.event.reminder, 'schedule');
+    const custom = await call('/api/events/custom-event', 'PUT', { ...newSimcha, type: 'custom', customCategory: 'Other event' }, owner.token);
+    assert.equal(custom.status, 201);
+    assert.equal(custom.body.event.reminder, undefined);
   } finally { await backend.dispose(); server?.close(); }
 });
 

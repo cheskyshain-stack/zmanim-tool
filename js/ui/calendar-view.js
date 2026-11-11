@@ -1,7 +1,7 @@
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession, calendarSessionWasCleared, restoreCalendarSession } from '../calendar/api.js';
-import { CALENDAR_REMINDER_TYPES, calendarReminderSlot } from '../calendar/reminder-date.js';
+import { calendarReminderSlot, calendarSupportsReminderSchedule } from '../calendar/reminder-date.js';
 import { shulNow } from '../zmanim/solar.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { escText, escAttr } from '../util.js';
@@ -444,14 +444,14 @@ export function renderCalendar(container, settings, tables, { standalone = false
       <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
       <p class="cal-form-hebrew" lang="he" dir="rtl"></p>
       <div class="cal-form-row" data-cal-times><label>Starts (optional)<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
-      ${reminderPublicKey && !previewing() ? `<label>Phone reminder<select name="reminder"><option value="">No reminder</option>${reminderSchedules ? `<option value="schedule" ${!item || original.reminder === 'schedule' ? 'selected' : ''}>Use phone reminder settings</option>` : ''}<option value="day-of" ${original.reminder === 'day-of' ? 'selected' : ''}>Morning of the simcha</option><option value="day-before" ${original.reminder === 'day-before' ? 'selected' : ''}>Morning before the simcha</option></select></label><p class="cal-form-note" data-cal-reminder-note></p>` : ''}
+      ${reminderSchedules && !previewing() ? '<p class="cal-form-note" data-cal-reminder-note hidden></p>' : ''}
       <details class="cal-extra"><summary>More options</summary><label>Last date (for a multi-day event)<input name="endDate" type="date" min="${original.date}" max="2299-12-31" value="${original.endDate !== original.date ? original.endDate : ''}"></label></details>
       <p class="cal-form-note">Times use ${calEscape(settings.timezone.id.replaceAll('_', ' '))}. Calendar entries do not change the minyan schedule.</p>
       ${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin to save changes.</p>' : ''}<p role="status" class="cal-error" aria-live="polite"></p><div class="cal-form-actions"><button type="submit" class="cal-primary" ${previewing() ? 'disabled' : ''}>${item ? 'Save changes' : 'Save event'}</button><button type="button" data-cal-cancel>Cancel</button>${item ? `<button type="button" data-cal-remove-event ${previewing() ? 'disabled' : ''}>Delete event</button>` : ''}</div></form>`,
       { onClose: () => !saving && (new URLSearchParams(new FormData(view.el.querySelector('form'))).toString() === initial || confirm('Discard your unsaved event changes?')) });
     view.title(item ? 'Edit event' : 'Add an event');
     const form = view.el.querySelector('form');
-    const scheduleOption = form.elements.reminder?.querySelector('[value=schedule]');
+    const reminderNote = form.querySelector('[data-cal-reminder-note]');
     form.elements.type.addEventListener('change', () => {
       const custom = form.elements.type.value === 'custom';
       form.querySelector('[data-cal-custom-category]').hidden = !custom;
@@ -462,24 +462,14 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const value = form.elements.date.value;
       view.el.querySelector('.cal-form-hebrew').textContent = Number.isFinite(calendarSerial(value)) ? hebrewLabel(value) : '';
       form.elements.endDate.min = value;
-      if (form.elements.reminder) {
-        const type = form.elements.type.value;
-        const personalTimes = !!scheduleOption && CALENDAR_REMINDER_TYPES.some(category => category.id === type);
-        if (scheduleOption) {
-          scheduleOption.hidden = scheduleOption.disabled = !personalTimes;
-          if (scheduleOption.disabled && form.elements.reminder.value === 'schedule') form.elements.reminder.value = '';
-        }
-        const mode = form.elements.reminder.value;
-        const reminder = calendarReminderSlot({ date: value, type, reminder: mode });
-        const preview = form.querySelector('[data-cal-reminder-note]');
-        if (!reminder) preview.textContent = 'No phone alert is scheduled for this event.';
-        else if (personalTimes) preview.textContent = `Default reminder is ${calFullDate(reminder.date)} at 9:00 a.m. New York time. People can choose their own times on their phones.`;
-        else preview.textContent = `${calFullDate(reminder.date)} at 9:00 a.m. New York time. Shabbos reminders go out Friday morning.`;
+      if (reminderNote) {
+        const reminder = calendarReminderSlot({ date: value, type: form.elements.type.value, reminder: 'schedule' });
+        reminderNote.hidden = !reminder;
+        reminderNote.textContent = reminder ? `Uses each phone’s reminder settings. Default reminder is ${calFullDate(reminder.date)} at 9:00 a.m. New York time.` : '';
       }
     };
     updateDate(); form.elements.date.addEventListener('change', updateDate);
     initial = new URLSearchParams(new FormData(form)).toString();
-    form.elements.reminder?.addEventListener('change', updateDate);
     view.el.querySelector('[data-cal-cancel]').addEventListener('click', view.close);
     view.el.querySelector('[data-cal-remove-event]')?.addEventListener('click', async () => {
       if (saving || previewing() || !confirm('Delete this event from the calendar?')) return;
@@ -498,7 +488,10 @@ export function renderCalendar(container, settings, tables, { standalone = false
       try {
         const fields = Object.fromEntries(new FormData(form));
         const next = { ...original, ...calendarEvent({ ...fields, ...calendarDetailsFields(fields.details, original), allDay: false, revision: original.revision }) };
-        if (form.elements.reminder) next.reminder = fields.reminder;
+        if (reminderSchedules) {
+          if (calendarSupportsReminderSchedule(next.type)) next.reminder = 'schedule';
+          else if (next.type !== original.type) next.reminder = '';
+        }
         saving = true; form.querySelector('[type=submit]').disabled = true; status.textContent = 'Saving…';
         await saveEvent(next); saving = false; initial = new URLSearchParams(new FormData(form)).toString(); view.close();
         selected = next.date; note = 'Event saved.';
