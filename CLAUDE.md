@@ -1062,9 +1062,12 @@ stored and keep full dates and times in the calendar manager's announcement view
 Owners and calendar editors can set an optional Added date and time when posting,
 or change it in Edit. Use the shul timezone, preserve unchanged seconds, and reject
 nonexistent or ambiguous local times rather than guessing. Added dates determine
-the order. The API and manager archive return newest first. Congregation Messages
-opens at the newest message at the bottom. Load older messages above the current
-view, preserve the reader’s place, and follow new messages while at the bottom.
+the order. The API returns newest first. Congregation Messages and the manager's
+announcement feed open at the newest message at the bottom. Load older messages
+above the current view, preserve the reader's place, and follow new messages while
+at the bottom. The manager's composer stays below the scrolling feed, with the
+optional date and time collapsed. Show a sent message from the confirmed server
+response and keep any loaded history. Backdated posts follow their chosen date.
 Retain the original createdAt, sequence, source receipts and read markers.
 Synchronize date changes into open lists and retain unsaved drafts.
 The congregation can retrieve only the last 10 New York calendar days, including

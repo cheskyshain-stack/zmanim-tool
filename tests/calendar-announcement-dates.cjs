@@ -74,6 +74,31 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
    try{
     const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
+    const managerDialog = manager.getByRole('dialog', { name: 'Announcements' });
+    const managerFeed = managerDialog.locator('.cal-announcement-feed');
+    const managerCards = managerFeed.locator('[data-announcement-id]');
+    const composer = managerDialog.locator('.cal-announcement-compose');
+    const managerAtBottom = () => managerFeed.evaluate(feed => feed.scrollHeight - feed.clientHeight - feed.scrollTop <= 2);
+    assert.equal(await managerCards.last().getAttribute('data-announcement-id'),fresh.id,'The manager opens with the newest announcement last');
+    assert(await managerAtBottom(),'The manager opens at the bottom');
+    for (const [width, height] of [[375, 650], [393, 852], [393, 350]]) {
+     await manager.setViewportSize({ width, height });
+     await manager.waitForFunction(() => parseFloat(document.querySelector('.cal-announcements-dialog').style.getPropertyValue('--cal-dialog-height')) === (window.visualViewport?.height || innerHeight) - 32);
+     const geometry = await managerDialog.evaluate(dialog => {
+      const feed = dialog.querySelector('.cal-announcement-feed'), form = dialog.querySelector('.cal-announcement-compose');
+      const box = dialog.getBoundingClientRect(), before = form.getBoundingClientRect(), list = feed.getBoundingClientRect();
+      feed.scrollTop = 0;
+      feed.scrollTop = 100;
+      return { composerBelowFeed: before.top >= list.bottom, composerFixed: before.top === form.getBoundingClientRect().top,
+       composerFits: before.bottom <= box.bottom && form.scrollWidth <= form.clientWidth, historyScrolls: feed.scrollTop > 0,
+       fitsViewport: box.bottom < innerHeight && box.right < innerWidth && box.left > 0, outerOverflow: dialog.scrollHeight - dialog.clientHeight };
+     });
+     const { composerBelowFeed, composerFixed, composerFits, historyScrolls, fitsViewport, outerOverflow } = geometry;
+     assert(composerBelowFeed && composerFixed && composerFits && historyScrolls && fitsViewport && outerOverflow <= 1, JSON.stringify({ width, height, ...geometry }));
+     await managerFeed.evaluate(feed => { feed.scrollTop = feed.scrollHeight; });
+     await manager.screenshot({path:path.join(output,`manager-composer-${width}x${height}.png`)});
+    }
+    await manager.setViewportSize({ width: 393, height: 852 });
     assert.equal(await congregant.getByText('Showing the last 10 days.',{exact:true}).count(),0);
     const readerDialog = congregant.locator('.cal-announcement-reader');
     const readerFeed = readerDialog.locator('.cal-announcement-feed');
@@ -125,7 +150,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     for(const width of [320,393,1440]){await manager.setViewportSize({width,height:900});await dateInput.scrollIntoViewIfNeeded();const geometry=await dateInput.evaluate(el=>{const r=el.getBoundingClientRect();return {left:r.left,right:r.right,height:r.height,pageWidth:document.documentElement.scrollWidth,width:innerWidth};});assert(geometry.pageWidth<=width&&geometry.right<=width&&geometry.left>=0&&geometry.height>=44,JSON.stringify(geometry));await manager.screenshot({path:path.join(output,'date-editor-'+width+'.png'),fullPage:true});}
     await row.getByRole('button',{name:'Save changes',exact:true}).click();await row.locator('.cal-announcement-edit-form').waitFor({state:'detached'});
     assert.equal((await manager.locator('[data-announcement-id]').all()).length,37);
-    assert.equal(await manager.locator('[data-announcement-id]').nth(1).getAttribute('data-announcement-id'),legacy.id,'Date edit repositions the saved row');
+    assert.equal(await managerCards.nth(-2).getAttribute('data-announcement-id'),legacy.id,'Date edit repositions the saved row');
     assert.equal((await call('/api/announcements','GET',null,owner.token)).body.messages.find(value=>value.id===legacy.id).createdAt,legacy.createdAt);
     await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor();
     assert.equal(await readerCards.nth(-2).getAttribute('data-announcement-id'),legacy.id,'An edited date inserts a newly recent message near the bottom');
@@ -133,6 +158,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     await row.getByRole('button',{name:'Save changes',exact:true}).click();await row.locator('.cal-announcement-edit-form').waitFor({state:'detached'});
     await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));await congregant.locator('[data-announcement-id="'+legacy.id+'"]').waitFor({state:'detached'});
     assert.equal(await manager.locator('[data-announcement-id="'+legacy.id+'"]').count(),1,'Backdating retains the manager archive');
+    await managerFeed.evaluate(feed => { feed.scrollTop = 0; });
     await readerFeed.evaluate(feed=>{feed.scrollTop=feed.scrollHeight;});
     const followed = await post(null,'A message arriving while at the latest');
     await congregant.evaluate(()=>window.dispatchEvent(new Event('focus')));
@@ -150,7 +176,29 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     await readerFeed.locator(`[data-announcement-id="${whileReading.id}"]`).waitFor();
     assert.equal(await readerCards.last().getAttribute('data-announcement-id'),whileReading.id);
     assert(await atBottom(),'Show new messages returns to the latest message');
-    assert.deepEqual(errors,[]);console.log(JSON.stringify({browserDates:true,phoneAndDesktop:true,dateMovesRow:true,viewerWindowEnforced:true,openFeedReorders:true,originalTimestampPreserved:true,output}));
+    await managerFeed.evaluate(feed => { feed.scrollTop = 0; });
+    await manager.evaluate(()=>window.dispatchEvent(new Event('focus')));
+    await managerDialog.getByRole('button',{name:'Show new announcements',exact:true}).waitFor();
+    assert.equal(await managerCards.count(),37,'The manager keeps the loaded archive while reading older messages');
+    const draft = composer.getByLabel('New announcement'), send = composer.getByRole('button',{name:'Send announcement'});
+    const postedText = 'Sent from the bottom\nמזל טוב';
+    await draft.fill(postedText);
+    await send.click();
+    await managerCards.last().getByText('מזל טוב').waitFor();
+    assert.equal(await managerCards.last().locator('p').textContent(),postedText);
+    assert.equal(await managerCards.count(),38,'Sending appends the confirmed post without discarding loaded history');
+    assert.equal(await draft.inputValue(),'');
+    assert(await managerAtBottom(),'Sending a new post scrolls to it');
+    const date = composer.locator('input[name=addedAt]');
+    assert(await date.isHidden(),'The optional date starts collapsed');
+    await composer.getByText('Set date and time',{exact:true}).click();
+    await date.fill(calendarAnnouncementLocalTime(oldAt,'America/New_York'));
+    await draft.fill('An intentionally backdated post');
+    await send.click();
+    await managerCards.getByText('An intentionally backdated post',{exact:true}).waitFor();
+    assert.equal(await managerCards.last().locator('p').textContent(),postedText,'A backdated post sorts into its original place');
+    assert(await date.isHidden(),'Sending closes the optional date');
+    assert.deepEqual(errors,[]);console.log(JSON.stringify({browserDates:true,phoneAndDesktop:true,dateMovesRow:true,viewerWindowEnforced:true,openFeedReorders:true,originalTimestampPreserved:true,pinnedManagerComposer:true,postPreservesHistory:true,output}));
    }finally{await browser.close();}
   }
   console.log('Passed real server date edits, owner/editor/viewer boundaries, chronological pagination, date cutoff, unread preservation, idempotency and cursor deletion checks.');
