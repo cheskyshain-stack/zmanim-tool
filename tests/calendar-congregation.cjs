@@ -138,7 +138,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await saturday.click(); await page.locator('.cal-dialog .cal-event-card').first().waitFor(); assert.equal(await page.locator('.cal-dialog .cal-event-card').count(), 8);
         assert.deepEqual(await page.locator('.cal-dialog .cal-event-card').evaluateAll(nodes => nodes.map(node => [...node.classList].find(name => name.startsWith('cal-type-')).slice(9))), types, 'Day details automatically group event types');
         await page.keyboard.press('Escape');
-        await page.getByRole('button', { name:/^Notifications/ }).click(); await page.getByText('Example Shul announcement', { exact:true }).waitFor(); await page.keyboard.press('Escape');
+        await page.getByRole('button', { name:/^Messages/ }).click(); await page.getByText('Example Shul announcement', { exact:true }).waitFor(); await page.keyboard.press('Escape');
         await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Schedule messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
         await page.locator('[data-cal-step="-1"]').click(); await page.locator('[data-cal-day="2026-10-01"]:not([disabled])').waitFor(); assert(await page.locator('[data-cal-step="-1"]').isDisabled());
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();

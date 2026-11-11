@@ -1086,7 +1086,7 @@ and safe-area insets; distribute the month into equal, compact rows without page
 scrolling. Rows prefer 1.35 times their column width, between 72px and 128px, and
 shrink further when needed to keep the whole month within the remaining screen.
 Do not stretch the month to the bottom of a tall phone. Keep Back to the congregation homepage,
-the Community Calendar title on its own row, followed by Notifications with its
+the Community Calendar title on its own row, followed by Messages with its
 bell and unread badge, Refresh and More. Keep month arrows and Today below that row.
 Put the color key, account and Sign out in More. Day details and notifications open dialogs,
 not extra sections below the month. The owner preview uses the same congregation UI.

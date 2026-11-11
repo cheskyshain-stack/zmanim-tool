@@ -43,7 +43,7 @@ New events in the seven named simcha categories use phone reminder settings by
 default. Managers can turn reminders off for an event. Existing explicit reminder
 choices stay saved. Events previously saved with reminders off stay off.
 
-Readers use Notifications, then Phone reminders, to opt in and set times for this
+Readers use Messages, then Phone reminders, to opt in and set times for this
 device. The default is 9 a.m. New York time on the event date, or Friday for a
 Shabbos event. A device can set one rule for all simchas, then override individual
 categories. Each rule has a same-day or day-before time and an optional separate
