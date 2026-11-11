@@ -73,7 +73,8 @@ async function sendToDevice(storage, { key, device, slot }, keys, origin, now, c
   try {
     const request = await buildPushPayload({ data: payload, options: { ttl, urgency: 'normal', topic: 'simcha-' + at } }, device.subscription, { ...keys, subject: origin });
     if ((await storage.get(key))?.id !== device.id) return Infinity;
-    response = await send(device.subscription.endpoint, { ...request, redirect: 'error', signal: AbortSignal.timeout(12000) });
+    // Workerd supports manual redirects. The status check below rejects redirects.
+    response = await send(device.subscription.endpoint, { ...request, redirect: 'manual', signal: AbortSignal.timeout(12000) });
     await response.body?.cancel();
   } catch { /* Retry when delivery fails. */ }
   const current = await storage.get(key);
