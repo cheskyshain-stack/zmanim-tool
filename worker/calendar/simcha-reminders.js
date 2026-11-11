@@ -49,7 +49,7 @@ function reminderInstant({ date, time }) {
 }
 
 export function simchaReminderAt(event, schedule) {
-  const slot = calendarReminderSlot(event, schedule);
+  const slot = calendarReminderSlot(event, schedule || undefined);
   return slot ? reminderInstant(slot) : Infinity;
 }
 
@@ -57,6 +57,22 @@ export async function scheduleCalendarAlarm(storage, time) {
   if (!Number.isFinite(time)) return;
   const alarm = await storage.getAlarm();
   if (alarm === null || time < alarm) await storage.setAlarm(time);
+}
+
+export function reminderRegistrationExpired(status, device, now) {
+  // A new browser subscription can take a short time to register with the provider.
+  return (status === 404 || status === 410) && now - (device.enabledAt || 0) >= 60000;
+}
+
+export async function sendCalendarPush(storage, key, device, keys, origin, payload, options, send = fetch) {
+  try {
+    const request = await buildPushPayload({ data: payload, options }, device.subscription, { ...keys, subject: origin });
+    if ((await storage.get(key))?.id !== device.id) return 0;
+    // Workerd supports manual redirects. Only a successful provider response counts.
+    const response = await send(device.subscription.endpoint, { ...request, redirect: 'manual', signal: AbortSignal.timeout(12000) });
+    await response.body?.cancel().catch(() => {});
+    return response.status;
+  } catch { return 0; }
 }
 
 async function sendToDevice(storage, { key, device, slot }, keys, origin, now, cutoff, send) {
@@ -69,24 +85,18 @@ async function sendToDevice(storage, { key, device, slot }, keys, origin, now, c
   const own = user.role !== 'viewer' && events.find(event => event.createdBy === user.id);
   const payload = { date: (own || events[0]).date, post: Boolean(own), day: slot.day, slot: at };
   const ttl = Math.max(1, Math.floor((deadline - now) / 1000));
-  let response;
-  try {
-    const request = await buildPushPayload({ data: payload, options: { ttl, urgency: 'normal', topic: 'simcha-' + at } }, device.subscription, { ...keys, subject: origin });
-    if ((await storage.get(key))?.id !== device.id) return Infinity;
-    // Workerd supports manual redirects. The status check below rejects redirects.
-    response = await send(device.subscription.endpoint, { ...request, redirect: 'manual', signal: AbortSignal.timeout(12000) });
-    await response.body?.cancel();
-  } catch { /* Retry when delivery fails. */ }
+  const status = await sendCalendarPush(storage, key, device, keys, origin, payload, { ttl, urgency: 'high', topic: 'simcha-' + at }, send);
   const current = await storage.get(key);
   if (current?.id !== device.id) return Infinity;
-  if (response?.status === 404 || response?.status === 410) {
-    await storage.delete(key);
+  const lastDelivery = { at, status };
+  if (reminderRegistrationExpired(status, device, now)) {
+    await storage.put(key, { ...current, expiredAt: now, lastDelivery });
     return Infinity;
   }
   const sentSlots = (current.sentSlots || []).filter(time => time > cutoff);
   const retries = Object.fromEntries(Object.entries(current.reminderRetries || {}).filter(([time]) => Number(time) > cutoff));
   let next = Infinity;
-  if (response?.ok) {
+  if (status >= 200 && status < 300) {
     sentSlots.push(at);
     delete retries[at];
   } else {
@@ -95,7 +105,7 @@ async function sendToDevice(storage, { key, device, slot }, keys, origin, now, c
     retries[at] = { attempts, retryAt };
     next = retryAt || Infinity;
   }
-  await storage.put(key, { ...current, sentSlots, reminderRetries: retries });
+  await storage.put(key, { ...current, sentSlots, reminderRetries: retries, lastDelivery });
   return next;
 }
 
@@ -135,6 +145,13 @@ function reminderAgenda(groups, schedule, now, cutoff) {
   return { next, slots };
 }
 
+export async function nextSimchaReminder(storage, schedule, now = Date.now()) {
+  const today = civilDate(now);
+  const groups = reminderEventGroups(await storage.list({ prefix: 'event:' }), today, shiftDate(today, 1));
+  const { next } = reminderAgenda(groups, schedule, now, now);
+  return Number.isFinite(next) ? next : null;
+}
+
 export async function runSimchaReminders(storage, keys, origin, now = Date.now(), send = fetch) {
   const devices = await storage.list({ prefix: devicePrefix });
   if (!devices.size) return Infinity;
@@ -143,6 +160,7 @@ export async function runSimchaReminders(storage, keys, origin, now = Date.now()
   const agendas = new Map(), jobs = [];
   let next = Infinity;
   for (const [key, device] of devices) {
+    if (device.expiredAt) continue;
     const schedule = device.reminderSchedule;
     const agendaKey = JSON.stringify([schedule?.standard, schedule?.sameTime === true ? null : schedule?.categories]);
     if (!agendas.has(agendaKey)) agendas.set(agendaKey, reminderAgenda(groups, schedule, now, cutoff));

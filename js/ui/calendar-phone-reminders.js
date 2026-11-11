@@ -1,10 +1,11 @@
 import { calendarRequest } from '../calendar/api.js';
 import { CALENDAR_REMINDER_TYPES, DEFAULT_CALENDAR_REMINDER_RULE } from '../calendar/reminder-date.js';
 
-const workerPath = '/admin/calendar/phone-reminders.js';
+const workerPath = '/admin/calendar/phone-reminders.js?v=2';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
+const reminderDateTime = new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
 
 async function removePhoneReminder(subscription) {
   await calendarRequest('/api/phone-reminders', { method: 'DELETE', body: { endpoint: subscription.endpoint }, signal: AbortSignal.timeout(4000) });
@@ -29,7 +30,7 @@ function reminderRow(id, label) {
   </div>`;
 }
 
-function showReminderSchedule(container, endpoint, initial) {
+function showReminderSchedule(container, endpoint, initial, onSaved) {
   container.innerHTML = `<form class="cal-form cal-reminder-schedule" aria-label="Reminder times">
     <label class="cal-reminder-toggle">All the same<input type="checkbox" name="sameTime" role="switch" aria-controls="cal-reminder-shared cal-reminder-categories"><span aria-hidden="true" class="cal-reminder-track"></span></label>
     <p class="cal-form-note">Times are New York time. Shabbos simchos use Friday.</p>
@@ -87,6 +88,7 @@ function showReminderSchedule(container, endpoint, initial) {
     try {
       const result = await calendarRequest('/api/phone-reminders/schedule', { method: 'PUT', body: { endpoint, schedule: updated } });
       schedule = result.schedule;
+      onSaved(result);
       status.textContent = 'Reminder times saved for this phone.';
     } catch (error) { status.textContent = error.message; }
     finally {
@@ -98,33 +100,58 @@ function showReminderSchedule(container, endpoint, initial) {
 
 export async function openCalendarPhoneReminders(dialog, publicKey, schedules = false) {
   const description = schedules ? 'Get phone alerts for simchos. The default is 9:00 a.m. New York time, on the day of the simcha or on Friday for Shabbos. These settings apply to this device.' : 'Get a phone notification at 9:00 a.m. New York time on mornings when a simcha reminder is scheduled. This setting applies to this device.';
-  const view = dialog(`<div class="cal-form"><div data-reminder-schedule hidden></div><p data-reminder-description>${description}</p><button type="button" class="cal-primary" disabled>Turn on phone reminders</button><p role="status" aria-live="polite"></p></div>`);
+  const view = dialog(`<div class="cal-form"><div data-reminder-schedule hidden></div><p data-reminder-description>${description}</p>
+    <div data-reminder-delivery hidden><p data-reminder-next class="cal-form-note"></p><p data-reminder-last class="cal-form-note" hidden></p></div>
+    <button type="button" data-reminder-test hidden>Send test alert</button><button type="button" class="cal-primary" disabled>Turn on phone reminders</button><p role="status" aria-live="polite"></p></div>`);
   view.title('Phone reminders');
   const status = view.el.querySelector('[role=status]'), button = view.el.querySelector('.cal-primary');
+  const test = view.el.querySelector('[data-reminder-test]'), delivery = view.el.querySelector('[data-reminder-delivery]');
   if (!supported()) {
     status.textContent = 'On iPhone or iPad, add the calendar to your Home Screen and open it from its icon. On Android, open it in Chrome.';
     return;
   }
   try {
     const registered = await navigator.serviceWorker.register(workerPath);
+    const update = registered.installing || registered.waiting;
+    if (update) await new Promise(resolve => {
+      const check = () => {
+        if (update.state !== 'activated' && update.state !== 'redundant') return;
+        update.removeEventListener('statechange', check); resolve();
+      };
+      update.addEventListener('statechange', check); check();
+    });
     const registration = registered.active ? registered : await navigator.serviceWorker.ready;
     let subscription = await registration.pushManager.getSubscription();
     const current = subscription && await calendarRequest('/api/phone-reminders/status', { method: 'POST', body: { endpoint: subscription.endpoint } });
-    let enabled = !!current?.enabled;
+    const key = browserKey(publicKey), existingKey = subscription?.options?.applicationServerKey;
+    const wrongKey = existingKey && new Uint8Array(existingKey).toString() !== key.toString();
+    let enabled = !!current?.enabled && !wrongKey, previousEndpoint = !enabled ? subscription?.endpoint : undefined;
     if (!view.el.isConnected) return;
     const scheduleForm = view.el.querySelector('[data-reminder-schedule]');
-    if (schedules && enabled && current.schedule) showReminderSchedule(scheduleForm, subscription.endpoint, current.schedule);
+    function paintDelivery(result) {
+      const next = delivery.querySelector('[data-reminder-next]'), last = delivery.querySelector('[data-reminder-last]');
+      next.textContent = result.nextAt ? `Next alert for this phone: ${reminderDateTime.format(result.nextAt)} (New York time).` : 'No upcoming simcha alerts are scheduled for this phone.';
+      if (!result.lastDelivery) return;
+      const { at, status } = result.lastDelivery;
+      last.textContent = `Last scheduled alert: ${reminderDateTime.format(at)} (New York time). ${status >= 200 && status < 300 ? 'Accepted by the notification service.' : status ? `Notification service returned HTTP ${status}.` : 'Could not reach the notification service.'}`;
+      last.hidden = false;
+    }
+    if (enabled) {
+      paintDelivery(current);
+      if (schedules && current.schedule) showReminderSchedule(scheduleForm, subscription.endpoint, current.schedule, paintDelivery);
+    }
     function paint(message = '') {
       scheduleForm.hidden = !scheduleForm.hasChildNodes();
       view.el.querySelector('[data-reminder-description]').hidden = !scheduleForm.hidden;
+      test.hidden = delivery.hidden = !enabled;
       button.classList.toggle('cal-primary', scheduleForm.hidden);
-      button.textContent = enabled ? 'Turn off phone reminders' : 'Turn on phone reminders';
+      button.textContent = enabled ? 'Turn off phone reminders' : previousEndpoint ? 'Reconnect phone reminders' : 'Turn on phone reminders';
       button.disabled = false;
-      status.textContent = message || (Notification.permission === 'denied' ? 'Your browser reports that notifications for this site are blocked.' : enabled ? 'Phone reminders are on for this device.' : '');
+      status.textContent = message || (Notification.permission === 'denied' ? 'Your browser reports that notifications for this site are blocked.' : enabled ? 'Phone reminders are on for this device.' : previousEndpoint ? 'Reconnect to get alerts on this phone.' : '');
     }
     paint();
     button.addEventListener('click', async () => {
-      button.disabled = true;
+      button.disabled = test.disabled = true;
       let failure = 'Couldn’t turn off phone reminders.';
       try {
         if (enabled) {
@@ -132,6 +159,7 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
           await removePhoneReminder(subscription);
           enabled = false;
           scheduleForm.replaceChildren();
+          delivery.querySelector('[data-reminder-last]').hidden = true;
           try { await subscription.unsubscribe(); subscription = null; } catch { /* The server has already turned off reminders. */ }
         } else {
           if (Notification.permission !== 'granted') {
@@ -145,21 +173,51 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
                 : 'Notification permission is still pending. Tap Turn on phone reminders and choose Allow when your browser asks.');
               return;
             }
-            if (!subscription && navigator.userActivation?.isActive === false) {
-              paint('Notifications are allowed. Tap Turn on phone reminders once more to finish.');
+            if ((!subscription || previousEndpoint) && navigator.userActivation?.isActive === false) {
+              paint(`Notifications are allowed. Tap ${button.textContent} once more to finish.`);
               return;
             }
           }
           failure = 'The browser couldn’t register this phone for notifications.';
           status.textContent = 'Registering this phone for reminders…';
-          subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: browserKey(publicKey) });
+          if (subscription && subscription.endpoint === previousEndpoint) {
+            await subscription.unsubscribe(); subscription = null;
+            if (navigator.userActivation?.isActive === false) {
+              paint('Tap Reconnect phone reminders once more to finish.');
+              return;
+            }
+          }
+          subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
           failure = 'The calendar couldn’t save reminders for this phone.';
-          const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { subscription: subscription.toJSON() } });
+          const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { subscription: subscription.toJSON(), ...(previousEndpoint ? { previousEndpoint } : {}) } });
           enabled = result.enabled;
-          if (schedules && enabled && result.schedule) showReminderSchedule(scheduleForm, subscription.endpoint, result.schedule);
+          previousEndpoint = undefined;
+          paintDelivery(result);
+          if (schedules && enabled && result.schedule) showReminderSchedule(scheduleForm, subscription.endpoint, result.schedule, paintDelivery);
         }
         paint();
       } catch (error) { paint(`${failure} ${error.message || ''}`.trim()); }
+      finally { test.disabled = false; }
+    });
+    test.addEventListener('click', async () => {
+      if (Notification.permission !== 'granted') {
+        paint('Allow calendar notifications in this browser before sending a test alert.');
+        return;
+      }
+      test.disabled = button.disabled = true;
+      status.textContent = 'Sending a test alert…';
+      try {
+        const result = await calendarRequest('/api/phone-reminders/test', { method: 'POST', body: { endpoint: subscription.endpoint } });
+        if (result.expired) {
+          previousEndpoint = subscription.endpoint; enabled = false;
+          scheduleForm.replaceChildren();
+          delivery.querySelector('[data-reminder-last]').hidden = true;
+          paint('The notification service says this registration expired. Tap Reconnect phone reminders.');
+        } else if (result.accepted) paint('Test alert accepted. Check this phone’s notifications.');
+        else if (result.status === 404 || result.status === 410) paint('The new registration is still getting ready. Try again in a minute.');
+        else paint(result.status ? `The notification service rejected the test alert (HTTP ${result.status}).` : 'Could not reach the notification service. Try again.');
+      } catch (error) { paint(error.message); }
+      finally { test.disabled = false; }
     });
   } catch (error) { status.textContent = error.message; }
 }

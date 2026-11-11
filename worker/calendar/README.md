@@ -50,6 +50,11 @@ categories. Each rule has a same-day or day-before time and an optional separate
 Friday time. Settings are private to the signed-in account and device subscription.
 The All the same switch shows one shared time or the full seven-category list.
 Individual rules stay saved while the shared time is selected.
+The panel shows the next scheduled alert for the signed-in device and the last
+scheduled delivery result when available. Send test alert checks that device's
+registration without posting an announcement or creating an event. Provider
+acceptance confirms handoff to the phone's notification service. Reconnecting
+replaces an expired browser subscription and retains that device's saved times.
 Android can opt in through Chrome. On iPhone or iPad, open the calendar as a Home
 Screen web app before allowing notifications.
 

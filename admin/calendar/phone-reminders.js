@@ -3,8 +3,15 @@ self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 self.addEventListener('push', event => {
   let payload;
   try { payload = event.data?.json(); } catch { return; }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload?.date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(payload?.day || '')) return;
   const url = new URL('/admin/calendar/', self.location.origin);
+  if (payload?.test === true) {
+    event.waitUntil(self.registration.showNotification('Calendar test alert', {
+      body: 'Phone reminders can reach this device.', icon: '/icons/calendar/icon-192.png?v=1',
+      tag: 'calendar-reminder-test', data: url.href,
+    }));
+    return;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload?.date || '') || !/^\d{4}-\d{2}-\d{2}$/.test(payload?.day || '')) return;
   url.searchParams.set('simcha', payload.date);
   if (payload.post === true) url.searchParams.set('post', '1');
   event.waitUntil(self.registration.showNotification('Simcha reminder', {
