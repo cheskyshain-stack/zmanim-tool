@@ -1,6 +1,7 @@
 import { CALENDAR_TYPES, calendarISO, calendarSerial } from './model.js';
 
 export const CALENDAR_REMINDER_TYPES = CALENDAR_TYPES.filter(type => type.id !== 'custom');
+export const calendarSupportsReminderSchedule = type => CALENDAR_REMINDER_TYPES.some(category => category.id === type);
 export const DEFAULT_CALENDAR_REMINDER_RULE = { day: 'day-of', time: '09:00', fridayTime: '' };
 export const DEFAULT_CALENDAR_REMINDER_SCHEDULE = { revision: 0, standard: null, categories: {} };
 
@@ -16,7 +17,7 @@ export function calendarReminderSchedule(value) {
   if (!Number.isSafeInteger(revision) || revision < 0 || !categories || typeof categories !== 'object' || Array.isArray(categories)) throw new Error('Reload the reminder schedule before saving.');
   if (sameTime !== undefined && typeof sameTime !== 'boolean') throw new Error('Choose how to set the reminder times.');
   const overrides = Object.entries(categories).map(([id, rule]) => {
-    if (!CALENDAR_REMINDER_TYPES.some(type => type.id === id)) throw new Error('Choose a simcha category.');
+    if (!calendarSupportsReminderSchedule(id)) throw new Error('Choose a simcha category.');
     return [id, timing(rule)];
   });
   return { revision, standard: standard == null ? null : timing(standard), categories: Object.fromEntries(overrides), ...(sameTime === undefined ? {} : { sameTime }) };
@@ -32,7 +33,7 @@ export function calendarReminderDate(date, mode) {
 
 export function calendarReminderSlot(event, schedule = DEFAULT_CALENDAR_REMINDER_SCHEDULE) {
   if (!event.reminder) return null;
-  const supported = CALENDAR_REMINDER_TYPES.some(type => type.id === event.type);
+  const supported = calendarSupportsReminderSchedule(event.type);
   if (!supported && event.reminder === 'schedule') return null;
   const override = schedule.sameTime === true ? null : schedule.categories[event.type];
   const personal = supported && (override || schedule.standard);

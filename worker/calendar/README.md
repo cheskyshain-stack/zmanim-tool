@@ -39,9 +39,9 @@ cannot be removed through the account-management screen.
 
 ## Simcha phone reminders
 
-New events in the seven named simcha categories use phone reminder settings by
-default. Managers can turn reminders off for an event. Existing explicit reminder
-choices stay saved. Events previously saved with reminders off stay off.
+Saving an event in one of the seven named simcha categories uses each phone’s
+reminder settings. For an existing simcha, opening the event and saving it applies
+the same rule.
 
 Readers use Messages, then Phone reminders, to opt in and set times for this
 device. The default is 9 a.m. New York time on the event date, or Friday for a
