@@ -62,7 +62,7 @@ export function calendarEvent(value) {
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
   const reminder = text('reminder', 10);
-  if (reminder && !['day-of', 'day-before'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
+  if (reminder && !['day-of', 'day-before', 'schedule'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
     location: text('location', 200), description: text('description', 4000), ...(reminder ? { reminder } : {}), revision };
 }

@@ -1,3 +1,5 @@
+self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
+
 self.addEventListener('push', event => {
   let payload;
   try { payload = event.data?.json(); } catch { return; }
@@ -7,7 +9,7 @@ self.addEventListener('push', event => {
   if (payload.post === true) url.searchParams.set('post', '1');
   event.waitUntil(self.registration.showNotification('Simcha reminder', {
     body: payload.post === true ? 'Open the calendar to post a simcha reminder.' : 'Open the calendar for the simcha details.',
-    icon: '/icons/calendar/icon-192.png?v=1', tag: 'simcha-' + payload.day, data: url.href,
+    icon: '/icons/calendar/icon-192.png?v=1', tag: 'simcha-' + (Number.isSafeInteger(payload.slot) ? payload.slot : payload.day), data: url.href,
   }));
 });
 

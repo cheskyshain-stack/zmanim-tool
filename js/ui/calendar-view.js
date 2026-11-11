@@ -1,7 +1,7 @@
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession, calendarSessionWasCleared, restoreCalendarSession } from '../calendar/api.js';
-import { calendarReminderDate } from '../calendar/reminder-date.js';
+import { CALENDAR_REMINDER_TYPES, calendarReminderSlot } from '../calendar/reminder-date.js';
 import { shulNow } from '../zmanim/solar.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { escText, escAttr } from '../util.js';
@@ -25,7 +25,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
-  let reminderPublicKey = '';
+  let reminderPublicKey = '', reminderSchedules = false;
   let disposed = false, requestNumber = 0, busy = false, refreshing = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const readerCache = new Map(), readerPending = new Map();
   let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
@@ -156,7 +156,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     calendarSession(null); user = null; events = []; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
-  const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey);
+  const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey, reminderSchedules);
   const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
@@ -175,6 +175,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   async function openCalendarSession(session) {
     user = session.user; reminderPublicKey = session.reminderPublicKey || '';
+    reminderSchedules = session.reminderSchedules === true;
     const target = reminderDate;
     reminderDate = '';
     const requested = Number.isFinite(calendarSerial(target)) && dateAllowed(target);
@@ -433,29 +434,41 @@ export function renderCalendar(container, settings, tables, { standalone = false
       <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
       <p class="cal-form-hebrew" lang="he" dir="rtl"></p>
       <div class="cal-form-row" data-cal-times><label>Starts (optional)<input name="time" type="time" value="${escAttr(original.time)}"></label><label>Ends (optional)<input name="endTime" type="time" value="${escAttr(original.endTime)}"></label></div>
-      ${reminderPublicKey && !previewing() ? `<label>Phone reminder<select name="reminder"><option value="">No reminder</option><option value="day-of" ${original.reminder === 'day-of' ? 'selected' : ''}>Morning of the simcha</option><option value="day-before" ${original.reminder === 'day-before' ? 'selected' : ''}>Morning before the simcha</option></select></label><p class="cal-form-note" data-cal-reminder-note></p>` : ''}
+      ${reminderPublicKey && !previewing() ? `<label>Phone reminder<select name="reminder"><option value="">No reminder</option>${reminderSchedules ? `<option value="schedule" ${!item || original.reminder === 'schedule' ? 'selected' : ''}>Use phone reminder settings</option>` : ''}<option value="day-of" ${original.reminder === 'day-of' ? 'selected' : ''}>Morning of the simcha</option><option value="day-before" ${original.reminder === 'day-before' ? 'selected' : ''}>Morning before the simcha</option></select></label><p class="cal-form-note" data-cal-reminder-note></p>` : ''}
       <details class="cal-extra"><summary>More options</summary><label>Last date (for a multi-day event)<input name="endDate" type="date" min="${original.date}" max="2299-12-31" value="${original.endDate !== original.date ? original.endDate : ''}"></label></details>
       <p class="cal-form-note">Times use ${calEscape(settings.timezone.id.replaceAll('_', ' '))}. Calendar entries do not change the minyan schedule.</p>
       ${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin to save changes.</p>' : ''}<p role="status" class="cal-error" aria-live="polite"></p><div class="cal-form-actions"><button type="submit" class="cal-primary" ${previewing() ? 'disabled' : ''}>${item ? 'Save changes' : 'Save event'}</button><button type="button" data-cal-cancel>Cancel</button>${item ? `<button type="button" data-cal-remove-event ${previewing() ? 'disabled' : ''}>Delete event</button>` : ''}</div></form>`,
       { onClose: () => !saving && (new URLSearchParams(new FormData(view.el.querySelector('form'))).toString() === initial || confirm('Discard your unsaved event changes?')) });
     view.title(item ? 'Edit event' : 'Add an event');
     const form = view.el.querySelector('form');
+    const scheduleOption = form.elements.reminder?.querySelector('[value=schedule]');
     form.elements.type.addEventListener('change', () => {
       const custom = form.elements.type.value === 'custom';
       form.querySelector('[data-cal-custom-category]').hidden = !custom;
       form.elements.customCategory.disabled = !custom; form.elements.customCategory.required = custom;
+      updateDate();
     });
-    initial = new URLSearchParams(new FormData(form)).toString();
     const updateDate = () => {
       const value = form.elements.date.value;
       view.el.querySelector('.cal-form-hebrew').textContent = Number.isFinite(calendarSerial(value)) ? hebrewLabel(value) : '';
       form.elements.endDate.min = value;
       if (form.elements.reminder) {
-        const reminder = calendarReminderDate(value, form.elements.reminder.value);
-        form.querySelector('[data-cal-reminder-note]').textContent = reminder ? `${calFullDate(reminder)} at 9:00 a.m. New York time. Shabbos reminders go out Friday morning.` : 'This goes to people who turned on phone reminders.';
+        const type = form.elements.type.value;
+        const personalTimes = !!scheduleOption && CALENDAR_REMINDER_TYPES.some(category => category.id === type);
+        if (scheduleOption) {
+          scheduleOption.hidden = scheduleOption.disabled = !personalTimes;
+          if (scheduleOption.disabled && form.elements.reminder.value === 'schedule') form.elements.reminder.value = '';
+        }
+        const mode = form.elements.reminder.value;
+        const reminder = calendarReminderSlot({ date: value, type, reminder: mode });
+        const preview = form.querySelector('[data-cal-reminder-note]');
+        if (!reminder) preview.textContent = 'No phone alert is scheduled for this event.';
+        else if (personalTimes) preview.textContent = `Default reminder is ${calFullDate(reminder.date)} at 9:00 a.m. New York time. People can choose their own times on their phones.`;
+        else preview.textContent = `${calFullDate(reminder.date)} at 9:00 a.m. New York time. Shabbos reminders go out Friday morning.`;
       }
     };
     updateDate(); form.elements.date.addEventListener('change', updateDate);
+    initial = new URLSearchParams(new FormData(form)).toString();
     form.elements.reminder?.addEventListener('change', updateDate);
     view.el.querySelector('[data-cal-cancel]').addEventListener('click', view.close);
     view.el.querySelector('[data-cal-remove-event]')?.addEventListener('click', async () => {

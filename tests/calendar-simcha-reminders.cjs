@@ -95,6 +95,27 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.evaluate(() => { window.failCalendarPush = false; });
     await turnOn.click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
+    const appliesTo = reader.getByLabel('Applies to');
+    const reminderTime = reader.getByLabel('Reminder time', { exact: true });
+    assert.equal(await reminderTime.inputValue(), '09:00');
+    await reminderTime.fill('10:15');
+    await reader.getByRole('button', { name: 'Save reminder times' }).click();
+    await reader.getByText('Reminder times saved for this phone.').waitFor();
+    await appliesTo.selectOption('vort');
+    await reader.getByLabel('Use the all-category schedule').uncheck();
+    await reader.getByLabel('Weekday reminder').selectOption('day-before');
+    await reminderTime.fill('16:00');
+    await reader.getByLabel('Friday time for Shabbos (optional)').fill('08:30');
+    await reader.getByRole('button', { name: 'Save reminder times' }).click();
+    await reader.getByText('Reminder times saved for this phone.').waitFor();
+    await reader.keyboard.press('Escape');
+    await reader.getByRole('button', { name: /^Notifications/ }).click();
+    await notifications.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await appliesTo.selectOption('vort');
+    assert.equal(await reminderTime.inputValue(), '16:00');
+    assert.equal(await reader.getByLabel('Weekday reminder').inputValue(), 'day-before');
+    await appliesTo.selectOption('all');
+    assert.equal(await reminderTime.inputValue(), '10:15');
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -105,8 +126,8 @@ async function checkPhoneControls(site, owner, viewer, device) {
     const form = manager.getByRole('dialog', { name: 'Add an event' });
     await form.getByLabel('Details').fill('Synthetic Shabbos simcha');
     await form.getByLabel('Date', { exact: true }).fill('2090-12-02');
-    await form.getByLabel('Phone reminder').selectOption('day-of');
-    await form.getByText('Friday, December 1, 2090 at 9:00 a.m. New York time. Shabbos reminders go out Friday morning.', { exact: true }).waitFor();
+    assert.equal(await form.getByLabel('Phone reminder').inputValue(), 'schedule');
+    await form.getByText('Default reminder is Friday, December 1, 2090 at 9:00 a.m. New York time.', { exact: false }).waitFor();
     await form.getByRole('button', { name: 'Save event' }).click();
     await form.waitFor({ state: 'detached' });
     await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
@@ -150,6 +171,12 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     assert.equal((await call(settings, 'PUT', { subscription: device }, viewer.token)).body.enabled, true);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.enabled, true);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, owner.token)).body.enabled, false);
+    const schedule = { endpoint: device.endpoint, schedule: { revision: 0, standard: { day: 'day-of', time: '10:45' }, categories: {} } };
+    assert.equal((await call(settings + '/schedule', 'PUT', schedule)).status, 401);
+    assert.equal((await call(settings + '/schedule', 'PUT', schedule, owner.token)).status, 403);
+    assert.equal((await call(settings + '/schedule', 'PUT', schedule, viewer.token)).body.schedule.standard.time, '10:45');
+    assert.equal((await call(settings + '/schedule', 'PUT', schedule, viewer.token)).status, 409);
+    assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.schedule.revision, 1);
     assert.equal((await call(settings, 'DELETE', { endpoint: device.endpoint }, viewer.token)).body.enabled, false);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.enabled, false);
     const route = '/api/events/test-simcha';
@@ -189,7 +216,7 @@ test('Friday delivery uses New York time, retries transient failures, and skips 
   const calls = [];
   const send = async (url, options) => {
     const headers = new Headers(options.headers);
-    assert.equal(headers.get('Topic'), 'simcha-2026-11-13');
+    assert.equal(headers.get('Topic'), 'simcha-' + morning);
     assert.equal(headers.get('Content-Encoding'), 'aes128gcm');
     const id = url.split('/').at(-1); calls.push(id);
     return new Response(null, { status: id === 'viewer' && calls.filter(value => value === id).length === 1 ? 503 : 201 });
@@ -206,6 +233,48 @@ test('Friday delivery uses New York time, retries transient failures, and skips 
   assert.equal(calls.length, 3, 'Shabbos itself does not send a second alert');
 });
 
+test('two phones can use different simcha schedules on the same dates', async () => {
+  const { reminderKeys, reminderDeviceKey, runSimchaReminders, simchaReminderAt } = await import('../worker/calendar/simcha-reminders.js');
+  const standard = { day: 'day-of', time: '11:00' };
+  const categories = { vort: { day: 'day-before', time: '18:00', fridayTime: '08:30' } };
+  const schedule = { standard, categories };
+  const vort = { type: 'vort', date: '2026-11-12', reminder: 'schedule' };
+  const kiddush = { type: 'kiddush', date: '2026-11-12', reminder: 'schedule' };
+  const shabbos = { ...vort, date: '2026-11-14' };
+  const off = { ...kiddush, reminder: undefined };
+  const morning = Date.parse('2026-11-12T14:00:00Z');
+  const before = Date.parse('2026-11-11T23:00:00Z');
+  const lateMorning = Date.parse('2026-11-12T16:00:00Z');
+  const friday = Date.parse('2026-11-13T13:30:00Z');
+  const defaultFriday = Date.parse('2026-11-13T14:00:00Z');
+  assert.equal(simchaReminderAt(vort, schedule), before);
+  assert.equal(simchaReminderAt(shabbos, schedule), friday);
+  assert.equal(simchaReminderAt(off, schedule), Infinity);
+  const early = { ...kiddush, date: '2027-03-14' };
+  const repeated = { ...kiddush, date: '2026-11-01' };
+  assert.equal(new Date(simchaReminderAt(early, { standard: { day: 'day-of', time: '02:30' }, categories: {} })).toISOString(), '2027-03-14T07:30:00.000Z');
+  assert.equal(new Date(simchaReminderAt(repeated, { standard: { day: 'day-of', time: '01:30' }, categories: {} })).toISOString(), '2026-11-01T05:30:00.000Z');
+  const records = new Map([['event:vort', vort], ['event:kiddush', kiddush], ['event:shabbos', shabbos], ['event:off', off],
+    ['user:reader', { id: 'reader', role: 'viewer', active: true, version: 1 }]]);
+  const storage = { get: key => records.get(key), put: (key, value) => records.set(key, value),
+    list: ({ prefix }) => new Map([...records].filter(([key]) => key.startsWith(prefix))) };
+  for (const id of ['default', 'customized']) {
+    const sub = subscription(id);
+    records.set(await reminderDeviceKey(sub.endpoint), { id, userId: 'reader', version: 1, subscription: sub,
+      ...(id === 'customized' ? { reminderSchedule: schedule } : {}) });
+  }
+  const delivered = [];
+  const send = async (url, options) => {
+    delivered.push([url.split('/').at(-1), new Headers(options.headers).get('Topic')]);
+    return new Response(null, { status: 201 });
+  };
+  const keys = reminderKeys(vapid);
+  assert.equal(await runSimchaReminders(storage, keys, origin, before - 1, send), before);
+  for (const at of [before, morning, morning + 1000, lateMorning, friday, defaultFriday]) await runSimchaReminders(storage, keys, origin, at, send);
+  assert.deepEqual(delivered, [['customized', 'simcha-' + before], ['default', 'simcha-' + morning], ['customized', 'simcha-' + lateMorning],
+    ['customized', 'simcha-' + friday], ['default', 'simcha-' + defaultFriday]]);
+});
+
 test('phone notification hides private text and opens the calendar day', async () => {
   const handlers = {};
   let notification, opened;
@@ -214,9 +283,11 @@ test('phone notification hides private text and opens the calendar day', async (
     clients: { matchAll: async () => [], openWindow: async url => { opened = url; } } };
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../admin/calendar/phone-reminders.js'), 'utf8'), { self, URL });
   let pending;
-  handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', post: true, text: 'Private simcha details' }) }, waitUntil: work => { pending = work; } });
+  const slot = Date.parse('2026-11-13T14:00:00Z');
+  handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', slot, post: true, text: 'Private simcha details' }) }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(notification.title, 'Simcha reminder');
+  assert.equal(notification.tag, 'simcha-' + slot);
   assert(!JSON.stringify(notification).includes('Private simcha details'));
   handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
   await pending;

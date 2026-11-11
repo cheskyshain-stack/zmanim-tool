@@ -39,16 +39,22 @@ cannot be removed through the account-management screen.
 
 ## Simcha phone reminders
 
-Calendar managers can choose No reminder, Morning of the simcha or Morning before
-the simcha. Alerts use 9 a.m. New York time. A Shabbos simcha always uses Friday
-morning. The calendar sends at most one alert per opted-in device each morning.
-The alert opens the simcha date. For the manager who added the event, it includes
-a prompt to post an announcement. Details stay in the signed-in calendar.
+New events in the seven named simcha categories use phone reminder settings by
+default. Managers can turn reminders off for an event. Existing explicit reminder
+choices stay saved. Events previously saved with reminders off stay off.
 
-Readers use Calendar options, then Phone reminders, to turn alerts on or off for
-their device. Managers have the same control in the standalone calendar. Android
-can opt in through Chrome. On iPhone or iPad, open the calendar as a Home Screen
-web app before allowing notifications.
+Readers use Notifications, then Phone reminders, to opt in and set times for this
+device. The default is 9 a.m. New York time on the event date, or Friday for a
+Shabbos event. A device can set one rule for all simchas, then override individual
+categories. Each rule has a same-day or day-before time and an optional separate
+Friday time. Settings are private to the signed-in account and device subscription.
+Android can opt in through Chrome. On iPhone or iPad, open the calendar as a Home
+Screen web app before allowing notifications.
+
+The alarm combines events due at the same time on the same device into one alert.
+It opens the simcha date and offers the event's manager a prompt to post an
+announcement. Details stay in the signed-in calendar. A skipped New York time
+moves forward by an hour, and a repeated time uses its first occurrence.
 
 Enable this in production by deploying the Worker, then setting the encrypted
 `CALENDAR_REMINDER_VAPID` secret on that same Worker. Check `wrangler secret list`
@@ -60,7 +66,7 @@ node --input-type=module -e "import {generateKeyPairSync} from 'node:crypto'; pr
 ```
 
 Keep the private JWK out of shell output, files, and Git. Confirm `phoneReminders`
-is true in `/api/info` and the private reminder endpoints still reject anonymous
+and `reminderSchedules` are true in `/api/info` and the private reminder endpoints still reject anonymous
 requests before publishing the client. Use synthetic subscriptions for automated
 tests (`node --test tests/calendar-simcha-reminders.cjs`). `CALENDAR_REMINDER_BROWSER=1`
 also exercises the settings and event form in Chrome against the local Worker.

@@ -1,10 +1,11 @@
 import { buildPushPayload } from '@block65/webcrypto-web-push';
-import { calendarReminderDate } from '../../js/calendar/reminder-date.js';
-import { civilDate, shiftDate, midnight, HOUR } from '../traffic-calendar.js';
+import { calendarReminderShabbos, calendarReminderSlot } from '../../js/calendar/reminder-date.js';
+import { civilDate, shiftDate, HOUR, TIMEZONE } from '../traffic-calendar.js';
 
 const devicePrefix = 'simcha-phone:';
-const runKey = 'config:simcha-reminder-run';
 const batchSize = 16;
+const deliveryWindow = 2 * HOUR;
+const localTime = new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
 const decode = value => atob(value.replaceAll('-', '+').replaceAll('_', '/'));
 const keyPart = /^[A-Za-z0-9_-]{43}$/;
 
@@ -40,10 +41,16 @@ export async function reminderDeviceKey(endpoint) {
   return devicePrefix + [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-export function simchaReminderAt(event) {
-  const date = calendarReminderDate(event.date, event.reminder);
-  // Use the offset after the overnight clock change on daylight-saving Sundays.
-  return date ? midnight(shiftDate(date, 1)) - 15 * HOUR : Infinity;
+function reminderInstant({ date, time }) {
+  const wall = Date.parse(`${date}T${time}:00Z`);
+  const daylight = wall + 4 * HOUR;
+  // Use the first occurrence of a repeated time. Move skipped times forward by one hour.
+  return localTime.format(daylight) === time ? daylight : wall + 5 * HOUR;
+}
+
+export function simchaReminderAt(event, schedule) {
+  const slot = calendarReminderSlot(event, schedule);
+  return slot ? reminderInstant(slot) : Infinity;
 }
 
 export async function scheduleCalendarAlarm(storage, time) {
@@ -52,61 +59,105 @@ export async function scheduleCalendarAlarm(storage, time) {
   if (alarm === null || time < alarm) await storage.setAlarm(time);
 }
 
-async function sendToDevice(storage, key, device, due, day, keys, origin, ttl, send) {
-  if (device.lastSent === day) return true;
+async function sendToDevice(storage, { key, device, slot }, keys, origin, now, cutoff, send) {
   const user = await storage.get('user:' + device.userId);
   if (!user?.active || user.version !== device.version) {
     if ((await storage.get(key))?.id === device.id) await storage.delete(key);
-    return true;
+    return Infinity;
   }
-  const own = user.role !== 'viewer' && due.find(event => event.createdBy === user.id);
-  const payload = { date: (own || due[0]).date, post: Boolean(own), day };
-  let request;
-  try {
-    request = await buildPushPayload({ data: payload, options: { ttl, urgency: 'normal', topic: 'simcha-' + day } }, device.subscription, { ...keys, subject: origin });
-  } catch { return false; }
-  if ((await storage.get(key))?.id !== device.id) return true;
+  const { at, events } = slot, deadline = at + deliveryWindow;
+  const own = user.role !== 'viewer' && events.find(event => event.createdBy === user.id);
+  const payload = { date: (own || events[0]).date, post: Boolean(own), day: slot.day, slot: at };
+  const ttl = Math.max(1, Math.floor((deadline - now) / 1000));
   let response;
-  try { response = await send(device.subscription.endpoint, { ...request, redirect: 'error', signal: AbortSignal.timeout(12000) }); }
-  catch { return false; }
-  await response.body?.cancel();
+  try {
+    const request = await buildPushPayload({ data: payload, options: { ttl, urgency: 'normal', topic: 'simcha-' + at } }, device.subscription, { ...keys, subject: origin });
+    if ((await storage.get(key))?.id !== device.id) return Infinity;
+    response = await send(device.subscription.endpoint, { ...request, redirect: 'error', signal: AbortSignal.timeout(12000) });
+    await response.body?.cancel();
+  } catch { /* Retry when delivery fails. */ }
   const current = await storage.get(key);
-  if (current?.id !== device.id) return true;
-  if (response.ok) { await storage.put(key, { ...current, lastSent: day }); return true; }
-  if (response.status === 404 || response.status === 410) { await storage.delete(key); return true; }
-  return false;
+  if (current?.id !== device.id) return Infinity;
+  if (response?.status === 404 || response?.status === 410) {
+    await storage.delete(key);
+    return Infinity;
+  }
+  const sentSlots = (current.sentSlots || []).filter(time => time > cutoff);
+  const retries = Object.fromEntries(Object.entries(current.reminderRetries || {}).filter(([time]) => Number(time) > cutoff));
+  let next = Infinity;
+  if (response?.ok) {
+    sentSlots.push(at);
+    delete retries[at];
+  } else {
+    const attempts = (retries[at]?.attempts || 0) + 1;
+    const retryAt = attempts < 3 && now + 300000 < deadline ? now + 300000 : 0;
+    retries[at] = { attempts, retryAt };
+    next = retryAt || Infinity;
+  }
+  await storage.put(key, { ...current, sentSlots, reminderRetries: retries });
+  return next;
+}
+
+function reminderEventGroups(events, oldestDate, tomorrow) {
+  const nearby = new Map(), future = new Map();
+  for (const event of events.values()) {
+    if (event.deletedAt || !event.reminder || event.date < oldestDate) continue;
+    const kind = `${event.type}:${event.reminder}`;
+    if (event.date > tomorrow) {
+      const key = `${kind}:${calendarReminderShabbos(event.date)}`;
+      if (!future.has(key) || event.date < future.get(key)[0].date) future.set(key, [event]);
+    } else {
+      const key = `${kind}:${event.date}`;
+      if (!nearby.has(key)) nearby.set(key, []);
+      nearby.get(key).push(event);
+    }
+  }
+  return [...nearby.values(), ...future.values()];
+}
+
+function reminderAgenda(groups, schedule, now, cutoff) {
+  const due = new Map();
+  let next = Infinity;
+  for (const events of groups) {
+    const at = simchaReminderAt(events[0], schedule);
+    if (at > now) next = Math.min(next, at);
+    else if (at > cutoff) {
+      const active = events.filter(event => (event.reminderChangedAt || 0) <= at);
+      if (!active.length) continue;
+      if (!due.has(at)) due.set(at, []);
+      due.get(at).push(...active);
+    }
+  }
+  const slots = [...due].sort(([a], [b]) => a - b).map(([at, events]) => ({ at,
+    day: civilDate(at), legacyMorning: localTime.format(at) === '09:00', events: events.sort((a, b) => a.date.localeCompare(b.date)),
+  }));
+  return { next, slots };
 }
 
 export async function runSimchaReminders(storage, keys, origin, now = Date.now(), send = fetch) {
-  const day = civilDate(now), morning = midnight(shiftDate(day, 1)) - 15 * HOUR;
-  const deadline = morning + 2 * HOUR;
-  const due = [];
+  const devices = await storage.list({ prefix: devicePrefix });
+  if (!devices.size) return Infinity;
+  const cutoff = now - deliveryWindow;
+  const groups = reminderEventGroups(await storage.list({ prefix: 'event:' }), civilDate(cutoff), shiftDate(civilDate(now), 1));
+  const agendas = new Map(), jobs = [];
   let next = Infinity;
-  for (const event of (await storage.list({ prefix: 'event:' })).values()) {
-    if (event.deletedAt || !event.reminder) continue;
-    const at = simchaReminderAt(event);
-    if (at > now) next = Math.min(next, at);
-    else if (at === morning && now < deadline) due.push(event);
+  for (const [key, device] of devices) {
+    const schedule = device.reminderSchedule;
+    const agendaKey = JSON.stringify([schedule?.standard, schedule?.categories]);
+    if (!agendas.has(agendaKey)) agendas.set(agendaKey, reminderAgenda(groups, schedule, now, cutoff));
+    const agenda = agendas.get(agendaKey);
+    next = Math.min(next, agenda.next);
+    let selected = false;
+    for (const slot of agenda.slots) {
+      if (slot.at < Math.max(device.enabledAt || 0, schedule?.effectiveAt || 0) || device.sentSlots?.includes(slot.at) || slot.legacyMorning && device.lastSent === slot.day) continue;
+      const retry = device.reminderRetries?.[slot.at];
+      if (retry?.retryAt === 0) continue;
+      if (retry?.retryAt > now) { next = Math.min(next, retry.retryAt); continue; }
+      if (selected || jobs.length >= batchSize) { next = Math.min(next, now + 1000); break; }
+      jobs.push({ key, device, slot });
+      selected = true;
+    }
   }
-  if (!due.length) return next;
-  due.sort((a, b) => a.date.localeCompare(b.date));
-  const saved = await storage.get(runKey);
-  const run = saved?.day === day ? saved : { day, attempts: 0, after: '', retry: false };
-  if (run.done) return next;
-  if (run.resumeAt > now) return Math.min(run.resumeAt, next);
-  const devices = await storage.list({ prefix: devicePrefix, ...(run.after ? { startAfter: run.after } : {}), limit: batchSize });
-  const ttl = Math.max(1, Math.floor((deadline - now) / 1000));
-  const results = await Promise.all([...devices].map(([key, device]) => sendToDevice(storage, key, device, due, day, keys, origin, ttl, send)));
-  const retry = run.retry || results.some(result => !result);
-  if (devices.size === batchSize) {
-    await storage.put(runKey, { ...run, retry, after: [...devices.keys()].at(-1) });
-    return Math.min(Date.now() + 1000, next);
-  }
-  if (retry && run.attempts < 2 && now + 300000 < deadline) {
-    const resumeAt = now + 300000;
-    await storage.put(runKey, { day, attempts: run.attempts + 1, after: '', retry: false, resumeAt });
-    return Math.min(resumeAt, next);
-  }
-  await storage.put(runKey, { day, done: true });
-  return next;
+  const retries = await Promise.all(jobs.map(job => sendToDevice(storage, job, keys, origin, now, cutoff, send)));
+  return Math.min(next, ...retries);
 }
