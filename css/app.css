@@ -1446,6 +1446,15 @@ td.ruled .cell { background: var(--ruled); }
    other, which is how "28 · 5787 · שבת חורף weeks" happened elsewhere in this app. */
 .week-nav-hebrew { display: block; direction: rtl; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: var(--fs-md); }
 .week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
+.chart-current-week-badge { align-self:center; margin:.1rem 0 .85rem; padding:.4rem 1.2rem; border:1px solid #b19a58; border-radius:999px; background:#f2e8cb; color:#142b46; font:600 14px/1.4 Arial,sans-serif; text-align:center; }
+.chart-current-week-badge[hidden] { display:none; }
+.chart-current-week-badge bdi[lang=he] { font-family:"Times New Roman","Frank Ruhl Libre",serif; font-size:1.1em; }
+@media screen {
+  .pages-fit.has-current-week-layer { position:relative; }
+  .chart-current-week-layer { position:absolute; inset:0; pointer-events:none; }
+  .chart-current-week-band { position:absolute; box-sizing:border-box; border:1px solid #b19a58; background:#d1ad5f26; }
+  .chart-current-week-arrow { position:absolute; background:#b19a58; clip-path:polygon(100% 0,0 50%,100% 100%); }
+}
 /* Equal widths, so the group does not shift sideways as the labels change length. */
 .week-nav-row > button { flex: 1 1 0; max-width: 11rem; }
 

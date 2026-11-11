@@ -22,6 +22,7 @@ import { currentSerial, wireSwipe, wireSecretTaps, navUnlocked, unlockNav } from
 import { jewishDateString } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import { useStraightHebrewQuotes } from '../util.js';
+import { wireChartCurrentWeek } from './chart-week-indicator.js';
 
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
@@ -202,6 +203,7 @@ function fitChartToWindow(pagesEl, printSize, combinedPrint) {
 
 /** @param {object} opts
  *    - empty: what to say when there is no chart to show at all
+ *    - highlightCurrentWeek: screen-only indicators for the congregation page
  *    - swipe: false to leave the gesture off, for an embed sitting inside something that
  *      already swipes - two handlers on nested elements would both fire and the page
  *      would move twice at once.
@@ -212,7 +214,11 @@ function fitChartToWindow(pagesEl, printSize, combinedPrint) {
  *      sitting there permanently dead, the row goes: nothing on the screen is offering
  *      something it cannot do. Three taps on the chart itself opens it (navUnlocked). */
 export function renderChartBrowser(container, state, opts = {}) {
-  const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
+  container._chartCurrentWeekCleanup?.();
+  const { empty = 'Nothing has been published yet.', swipe = true, confine = false, highlightCurrentWeek = false } = opts;
+  let stopCurrentWeek = () => {};
+  const cleanup = () => stopCurrentWeek();
+  container._chartCurrentWeekCleanup = cleanup;
   const spreads = chartSpreads(state);
   // Settings for the same reason the week view needs them: which Shabbos is "this" one
   // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
@@ -221,6 +227,7 @@ export function renderChartBrowser(container, state, opts = {}) {
   let printLayout = chartPrintLayout();
 
   const draw = () => keepPosition(container, () => {
+    stopCurrentWeek();
     // This view chooses one paper size for the whole print job.
     // Asked every draw rather than once, so the redraw that follows the taps comes out
     // with the navigation on it.
@@ -260,6 +267,11 @@ export function renderChartBrowser(container, state, opts = {}) {
     const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
     fitChartToWindow(pagesEl, printSize, combinedPrint);
+    if (highlightCurrentWeek) stopCurrentWeek = wireChartCurrentWeek(container, state, settings, () => {
+      const next = spreadIndexForNow(spreads, state, settings);
+      if (confine && !navUnlocked() && next !== at) { at = next; draw(); return true; }
+      return false;
+    });
     container.querySelector('#chart-print-layout').addEventListener('change', event => {
       rememberChartPrintLayout(event.target.value);
       printLayout = chartPrintLayout();
@@ -299,6 +311,7 @@ export function renderChartBrowser(container, state, opts = {}) {
     }
   });
   draw();
+  return cleanup;
 }
 
 /** A filename from the spread's own dates: "Zmanim July 25 2026 to September 19 2026.pdf".
