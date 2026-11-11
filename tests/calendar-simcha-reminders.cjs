@@ -8,7 +8,7 @@ const vm = require('node:vm');
 
 const runtime = path.resolve(__dirname, '../worker/calendar');
 const { build } = require(require.resolve('esbuild', { paths: [runtime] }));
-const { Miniflare, convertV4MiniflareOptions } = require(require.resolve('miniflare', { paths: [runtime] }));
+const { Miniflare, Response: WorkerResponse, convertV4MiniflareOptions } = require(require.resolve('miniflare', { paths: [runtime] }));
 const origin = 'https://calendar.example.test';
 const password = 'Synthetic calendar password 2026';
 const vapid = JSON.stringify(generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ format: 'jwk' }));
@@ -222,6 +222,69 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
       await checkPhoneControls(host, owner, viewer, device);
     }
   } finally { await backend.dispose(); server?.close(); }
+});
+
+test('the Workerd alarm delivers Web Push and does not follow provider redirects', { timeout: 15000 }, async () => {
+  const accepted = subscription('accepted-device'), redirected = subscription('redirected-device'), outbound = [];
+  const contents = `
+    import worker, { CommunityCalendar } from './worker.js';
+    import { reminderDeviceKey } from './simcha-reminders.js';
+    import { calendarReminderShabbos } from '../../js/calendar/reminder-date.js';
+    import { civilDate, shiftDate, TIMEZONE } from '../traffic-calendar.js';
+    export default worker;
+    export class ReminderTestCalendar extends CommunityCalendar {
+      async route(request) {
+        const storage = this.ctx.storage;
+        const devices = this.env.TEST_DEVICES;
+        if (request.method === 'POST') {
+          const at = Date.now() - 60000;
+          const date = civilDate(at), saturday = calendarReminderShabbos(date);
+          const time = new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' }).format(at);
+          await storage.put({
+            'user:reader': { active: true, version: 1, role: 'viewer' },
+            'event:kiddush': { date: saturday ? shiftDate(date, 1) : date, type: 'kiddush', reminder: 'schedule' },
+          });
+          for (const subscription of devices) {
+            const key = await reminderDeviceKey(subscription.endpoint);
+            await storage.put(key, { id: key, userId: 'reader', version: 1, subscription,
+              reminderSchedule: { categories: {}, standard: { day: saturday ? 'day-before' : 'day-of', time } } });
+          }
+          await storage.setAlarm(Date.now());
+        }
+        const delivered = await storage.get(await reminderDeviceKey(devices[0].endpoint));
+        const refused = await storage.get(await reminderDeviceKey(devices[1].endpoint));
+        return Response.json({ sent: delivered?.sentSlots?.length === 1, retry: Object.keys(refused?.reminderRetries || {}).length === 1 });
+      }
+    }
+  `;
+  const bundle = await build({ stdin: { contents, resolveDir: runtime, sourcefile: 'alarm-fixture.js' }, bundle: true,
+    format: 'esm', platform: 'browser', write: false, external: ['cloudflare:workers'] });
+  const backend = new Miniflare(convertV4MiniflareOptions({ name: 'calendar-push-alarm-test', modules: true,
+    script: bundle.outputFiles[0].text, compatibilityDate: '2026-10-01',
+    bindings: { ALLOWED_ORIGIN: origin, CALENDAR_REMINDER_VAPID: vapid, TEST_DEVICES: [accepted, redirected] },
+    durableObjects: { CALENDAR: { className: 'ReminderTestCalendar', useSQLite: true } },
+    outboundService: async request => {
+      outbound.push({ url: request.url, method: request.method, encoding: request.headers.get('content-encoding') });
+      if (request.url === redirected.endpoint) return new WorkerResponse(null, { status: 302, headers: { Location: 'https://redirect.example.test/' } });
+      return new WorkerResponse(null, { status: 201 });
+    },
+  }));
+  try {
+    const call = async method => {
+      const response = await backend.dispatchFetch('https://worker.example.test/alarm-fixture', { method, headers: { Origin: origin } });
+      assert.equal(response.status, 200);
+      return response.json();
+    };
+    let result = await call('POST');
+    for (let count = 0; count < 50 && (!result.sent || !result.retry); count++) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+      result = await call('GET');
+    }
+    assert.deepEqual(result, { sent: true, retry: true });
+    assert.deepEqual(outbound.sort((a, b) => a.url.localeCompare(b.url)), [accepted, redirected].map(({ endpoint }) => ({
+      url: endpoint, method: 'POST', encoding: 'aes128gcm',
+    })));
+  } finally { await backend.dispose(); }
 });
 
 test('Friday delivery uses New York time, retries transient failures, and skips revoked devices', async () => {
