@@ -95,27 +95,53 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.evaluate(() => { window.failCalendarPush = false; });
     await turnOn.click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
-    const appliesTo = reader.getByLabel('Applies to');
+    const sameTime = reader.getByRole('switch', { name: 'All the same' });
+    const modeLabel = reader.locator('.cal-reminder-toggle');
+    const categories = reader.getByRole('group', { name: 'Simcha categories', exact: true });
+    const save = reader.getByRole('button', { name: 'Save reminder times' });
+    const saved = reader.getByText('Reminder times saved for this phone.');
     const reminderTime = reader.getByLabel('Reminder time', { exact: true });
+    assert(await sameTime.isChecked());
+    assert(await categories.isHidden());
     assert.equal(await reminderTime.inputValue(), '09:00');
     await reminderTime.fill('10:15');
-    await reader.getByRole('button', { name: 'Save reminder times' }).click();
-    await reader.getByText('Reminder times saved for this phone.').waitFor();
-    await appliesTo.selectOption('vort');
-    await reader.getByLabel('Use the all-category schedule').uncheck();
-    await reader.getByLabel('Weekday reminder').selectOption('day-before');
-    await reminderTime.fill('16:00');
-    await reader.getByLabel('Friday time for Shabbos (optional)').fill('08:30');
-    await reader.getByRole('button', { name: 'Save reminder times' }).click();
-    await reader.getByText('Reminder times saved for this phone.').waitFor();
+    await modeLabel.click();
+    await categories.waitFor();
+    for (const width of [375, 393]) {
+      await reader.setViewportSize({ width, height: 720 });
+      const geometry = await categories.locator('.cal-reminder-time').evaluateAll(rows => rows.map(row => {
+        const label = row.querySelector('label'), time = row.querySelector('input').getBoundingClientRect();
+        const panel = row.closest('dialog');
+        return { label: label.textContent, fits: label.getBoundingClientRect().right <= time.left && time.right <= panel.getBoundingClientRect().right && time.height >= 44 && panel.scrollWidth <= panel.clientWidth };
+      }));
+      assert.deepEqual(geometry.map(row => row.label), ['Shalom Zachor', 'Kiddush', 'Vort', 'Aufruf', 'Chasuna', 'Bar mitzva shabbos', 'Bar mitzva dessert']);
+      assert(geometry.every(row => row.fits), `Every reminder label and time input fit side by side at ${width}px`);
+    }
+    const vort = categories.locator('[data-reminder-rule=vort]');
+    const kiddush = categories.getByLabel('Kiddush', { exact: true });
+    assert.equal(await kiddush.inputValue(), '10:15', 'New category rows use the shared time');
+    await kiddush.fill('11:30');
+    await vort.getByLabel('Vort', { exact: true }).fill('16:00');
+    await vort.locator('summary').click();
+    await vort.getByLabel('Weekday reminder').selectOption('day-before');
+    await vort.getByLabel('Friday time (optional)').fill('08:30');
+    await save.click();
+    await saved.waitFor();
+    await modeLabel.click();
+    await save.click();
+    await saved.waitFor();
     await reader.keyboard.press('Escape');
     await reader.getByRole('button', { name: /^Notifications/ }).click();
     await notifications.getByRole('button', { name: 'Phone reminders', exact: true }).click();
-    await appliesTo.selectOption('vort');
-    assert.equal(await reminderTime.inputValue(), '16:00');
-    assert.equal(await reader.getByLabel('Weekday reminder').inputValue(), 'day-before');
-    await appliesTo.selectOption('all');
+    await sameTime.waitFor();
+    assert(await sameTime.isChecked());
     assert.equal(await reminderTime.inputValue(), '10:15');
+    await modeLabel.click();
+    assert.equal(await vort.getByLabel('Vort', { exact: true }).inputValue(), '16:00');
+    assert.equal(await kiddush.inputValue(), '11:30');
+    await vort.locator('summary').click();
+    assert.equal(await vort.getByLabel('Weekday reminder').inputValue(), 'day-before');
+    assert.equal(await vort.getByLabel('Friday time (optional)').inputValue(), '08:30');
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
@@ -233,7 +259,7 @@ test('Friday delivery uses New York time, retries transient failures, and skips 
   assert.equal(calls.length, 3, 'Shabbos itself does not send a second alert');
 });
 
-test('two phones can use different simcha schedules on the same dates', async () => {
+test('shared and individual phone schedules deliver at their active times', async () => {
   const { reminderKeys, reminderDeviceKey, runSimchaReminders, simchaReminderAt } = await import('../worker/calendar/simcha-reminders.js');
   const standard = { day: 'day-of', time: '11:00' };
   const categories = { vort: { day: 'day-before', time: '18:00', fridayTime: '08:30' } };
@@ -247,8 +273,10 @@ test('two phones can use different simcha schedules on the same dates', async ()
   const lateMorning = Date.parse('2026-11-12T16:00:00Z');
   const friday = Date.parse('2026-11-13T13:30:00Z');
   const defaultFriday = Date.parse('2026-11-13T14:00:00Z');
+  const sharedFriday = Date.parse('2026-11-13T16:00:00Z');
   assert.equal(simchaReminderAt(vort, schedule), before);
   assert.equal(simchaReminderAt(shabbos, schedule), friday);
+  assert.equal(simchaReminderAt(shabbos, { ...schedule, sameTime: true }), sharedFriday);
   assert.equal(simchaReminderAt(off, schedule), Infinity);
   const early = { ...kiddush, date: '2027-03-14' };
   const repeated = { ...kiddush, date: '2026-11-01' };
@@ -258,10 +286,10 @@ test('two phones can use different simcha schedules on the same dates', async ()
     ['user:reader', { id: 'reader', role: 'viewer', active: true, version: 1 }]]);
   const storage = { get: key => records.get(key), put: (key, value) => records.set(key, value),
     list: ({ prefix }) => new Map([...records].filter(([key]) => key.startsWith(prefix))) };
-  for (const id of ['default', 'customized']) {
+  for (const id of ['default', 'customized', 'shared']) {
     const sub = subscription(id);
     records.set(await reminderDeviceKey(sub.endpoint), { id, userId: 'reader', version: 1, subscription: sub,
-      ...(id === 'customized' ? { reminderSchedule: schedule } : {}) });
+      reminderSchedule: id === 'shared' ? { ...schedule, sameTime: true } : id === 'customized' ? schedule : undefined });
   }
   const delivered = [];
   const send = async (url, options) => {
@@ -270,9 +298,9 @@ test('two phones can use different simcha schedules on the same dates', async ()
   };
   const keys = reminderKeys(vapid);
   assert.equal(await runSimchaReminders(storage, keys, origin, before - 1, send), before);
-  for (const at of [before, morning, morning + 1000, lateMorning, friday, defaultFriday]) await runSimchaReminders(storage, keys, origin, at, send);
-  assert.deepEqual(delivered, [['customized', 'simcha-' + before], ['default', 'simcha-' + morning], ['customized', 'simcha-' + lateMorning],
-    ['customized', 'simcha-' + friday], ['default', 'simcha-' + defaultFriday]]);
+  for (const at of [before, morning, morning + 1000, lateMorning, friday, defaultFriday, sharedFriday]) await runSimchaReminders(storage, keys, origin, at, send);
+  assert.deepEqual(delivered.sort(), [['customized', 'simcha-' + before], ['default', 'simcha-' + morning], ['customized', 'simcha-' + lateMorning],
+    ['shared', 'simcha-' + lateMorning], ['customized', 'simcha-' + friday], ['default', 'simcha-' + defaultFriday], ['shared', 'simcha-' + sharedFriday]].sort());
 });
 
 test('phone notification hides private text and opens the calendar day', async () => {

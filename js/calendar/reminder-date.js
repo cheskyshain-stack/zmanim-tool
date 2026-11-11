@@ -12,13 +12,14 @@ export function calendarReminderSchedule(value) {
     if (!validTime(time) || fridayTime !== '' && !validTime(fridayTime)) throw new Error('Choose valid reminder times.');
     return { day, time, fridayTime };
   };
-  const { revision, standard, categories } = value || {};
+  const { revision, standard, categories, sameTime } = value || {};
   if (!Number.isSafeInteger(revision) || revision < 0 || !categories || typeof categories !== 'object' || Array.isArray(categories)) throw new Error('Reload the reminder schedule before saving.');
+  if (sameTime !== undefined && typeof sameTime !== 'boolean') throw new Error('Choose how to set the reminder times.');
   const overrides = Object.entries(categories).map(([id, rule]) => {
     if (!CALENDAR_REMINDER_TYPES.some(type => type.id === id)) throw new Error('Choose a simcha category.');
     return [id, timing(rule)];
   });
-  return { revision, standard: standard == null ? null : timing(standard), categories: Object.fromEntries(overrides) };
+  return { revision, standard: standard == null ? null : timing(standard), categories: Object.fromEntries(overrides), ...(sameTime === undefined ? {} : { sameTime }) };
 }
 
 export const calendarReminderShabbos = date => new Date(date + 'T12:00:00Z').getUTCDay() === 6;
@@ -33,7 +34,8 @@ export function calendarReminderSlot(event, schedule = DEFAULT_CALENDAR_REMINDER
   if (!event.reminder) return null;
   const supported = CALENDAR_REMINDER_TYPES.some(type => type.id === event.type);
   if (!supported && event.reminder === 'schedule') return null;
-  const personal = supported && (schedule.categories[event.type] || schedule.standard);
+  const override = schedule.sameTime === true ? null : schedule.categories[event.type];
+  const personal = supported && (override || schedule.standard);
   const rule = personal || (event.reminder === 'schedule' ? DEFAULT_CALENDAR_REMINDER_RULE : { ...DEFAULT_CALENDAR_REMINDER_RULE, day: event.reminder });
   const date = calendarReminderDate(event.date, rule.day);
   const time = calendarReminderShabbos(event.date) && rule.fridayTime || rule.time;

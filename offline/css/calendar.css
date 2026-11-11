@@ -157,6 +157,20 @@
 .cal-form-actions, .cal-backup-actions { display:flex; flex-wrap:wrap; gap:.65rem; }
 .cal-form-note { margin:0; font-size:.75rem; line-height:1.55; color:#77807f; }
 .cal-form [role=status] { margin:0; }
+.cal-reminder-schedule { gap:.65rem; }
+.cal-reminder-schedule fieldset { min-width:0; padding:0; margin:0; border:0; }
+.cal-form .cal-reminder-toggle { position:relative; flex-direction:row; align-items:center; justify-content:space-between; min-height:44px; cursor:pointer; }
+.cal-reminder-toggle input { position:absolute; opacity:0; width:1px; height:1px; }
+.cal-reminder-track { position:relative; display:block; width:42px; height:24px; border-radius:999px; background:#626c77; }
+.cal-reminder-track::before { content:""; position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; }
+.cal-reminder-toggle input:checked + .cal-reminder-track { background:#142b46; }
+.cal-reminder-toggle input:checked + .cal-reminder-track::before { transform:translateX(18px); }
+.cal-reminder-toggle input:focus-visible + .cal-reminder-track { outline:2px solid #9e7b31; outline-offset:3px; }
+.cal-reminder-row { padding:.4rem 0; border-bottom:1px solid #dedccf; }
+.cal-reminder-time { display:grid; grid-template-columns:minmax(0,1fr) minmax(7rem,42%); align-items:center; gap:.6rem; }
+.cal-reminder-details summary { display:list-item; width:fit-content; min-height:0; padding:.35rem 0; font-size:.8rem; color:#52616d; }
+.cal-reminder-details label { margin-top:.25rem; }
+.cal-reminder-schedule [role=status]:empty { display:none; }
 .cal-file-label { display:inline-flex; align-items:center; position:relative; overflow:hidden; }
 .cal-file-label input { position:absolute; inset:0; opacity:0; width:100%; cursor:pointer; }
 .cal-file-label:focus-within { outline:3px solid #9e7b31; outline-offset:2px; }

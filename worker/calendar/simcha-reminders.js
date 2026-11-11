@@ -143,7 +143,7 @@ export async function runSimchaReminders(storage, keys, origin, now = Date.now()
   let next = Infinity;
   for (const [key, device] of devices) {
     const schedule = device.reminderSchedule;
-    const agendaKey = JSON.stringify([schedule?.standard, schedule?.categories]);
+    const agendaKey = JSON.stringify([schedule?.standard, schedule?.sameTime === true ? null : schedule?.categories]);
     if (!agendas.has(agendaKey)) agendas.set(agendaKey, reminderAgenda(groups, schedule, now, cutoff));
     const agenda = agendas.get(agendaKey);
     next = Math.min(next, agenda.next);

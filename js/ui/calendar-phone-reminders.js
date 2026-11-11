@@ -4,6 +4,7 @@ import { CALENDAR_REMINDER_TYPES, DEFAULT_CALENDAR_REMINDER_RULE } from '../cale
 const workerPath = '/admin/calendar/phone-reminders.js';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
+const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
 
 async function removePhoneReminder(subscription) {
   await calendarRequest('/api/phone-reminders', { method: 'DELETE', body: { endpoint: subscription.endpoint }, signal: AbortSignal.timeout(4000) });
@@ -18,45 +19,70 @@ export async function turnOffCalendarPhoneReminders() {
   finally { await subscription.unsubscribe(); }
 }
 
-function showReminderSchedule(container, endpoint, initial) {
-  container.innerHTML = `<form class="cal-form">
-    <h3>Reminder times</h3>
-    <label>Applies to<select name="category"><option value="all">All simcha categories</option>${CALENDAR_REMINDER_TYPES.map(type => `<option value="${type.id}">${type.label}</option>`).join('')}</select></label>
-    <div data-reminder-inherit hidden><label class="cal-checkbox"><input type="checkbox" name="inherit"> Use the all-category schedule</label></div>
-    <div data-reminder-times><div class="cal-form-row">
+function reminderRow(id, label) {
+  return `<div class="cal-reminder-row" data-reminder-rule="${id}">
+    <div class="cal-reminder-time"><label for="cal-reminder-${id}">${label}</label><input id="cal-reminder-${id}" name="time" type="time" required></div>
+    <details class="cal-extra cal-reminder-details"><summary></summary><div class="cal-form-row">
       <label>Weekday reminder<select name="day"><option value="day-of">Day of the simcha</option><option value="day-before">Day before the simcha</option></select></label>
-      <label>Reminder time<input name="time" type="time" required></label>
-    </div><label>Friday time for Shabbos (optional)<input name="fridayTime" type="time"></label>
-    <p class="cal-form-note">Shabbos simchos use Friday. Leave the Friday time blank to use the same time. All times are New York time.</p></div>
-    <button type="submit">Save reminder times</button><p data-reminder-saved role="status" aria-live="polite"></p>
+      <label>Friday time (optional)<input name="fridayTime" type="time"></label>
+    </div></details>
+  </div>`;
+}
+
+function showReminderSchedule(container, endpoint, initial) {
+  container.innerHTML = `<form class="cal-form cal-reminder-schedule" aria-label="Reminder times">
+    <label class="cal-reminder-toggle">All the same<input type="checkbox" name="sameTime" role="switch" aria-controls="cal-reminder-shared cal-reminder-categories"><span aria-hidden="true" class="cal-reminder-track"></span></label>
+    <p class="cal-form-note">Times are New York time. Shabbos simchos use Friday.</p>
+    <fieldset id="cal-reminder-shared" aria-label="All simcha categories">${reminderRow('all', 'Reminder time')}</fieldset>
+    <fieldset id="cal-reminder-categories" aria-label="Simcha categories">${CALENDAR_REMINDER_TYPES.map(type => reminderRow(type.id, type.label)).join('')}</fieldset>
+    <button class="cal-primary" type="submit">Save reminder times</button><p role="status" aria-live="polite"></p>
   </form>`;
-  let schedule = initial;
-  const form = container.querySelector('form'), { category, inherit, day, time, fridayTime } = form.elements;
-  const status = form.querySelector('[data-reminder-saved]'), save = form.querySelector('[type=submit]');
-  const timing = form.querySelector('[data-reminder-times]');
-  function displayTimes() {
-    timing.hidden = inherit.checked;
-    for (const field of [day, time, fridayTime]) field.disabled = inherit.checked;
+  let schedule = initial, sharedEdited = false;
+  const edited = new Set(Object.keys(initial.categories));
+  const form = container.querySelector('form'), mode = form.elements.sameTime;
+  const shared = form.querySelector('#cal-reminder-shared'), categories = form.querySelector('#cal-reminder-categories');
+  const status = form.querySelector('[role=status]'), save = form.querySelector('[type=submit]');
+  const rows = Object.fromEntries([...form.querySelectorAll('[data-reminder-rule]')].map(row => [row.dataset.reminderRule, {
+    day: row.querySelector('select'), time: row.querySelector('[name=time]'), fridayTime: row.querySelector('[name=fridayTime]'), summary: row.querySelector('summary'),
+  }]));
+  const readRule = ({ day, time, fridayTime }) => ({ day: day.value, time: time.value, fridayTime: fridayTime.value });
+  function summarize({ day, fridayTime, summary }) {
+    const friday = fridayTime.value && reminderClock.format(new Date(`2000-01-01T${fridayTime.value}:00Z`));
+    summary.textContent = `${day.value === 'day-before' ? 'Day before' : 'Day of'}${friday ? ` · Friday ${friday}` : ''}`;
   }
-  function showCategory() {
-    const all = category.value === 'all', custom = schedule.categories[category.value];
-    const rule = custom || schedule.standard || DEFAULT_CALENDAR_REMINDER_RULE;
-    form.querySelector('[data-reminder-inherit]').hidden = all;
-    inherit.checked = !all && !custom;
-    day.value = rule.day; time.value = rule.time; fridayTime.value = rule.fridayTime;
+  function fillRule(row, rule) {
+    row.day.value = rule.day; row.time.value = rule.time; row.fridayTime.value = rule.fridayTime;
+    summarize(row);
+  }
+  function displayMode() {
+    shared.disabled = shared.hidden = !mode.checked;
+    categories.disabled = categories.hidden = mode.checked;
+    const standard = readRule(rows.all);
+    if (!mode.checked) for (const type of CALENDAR_REMINDER_TYPES) {
+      if (!edited.has(type.id)) fillRule(rows[type.id], standard.time ? standard : schedule.standard || DEFAULT_CALENDAR_REMINDER_RULE);
+    }
+  }
+  mode.checked = initial.sameTime ?? !edited.size;
+  fillRule(rows.all, initial.standard || DEFAULT_CALENDAR_REMINDER_RULE);
+  for (const type of CALENDAR_REMINDER_TYPES) fillRule(rows[type.id], initial.categories[type.id] || initial.standard || DEFAULT_CALENDAR_REMINDER_RULE);
+  displayMode();
+  mode.addEventListener('change', displayMode);
+  form.addEventListener('input', event => {
     status.textContent = '';
-    displayTimes();
-  }
-  category.addEventListener('change', showCategory);
-  inherit.addEventListener('change', displayTimes);
+    const id = event.target.closest('[data-reminder-rule]')?.dataset.reminderRule;
+    if (!id) return;
+    if (id === 'all') sharedEdited = true;
+    else edited.add(id);
+    summarize(rows[id]);
+  });
   form.addEventListener('submit', async event => {
     event.preventDefault();
-    const updated = { ...schedule, categories: { ...schedule.categories } };
-    const rule = { day: day.value, time: time.value, fridayTime: fridayTime.value };
-    if (category.value === 'all') updated.standard = rule;
-    else if (inherit.checked) delete updated.categories[category.value];
-    else updated.categories[category.value] = rule;
-    for (const control of [save, category, inherit, day, time, fridayTime]) control.disabled = true;
+    const sameTime = mode.checked, standard = readRule(rows.all);
+    const updated = { revision: schedule.revision, sameTime,
+      standard: sameTime || sharedEdited && standard.time ? standard : schedule.standard,
+      categories: sameTime ? schedule.categories : Object.fromEntries([...edited].map(id => [id, readRule(rows[id])])),
+    };
+    save.disabled = mode.disabled = shared.disabled = categories.disabled = true;
     status.textContent = 'Saving…';
     try {
       const result = await calendarRequest('/api/phone-reminders/schedule', { method: 'PUT', body: { endpoint, schedule: updated } });
@@ -64,16 +90,15 @@ function showReminderSchedule(container, endpoint, initial) {
       status.textContent = 'Reminder times saved for this phone.';
     } catch (error) { status.textContent = error.message; }
     finally {
-      save.disabled = category.disabled = inherit.disabled = false;
-      displayTimes();
+      save.disabled = mode.disabled = false;
+      displayMode();
     }
   });
-  showCategory();
 }
 
 export async function openCalendarPhoneReminders(dialog, publicKey, schedules = false) {
   const description = schedules ? 'Get phone alerts for simchos. The default is 9:00 a.m. New York time, on the day of the simcha or on Friday for Shabbos. These settings apply to this device.' : 'Get a phone notification at 9:00 a.m. New York time on mornings when a simcha reminder is scheduled. This setting applies to this device.';
-  const view = dialog(`<div class="cal-form"><p>${description}</p><button type="button" class="cal-primary" disabled>Turn on phone reminders</button><p role="status" aria-live="polite"></p><div data-reminder-schedule></div></div>`);
+  const view = dialog(`<div class="cal-form"><div data-reminder-schedule hidden></div><p data-reminder-description>${description}</p><button type="button" class="cal-primary" disabled>Turn on phone reminders</button><p role="status" aria-live="polite"></p></div>`);
   view.title('Phone reminders');
   const status = view.el.querySelector('[role=status]'), button = view.el.querySelector('.cal-primary');
   if (!supported()) {
@@ -90,6 +115,9 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
     const scheduleForm = view.el.querySelector('[data-reminder-schedule]');
     if (schedules && enabled && current.schedule) showReminderSchedule(scheduleForm, subscription.endpoint, current.schedule);
     function paint(message = '') {
+      scheduleForm.hidden = !scheduleForm.hasChildNodes();
+      view.el.querySelector('[data-reminder-description]').hidden = !scheduleForm.hidden;
+      button.classList.toggle('cal-primary', scheduleForm.hidden);
       button.textContent = enabled ? 'Turn off phone reminders' : 'Turn on phone reminders';
       button.disabled = false;
       status.textContent = message || (Notification.permission === 'denied' ? 'Your browser reports that notifications for this site are blocked.' : enabled ? 'Phone reminders are on for this device.' : '');
