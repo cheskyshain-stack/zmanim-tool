@@ -25,8 +25,10 @@
 .cal-announcement-reader > :not(.cal-announcement-feed) { flex:none; }
 .cal-announcement-reader > .cal-dialog-header, .cal-announcement-reader > .cal-announcement-status { margin:0; }
 .cal-announcement-reader > .cal-announcement-status:empty { position:absolute; }
-.cal-announcement-reader > .cal-announcement-feed { min-height:0; max-height:none; margin:0; }
+.cal-announcement-reader > .cal-announcement-feed { min-height:0; max-height:none; margin:0; overflow-anchor:none; }
 .cal-announcement-reader > button { align-self:flex-start; }
+.cal-announcement-reader > [data-cal-new-announcements] { align-self:center; }
+.cal-announcement-reader [data-cal-older-announcements] { display:block; margin:0 auto .65rem; }
 .cal-announcement-message { margin:0 0 .85rem; padding:.9rem 1rem; border:1px solid #dedfd9; border-radius:12px; background:#faf7f0; overflow-wrap:anywhere; }
 .cal-announcement-message.is-unread { border-color:#a88c47; }
 .cal-announcement-message header { display:flex; flex-wrap:wrap; gap:.3rem .65rem; align-items:baseline; font-size:.8rem; }

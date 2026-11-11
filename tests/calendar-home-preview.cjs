@@ -129,7 +129,8 @@ const server = http.createServer((req, res) => {
       const t = await prepare({ role });
       t.addAnnouncement({ id:'already-read', sequence:1, text:'Previously read update', createdAt:'2026-11-01T12:00:00Z', revision:1, read:true });
       t.addAnnouncement({ id:'long-unread', sequence:2, text:'Long update\n' + 'More announcement details\n'.repeat(80), createdAt:'2026-11-02T12:00:00Z', revision:1 });
-      t.addAnnouncement({ id:'short-unread', sequence:3, text:'New Shul announcement', createdAt:'2026-11-03T12:00:00Z', revision:1 });
+      t.addAnnouncement({ id:'long-already-read', sequence:3, text:'Previously read details\n'.repeat(50), createdAt:'2026-11-02T15:00:00Z', revision:1, read:true });
+      t.addAnnouncement({ id:'short-unread', sequence:4, text:'New Shul announcement', createdAt:'2026-11-03T12:00:00Z', revision:1 });
       await t.home(); await t.tap(3);
       await t.page.waitForURL('**/admin/calendar/?preview=congregation');
       await t.page.locator('.shul-calendar').waitFor();
@@ -142,12 +143,12 @@ const server = http.createServer((req, res) => {
       await t.page.getByRole('button', { name:'Messages, 1 unread', exact:true }).waitFor();
       assert.equal(await t.page.locator('.cal-announcement-compose:not([hidden]),[data-cal-edit-announcement]:not([hidden]),[data-cal-delete-announcement]:not([hidden])').count(), 0);
       assert(!/Preview|Main admin|Choose Main admin/.test(await t.page.locator('.cal-dialog').innerText()));
-      await t.page.locator('.cal-announcement-feed').evaluate(feed => { feed.scrollTop = feed.scrollHeight; });
+      await t.page.locator('[data-cal-announcement-end="long-unread"]').scrollIntoViewIfNeeded();
       await t.page.waitForFunction(() => document.querySelector('[data-cal-announcement-count]').hidden);
       await t.page.keyboard.press('Escape');
       await t.page.reload(); await t.page.locator('.shul-calendar').waitFor();
       await t.page.waitForFunction(() => document.querySelector('[data-cal-announcement-count]').hidden);
-      t.addAnnouncement({ id:'later-unread', sequence:4, text:'Another new update', createdAt:'2026-11-04T12:00:00Z', revision:1 });
+      t.addAnnouncement({ id:'later-unread', sequence:5, text:'Another new update', createdAt:'2026-11-04T12:00:00Z', revision:1 });
       await t.page.evaluate(() => window.dispatchEvent(new Event('focus')));
       await t.page.getByRole('button', { name:'Messages, 1 unread', exact:true }).waitFor();
       await t.page.locator('[data-cal-options]').click();

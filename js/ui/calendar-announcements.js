@@ -33,7 +33,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       button.setAttribute('aria-label', unavailable ? `${label}, unread count unavailable` : count ? `${label}, ${count} unread` : label);
     }
     if (active) {
-      active.newButton.hidden = total <= active.latest;
+      active.newButton.hidden = total <= active.latest || active.following;
       active.form.hidden = !canPost;
       active.form.querySelectorAll('input,textarea,button').forEach(control => { if (previewing()) control.disabled = true; });
       active.form.querySelector('[data-cal-added-date]').hidden = !dateEditing;
@@ -64,7 +64,12 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
     const id = actor;
-    try { const value = await request('/api/announcements/status'); if (matches(id)) { status(value); await active?.syncDeleted(); await active?.syncEdits(); } }
+    try {
+      const value = await request('/api/announcements/status');
+      if (!matches(id)) return;
+      if (active && value.total > active.latest) active.followNew();
+      status(value); await active?.syncDeleted(); await active?.syncEdits();
+    }
     catch (error) { if (matches(id) && !failed(error, id)) { unavailable = true; paint(); } }
   }
   function visible() { refresh(); active?.observe(); }
@@ -91,21 +96,24 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   }
   async function open(openPhoneReminders) {
     if (!actor || active) return;
-    const id = actor;
+    const id = actor, reader = id.role === 'viewer';
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
     const openingId = crypto.randomUUID(); let openingRecorded = false;
     let editing = null, syncingEdits = null, knownEditCount = 0;
     let observer;
     const intro = previewing() ? '<p class="cal-announcement-intro">Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.</p>' : '';
-    const view = dialog(intro + `<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><div data-cal-added-date hidden><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></div><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-new-announcements hidden>Show new announcements</button><div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages"><p>Loading announcements…</p></div><button type="button" data-cal-older-announcements hidden>Load older announcements</button><button type="button" data-cal-announcement-retry hidden>Try again</button>`, {
+    const olderControl = `<button type="button" data-cal-older-announcements hidden>Load older ${reader ? 'messages' : 'announcements'}</button>`;
+    const newControl = `<button type="button" data-cal-new-announcements hidden>Show new ${reader ? 'messages' : 'announcements'}</button>`;
+    const loadingFeed = '<p>Loading announcements…</p>';
+    const view = dialog(intro + `<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><div data-cal-added-date hidden><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></div><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p>${reader ? '' : newControl}<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${reader ? `${olderControl}<div data-cal-message-list>${loadingFeed}</div>` : loadingFeed}</div>${reader ? newControl : olderControl}<button type="button" data-cal-announcement-retry hidden>Try again</button>`, {
       onClose: () => {
         if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
         cleanup(); active = null; return true;
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
-    if (actor.role === 'viewer') {
+    if (reader) {
       view.el.classList.add('cal-announcement-reader');
       if (openPhoneReminders) {
         const setup = document.createElement('button');
@@ -118,10 +126,29 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       }
     }
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
+    const list = reader ? feed.querySelector('[data-cal-message-list]') : feed;
     const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
     const newButton = view.el.querySelector('[data-cal-new-announcements]');
     const current = () => matches(id) && active?.view === view && view.el.isConnected;
+    const atLatest = () => feed.scrollHeight - feed.clientHeight - feed.scrollTop <= 16;
+    const scrollToLatest = () => { feed.scrollTop = feed.scrollHeight; };
+    function rememberFeedPosition(follow = reader && atLatest()) {
+      if (follow) return scrollToLatest;
+      const top = feed.scrollTop;
+      if (!reader) return () => { feed.scrollTop = top; };
+      const box = feed.getBoundingClientRect(), visible = [];
+      for (const node of list.children) {
+        const rect = node.getBoundingClientRect();
+        if (rect.top >= box.bottom) break;
+        if (rect.bottom > box.top) visible.push({ node, offset: rect.top - box.top });
+      }
+      return () => {
+        const anchor = visible.find(({ node }) => node.isConnected);
+        if (!anchor) { feed.scrollTop = top; return; }
+        feed.scrollTop += anchor.node.getBoundingClientRect().top - feed.getBoundingClientRect().top - anchor.offset;
+      };
+    }
     const editDirty = () => editing && (editing.field.value !== editing.original || editing.dateField && editing.dateField.value !== editing.originalDate);
     function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); }
     function notice(text, error = false, source = '') {
@@ -142,9 +169,10 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     function sortMessages() {
       if (editing) return;
       const focused = document.activeElement; let previous = null;
-      for (const message of [...messages.values()].sort(calendarAnnouncementOrder)) {
-        const node = messageNode(message.id), before = previous ? previous.nextElementSibling : feed.firstElementChild;
-        if (node && node !== before) feed.insertBefore(node, before);
+      const order = reader ? (a, b) => calendarAnnouncementOrder(b, a) : calendarAnnouncementOrder;
+      for (const message of [...messages.values()].sort(order)) {
+        const node = messageNode(message.id), before = previous ? previous.nextElementSibling : list.firstElementChild;
+        if (node && node !== before) list.insertBefore(node, before);
         previous = node;
       }
       if (focused?.isConnected && document.activeElement !== focused) focused.focus({ preventScroll: true });
@@ -156,16 +184,16 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       if (nextCursor && nextCursor < historySince) { nextCursor = nextBefore = null; older.hidden = true; }
     }
     function applyEdits(values) {
-      const scrollTop = feed.scrollTop;
+      const restorePosition = rememberFeedPosition();
       for (const value of values) {
         const old = messages.get(value.id);
         if (deletedIds.has(value.id) || old && (value.revision || 1) <= (old.revision || 1)) continue;
         if (historySince && calendarAnnouncementDate(value) < historySince) { removeDeleted([value.id], false); continue; }
         const next = { ...old, ...value, read: old?.read ?? value.read ?? false }; messages.set(value.id, next);
-        if (!old) { feed.querySelector('.cal-empty')?.remove(); feed.insertAdjacentHTML('beforeend', card(next)); }
+        if (!old) { list.querySelector('.cal-empty')?.remove(); list.insertAdjacentHTML('beforeend', card(next)); }
         else if (editing?.id !== value.id) paintMessage(next);
       }
-      sortMessages(); feed.scrollTop = scrollTop; observe();
+      sortMessages(); restorePosition(); observe();
     }
     async function syncEdits() {
       if (!current() || knownEditCount >= editCount) return;
@@ -217,7 +245,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       field.focus(); field.scrollIntoView({ block: 'nearest' });
     }
     function removeDeleted(ids, permanent = true) {
-      const scrollTop = feed.scrollTop;
+      const restorePosition = rememberFeedPosition();
       for (const key of ids) {
         if (editing?.id === key) closeEditor();
         if (permanent) deletedIds.add(key); pending.delete(key); messages.delete(key);
@@ -227,8 +255,8 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
         observer?.unobserve(node.querySelector('[data-cal-announcement-end]')); node.remove();
         if (focused) (neighbor?.querySelector('[data-cal-delete-announcement]') || feed).focus({ preventScroll: true });
       }
-      if (!messages.size) feed.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
-      feed.scrollTop = scrollTop;
+      if (!messages.size) list.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
+      restorePosition();
     }
     async function syncDeleted() {
       if (!current() || knownDeletedCount >= deletedCount) return;
@@ -275,38 +303,51 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       }
       clearTimeout(pendingTimer); pendingTimer = setTimeout(markRead, 250);
     }, { threshold: 1 });
-    active = { view, latest: 0, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits }; paint();
-    async function load(append = false) {
+    function followNew() {
+      if (reader && openingRecorded && !loading && atLatest()) load(false, true);
+    }
+    active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits, followNew }; paint();
+    async function load(append = false, follow = false) {
       if (!current() || loading) return;
       if (!append && editing) {
         if (editing.saving || editDirty() && !confirm('Discard your unsaved announcement changes?')) return;
         closeEditor();
       }
-      loading = true; older.disabled = retry.disabled = newButton.disabled = true;
+      loading = true; active.following = follow; older.disabled = retry.disabled = newButton.disabled = true;
       try {
         const value = !previewing() && !openingRecorded && !append
           ? await request('/api/announcements/open', { method: 'POST', body: { id: openingId } })
           : await request('/api/announcements' + (append && nextCursor ? '?cursor=' + encodeURIComponent(nextCursor) : append && nextBefore ? '?before=' + nextBefore : ''));
-        if (!current()) return;
+        if (!current() || follow && !atLatest()) return;
         openingRecorded = true;
         if (messageStatus.dataset.source === 'load') notice('');
+        const restorePosition = reader && append ? rememberFeedPosition(false) : null;
         const previous = new Map(messages);
-        if (!append) { messages.clear(); feed.innerHTML = ''; feed.scrollTop = 0; }
-        else if (!messages.size) feed.innerHTML = '';
+        if (!append) { messages.clear(); list.innerHTML = ''; if (!reader) feed.scrollTop = 0; }
+        else if (!messages.size) list.innerHTML = '';
         for (const item of value.messages) if (!messages.has(item.id) && !deletedIds.has(item.id)) {
           const old = previous.get(item.id), next = old && (old.revision || 1) > (item.revision || 1) ? old : item;
-          messages.set(item.id, next); feed.insertAdjacentHTML('beforeend', card(next));
+          messages.set(item.id, next); list.insertAdjacentHTML('beforeend', card(next));
         }
-        if (!messages.size) feed.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
+        if (!messages.size) list.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
         if (!append) { active.latest = Math.max(active.latest, value.total); knownEditCount = value.editCount || 0; }
         else knownEditCount = Math.min(knownEditCount, value.editCount || 0);
-        nextBefore = value.nextBefore; nextCursor = value.nextCursor || null; older.hidden = !nextCursor && !nextBefore; retry.hidden = true; status(value); sortMessages(); await syncDeleted(); await syncEdits(); observe();
+        nextBefore = value.nextBefore; nextCursor = value.nextCursor || null; older.hidden = !nextCursor && !nextBefore; retry.hidden = true; status(value); sortMessages();
+        if (reader && !append) scrollToLatest();
+        restorePosition?.();
+        await syncDeleted(); await syncEdits(); observe();
       } catch (error) {
         if (current() && !failed(error, id)) {
           notice(error.message, true, 'load'); retry.hidden = false;
-          if (!messages.size) feed.innerHTML = '<p class="cal-empty">Announcements could not be loaded.</p>';
+          if (!messages.size) list.innerHTML = '<p class="cal-empty">Announcements could not be loaded.</p>';
         }
-      } finally { loading = false; if (current()) older.disabled = retry.disabled = newButton.disabled = false; }
+      } finally {
+        loading = false;
+        if (current()) {
+          active.following = false; older.disabled = retry.disabled = newButton.disabled = false;
+          paint();
+        }
+      }
     }
     form.addEventListener('submit', async event => {
       event.preventDefault(); if (previewing() || posting || deleting || editing?.saving) return;
