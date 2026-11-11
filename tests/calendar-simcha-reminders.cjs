@@ -51,6 +51,9 @@ async function checkPhoneControls(site, owner, viewer, device) {
             if (window.failCalendarPush) throw new DOMException('Push registration denied', 'NotAllowedError');
             return current = { endpoint: device.endpoint, toJSON: () => device, unsubscribe: async () => { current = null; return true; } };
           } } };
+        window.seedStaleReminder = () => {
+          current = { endpoint: device.endpoint + '-stale', unsubscribe: async () => { current = null; return true; } };
+        };
         navigator.serviceWorker.register = async () => registration;
         navigator.serviceWorker.getRegistration = async () => registration;
       }, { session, device });
@@ -95,6 +98,9 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.evaluate(() => { window.failCalendarPush = false; });
     await turnOn.click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
+    await reader.getByRole('button', { name: 'Send test alert' }).click();
+    await reader.getByText('Test alert accepted.', { exact: false }).waitFor();
+    await reader.getByText('No upcoming simcha alerts are scheduled for this phone.', { exact: true }).waitFor();
     const sameTime = reader.getByRole('switch', { name: 'All the same' });
     const modeLabel = reader.locator('.cal-reminder-toggle');
     const categories = reader.getByRole('group', { name: 'Simcha categories', exact: true });
@@ -144,6 +150,14 @@ async function checkPhoneControls(site, owner, viewer, device) {
     assert.equal(await vort.getByLabel('Friday time (optional)').inputValue(), '08:30');
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
+    await reader.keyboard.press('Escape');
+    await reader.evaluate(() => window.seedStaleReminder());
+    await reader.getByRole('button', { name: /^Messages/ }).click();
+    await messages.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await reader.getByRole('button', { name: 'Reconnect phone reminders' }).click();
+    await reader.getByText('Phone reminders are on for this device.').waitFor();
+    await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
+    await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
     const manager = await pageAs(owner);
@@ -178,9 +192,17 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
     host = 'http://127.0.0.1:' + server.address().port;
   }
+  let providerStatus = 201, pushes = 0;
   const backend = new Miniflare(convertV4MiniflareOptions({ name: 'simcha-test', modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-10-01',
     bindings: { ALLOWED_ORIGIN: host, BOOTSTRAP_SHA256: createHash('sha256').update(setupToken).digest('hex'), CALENDAR_REMINDER_VAPID: vapid },
-    durableObjects: { CALENDAR: { className: 'CommunityCalendar', useSQLite: true } } }));
+    durableObjects: { CALENDAR: { className: 'CommunityCalendar', useSQLite: true } },
+    outboundService: async request => {
+      assert.equal(new URL(request.url).hostname, 'fcm.googleapis.com');
+      assert.equal(request.headers.get('content-encoding'), 'aes128gcm');
+      pushes++;
+      return new WorkerResponse(null, { status: providerStatus });
+    },
+  }));
   try {
     const call = async (route, method = 'GET', body, token) => {
       const response = await backend.dispatchFetch('https://worker.example.test' + route, { method, headers: { Origin: host,
@@ -193,18 +215,30 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     const viewer = (await call('/api/register', 'POST', { name: 'Test viewer', email: 'viewer@example.test', password })).body;
     assert.match(owner.reminderPublicKey, /^[A-Za-z0-9_-]{87}$/);
     assert.equal((await call('/api/info')).body.phoneReminders, true);
+    assert.equal((await call('/api/info')).body.phoneReminderTest, true);
     assert.equal((await call(settings, 'PUT', { subscription: { ...device, endpoint: 'https://push.apple.com.evil.test/abc' } }, viewer.token)).status, 400);
     assert.equal((await call(settings, 'PUT', { subscription: device }, viewer.token)).body.enabled, true);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.enabled, true);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, owner.token)).body.enabled, false);
+    assert.equal((await call(settings + '/test', 'POST', { endpoint: device.endpoint })).status, 401);
+    assert.equal((await call(settings + '/test', 'POST', { endpoint: device.endpoint }, owner.token)).status, 409);
+    assert.equal(pushes, 0);
+    providerStatus = 410;
+    assert.deepEqual((await call(settings + '/test', 'POST', { endpoint: device.endpoint }, viewer.token)).body, { accepted: false, status: 410, expired: false });
+    assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.enabled, true, 'A fresh registration is given time to settle');
+    providerStatus = 201;
+    assert.equal((await call(settings + '/test', 'POST', { endpoint: device.endpoint }, viewer.token)).body.accepted, true);
+    assert.equal(pushes, 2);
     const schedule = { endpoint: device.endpoint, schedule: { revision: 0, standard: { day: 'day-of', time: '10:45' }, categories: {} } };
     assert.equal((await call(settings + '/schedule', 'PUT', schedule)).status, 401);
     assert.equal((await call(settings + '/schedule', 'PUT', schedule, owner.token)).status, 403);
     assert.equal((await call(settings + '/schedule', 'PUT', schedule, viewer.token)).body.schedule.standard.time, '10:45');
     assert.equal((await call(settings + '/schedule', 'PUT', schedule, viewer.token)).status, 409);
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.schedule.revision, 1);
-    assert.equal((await call(settings, 'DELETE', { endpoint: device.endpoint }, viewer.token)).body.enabled, false);
+    const replacement = subscription('replacement-device');
+    assert.equal((await call(settings, 'PUT', { subscription: replacement, previousEndpoint: device.endpoint }, viewer.token)).body.schedule.standard.time, '10:45');
     assert.equal((await call(settings + '/status', 'POST', { endpoint: device.endpoint }, viewer.token)).body.enabled, false);
+    assert.equal((await call(settings, 'DELETE', { endpoint: replacement.endpoint }, viewer.token)).body.enabled, false);
     const route = '/api/events/test-simcha';
     const fields = { title: 'Synthetic Kiddush', type: 'kiddush', date: '2090-12-02', revision: 0, reminder: 'day-before' };
     assert.equal((await call(route, 'PUT', fields, viewer.token)).status, 403);
@@ -225,7 +259,7 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
 });
 
 test('the Workerd alarm delivers Web Push and does not follow provider redirects', { timeout: 15000 }, async () => {
-  const accepted = subscription('accepted-device'), redirected = subscription('redirected-device'), outbound = [];
+  const accepted = subscription('accepted-device'), redirected = subscription('redirected-device'), expired = subscription('expired-device'), outbound = [];
   const contents = `
     import worker, { CommunityCalendar } from './worker.js';
     import { reminderDeviceKey } from './simcha-reminders.js';
@@ -253,7 +287,9 @@ test('the Workerd alarm delivers Web Push and does not follow provider redirects
         }
         const delivered = await storage.get(await reminderDeviceKey(devices[0].endpoint));
         const refused = await storage.get(await reminderDeviceKey(devices[1].endpoint));
-        return Response.json({ sent: delivered?.sentSlots?.length === 1, retry: Object.keys(refused?.reminderRetries || {}).length === 1 });
+        const expired = await storage.get(await reminderDeviceKey(devices[2].endpoint));
+        return Response.json({ sent: delivered?.lastDelivery?.status === 201 && delivered?.sentSlots?.length === 1,
+          retry: Object.keys(refused?.reminderRetries || {}).length === 1, expired: !!expired?.expiredAt && expired.lastDelivery.status === 410 });
       }
     }
   `;
@@ -261,11 +297,12 @@ test('the Workerd alarm delivers Web Push and does not follow provider redirects
     format: 'esm', platform: 'browser', write: false, external: ['cloudflare:workers'] });
   const backend = new Miniflare(convertV4MiniflareOptions({ name: 'calendar-push-alarm-test', modules: true,
     script: bundle.outputFiles[0].text, compatibilityDate: '2026-10-01',
-    bindings: { ALLOWED_ORIGIN: origin, CALENDAR_REMINDER_VAPID: vapid, TEST_DEVICES: [accepted, redirected] },
+    bindings: { ALLOWED_ORIGIN: origin, CALENDAR_REMINDER_VAPID: vapid, TEST_DEVICES: [accepted, redirected, expired] },
     durableObjects: { CALENDAR: { className: 'ReminderTestCalendar', useSQLite: true } },
     outboundService: async request => {
       outbound.push({ url: request.url, method: request.method, encoding: request.headers.get('content-encoding') });
       if (request.url === redirected.endpoint) return new WorkerResponse(null, { status: 302, headers: { Location: 'https://redirect.example.test/' } });
+      if (request.url === expired.endpoint) return new WorkerResponse(null, { status: 410 });
       return new WorkerResponse(null, { status: 201 });
     },
   }));
@@ -276,12 +313,12 @@ test('the Workerd alarm delivers Web Push and does not follow provider redirects
       return response.json();
     };
     let result = await call('POST');
-    for (let count = 0; count < 50 && (!result.sent || !result.retry); count++) {
+    for (let count = 0; count < 50 && (!result.sent || !result.retry || !result.expired); count++) {
       await new Promise(resolve => setTimeout(resolve, 100));
       result = await call('GET');
     }
-    assert.deepEqual(result, { sent: true, retry: true });
-    assert.deepEqual(outbound.sort((a, b) => a.url.localeCompare(b.url)), [accepted, redirected].map(({ endpoint }) => ({
+    assert.deepEqual(result, { sent: true, retry: true, expired: true });
+    assert.deepEqual(outbound.sort((a, b) => a.url.localeCompare(b.url)), [accepted, expired, redirected].map(({ endpoint }) => ({
       url: endpoint, method: 'POST', encoding: 'aes128gcm',
     })));
   } finally { await backend.dispose(); }
@@ -306,6 +343,7 @@ test('Friday delivery uses New York time, retries transient failures, and skips 
   const send = async (url, options) => {
     const headers = new Headers(options.headers);
     assert.equal(headers.get('Topic'), 'simcha-' + morning);
+    assert.equal(headers.get('Urgency'), 'high');
     assert.equal(headers.get('Content-Encoding'), 'aes128gcm');
     const id = url.split('/').at(-1); calls.push(id);
     return new Response(null, { status: id === 'viewer' && calls.filter(value => value === id).length === 1 ? 503 : 201 });
@@ -323,7 +361,7 @@ test('Friday delivery uses New York time, retries transient failures, and skips 
 });
 
 test('shared and individual phone schedules deliver at their active times', async () => {
-  const { reminderKeys, reminderDeviceKey, runSimchaReminders, simchaReminderAt } = await import('../worker/calendar/simcha-reminders.js');
+  const { nextSimchaReminder, reminderKeys, reminderDeviceKey, runSimchaReminders, simchaReminderAt } = await import('../worker/calendar/simcha-reminders.js');
   const standard = { day: 'day-of', time: '11:00' };
   const categories = { vort: { day: 'day-before', time: '18:00', fridayTime: '08:30' } };
   const schedule = { standard, categories };
@@ -349,6 +387,8 @@ test('shared and individual phone schedules deliver at their active times', asyn
     ['user:reader', { id: 'reader', role: 'viewer', active: true, version: 1 }]]);
   const storage = { get: key => records.get(key), put: (key, value) => records.set(key, value),
     list: ({ prefix }) => new Map([...records].filter(([key]) => key.startsWith(prefix))) };
+  assert.equal(await nextSimchaReminder(storage, schedule, before - 1), before);
+  assert.equal(await nextSimchaReminder(storage, null, before), morning);
   for (const id of ['default', 'customized', 'shared']) {
     const sub = subscription(id);
     records.set(await reminderDeviceKey(sub.endpoint), { id, userId: 'reader', version: 1, subscription: sub,
@@ -383,4 +423,8 @@ test('phone notification hides private text and opens the calendar day', async (
   handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(opened, origin + '/admin/calendar/?simcha=2026-11-14&post=1');
+  handlers.push({ data: { json: () => ({ test: true }) }, waitUntil: work => { pending = work; } });
+  await pending;
+  assert.equal(notification.title, 'Calendar test alert');
+  assert.equal(notification.data, origin + '/admin/calendar/');
 });
