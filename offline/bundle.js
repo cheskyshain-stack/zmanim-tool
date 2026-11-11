@@ -11512,9 +11512,11 @@ function wireChartCurrentWeek(container, state, settings, onWeekChange) {
     if (!rows.length) return;
     const parsha = rows[0].querySelector('.parsha-cell');
     const name = (parsha?.querySelector('.parsha-cell-name') || parsha)?.innerText.split('\n')[0].trim() || '';
-    const label = document.createElement('bdi'); label.textContent = name;
-    if (/[\u0590-\u05ff]/.test(name)) label.lang = 'he';
-    badge.replaceChildren(document.createTextNode(name ? 'This week · ' : 'This week'), label);
+    if (badge.textContent !== (name ? 'This week · ' + name : 'This week')) {
+      const label = document.createElement('bdi'); label.textContent = name;
+      if (/[\u0590-\u05ff]/.test(name)) label.lang = 'he';
+      badge.replaceChildren(document.createTextNode(name ? 'This week · ' : 'This week'), label);
+    }
     const base = fit.getBoundingClientRect();
     for (const row of rows) {
       const rect = row.getBoundingClientRect();
