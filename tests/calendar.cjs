@@ -334,7 +334,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal(editorAnnouncement.status, 201); assert.equal(editorAnnouncement.body.message.authorId, editorSession.user.id);
     assert.equal((await call('/api/announcements', 'GET', null, viewerSession.token)).body.messages.length, 2);
     await viewerPage.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await viewerPage.getByRole('button', { name: 'Notifications, 2 unread', exact: true }).click();
+    await viewerPage.getByRole('button', { name: 'Messages, 2 unread', exact: true }).click();
     await viewerPage.locator('.cal-announcement-message').first().waitFor();
     assert(await viewerPage.locator('.cal-announcement-compose').isHidden());
     assert.equal(await viewerPage.locator('[data-cal-edit-announcement]:visible').count(), 0);
