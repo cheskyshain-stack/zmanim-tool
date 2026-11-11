@@ -105,8 +105,11 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     const intro = previewing() ? '<p class="cal-announcement-intro">Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.</p>' : '';
     const olderControl = `<button type="button" data-cal-older-announcements hidden>Load older ${reader ? 'messages' : 'announcements'}</button>`;
     const newControl = `<button type="button" data-cal-new-announcements hidden>Show new ${reader ? 'messages' : 'announcements'}</button>`;
-    const loadingFeed = '<p>Loading announcements…</p>';
-    const view = dialog(intro + `<form class="cal-form cal-announcement-compose" hidden><label>New announcement<textarea name="message" maxlength="4000" rows="3" required placeholder="Write an update…"></textarea></label><div data-cal-added-date hidden><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></div><button class="cal-primary" type="submit">Post announcement</button></form><p class="cal-announcement-status" role="status" aria-live="polite"></p>${reader ? '' : newControl}<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${reader ? `${olderControl}<div data-cal-message-list>${loadingFeed}</div>` : loadingFeed}</div>${reader ? newControl : olderControl}<button type="button" data-cal-announcement-retry hidden>Try again</button>`, {
+    const composer = `<form class="cal-form cal-announcement-compose" hidden>
+      <details class="cal-extra" data-cal-added-date hidden><summary>Set date and time</summary><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></details>
+      <div class="cal-announcement-compose-row"><textarea name="message" aria-label="New announcement" dir="auto" maxlength="4000" rows="2" required placeholder="Write a message…"></textarea><button class="cal-primary" type="submit" aria-label="Send announcement">Send</button></div>
+    </form>`;
+    const view = dialog(intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${olderControl}<div data-cal-message-list><p>Loading announcements…</p></div></div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`, {
       onClose: () => {
         if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
         cleanup(); active = null; return true;
@@ -126,17 +129,18 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       }
     }
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
-    const list = reader ? feed.querySelector('[data-cal-message-list]') : feed;
-    const textarea = form.elements.message, messageStatus = view.el.querySelector('[role=status]');
+    const list = feed.querySelector('[data-cal-message-list]');
+    const textarea = form.elements.message, dateOptions = form.querySelector('[data-cal-added-date]');
+    const send = form.querySelector('button[type=submit]'), messageStatus = view.el.querySelector('[role=status]');
     const older = view.el.querySelector('[data-cal-older-announcements]'), retry = view.el.querySelector('[data-cal-announcement-retry]');
     const newButton = view.el.querySelector('[data-cal-new-announcements]');
     const current = () => matches(id) && active?.view === view && view.el.isConnected;
     const atLatest = () => feed.scrollHeight - feed.clientHeight - feed.scrollTop <= 16;
     const scrollToLatest = () => { feed.scrollTop = feed.scrollHeight; };
-    function rememberFeedPosition(follow = reader && atLatest()) {
+    const updateSend = () => { send.disabled = previewing() || posting || deleting || loading; };
+    function rememberFeedPosition(follow = atLatest()) {
       if (follow) return scrollToLatest;
       const top = feed.scrollTop;
-      if (!reader) return () => { feed.scrollTop = top; };
       const box = feed.getBoundingClientRect(), visible = [];
       for (const node of list.children) {
         const rect = node.getBoundingClientRect();
@@ -169,8 +173,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     function sortMessages() {
       if (editing) return;
       const focused = document.activeElement; let previous = null;
-      const order = reader ? (a, b) => calendarAnnouncementOrder(b, a) : calendarAnnouncementOrder;
-      for (const message of [...messages.values()].sort(order)) {
+      for (const message of [...messages.values()].sort((a, b) => calendarAnnouncementOrder(b, a))) {
         const node = messageNode(message.id), before = previous ? previous.nextElementSibling : list.firstElementChild;
         if (node && node !== before) list.insertBefore(node, before);
         previous = node;
@@ -304,26 +307,26 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       clearTimeout(pendingTimer); pendingTimer = setTimeout(markRead, 250);
     }, { threshold: 1 });
     function followNew() {
-      if (reader && openingRecorded && !loading && atLatest()) load(false, true);
+      if (openingRecorded && !editing && !deleting && atLatest()) load(false, true);
     }
     active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits, followNew }; paint();
     async function load(append = false, follow = false) {
-      if (!current() || loading) return;
+      if (!current() || loading || posting) return;
       if (!append && editing) {
         if (editing.saving || editDirty() && !confirm('Discard your unsaved announcement changes?')) return;
         closeEditor();
       }
-      loading = true; active.following = follow; older.disabled = retry.disabled = newButton.disabled = true;
+      loading = true; active.following = follow; older.disabled = retry.disabled = newButton.disabled = true; updateSend();
       try {
         const value = !previewing() && !openingRecorded && !append
           ? await request('/api/announcements/open', { method: 'POST', body: { id: openingId } })
           : await request('/api/announcements' + (append && nextCursor ? '?cursor=' + encodeURIComponent(nextCursor) : append && nextBefore ? '?before=' + nextBefore : ''));
-        if (!current() || follow && !atLatest()) return;
+        if (!current() || !append && editing || follow && !atLatest()) return;
         openingRecorded = true;
         if (messageStatus.dataset.source === 'load') notice('');
-        const restorePosition = reader && append ? rememberFeedPosition(false) : null;
+        const restorePosition = append ? rememberFeedPosition(false) : scrollToLatest;
         const previous = new Map(messages);
-        if (!append) { messages.clear(); list.innerHTML = ''; if (!reader) feed.scrollTop = 0; }
+        if (!append) { messages.clear(); list.innerHTML = ''; }
         else if (!messages.size) list.innerHTML = '';
         for (const item of value.messages) if (!messages.has(item.id) && !deletedIds.has(item.id)) {
           const old = previous.get(item.id), next = old && (old.revision || 1) > (item.revision || 1) ? old : item;
@@ -333,8 +336,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
         if (!append) { active.latest = Math.max(active.latest, value.total); knownEditCount = value.editCount || 0; }
         else knownEditCount = Math.min(knownEditCount, value.editCount || 0);
         nextBefore = value.nextBefore; nextCursor = value.nextCursor || null; older.hidden = !nextCursor && !nextBefore; retry.hidden = true; status(value); sortMessages();
-        if (reader && !append) scrollToLatest();
-        restorePosition?.();
+        restorePosition();
         await syncDeleted(); await syncEdits(); observe();
       } catch (error) {
         if (current() && !failed(error, id)) {
@@ -344,35 +346,41 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       } finally {
         loading = false;
         if (current()) {
-          active.following = false; older.disabled = retry.disabled = newButton.disabled = false;
+          active.following = false; older.disabled = retry.disabled = newButton.disabled = false; updateSend();
           paint();
         }
       }
     }
     form.addEventListener('submit', async event => {
-      event.preventDefault(); if (previewing() || posting || deleting || editing?.saving) return;
+      event.preventDefault(); if (!current() || !canPost || send.disabled || editing?.saving) return;
       let text, addedAt; try { text = calendarAnnouncementText(textarea.value); if (dateEditing && form.elements.addedAt.value) addedAt = calendarAnnouncementInstant(form.elements.addedAt.value, timeZone); } catch (error) { notice(error.message, true, 'post'); return; }
       if (!operation || operation.text !== text || operation.addedAt !== addedAt) operation = { id: crypto.randomUUID(), text, ...(addedAt ? { addedAt } : {}) };
-      posting = true; textarea.disabled = true; form.elements.addedAt.disabled = true; form.querySelector('button').disabled = true; notice('Posting…');
+      posting = true; textarea.disabled = true; form.elements.addedAt.disabled = true; updateSend(); notice('Sending…');
       try {
         const value = await request('/api/announcements', { method: 'POST', body: operation });
         if (!current()) return;
-        status(value); textarea.value = ''; form.elements.addedAt.value = ''; operation = null; notice('Announcement posted.'); await load();
+        const message = value.message;
+        if (message.sequence === active.latest + 1) active.latest = message.sequence;
+        textarea.value = ''; form.elements.addedAt.value = ''; dateOptions.open = false; operation = null;
+        status(value); notice('Announcement posted.');
+        applyEdits([{ ...message, read: true }]);
+        if (!addedAt) scrollToLatest();
+        await syncDeleted(); await syncEdits();
       } catch (error) { if (current() && !failed(error, id)) notice(error.message + ' Your text is kept; try posting again.', true, 'post'); }
-      finally { posting = false; if (current()) { textarea.disabled = false; form.elements.addedAt.disabled = !dateEditing; form.querySelector('button').disabled = false; } }
+      finally { posting = false; if (current()) { textarea.disabled = false; form.elements.addedAt.disabled = !dateEditing; updateSend(); } }
     });
     feed.addEventListener('click', async event => {
       const edit = event.target.closest('[data-cal-edit-announcement]'); if (edit) { editMessage(edit.dataset.calEditAnnouncement); return; }
       const control = event.target.closest('[data-cal-delete-announcement]');
       if (previewing() || !control || !canDelete || posting || deleting || editing?.saving || !current() || !confirm('Delete this announcement for everyone?')) return;
       const messageId = control.dataset.calDeleteAnnouncement;
-      deleting = true; control.disabled = true; form.querySelector('button').disabled = true; notice('Deleting…');
+      deleting = true; control.disabled = true; updateSend(); notice('Deleting…');
       try {
         const value = await request('/api/announcements/' + encodeURIComponent(messageId), { method: 'DELETE' });
         if (!current()) return;
         status(value); removeDeleted([messageId]); notice('Announcement deleted.'); await syncDeleted();
       } catch (error) { if (current() && !failed(error, id)) notice(error.message + ' Try Delete again to retry.', true, 'delete'); }
-      finally { deleting = false; if (current()) { control.disabled = false; form.querySelector('button').disabled = false; } }
+      finally { deleting = false; if (current()) { control.disabled = false; updateSend(); } }
     });
     older.addEventListener('click', () => load(true));
     newButton.addEventListener('click', () => load());

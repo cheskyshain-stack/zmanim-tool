@@ -15,20 +15,16 @@
 .cal-admin-actions a:focus-visible { outline:3px solid #9e7b31; outline-offset:2px; }
 .cal-unread-count { display:inline-flex; align-items:center; justify-content:center; min-width:1.35em; margin-left:.35rem; padding:.1em .3em; border-radius:1em; background:#142b46; color:#fff; font-size:.75rem; }
 .cal-unread-count[hidden] { display:none; }
-.cal-announcements-dialog { width:min(42rem,calc(100vw - 2rem)); }
+.cal-announcements-dialog[open] { display:flex; flex-direction:column; gap:.4rem; padding:.75rem .85rem; }
+.cal-announcements-dialog > :not(.cal-announcement-feed) { flex:none; }
+.cal-announcements-dialog > :is(.cal-dialog-header,.cal-announcement-status,.cal-announcement-intro) { margin:0; }
 .cal-announcement-intro { color:#60717d; }
-.cal-announcement-compose { padding:1rem; background:#f6f3eb; border:1px solid #e3dfd3; border-radius:10px; }
-.cal-announcement-compose button { align-self:flex-end; }
-.cal-announcement-status { min-height:1.3em; }
-.cal-announcement-feed { margin:.75rem 0; max-height:min(45vh,28rem); min-height:7rem; overflow:auto; overscroll-behavior:contain; padding:.25rem; }
-.cal-announcement-reader[open] { display:flex; flex-direction:column; gap:.4rem; padding:.75rem .85rem; }
-.cal-announcement-reader > :not(.cal-announcement-feed) { flex:none; }
-.cal-announcement-reader > .cal-dialog-header, .cal-announcement-reader > .cal-announcement-status { margin:0; }
-.cal-announcement-reader > .cal-announcement-status:empty { position:absolute; }
-.cal-announcement-reader > .cal-announcement-feed { min-height:0; max-height:none; margin:0; overflow-anchor:none; }
-.cal-announcement-reader > button { align-self:flex-start; }
-.cal-announcement-reader > [data-cal-new-announcements] { align-self:center; }
-.cal-announcement-reader [data-cal-older-announcements] { display:block; margin:0 auto .65rem; }
+.cal-announcement-status:empty { position:absolute; }
+.cal-announcement-feed { min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; padding:.25rem; }
+.cal-announcements-dialog > button { align-self:flex-start; }
+.cal-announcements-dialog > [data-cal-new-announcements] { align-self:center; }
+.cal-announcement-feed [data-cal-older-announcements] { display:block; margin:0 auto .65rem; }
+.cal-announcement-compose-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem; align-items:end; }
 .cal-announcement-message { margin:0 0 .85rem; padding:.9rem 1rem; border:1px solid #dedfd9; border-radius:12px; background:#faf7f0; overflow-wrap:anywhere; }
 .cal-announcement-message.is-unread { border-color:#a88c47; }
 .cal-announcement-message header { display:flex; flex-wrap:wrap; gap:.3rem .65rem; align-items:baseline; font-size:.8rem; }
@@ -148,6 +144,8 @@
 .cal-form label, [data-cal-invitation] label { display:flex; flex-direction:column; gap:.4rem; font-size:.85rem; font-weight:600; color:#344757; margin:0; }
 .cal-form input:not([type=checkbox]), .cal-form select, .cal-form textarea, [data-cal-invitation] input { box-sizing:border-box; min-width:0; width:100%; min-height:44px; padding:.65rem .7rem; border:1px solid #cfd3d1; border-radius:8px; background:#fff; color:#142b46; font:400 1rem/1.3 system-ui,sans-serif; }
 .cal-form textarea { resize:vertical; }
+.cal-form.cal-announcement-compose { gap:.25rem; border-top:1px solid #e3dfd3; padding-top:.5rem; }
+.cal-announcement-compose textarea { resize:none; }
 .cal-form [data-cal-custom-category][hidden] { display:none; }
 .cal-form-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:.8rem; }
 .cal-form .cal-checkbox { display:flex; flex-direction:row; align-items:center; min-height:36px; gap:.5rem; }
