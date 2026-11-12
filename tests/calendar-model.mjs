@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
-import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 import { calendarSessionExpiration } from '../worker/calendar/session-expiration.js';
 import { calendarReminderDate } from '../js/calendar/reminder-date.js';
@@ -189,6 +189,26 @@ test('one details box keeps legacy information and separates a short calendar su
   assert.equal(adminOnly.reminder, undefined);
   assert.equal(event({}).visibility, 'everyone');
   assert.throws(() => event({ visibility: 'public' }), /who can see/);
+});
+
+test('an event stores each audience’s original wording and summarizes only the shared text when present', () => {
+  const admin = '\n  Private wording\n\nמזל טוב  \n', congregation = 'Community Kiddush\n\nAll are welcome.\n';
+  const internal = event({ adminDetails: admin, congregationDetails: '', reminder: 'schedule' });
+  assert.equal(internal.visibility, 'admins');
+  assert.equal(internal.reminder, undefined);
+  assert.equal(calendarAdminDetails(internal), admin);
+  assert.equal(calendarCongregationDetails(internal), '');
+  const shared = event({ adminDetails: admin, congregationDetails: congregation });
+  assert.equal(shared.visibility, 'everyone');
+  assert.equal(shared.title, 'Community Kiddush');
+  assert.equal(calendarAdminDetails(shared), admin);
+  assert.equal(calendarCongregationDetails(shared), congregation);
+  assert.equal(calendarAdminDetails(event({ congregationDetails: congregation })), '');
+  assert.throws(() => event({ adminDetails: ' \n ', congregationDetails: '' }), /Enter admin information or congregation information/);
+  assert.throws(() => event({ adminDetails: 'א'.repeat(4365), congregationDetails: congregation }), /admin information/);
+  const legacyInternal = event({ title: 'Private legacy summary', details: 'Wording to share', visibility: 'admins' });
+  const published = calendarEvent({ ...legacyInternal, congregationDetails: legacyInternal.details, adminDetails: '' }, legacyInternal);
+  assert.equal(published.title, 'Wording to share', 'Switching audiences rebuilds the summary from the shared text');
 });
 
 test('preview storage preserves corrupt data and reports unavailable storage instead of claiming a save', () => {

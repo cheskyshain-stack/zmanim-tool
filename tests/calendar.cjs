@@ -79,7 +79,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.screenshot({ path: path.join(output, 'calendar-' + width + '.png'), fullPage: true });
       const form = await fillEvent(page, 'Synthetic Kiddush with a long title - מזל טוב למשפחה ולכל הקהילה', 'kiddush');
       await form.locator('[name=details]').fill('Synthetic Kiddush with a long title - מזל טוב למשפחה ולכל הקהילה\nSynthetic shul location\nFirst line\nSecond line: מזל טוב');
-      assert.equal(await form.locator('textarea').count(), 1);
+      assert.equal(await form.locator('textarea').count(), 2);
       assert.equal(await form.locator('[name=title],[name=location],[name=description],[name=allDay]').count(), 0);
       assert.equal(await form.locator('[name=time]').getAttribute('required'), null);
       await form.getByRole('button', { name: 'Save event', exact: true }).click();
@@ -570,15 +570,17 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal((await call('/api/events/' + ownerId, 'DELETE', { revision: 1 }, owner)).status, 200);
     assert.equal((await call('/api/events/' + ownerId, 'PUT', fields, owner)).status, 409, 'A stale retry cannot recreate a deleted event');
     const adminDate = '2026-11-13', adminDetails = '\n  Admin simcha wording\n\n  מזל טוב, "Mazel tov!"  \n';
-    const adminForm = await fillEvent(editorPage, adminDetails, 'kiddush', adminDate);
-    assert.equal(await adminForm.getByLabel('Who can see this?').inputValue(), 'everyone');
-    await adminForm.getByLabel('Who can see this?').selectOption('admins');
+    const adminForm = await fillEvent(editorPage, '', 'kiddush', adminDate);
+    assert.equal(await adminForm.locator('[name=visibility]').count(), 0);
+    await adminForm.getByRole('button', { name: 'Save event', exact: true }).click();
+    await adminForm.getByText('Enter admin information or congregation information.', { exact: true }).waitFor();
+    await adminForm.getByLabel('Admin information', { exact: true }).fill(adminDetails);
     for (const width of [375, 393]) {
       await editorPage.setViewportSize({ width, height: 900 });
-      assert(await adminForm.locator('[name=visibility]').evaluate(input => {
+      assert(await adminForm.locator('textarea').evaluateAll(inputs => inputs.every(input => {
         const box = input.getBoundingClientRect(), dialog = input.closest('dialog').getBoundingClientRect();
         return box.left >= dialog.left && box.right <= dialog.right && box.height >= 44 && document.documentElement.scrollWidth <= innerWidth;
-      }), 'The visibility choice fits the phone form at ' + width + 'px');
+      })), 'Both information boxes fit the phone form at ' + width + 'px');
     }
     await adminForm.getByRole('button', { name: 'Save event', exact: true }).click();
     await editorPage.locator('.cal-dialog').waitFor({ state: 'detached' });
@@ -611,16 +613,36 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await adminCard.getByRole('button', { name: 'Copied', exact: true }).waitFor();
     assert.equal(await ownerPage.evaluate(() => window.copiedEventDetails), adminDetails, 'Another admin can copy the exact text');
     await adminCard.locator('[data-cal-edit]').click();
-    assert.equal(await ownerPage.locator('[name=details]').inputValue(), adminDetails);
-    await ownerPage.getByLabel('Who can see this?').selectOption('everyone');
+    assert.equal(await ownerPage.getByLabel('Admin information', { exact: true }).inputValue(), adminDetails);
+    const congregationBox = ownerPage.getByLabel('Congregation information', { exact: true });
+    assert.equal(await congregationBox.inputValue(), '', 'An existing admin-only event keeps its text in the admin box');
+    const congregationDetails = 'Congregation simcha wording\n\nEveryone is welcome.';
+    await congregationBox.fill(congregationDetails);
     await ownerPage.getByRole('button', { name: 'Save changes', exact: true }).click();
     await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
-    const publishedEvent = (await adminEvents(viewerSession.token)).find(event => event.id === adminEvent.id);
-    assert.equal(publishedEvent.details, adminDetails);
-    const madePrivate = await call(adminRoute, 'PUT', { ...publishedEvent, visibility: 'admins' }, owner);
-    assert.equal(madePrivate.status, 200);
-    assert(!(await adminEvents(viewerSession.token)).some(event => event.id === adminEvent.id));
-    checks.push({ adminOnlyEvents: true, exactEventCopy: true });
+    for (const [token, view] of [[viewerSession.token, '&view=owner'], [owner, '&view=congregation'], [editor, '&view=congregation']]) {
+      const publishedEvent = (await adminEvents(token, view)).find(event => event.id === adminEvent.id);
+      assert.equal(publishedEvent.details, congregationDetails);
+      assert.equal(publishedEvent.title, 'Congregation simcha wording');
+      assert(!Object.hasOwn(publishedEvent, 'adminDetails'));
+      assert(!JSON.stringify(publishedEvent).includes('Admin simcha wording'));
+    }
+    for (const token of [owner, editor]) {
+      const combined = (await adminEvents(token)).find(event => event.id === adminEvent.id);
+      assert.equal(combined.adminDetails, adminDetails);
+      assert.equal(combined.details, congregationDetails);
+    }
+    const { adminDetails: _adminDetails, ...olderCombined } = (await adminEvents(owner)).find(event => event.id === adminEvent.id);
+    const olderCombinedEdit = await call(adminRoute, 'PUT', { ...olderCombined, time: '12:30' }, owner);
+    assert.equal(olderCombinedEdit.body.event.adminDetails, adminDetails, 'Editing from an older client retains the admin box');
+    await ownerPage.locator('[data-cal-day="' + adminDate + '"]').click();
+    assert.deepEqual(await adminCard.locator('.cal-event-description').allTextContents(), [congregationDetails, adminDetails]);
+    await ownerPage.evaluate(() => { window.copiedEventDetails = null; });
+    await adminCard.getByRole('button', { name: 'Copy', exact: true }).click();
+    await adminCard.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    assert.equal(await ownerPage.evaluate(() => window.copiedEventDetails), adminDetails, 'Copy selects only the admin text on a shared event');
+    await ownerPage.keyboard.press('Escape');
+    checks.push({ twoEventInformationBoxes: true, adminOnlyEvents: true, exactEventCopy: true });
     await ownerPage.setViewportSize({ width: 1440, height: 900 });
     const access = await call('/api/access', 'GET', null, owner);
     assert(!/password|salt/.test(JSON.stringify(access.body)), 'Account API never returns password material');
@@ -754,7 +776,15 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await ownerPage.locator('[data-cal-view-notice]').waitFor();
       if (role === 'editor') await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
       else await ownerPage.locator('.cal-day:not([disabled])').first().waitFor();
-      assert.equal(await ownerPage.locator('[data-cal-day][aria-label*="Admin simcha wording"]').count(), role === 'editor' ? 1 : 0);
+      assert.equal(await ownerPage.locator('[data-cal-day][aria-label*="Admin simcha wording"]').count(), 0);
+      if (await ownerPage.locator('[data-cal-day="' + adminDate + '"]').count()) {
+        await ownerPage.setViewportSize({ width: 375, height: 900 });
+        await ownerPage.locator('[data-cal-day="' + adminDate + '"]').click();
+        const card = ownerPage.locator('.cal-dialog .cal-event-card').filter({ hasText: 'Congregation simcha wording' });
+        assert.deepEqual(await card.locator('.cal-event-description').allTextContents(), role === 'editor' ? [congregationDetails, adminDetails] : [congregationDetails]);
+        assert.equal(await card.locator('[data-cal-copy-event]').count(), role === 'editor' ? 1 : 0);
+        await ownerPage.keyboard.press('Escape');
+      }
       assert.equal(await ownerPage.locator('[data-cal-access]').count(), 0);
       assert.equal(await ownerPage.locator('.cal-brand [data-cal-add]').count(), role === 'editor' ? 1 : 0);
       for (const width of [375, 393, 1440]) {
