@@ -4560,7 +4560,8 @@ async function openCalendarEmailImport({ dialog, timeZone }) {
 }
 
 // ==== ui/calendar-phone-reminders.js ====
-const workerPath = '/admin/calendar/phone-reminders.js?v=2';
+const calendarPath = '/admin/calendar/';
+const workerPath = calendarPath + 'phone-reminders.js?v=3';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
@@ -4570,9 +4571,15 @@ async function removePhoneReminder(subscription) {
   await calendarRequest('/api/phone-reminders', { method: 'DELETE', body: { endpoint: subscription.endpoint }, signal: AbortSignal.timeout(4000) });
 }
 
+async function refreshCalendarPhoneReminderWorker() {
+  if (!supported()) return;
+  const registration = await navigator.serviceWorker.getRegistration(calendarPath);
+  if (registration?.scope === new URL(calendarPath, location.origin).href) await navigator.serviceWorker.register(workerPath);
+}
+
 async function turnOffCalendarPhoneReminders() {
   if (!supported()) return;
-  const registration = await navigator.serviceWorker.getRegistration('/admin/calendar/');
+  const registration = await navigator.serviceWorker.getRegistration(calendarPath);
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
   try { await removePhoneReminder(subscription); }
@@ -4838,7 +4845,7 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderPost = false } = {}) {
+function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
@@ -4984,8 +4991,12 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
-  function openDay(date, remindToPost = false) {
-    const view = dialog(dayHtml(date)); view.title('Day details'); wireDay(view.el, view.close);
+  function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
+    const content = event
+      ? `<div class="cal-day-heading"><h3>${calEscape(calFullDate(event.date))}</h3><p lang="he" dir="rtl">${calEscape(hebrewLabel(event.date))}</p></div>
+        <div class="cal-day-events">${eventCard(event)}</div><p class="cal-error cal-day-status" role="status"></p>`
+      : (missingEvent ? '<p class="cal-form-note">The event in this reminder is unavailable.</p>' : '') + dayHtml(date);
+    const view = dialog(content); view.title(event ? 'Event details' : 'Day details'); wireDay(view.el, view.close);
     if (remindToPost && !reader() && canAdd()) {
       view.el.insertAdjacentHTML('beforeend', '<button type="button" data-cal-post-reminder>Post an announcement</button>');
       view.el.querySelector('[data-cal-post-reminder]').addEventListener('click', () => { view.close(); announcements.open(); });
@@ -5005,13 +5016,18 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       }
     }
     const target = calendarRefresh ? '' : reminderDate;
+    const eventId = calendarRefresh ? '' : reminderEventId;
     reminderDate = '';
+    reminderEventId = '';
     const requested = Number.isFinite(calendarSerial(target)) && dateAllowed(target);
     if (requested) { month = target.slice(0, 7); selected = target; }
     const loading = loadEvents();
     if (calendarRefresh?.focus) container.querySelector('[data-cal-refresh]')?.focus({ preventScroll: true });
     await loading;
-    if (requested && !disposed && user === session.user) openDay(target, reminderPost);
+    if (requested && !disposed && user === session.user) {
+      const event = eventId && events.find(item => item.id === eventId);
+      openDay(target, { event, missingEvent: !!eventId && !event && !loadError, remindToPost: reminderPost && (!eventId || !!event) });
+    }
   }
   function fitReader() {
     if (disposed) return;

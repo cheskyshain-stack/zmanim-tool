@@ -177,7 +177,8 @@ async function checkPhoneControls(site, owner, viewer, device) {
       manager.waitForResponse(response => response.url().includes('/api/events/') && response.request().method() === 'PUT'),
       form.getByRole('button', { name: 'Save event' }).click(),
     ]);
-    assert.equal((await newEvent.json()).event.reminder, 'schedule');
+    const savedSimcha = (await newEvent.json()).event;
+    assert.equal(savedSimcha.reminder, 'schedule');
     await form.waitFor({ state: 'detached' });
     await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
     const day = manager.getByRole('dialog', { name: 'Day details' });
@@ -190,8 +191,12 @@ async function checkPhoneControls(site, owner, viewer, device) {
     ]);
     assert.equal((await updatedEvent.json()).event.reminder, 'schedule', 'Resaving an existing simcha applies phone reminder settings');
     await edit.waitFor({ state: 'detached' });
-    await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
-    await manager.getByRole('button', { name: 'Post an announcement' }).click();
+    await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&event=' + savedSimcha.id + '&post=1');
+    const eventDetails = manager.getByRole('dialog', { name: 'Event details' });
+    await eventDetails.getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
+    assert.equal(await eventDetails.locator('.cal-event-card').count(), 1);
+    assert.equal(await eventDetails.getByText('Edited by older calendar client', { exact: true }).count(), 0);
+    await eventDetails.getByRole('button', { name: 'Post an announcement' }).click();
     await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
     await manager.keyboard.press('Escape');
     await manager.locator('[data-cal-view]').selectOption('viewer');
@@ -432,7 +437,7 @@ test('shared and individual phone schedules deliver at their active times', asyn
     ['shared', 'simcha-' + lateMorning], ['customized', 'simcha-' + friday], ['default', 'simcha-' + defaultFriday], ['shared', 'simcha-' + sharedFriday]].sort());
 });
 
-test('phone notification hides private text and opens the calendar day', async () => {
+test('phone notifications hide private text and link to the specific event', async () => {
   const handlers = {};
   let notification, opened;
   const self = { location: { origin }, addEventListener: (type, handle) => { handlers[type] = handle; },
@@ -441,14 +446,17 @@ test('phone notification hides private text and opens the calendar day', async (
   vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../admin/calendar/phone-reminders.js'), 'utf8'), { self, URL });
   let pending;
   const slot = Date.parse('2026-11-13T14:00:00Z');
-  handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', slot, post: true, text: 'Private simcha details' }) }, waitUntil: work => { pending = work; } });
+  handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', eventId: 'test-simcha', slot, post: true, text: 'Private simcha details' }) }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(notification.title, 'Simcha reminder');
   assert.equal(notification.tag, 'simcha-' + slot);
   assert(!JSON.stringify(notification).includes('Private simcha details'));
   handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
   await pending;
-  assert.equal(opened, origin + '/admin/calendar/?simcha=2026-11-14&post=1');
+  assert.equal(opened, origin + '/admin/calendar/?simcha=2026-11-14&event=test-simcha&post=1');
+  handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', slot }) }, waitUntil: work => { pending = work; } });
+  await pending;
+  assert.equal(notification.data, origin + '/admin/calendar/?simcha=2026-11-14');
   handlers.push({ data: { json: () => ({ test: true }) }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(notification.title, 'Calendar test alert');

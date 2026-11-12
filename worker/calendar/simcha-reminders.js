@@ -83,7 +83,8 @@ async function sendToDevice(storage, { key, device, slot }, keys, origin, now, c
   }
   const { at, events } = slot, deadline = at + deliveryWindow;
   const own = user.role !== 'viewer' && events.find(event => event.createdBy === user.id);
-  const payload = { date: (own || events[0]).date, post: Boolean(own), day: slot.day, slot: at };
+  const event = own || events[0];
+  const payload = { date: event.date, eventId: event.id, post: Boolean(own), day: slot.day, slot: at };
   const ttl = Math.max(1, Math.floor((deadline - now) / 1000));
   const status = await sendCalendarPush(storage, key, device, keys, origin, payload, { ttl, urgency: 'high', topic: 'simcha-' + at }, send);
   const current = await storage.get(key);

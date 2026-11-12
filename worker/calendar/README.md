@@ -59,8 +59,9 @@ Android can opt in through Chrome. On iPhone or iPad, open the calendar as a Hom
 Screen web app before allowing notifications.
 
 The alarm combines events due at the same time on the same device into one alert.
-It opens the simcha date and offers the event's manager a prompt to post an
-announcement. Details stay in the signed-in calendar. A skipped New York time
+Tapping it opens the selected simcha’s event details and offers the event's
+manager a prompt to post an announcement. Older alerts open the simcha date.
+Details stay in the signed-in calendar. A skipped New York time
 moves forward by an hour, and a repeated time uses its first occurrence.
 
 Enable this in production by deploying the Worker, then setting the encrypted

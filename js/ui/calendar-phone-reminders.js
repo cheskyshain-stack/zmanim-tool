@@ -1,7 +1,8 @@
 import { calendarRequest } from '../calendar/api.js';
 import { CALENDAR_REMINDER_TYPES, DEFAULT_CALENDAR_REMINDER_RULE } from '../calendar/reminder-date.js';
 
-const workerPath = '/admin/calendar/phone-reminders.js?v=2';
+const calendarPath = '/admin/calendar/';
+const workerPath = calendarPath + 'phone-reminders.js?v=3';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
@@ -11,9 +12,15 @@ async function removePhoneReminder(subscription) {
   await calendarRequest('/api/phone-reminders', { method: 'DELETE', body: { endpoint: subscription.endpoint }, signal: AbortSignal.timeout(4000) });
 }
 
+export async function refreshCalendarPhoneReminderWorker() {
+  if (!supported()) return;
+  const registration = await navigator.serviceWorker.getRegistration(calendarPath);
+  if (registration?.scope === new URL(calendarPath, location.origin).href) await navigator.serviceWorker.register(workerPath);
+}
+
 export async function turnOffCalendarPhoneReminders() {
   if (!supported()) return;
-  const registration = await navigator.serviceWorker.getRegistration('/admin/calendar/');
+  const registration = await navigator.serviceWorker.getRegistration(calendarPath);
   const subscription = await registration?.pushManager.getSubscription();
   if (!subscription) return;
   try { await removePhoneReminder(subscription); }
