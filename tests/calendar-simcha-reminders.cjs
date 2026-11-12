@@ -34,7 +34,7 @@ function browserSite(getEndpoint) {
   });
 }
 
-async function checkPhoneControls(site, owner, viewer, device) {
+async function checkPhoneControls(site, owner, viewer, device, detailsDate) {
   const { chromium } = require('playwright');
   const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless: true });
   try {
@@ -166,6 +166,18 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
+    await reader.goto(site + '/admin/calendar/?preview=congregation&simcha=' + detailsDate);
+    const readerDay = reader.getByRole('dialog', { name: 'Day details' });
+    const dayShortcut = readerDay.getByRole('button', { name: 'Phone reminders', exact: true });
+    await readerDay.getByText('Synthetic simcha for the reminder shortcut', { exact: true }).waitFor();
+    await dayShortcut.click();
+    const readerReminders = reader.getByRole('dialog', { name: 'Phone reminders' });
+    await readerReminders.getByRole('button', { name: 'Turn on phone reminders' }).click();
+    await readerReminders.getByText('Phone reminders are on for this device.').waitFor();
+    await readerReminders.getByRole('button', { name: 'Close' }).click();
+    assert(await readerDay.isVisible());
+    assert(await dayShortcut.evaluate(button => button === document.activeElement));
+
     const manager = await pageAs(owner);
     await manager.goto(site + '/admin/calendar/');
     await manager.locator('.cal-brand [data-cal-add]:not([disabled])').click();
@@ -202,6 +214,8 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await eventDetails.getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
     assert.equal(await eventDetails.locator('.cal-event-card').count(), 1);
     assert.equal(await eventDetails.getByText('Edited by older calendar client', { exact: true }).count(), 0);
+    await eventDetails.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await manager.getByRole('dialog', { name: 'Phone reminders' }).getByRole('button', { name: 'Close' }).click();
     await eventDetails.getByRole('button', { name: 'Post an announcement' }).click();
     await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
     await manager.keyboard.press('Escape');
@@ -283,7 +297,13 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     assert.equal(cleared.body.event.reminder, undefined);
     if (server) {
       endpoint = (await backend.ready).origin;
-      await checkPhoneControls(host, owner, viewer, device);
+      const { civilDate, shiftDate } = await import('../worker/traffic-calendar.js');
+      const detailsDate = shiftDate(civilDate(Date.now()), -2);
+      const pastSimcha = await call('/api/events/simcha-shortcut', 'PUT', {
+        type: 'kiddush', title: 'Synthetic simcha for the reminder shortcut', date: detailsDate, revision: 0, reminder: 'schedule',
+      }, owner.token);
+      assert.equal(pastSimcha.status, 201);
+      await checkPhoneControls(host, owner, viewer, device, detailsDate);
     }
     const newSimcha = { ...legacy, title: 'New simcha without a reminder choice', revision: 0 };
     const defaulted = await call('/api/events/default-simcha', 'PUT', newSimcha, owner.token);

@@ -4833,6 +4833,7 @@ async function openCalendarSmsImport({ dialog, timeZone }) {
 
 // ==== ui/calendar-view.js ====
 let calendarAnalyticsOpened = false;
+let calendarDialogCount = 0;
 
 const calEscape = value => escText(String(value ?? ''));
 const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' }).format(new Date(iso + 'T12:00:00Z'));
@@ -4871,8 +4872,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
 
   function dialog(html, { onClose } = {}) {
     const previous = document.activeElement, el = document.createElement('dialog');
-    el.className = 'cal-dialog no-print'; el.setAttribute('aria-labelledby', 'cal-dialog-title');
-    el.innerHTML = `<header class="cal-dialog-header"><h2 id="cal-dialog-title">Calendar</h2><button type="button" data-cal-close aria-label="Close">×</button></header>${html}`;
+    const titleId = 'cal-dialog-title-' + ++calendarDialogCount;
+    el.className = 'cal-dialog no-print'; el.setAttribute('aria-labelledby', titleId);
+    el.innerHTML = `<header class="cal-dialog-header"><h2 id="${titleId}">Calendar</h2><button type="button" data-cal-close aria-label="Close">×</button></header>${html}`;
     let focusFrame;
     const size = () => {
       const view = window.visualViewport;
@@ -4940,9 +4942,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     return `<div class="cal-day-heading"><p class="cal-eyebrow">${date === today ? 'Today' : 'Selected day'}</p><h3>${calEscape(calFullDate(date))}</h3><p lang="he" dir="rtl">${calEscape(day.hebrewLabel)}</p></div>
       ${day.facts.length || day.parsha || day.specialLabel || day.mevarchim ? `<div class="cal-day-facts" lang="he" dir="rtl">${day.specialLabel ? `<p>${calEscape(day.specialLabel)}</p>` : ''}${day.facts.map(fact => `<p>${calEscape(fact)}</p>`).join('')}${day.parsha ? `<p>פרשת ${calEscape(day.parsha)}</p>` : ''}${day.mevarchim ? '<p>מברכים</p>' : ''}</div>` : ''}
       <div class="cal-day-events">${busy ? '<p class="cal-empty">Loading events…</p>' : loadError ? `<p class="cal-error">${calEscape(loadError)}</p><button type="button" data-cal-reload>Try again</button>` : list.length ? list.map(eventCard).join('') : `<p class="cal-empty">${canAdd() ? 'Nothing added yet.<br>Add a simcha, schedule or announcement.' : 'No events for this day.'}</p>`}</div>
+      ${!busy && !loadError ? eventReminderButton(list) : ''}
       <p class="cal-error cal-day-status" role="status"></p>${canAdd() ? `<button type="button" class="cal-primary cal-day-add" data-cal-add="${date}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add an event</button>` : ''}`;
   }
   function wireDay(scope, close = () => {}) {
+    scope.querySelectorAll('[data-cal-phone-reminders]').forEach(button => button.addEventListener('click', showPhoneReminders));
     scope.querySelectorAll('[data-cal-reload]').forEach(button => button.addEventListener('click', () => { close(); loadEvents(); }));
     scope.querySelectorAll('[data-cal-add]').forEach(button => button.addEventListener('click', () => { close(); editEvent(null, button.dataset.calAdd); }));
     scope.querySelectorAll('[data-cal-edit]').forEach(button => button.addEventListener('click', () => { const item = events.find(event => event.id === button.dataset.calEdit); close(); if (item) editEvent(item); }));
@@ -4977,6 +4981,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
   const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey, reminderSchedules);
   const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
+  const eventReminderButton = items => items.some(item => calendarReminderSlot(item)) ? phoneReminderButton() : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
@@ -4988,7 +4993,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
     const content = event
       ? `<div class="cal-day-heading"><h3>${calEscape(calFullDate(event.date))}</h3><p lang="he" dir="rtl">${calEscape(hebrewLabel(event.date))}</p></div>
-        <div class="cal-day-events">${eventCard(event)}</div><p class="cal-error cal-day-status" role="status"></p>`
+        <div class="cal-day-events">${eventCard(event)}</div>${eventReminderButton([event])}<p class="cal-error cal-day-status" role="status"></p>`
       : (missingEvent ? '<p class="cal-form-note">The event in this reminder is unavailable.</p>' : '') + dayHtml(date);
     const view = dialog(content); view.title(event ? 'Event details' : 'Day details'); wireDay(view.el, view.close);
     if (remindToPost && !reader() && canAdd()) {
@@ -5106,7 +5111,6 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
     const adminActions = container.querySelector('.cal-admin-actions');
     adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton());
-    adminActions?.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', showPhoneReminders);
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
