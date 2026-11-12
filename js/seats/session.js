@@ -1,14 +1,13 @@
 import { escAttr } from '../util.js';
+import { shulSessionExpiration } from '../session-expiration.js';
 
 export const SEATS_SESSION_KEY = 'lakewood-commons-seats-session-v1';
-export const SEATS_SESSION_IDLE = 3 * 60 * 60 * 1000;
 export const SEATS_UNLOCK_KEY = 'lakewood-commons-seats-unlock';
 const onlineKey = 'lakewood-commons-seats-online-session';
 
 export function seatsSessionValid(session, endpoint, now = Date.now()) {
   return Boolean(session?.version === 1 && typeof session.name === 'string' && session.name.trim()
-    && session.endpoint === endpoint && Number.isFinite(session.lastActive) && session.lastActive <= now
-    && now - session.lastActive < SEATS_SESSION_IDLE && session.expires > now
+    && session.endpoint === endpoint && Number.isFinite(session.expires) && session.expires > now
     && (!endpoint || /^[a-f0-9]{64}$/.test(session.token || '')));
 }
 
@@ -51,9 +50,9 @@ export async function seatsOpenSession(root) {
   try {
     if (!session) {
       const previous = JSON.parse(sessionStorage.getItem(onlineKey) || 'null');
-      if (previous?.endpoint === endpoint && previous.expires > Date.now()) session = { ...previous, version: 1, lastActive: Date.now() };
+      if (previous?.endpoint === endpoint && previous.expires > Date.now()) session = { ...previous, version: 1 };
       // Retain an already unlocked offline visit while migrating to timed sign-in.
-      else if (!endpoint && !configError && sessionStorage.getItem(SEATS_UNLOCK_KEY) === 'open') session = { version: 1, name: profile || 'Organizer', endpoint, lastActive: Date.now(), expires: Date.now() + 24 * 60 * 60 * 1000 };
+      else if (!endpoint && !configError && sessionStorage.getItem(SEATS_UNLOCK_KEY) === 'open') session = { version: 1, name: profile || 'Organizer', endpoint, expires: shulSessionExpiration(Date.now()) };
     }
   } catch { /* A malformed old session returns to the entry form. */ }
   if (!seatsSessionValid(session, endpoint)) {
@@ -78,9 +77,9 @@ export async function seatsOpenSession(root) {
           const bytes = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pin + 'lakewood-commons/seats/v1'));
           const hash = [...new Uint8Array(bytes)].map(byte => byte.toString(16).padStart(2, '0')).join('');
           if (hash !== 'c5eebef6b017a917b05502fb6016a9dadfd75f31b2e48aa445175a5827a6cc55') throw new Error('That PIN did not match. Try again.');
-          result = { name, expires: Date.now() + 24 * 60 * 60 * 1000 };
+          result = { name, expires: shulSessionExpiration(Date.now()) };
         }
-        resolve({ ...result, name, endpoint, version: 1, lastActive: Date.now() });
+        resolve({ ...result, name, endpoint, version: 1 });
       } catch (error) {
         message.textContent = error instanceof TypeError || error instanceof SyntaxError ? 'Could not connect. Check your connection and try again.' : error.message;
         root.querySelector('#seats-pin').focus({ preventScroll: true });
@@ -92,7 +91,7 @@ export async function seatsOpenSession(root) {
 }
 
 function seatsWatchSession(session) {
-  let expired = false, timer, lastPersist = session.lastActive, onLock = () => location.reload();
+  let expired = false, timer, onLock = () => location.reload();
   const lock = (clear = true) => {
     if (expired) return;
     expired = true; clearTimeout(timer);
@@ -100,34 +99,20 @@ function seatsWatchSession(session) {
     else try { sessionStorage.removeItem(onlineKey); sessionStorage.removeItem(SEATS_SESSION_KEY); sessionStorage.removeItem(SEATS_UNLOCK_KEY); } catch { /* A newer session is still available in local storage. */ }
     onLock();
   };
-  const refreshActivity = () => {
-    const other = storedSession();
-    if (other && other.name === session.name && other.token === session.token && other.endpoint === session.endpoint) session.lastActive = Math.max(session.lastActive, other.lastActive);
-  };
   const check = () => {
     if (expired) return;
-    refreshActivity();
-    const remaining = Math.min(session.lastActive + SEATS_SESSION_IDLE, session.expires) - Date.now();
+    const remaining = session.expires - Date.now();
     if (remaining <= 0) { lock(); return; }
     clearTimeout(timer); timer = setTimeout(check, remaining);
   };
-  const touch = event => {
-    if (expired) return;
-    if (event?.isTrusted === false) return;
-    refreshActivity();
-    if (!seatsSessionValid(session, session.endpoint)) { lock(); return; }
-    session.lastActive = Date.now();
-    if (session.lastActive - lastPersist > 15000) { persist(session); lastPersist = session.lastActive; }
-  };
-  for (const name of ['pointerdown', 'pointermove', 'keydown', 'input', 'wheel', 'touchstart', 'touchmove']) window.addEventListener(name, touch, { passive: true, capture: true });
-  window.addEventListener('pagehide', () => { if (!expired) persist(session); });
   window.addEventListener('storage', event => {
     if (event.key !== SEATS_SESSION_KEY || expired) return;
     let other = null;
     try { other = JSON.parse(event.newValue || 'null'); } catch { /* A malformed replacement requires sign-in. */ }
-    if (!other || other.name !== session.name || other.token !== session.token) lock(false); else check();
+    if (!other || other.name !== session.name || other.token !== session.token || other.expires !== session.expires || other.endpoint !== session.endpoint) lock(false);
   });
   document.addEventListener('visibilitychange', () => { if (!document.hidden) check(); });
+  window.addEventListener('pageshow', check);
   check();
   return { session, lock, onLock: callback => { onLock = callback; } };
 }
