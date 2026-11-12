@@ -44,7 +44,7 @@ const server = http.createServer((req,res) => {
         }
         await route.fulfill({headers,contentType:'application/json',body:JSON.stringify({events})});finished.push(middle);return;
       }
-      if(url.pathname==='/api/announcements/status')announcementChecks++;
+      if(['/api/announcements','/api/announcements/status'].includes(url.pathname))announcementChecks++;
       const body=url.pathname==='/api/session'?{user:{id:'fixture-reader',role,name:'Example reader',active:true}}:{total:0,unread:0,deletedCount:0,editCount:0,messages:[],nextBefore:null};
       return route.fulfill({headers,contentType:'application/json',body:JSON.stringify(body)});
     });

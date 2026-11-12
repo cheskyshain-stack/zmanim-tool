@@ -253,7 +253,7 @@ export class CommunityCalendar extends DurableObject {
       const recorded = await storage.get(key);
       if (!recorded) await this.limited(request, 'announcement-open', 120);
       const page = new URL('/api/announcements' + url.search, url);
-      const response = await this.announcements(new Request(page, { headers: request.headers }), user, page);
+      const response = body.recordOnly === true ? json(await status()) : await this.announcements(new Request(page, { headers: request.headers }), user, page);
       if (!recorded) await storage.put({ [key]: true, ...activityFields(['announcementOpens']) });
       return response;
     }
