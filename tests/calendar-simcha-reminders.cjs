@@ -182,7 +182,7 @@ async function checkPhoneControls(site, owner, viewer, device, detailsDate) {
     await manager.goto(site + '/admin/calendar/');
     await manager.locator('.cal-brand [data-cal-add]:not([disabled])').click();
     const form = manager.getByRole('dialog', { name: 'Add an event' });
-    await form.getByLabel('Details').fill('Synthetic Shabbos simcha');
+    await form.getByLabel('Congregation information').fill('Synthetic Shabbos simcha');
     await form.getByLabel('Date', { exact: true }).fill('2090-12-02');
     assert.equal(await form.locator('select[name=reminder]').count(), 0);
     const note = form.locator('[data-cal-reminder-note]');

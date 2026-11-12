@@ -1048,11 +1048,14 @@ never use custom wording as a CSS class. Preserve older generic event types for
 existing events and editing them without migration. Deploy the matching shared
 event validator before its client. Category changes retain normal role checks,
 revision conflicts, calendar dates and private activity tracking.
-The event form has one Details textarea instead of separate title, location and
-description boxes. Derive the short calendar-cell title from its first line; keep
-the remaining text in the existing description field. Existing events show all
-three legacy fields in the single box and preserve those fields when its text is
-unchanged. There is no All day checkbox. Both times are optional independently;
+The event form has Admin information and Congregation information textareas.
+Either field can be left blank. Calendar admins see both texts and can copy the
+admin text exactly. The service sends only congregation information to signed-in
+viewers and congregation previews, and omits events with only admin information.
+Derive the calendar-cell title and other legacy summary fields from the text for
+the congregation when present. Existing events put all their text in the box for
+their stored audience and keep unchanged legacy fields. There is no All day checkbox.
+Both times are optional independently;
 blank times show no time label, and an end alone is labelled Until. Preserve old
 allDay records. Deploy the optional-time validator before publishing its client.
 Daily events sort by the category-picker order, keeping every matching category

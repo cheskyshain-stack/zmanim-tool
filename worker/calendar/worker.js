@@ -118,7 +118,7 @@ export class CommunityCalendar extends DurableObject {
     return { token, expires, ...this.sessionInfo(user) };
   }
   sessionInfo(user) {
-    return { user: userView(user), eventVisibility: true, ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey, reminderSchedules: true } : {}) };
+    return { user: userView(user), eventVisibility: true, eventAudienceDetails: true, ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey, reminderSchedules: true } : {}) };
   }
   async phoneReminders(request, user, path) {
     const method = request.method, statusOnly = path === '/api/phone-reminders/status' && method === 'POST';
@@ -488,7 +488,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -585,17 +585,17 @@ export class CommunityCalendar extends DurableObject {
     if (path === '/api/events' && method === 'GET') {
       const from = url.searchParams.get('from'), to = url.searchParams.get('to');
       if (!Number.isFinite(calendarSerial(from)) || !Number.isFinite(calendarSerial(to)) || calendarSerial(to) < calendarSerial(from) || calendarSerial(to) - calendarSerial(from) > 62) fail('Choose a calendar month.');
-      const events = [...(await this.ctx.storage.list({ prefix: 'event:' })).values()];
+      const events = [...(await this.ctx.storage.list({ prefix: 'event:' })).values()].filter(event => !event.deletedAt && event.date <= to && event.endDate >= from);
       const canSeeAdminEvents = ['owner', 'editor'].includes(user.role) && url.searchParams.get('view') !== 'congregation';
-      return json({ events: events.filter(event => !event.deletedAt && event.date <= to && event.endDate >= from && (canSeeAdminEvents || event.visibility !== 'admins')) });
+      return json({ events: canSeeAdminEvents ? events : events.filter(event => event.visibility !== 'admins').map(({ adminDetails, ...event }) => event) });
     }
     const entry = /^\/api\/events\/([a-zA-Z0-9_-]+)$/.exec(path);
     if (entry && ['PUT', 'DELETE'].includes(method)) {
       if (!['owner', 'editor'].includes(user.role)) fail('Only calendar admins can add or change events.', 403);
       await this.limited(request, 'event-write', 120);
       if (!identifier(entry[1])) fail('That event was not found.', 404);
-      // The full Details text and legacy summary fields can both contain multibyte text.
-      const body = await this.body(request, 56000), key = 'event:' + entry[1], old = await this.ctx.storage.get(key);
+      // A complete event can include two details fields and the older summary fields.
+      const body = await this.body(request, 82000), key = 'event:' + entry[1], old = await this.ctx.storage.get(key);
       const deleted = await this.ctx.storage.get('deleted-event:' + entry[1]);
       if (old && user.role !== 'owner' && old.createdBy !== user.id) fail('Only the main admin can change another editor’s event.', 403);
       if ((old?.revision || 0) !== body.revision || deleted) fail('This event changed in another session. Reload the month before saving.', 409);
@@ -609,8 +609,10 @@ export class CommunityCalendar extends DurableObject {
         return json({ removed: true });
       }
       if (!old && (await this.ctx.storage.list({ prefix: 'event:', limit: 2000 })).size >= 2000) fail('Remove unused or past events before adding more. This calendar has reached its event limit.', 409);
+      const splitDetails = Object.hasOwn(body, 'congregationDetails'), visibility = body.visibility ?? old?.visibility;
+      if (!splitDetails && old?.adminDetails && visibility !== old.visibility) fail('Reload the calendar to change who can see this event.', 409);
       let fields;
-      try { fields = calendarEvent({ ...body, visibility: body.visibility ?? old?.visibility, reminder: body.reminder ?? old?.reminder }); } catch (error) { fail(error.message); }
+      try { fields = calendarEvent({ ...body, visibility, adminDetails: splitDetails ? body.adminDetails : old?.adminDetails, reminder: body.reminder ?? old?.reminder }, old); } catch (error) { fail(error.message); }
       if (fields.details === undefined && old?.details !== undefined && ['title', 'location', 'description'].every(key => fields[key] === old[key])) fields.details = old.details;
       if ((!old || old.visibility === 'admins') && fields.visibility === 'everyone' && body.reminder == null && this.reminderKeys && calendarSupportsReminderSchedule(fields.type)) fields.reminder = 'schedule';
       const event = { ...fields, id: entry[1], revision: (old?.revision || 0) + 1,

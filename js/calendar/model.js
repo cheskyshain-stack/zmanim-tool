@@ -37,8 +37,16 @@ export function calendarSerial(value) {
   return Math.floor(excelSerial(date));
 }
 
-export function calendarEvent(value) {
+export function calendarEvent(value, original) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Choose a valid calendar event.');
+  const adminDetails = calendarAudienceText(value.adminDetails, 'admin');
+  if (Object.hasOwn(value, 'congregationDetails')) {
+    const congregationDetails = calendarAudienceText(value.congregationDetails, 'congregation');
+    if (!congregationDetails && !adminDetails) throw new Error('Enter admin information or congregation information.');
+    const visibility = congregationDetails ? 'everyone' : 'admins';
+    const sameAudience = visibility === (original?.visibility ?? 'everyone');
+    value = { ...value, ...calendarDetailsFields(congregationDetails || adminDetails, sameAudience ? original : undefined), visibility };
+  }
   const text = (key, limit, required = false) => {
     if (typeof (value[key] ?? '') !== 'string') throw new Error('Enter valid event information.');
     const out = (value[key] || '').trim();
@@ -70,12 +78,20 @@ export function calendarEvent(value) {
   if (reminder && !['day-of', 'day-before', 'schedule'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
     location: text('location', 200), description: text('description', 4000), ...(details === undefined ? {} : { details }),
-    visibility, ...(reminder && visibility === 'everyone' ? { reminder } : {}), revision };
+    visibility, ...(adminDetails && visibility === 'everyone' ? { adminDetails } : {}), ...(reminder && visibility === 'everyone' ? { reminder } : {}), revision };
+}
+
+function calendarAudienceText(value = '', audience) {
+  if (typeof value !== 'string' || value.length > CALENDAR_EVENT_DETAILS_MAX) throw new Error(`Enter up to 4,364 characters of ${audience} information.`);
+  return value.trim() ? value : '';
 }
 
 export function calendarEventDetails(event) {
   return event.details ?? [event.title, event.location, event.description].filter(Boolean).join('\n');
 }
+
+export const calendarCongregationDetails = event => event.visibility === 'admins' ? '' : calendarEventDetails(event);
+export const calendarAdminDetails = event => event.visibility === 'admins' ? calendarEventDetails(event) : event.adminDetails || '';
 
 export function calendarDetailsFields(details, original = {}) {
   const text = details.trim(), firstLine = text.split('\n', 1)[0];
