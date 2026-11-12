@@ -27,6 +27,12 @@ events. New readers register with their name, email and a password and immediate
 receive viewer access. Viewers can read the calendar and announcements but cannot
 change events, post announcements or manage accounts. No calendar role grants
 schedule-settings, seating-plan or GitHub access.
+
+When saving an event, choose Everyone signed in or Admins only. Existing events
+default to Everyone signed in. The service filters admin-only events out of the
+congregation calendar, congregation preview and reminder schedules. The owner and
+editors can copy the saved Details text, including its original line breaks, from
+an admin-only event. Deploy eventVisibility:true before publishing the new form.
 Passwords use salted PBKDF2-SHA256 with 100,000 iterations, the supported Workerd
 limit. New bearer sessions expire at the first 3 a.m. in New York at or after
 seven full days from sign-in. Tokens are stored hashed on the server. The browser

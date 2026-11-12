@@ -3751,6 +3751,7 @@ const CALENDAR_LEGACY_TYPES = [
 ];
 
 const CALENDAR_TYPE_ORDER = new Map([...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].map((type, index) => [type.id, index]));
+const CALENDAR_EVENT_DETAILS_MAX = 4364;
 
 function calendarEventCategory(event) {
   const type = [...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].find(item => item.id === event.type) || CALENDAR_LEGACY_TYPES.at(-1);
@@ -3791,23 +3792,29 @@ function calendarEvent(value) {
   if (endDate === date && time && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
+  const visibility = value.visibility ?? 'everyone';
+  if (!['everyone', 'admins'].includes(visibility)) throw new Error('Choose who can see this event.');
+  const details = value.details;
+  if (details !== undefined && (typeof details !== 'string' || !details.trim() || details.length > CALENDAR_EVENT_DETAILS_MAX)) throw new Error('Enter up to 4,364 characters of event details.');
   const reminder = text('reminder', 10);
   if (reminder && !['day-of', 'day-before', 'schedule'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
-    location: text('location', 200), description: text('description', 4000), ...(reminder ? { reminder } : {}), revision };
+    location: text('location', 200), description: text('description', 4000), ...(details === undefined ? {} : { details }),
+    visibility, ...(reminder && visibility === 'everyone' ? { reminder } : {}), revision };
 }
 
 function calendarEventDetails(event) {
-  return [event.title, event.location, event.description].filter(Boolean).join('\n');
+  return event.details ?? [event.title, event.location, event.description].filter(Boolean).join('\n');
 }
 
 function calendarDetailsFields(details, original = {}) {
   const text = details.trim(), firstLine = text.split('\n', 1)[0];
   if (!text) throw new Error('Enter the event details.');
   // Keep legacy fields intact when only a category, date or time is changed.
-  if (details === calendarEventDetails(original)) return { title: original.title || '', location: original.location || '', description: original.description || '' };
-  const title = firstLine.slice(0, 160), description = text.slice(title.length).trim();
-  return { title, location: '', description };
+  if (details === calendarEventDetails(original)) return { title: original.title || '', location: original.location || '', description: original.description || '', details: original.details };
+  // Keep the legacy summary fields bounded while storing the full, unchanged text.
+  const title = firstLine.slice(0, 160), description = text.slice(title.length).trim().slice(0, 4000);
+  return { title, location: '', description, details };
 }
 
 function calendarEventsOn(events, date) {
@@ -3942,7 +3949,7 @@ function calendarReminderDate(date, mode) {
 }
 
 function calendarReminderSlot(event, schedule = DEFAULT_CALENDAR_REMINDER_SCHEDULE) {
-  if (!event.reminder) return null;
+  if (!event.reminder || event.visibility === 'admins') return null;
   const supported = calendarSupportsReminderSchedule(event.type);
   if (!supported && event.reminder === 'schedule') return null;
   const override = schedule.sameTime === true ? null : schedule.categories[event.type];
@@ -4895,7 +4902,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
-  let reminderPublicKey = '', reminderSchedules = false;
+  let reminderPublicKey = '', reminderSchedules = false, eventVisibility = false;
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const readerCache = new Map(), readerPending = new Map();
   let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
@@ -4969,7 +4976,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
-  const visibleEvents = () => [...events, ...sampleEvents()];
+  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents()];
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -4979,11 +4986,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const canEdit = event => !event.example && (!endpoint || role() === 'owner' || role() === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
-    const type = calendarEventCategory(event);
-    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}</div>
+    const type = calendarEventCategory(event), adminsOnly = event.visibility === 'admins', editable = canEdit(event);
+    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
       <p class="cal-event-description" dir="auto">${calEscape(calendarEventDetails(event))}</p>${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
-      ${canEdit(event) ? `<div class="cal-event-actions"><button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}" ${previewing() ? 'disabled' : ''}>Delete</button></div>` : ''}</article>`;
+      ${adminsOnly || editable ? `<div class="cal-event-actions">${adminsOnly ? `<button type="button" data-cal-copy-event="${escAttr(event.id)}">Copy</button>` : ''}${editable ? `<button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}" ${previewing() ? 'disabled' : ''}>Delete</button>` : ''}</div>` : ''}</article>`;
   }
   function dayHtml(date) {
     const info = calendarMonth(date.slice(0, 7), settings, tables), day = info.days.find(item => item.iso === date);
@@ -4996,6 +5003,10 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   }
   function wireDay(scope, close = () => {}) {
     scope.querySelectorAll('[data-cal-phone-reminders]').forEach(button => button.addEventListener('click', showPhoneReminders));
+    scope.querySelectorAll('[data-cal-copy-event]').forEach(button => {
+      const item = events.find(event => event.id === button.dataset.calCopyEvent);
+      if (item) wireCopyButton(button, () => calendarEventDetails(item));
+    });
     scope.querySelectorAll('[data-cal-reload]').forEach(button => button.addEventListener('click', () => { close(); loadEvents(); }));
     scope.querySelectorAll('[data-cal-add]').forEach(button => button.addEventListener('click', () => { close(); editEvent(null, button.dataset.calAdd); }));
     scope.querySelectorAll('[data-cal-edit]').forEach(button => button.addEventListener('click', () => { const item = events.find(event => event.id === button.dataset.calEdit); close(); if (item) editEvent(item); }));
@@ -5053,6 +5064,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function openCalendarSession(session) {
     user = session.user; reminderPublicKey = session.reminderPublicKey || '';
     reminderSchedules = session.reminderSchedules === true;
+    eventVisibility = session.eventVisibility === true;
     const { calendarRefresh, ...historyState } = history.state || {};
     if (calendarRefresh) {
       history.replaceState(historyState, '');
@@ -5073,7 +5085,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     if (calendarRefresh?.focus) container.querySelector('[data-cal-refresh]')?.focus({ preventScroll: true });
     await loading;
     if (requested && !disposed && user === session.user) {
-      const event = eventId && events.find(item => item.id === eventId);
+      const event = eventId && visibleEvents().find(item => item.id === eventId);
       openDay(target, { event, missingEvent: !!eventId && !event && !loadError, remindToPost: reminderPost && (!eventId || !!event) });
     }
   }
@@ -5215,7 +5227,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const info = calendarMonth(value, settings, tables);
     const from = info.days[0].iso < '1900-01-01' ? '1900-01-01' : info.days[0].iso;
     const to = info.days.at(-1).iso > '2299-12-31' ? '2299-12-31' : info.days.at(-1).iso;
-    const response = await calendarRequest(`/api/events?from=${from}&to=${to}`);
+    const response = await calendarRequest(`/api/events?from=${from}&to=${to}${reader() ? '&view=congregation' : ''}`);
     if (!Array.isArray(response.events)) throw new Error('The calendar returned an invalid event list.');
     return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedAt: String(item.updatedAt || '') }));
   }
@@ -5321,7 +5333,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   function editEvent(item, date = selected) {
     const original = item || { id: crypto.randomUUID(), title: '', type: 'kiddush', date, endDate: date, allDay: true, time: '', endTime: '', location: '', description: '', revision: 0 };
     let saving = false, initial = '';
-    const view = dialog(`<form class="cal-form"><label>Details<textarea name="details" required maxlength="4364" rows="4" placeholder="Enter all the event information">${calEscape(calendarEventDetails(original))}</textarea></label>
+    const view = dialog(`<form class="cal-form"><label>Details<textarea name="details" required maxlength="${CALENDAR_EVENT_DETAILS_MAX}" rows="4" placeholder="Enter all the event information"></textarea></label>
+      ${eventVisibility ? `<label>Who can see this?<select name="visibility"><option value="everyone">Everyone signed in</option><option value="admins" ${original.visibility === 'admins' ? 'selected' : ''}>Admins only</option></select></label>` : ''}
       <div class="cal-form-row"><label>Category<select name="type">${[...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES.filter(type => type.id === original.type)].map(type => `<option value="${type.id}" ${type.id === original.type ? 'selected' : ''}>${calEscape(type.label)}</option>`).join('')}</select></label><label>Date<input name="date" type="date" required min="1900-01-01" max="2299-12-31" value="${original.date}"></label></div>
       <label data-cal-custom-category ${original.type === 'custom' ? '' : 'hidden'}>Category name<input name="customCategory" maxlength="60" value="${escAttr(original.customCategory || '')}" placeholder="Enter any category name" ${original.type === 'custom' ? 'required' : 'disabled'}></label>
       <p class="cal-form-hebrew" lang="he" dir="rtl"></p>
@@ -5333,6 +5346,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       { onClose: () => !saving && (new URLSearchParams(new FormData(view.el.querySelector('form'))).toString() === initial || confirm('Discard your unsaved event changes?')) });
     view.title(item ? 'Edit event' : 'Add an event');
     const form = view.el.querySelector('form');
+    form.elements.details.value = calendarEventDetails(original);
+    const visibility = form.elements.visibility;
     const reminderNote = form.querySelector('[data-cal-reminder-note]');
     form.elements.type.addEventListener('change', () => {
       const custom = form.elements.type.value === 'custom';
@@ -5345,12 +5360,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       view.el.querySelector('.cal-form-hebrew').textContent = Number.isFinite(calendarSerial(value)) ? hebrewLabel(value) : '';
       form.elements.endDate.min = value;
       if (reminderNote) {
-        const reminder = calendarReminderSlot({ date: value, type: form.elements.type.value, reminder: 'schedule' });
+        const reminder = calendarReminderSlot({ date: value, type: form.elements.type.value, visibility: visibility?.value, reminder: 'schedule' });
         reminderNote.hidden = !reminder;
         reminderNote.textContent = reminder ? `Uses each phone’s reminder settings. Default reminder is ${calFullDate(reminder.date)} at 9:00 a.m. New York time.` : '';
       }
     };
     updateDate(); form.elements.date.addEventListener('change', updateDate);
+    visibility?.addEventListener('change', updateDate);
     initial = new URLSearchParams(new FormData(form)).toString();
     view.el.querySelector('[data-cal-cancel]').addEventListener('click', view.close);
     view.el.querySelector('[data-cal-remove-event]')?.addEventListener('click', async () => {
@@ -5369,8 +5385,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       const status = view.el.querySelector('[role=status]');
       try {
         const fields = Object.fromEntries(new FormData(form));
-        const next = { ...original, ...calendarEvent({ ...fields, ...calendarDetailsFields(fields.details, original), allDay: false, revision: original.revision }) };
-        if (reminderSchedules) {
+        const next = { ...original, ...calendarEvent({ ...fields, ...calendarDetailsFields(form.elements.details.value, original), visibility: visibility?.value ?? original.visibility, allDay: false, revision: original.revision }) };
+        if (next.visibility === 'admins') next.reminder = '';
+        else if (reminderSchedules) {
           if (calendarSupportsReminderSchedule(next.type)) next.reminder = 'schedule';
           else if (next.type !== original.type) next.reminder = '';
         }

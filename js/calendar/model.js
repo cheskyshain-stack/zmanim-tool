@@ -21,6 +21,7 @@ export const CALENDAR_LEGACY_TYPES = [
 ];
 
 const CALENDAR_TYPE_ORDER = new Map([...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].map((type, index) => [type.id, index]));
+export const CALENDAR_EVENT_DETAILS_MAX = 4364;
 
 export function calendarEventCategory(event) {
   const type = [...CALENDAR_TYPES, ...CALENDAR_LEGACY_TYPES].find(item => item.id === event.type) || CALENDAR_LEGACY_TYPES.at(-1);
@@ -61,23 +62,29 @@ export function calendarEvent(value) {
   if (endDate === date && time && endTime && endTime <= time) throw new Error('The end time must follow the start time.');
   const revision = value.revision ?? 0;
   if (!Number.isInteger(revision) || revision < 0) throw new Error('This event needs to be reloaded.');
+  const visibility = value.visibility ?? 'everyone';
+  if (!['everyone', 'admins'].includes(visibility)) throw new Error('Choose who can see this event.');
+  const details = value.details;
+  if (details !== undefined && (typeof details !== 'string' || !details.trim() || details.length > CALENDAR_EVENT_DETAILS_MAX)) throw new Error('Enter up to 4,364 characters of event details.');
   const reminder = text('reminder', 10);
   if (reminder && !['day-of', 'day-before', 'schedule'].includes(reminder)) throw new Error('Choose a valid phone reminder.');
   return { title: text('title', 160, true), type, customCategory, date, endDate, allDay, time, endTime,
-    location: text('location', 200), description: text('description', 4000), ...(reminder ? { reminder } : {}), revision };
+    location: text('location', 200), description: text('description', 4000), ...(details === undefined ? {} : { details }),
+    visibility, ...(reminder && visibility === 'everyone' ? { reminder } : {}), revision };
 }
 
 export function calendarEventDetails(event) {
-  return [event.title, event.location, event.description].filter(Boolean).join('\n');
+  return event.details ?? [event.title, event.location, event.description].filter(Boolean).join('\n');
 }
 
 export function calendarDetailsFields(details, original = {}) {
   const text = details.trim(), firstLine = text.split('\n', 1)[0];
   if (!text) throw new Error('Enter the event details.');
   // Keep legacy fields intact when only a category, date or time is changed.
-  if (details === calendarEventDetails(original)) return { title: original.title || '', location: original.location || '', description: original.description || '' };
-  const title = firstLine.slice(0, 160), description = text.slice(title.length).trim();
-  return { title, location: '', description };
+  if (details === calendarEventDetails(original)) return { title: original.title || '', location: original.location || '', description: original.description || '', details: original.details };
+  // Keep the legacy summary fields bounded while storing the full, unchanged text.
+  const title = firstLine.slice(0, 160), description = text.slice(title.length).trim().slice(0, 4000);
+  return { title, location: '', description, details };
 }
 
 export function calendarEventsOn(events, date) {
