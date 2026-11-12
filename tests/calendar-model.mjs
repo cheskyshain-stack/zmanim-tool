@@ -183,6 +183,12 @@ test('one details box keeps legacy information and separates a short calendar su
   const long = 'A'.repeat(200), split = calendarDetailsFields(long);
   assert.equal(split.title + split.description, long); assert.equal(split.title.length, 160);
   assert.throws(() => calendarDetailsFields('  '), /details/);
+  const formatted = '\n  Mazel tov!\n\n  מזל טוב  \n';
+  const adminOnly = event({ ...calendarDetailsFields(formatted), visibility: 'admins', reminder: 'schedule' });
+  assert.equal(calendarEventDetails(calendarEvent(JSON.parse(JSON.stringify(adminOnly)))), formatted);
+  assert.equal(adminOnly.reminder, undefined);
+  assert.equal(event({}).visibility, 'everyone');
+  assert.throws(() => event({ visibility: 'public' }), /who can see/);
 });
 
 test('preview storage preserves corrupt data and reports unavailable storage instead of claiming a save', () => {

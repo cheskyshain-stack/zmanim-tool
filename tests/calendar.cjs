@@ -568,6 +568,57 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal((await call('/api/events/' + ownerId, 'PUT', { ...ownerEvent.body.event, date: '2026-02-30' }, owner)).status, 400);
     assert.equal((await call('/api/events/' + ownerId, 'DELETE', { revision: 1 }, owner)).status, 200);
     assert.equal((await call('/api/events/' + ownerId, 'PUT', fields, owner)).status, 409, 'A stale retry cannot recreate a deleted event');
+    const adminDate = '2026-11-11', adminDetails = '\n  Admin simcha wording\n\n  מזל טוב, "Mazel tov!"  \n';
+    const adminForm = await fillEvent(editorPage, adminDetails, 'kiddush', adminDate);
+    assert.equal(await adminForm.getByLabel('Who can see this?').inputValue(), 'everyone');
+    await adminForm.getByLabel('Who can see this?').selectOption('admins');
+    for (const width of [375, 393]) {
+      await editorPage.setViewportSize({ width, height: 900 });
+      assert(await adminForm.locator('[name=visibility]').evaluate(input => {
+        const box = input.getBoundingClientRect(), dialog = input.closest('dialog').getBoundingClientRect();
+        return box.left >= dialog.left && box.right <= dialog.right && box.height >= 44 && document.documentElement.scrollWidth <= innerWidth;
+      }), 'The visibility choice fits the phone form at ' + width + 'px');
+    }
+    await adminForm.getByRole('button', { name: 'Save event', exact: true }).click();
+    await editorPage.locator('.cal-dialog').waitFor({ state: 'detached' });
+    const adminDay = '/api/events?from=' + adminDate + '&to=' + adminDate;
+    const adminEvents = async (token, view = '') => (await call(adminDay + view, 'GET', null, token)).body.events;
+    const adminEvent = (await adminEvents(owner)).find(event => event.visibility === 'admins');
+    assert.equal(adminEvent.details, adminDetails);
+    assert.equal(adminEvent.createdBy, editorSession.user.id);
+    assert((await adminEvents(editor)).some(event => event.id === adminEvent.id));
+    for (const token of [owner, editor, viewerSession.token]) {
+      assert(!(await adminEvents(token, '&view=congregation')).some(event => event.id === adminEvent.id));
+    }
+    assert(!(await adminEvents(viewerSession.token, '&view=owner')).some(event => event.id === adminEvent.id), 'A reader cannot request admin events');
+    assert((await adminEvents(viewerSession.token)).some(event => event.id === item.id), 'Readers still see shared events');
+    const adminRoute = '/api/events/' + adminEvent.id;
+    assert.equal((await call(adminRoute, 'PUT', { ...adminEvent, visibility: 'everyone' }, viewerSession.token)).status, 403);
+    const { visibility: _visibility, details: _details, ...olderEvent } = adminEvent;
+    const legacyEdit = await call(adminRoute, 'PUT', { ...olderEvent, time: '12:00' }, editor);
+    assert.equal(legacyEdit.body.event.visibility, 'admins');
+    assert.equal(legacyEdit.body.event.details, adminDetails, 'A legacy time edit preserves both privacy and exact text');
+    await ownerPage.setViewportSize({ width: 393, height: 900 });
+    await ownerPage.reload(); await ownerPage.locator('.shul-calendar').waitFor(); await jump(ownerPage, '2026-11');
+    await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+    await ownerPage.evaluate(() => { navigator.clipboard.writeText = async text => { window.copiedEventDetails = text; }; });
+    await ownerPage.locator('[data-cal-day="' + adminDate + '"]').click();
+    const adminCard = ownerPage.locator('.cal-dialog .cal-event-card').filter({ hasText: 'Admin simcha wording' });
+    assert.equal(await adminCard.locator('.cal-visibility-tag').textContent(), 'Admins only');
+    await adminCard.getByRole('button', { name: 'Copy', exact: true }).click();
+    await adminCard.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    assert.equal(await ownerPage.evaluate(() => window.copiedEventDetails), adminDetails, 'Another admin can copy the exact text');
+    await adminCard.locator('[data-cal-edit]').click();
+    assert.equal(await ownerPage.locator('[name=details]').inputValue(), adminDetails);
+    await ownerPage.getByLabel('Who can see this?').selectOption('everyone');
+    await ownerPage.getByRole('button', { name: 'Save changes', exact: true }).click();
+    await ownerPage.locator('.cal-dialog').waitFor({ state: 'detached' });
+    const publishedEvent = (await adminEvents(viewerSession.token)).find(event => event.id === adminEvent.id);
+    assert.equal(publishedEvent.details, adminDetails);
+    const madePrivate = await call(adminRoute, 'PUT', { ...publishedEvent, visibility: 'admins' }, owner);
+    assert.equal(madePrivate.status, 200);
+    assert(!(await adminEvents(viewerSession.token)).some(event => event.id === adminEvent.id));
+    await ownerPage.setViewportSize({ width: 1440, height: 900 });
     const access = await call('/api/access', 'GET', null, owner);
     assert(!/password|salt/.test(JSON.stringify(access.body)), 'Account API never returns password material');
     assert.equal((await call('/api/access/' + session.user.id, 'DELETE', null, owner)).status, 400, 'Main admin cannot be accidentally removed');
@@ -698,6 +749,9 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     for (const role of ['editor', 'viewer']) {
       await ownerPage.locator('[data-cal-view]').selectOption(role);
       await ownerPage.locator('[data-cal-view-notice]').waitFor();
+      if (role === 'editor') await ownerPage.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+      else await ownerPage.locator('.cal-day:not([disabled])').first().waitFor();
+      assert.equal(await ownerPage.locator('[data-cal-day][aria-label*="Admin simcha wording"]').count(), role === 'editor' ? 1 : 0);
       assert.equal(await ownerPage.locator('[data-cal-access]').count(), 0);
       assert.equal(await ownerPage.locator('.cal-brand [data-cal-add]').count(), role === 'editor' ? 1 : 0);
       for (const width of [375, 393, 1440]) {

@@ -32,7 +32,7 @@ export function calendarReminderDate(date, mode) {
 }
 
 export function calendarReminderSlot(event, schedule = DEFAULT_CALENDAR_REMINDER_SCHEDULE) {
-  if (!event.reminder) return null;
+  if (!event.reminder || event.visibility === 'admins') return null;
   const supported = calendarSupportsReminderSchedule(event.type);
   if (!supported && event.reminder === 'schedule') return null;
   const override = schedule.sameTime === true ? null : schedule.categories[event.type];

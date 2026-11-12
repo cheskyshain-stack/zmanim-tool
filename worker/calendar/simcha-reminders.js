@@ -113,7 +113,7 @@ async function sendToDevice(storage, { key, device, slot }, keys, origin, now, c
 function reminderEventGroups(events, oldestDate, tomorrow) {
   const nearby = new Map(), future = new Map();
   for (const event of events.values()) {
-    if (event.deletedAt || !event.reminder || event.date < oldestDate) continue;
+    if (event.deletedAt || event.visibility === 'admins' || !event.reminder || event.date < oldestDate) continue;
     const kind = `${event.type}:${event.reminder}`;
     if (event.date > tomorrow) {
       const key = `${kind}:${calendarReminderShabbos(event.date)}`;

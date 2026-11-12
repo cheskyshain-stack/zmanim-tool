@@ -309,6 +309,9 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     const defaulted = await call('/api/events/default-simcha', 'PUT', newSimcha, owner.token);
     assert.equal(defaulted.status, 201);
     assert.equal(defaulted.body.event.reminder, 'schedule');
+    const adminOnly = await call('/api/events/admin-only-simcha', 'PUT', { ...newSimcha, visibility: 'admins', reminder: 'schedule' }, owner.token);
+    assert.equal(adminOnly.status, 201);
+    assert.equal(adminOnly.body.event.reminder, undefined, 'Admin-only simchas do not schedule phone reminders');
     const custom = await call('/api/events/custom-event', 'PUT', { ...newSimcha, type: 'custom', customCategory: 'Other event' }, owner.token);
     assert.equal(custom.status, 201);
     assert.equal(custom.body.event.reminder, undefined);
