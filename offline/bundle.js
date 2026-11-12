@@ -4061,6 +4061,7 @@ function calendarAnnouncementText(value, maximum = CALENDAR_ANNOUNCEMENT_LENGTH)
 // ==== ui/calendar-announcements.js ====
 function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
   let actor = null, timer = null, button = null, active = null;
+  let firstPage = null, firstPageRequest = null;
   let total = 0, readCount = 0, deletedCount = 0, editCount = 0, canPost = false, canDelete = false, canEdit = false, unavailable = false;
   let dateEditing = false, historySince = null, snapshotAt = '';
   const dayFormat = new Intl.DateTimeFormat('en-US', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone });
@@ -4118,14 +4119,48 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     if (matches(id) && error.status === 401) { onSessionExpired(error.message); return true; }
     return false;
   }
+  function currentFirstPage() {
+    if (!firstPage || (firstPage.deletedCount || 0) < deletedCount || (firstPage.editCount || 0) < editCount || (firstPage.historySince || null) !== historySince) return null;
+    if (firstPage.historySince && firstPage.snapshotAt && localDay(new Date(firstPage.snapshotAt)) !== localDay(new Date())) return null;
+    return firstPage;
+  }
+  function fetchFirstPage() {
+    if (firstPageRequest) return firstPageRequest;
+    const id = actor;
+    firstPageRequest = request('/api/announcements').then(value => {
+      if (matches(id)) firstPage = value;
+      return value;
+    }).finally(() => { if (matches(id)) firstPageRequest = null; });
+    return firstPageRequest;
+  }
+  async function preload() {
+    const id = actor;
+    try {
+      const value = await fetchFirstPage();
+      if (matches(id)) status(value);
+    } catch (error) {
+      if (matches(id) && !failed(error, id) && !firstPage && !snapshotAt) { unavailable = true; paint(); }
+    }
+  }
+  function keepFirstPageReady() {
+    const cached = currentFirstPage();
+    if (!cached || cached.total !== total || cached.unread !== unread()) preload();
+  }
+  async function applyStatus(value) {
+    if (value.snapshotAt && value.snapshotAt < snapshotAt) return;
+    // Check the scroll position before the new-message button changes the feed height.
+    if (active && value.total > active.latest) active.followNew();
+    status(value);
+    if (!active) { keepFirstPageReady(); return; }
+    await active?.syncDeleted(); await active?.syncEdits();
+  }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
     const id = actor;
     try {
       const value = await request('/api/announcements/status');
       if (!matches(id)) return;
-      if (active && value.total > active.latest) active.followNew();
-      status(value); await active?.syncDeleted(); await active?.syncEdits();
+      await applyStatus(value);
     }
     catch (error) { if (matches(id) && !failed(error, id)) { unavailable = true; paint(); } }
   }
@@ -4134,15 +4169,17 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     actor = null; clearInterval(timer); timer = null;
     document.removeEventListener('visibilitychange', visible); window.removeEventListener('focus', visible);
     active?.cleanup(); active?.view.el.calDispose(); active = null;
+    firstPage = firstPageRequest = null;
     total = readCount = deletedCount = editCount = 0; canPost = canDelete = canEdit = unavailable = false;
     dateEditing = false; historySince = null; snapshotAt = '';
   }
   function start(user, { previewRole = '', readOnly = false } = {}) {
     const role = readOnly ? 'viewer' : previewRole || user.role, preview = !!previewRole;
-    if (actor?.id === user.id && actor.role === role && actor.preview === preview) return;
-    stop(); actor = { ...user, role, preview };
+    const token = calendarSession()?.token;
+    if (actor?.id === user.id && actor.role === role && actor.preview === preview && actor.token === token) return;
+    stop(); actor = { ...user, role, preview, token };
     document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
-    timer = setInterval(refresh, 30000); refresh();
+    timer = setInterval(refresh, 30000); preload();
   }
   function bind(container) {
     button = container.querySelector('[data-cal-announcements]');
@@ -4154,9 +4191,11 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
   async function open() {
     if (!actor || active) return;
     const id = actor, reader = id.role === 'viewer';
+    if (!id.token || calendarSession()?.token !== id.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
+    const cached = currentFirstPage();
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
-    const openingId = crypto.randomUUID(); let openingRecorded = false;
+    let pageLoaded = false;
     let editing = null, syncingEdits = null, knownEditCount = 0;
     let observer;
     const intro = previewing() ? '<p class="cal-announcement-intro">Preview only. Posts and read status stay unchanged. Choose Main admin to make changes.</p>' : '';
@@ -4169,7 +4208,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     const view = dialog(intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${olderControl}<div data-cal-message-list><p>Loading announcements…</p></div></div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`, {
       onClose: () => {
         if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
-        cleanup(); active = null; return true;
+        cleanup(); active = null; keepFirstPageReady(); return true;
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
@@ -4333,6 +4372,11 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
         const value = await request('/api/announcements/read', { method: 'POST', body: { ids } });
         if (!matches(id)) return;
         status(value); saved = true;
+        const cached = currentFirstPage();
+        if (cached) {
+          for (const message of cached.messages) if (ids.includes(message.id)) message.read = true;
+          if (cached.total === total && value.snapshotAt === snapshotAt) cached.unread = value.unread;
+        }
         if (current() && messageStatus.dataset.source === 'read') { notice(''); retry.hidden = true; }
         if (current()) for (const key of ids) {
           if (messages.has(key)) messages.get(key).read = true;
@@ -4358,10 +4402,10 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       clearTimeout(pendingTimer); pendingTimer = setTimeout(markRead, 250);
     }, { threshold: 1 });
     function followNew() {
-      if (openingRecorded && !editing && !deleting && atLatest()) load(false, true);
+      if (pageLoaded && !editing && !deleting && atLatest()) load(false, true);
     }
     active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits, followNew }; paint();
-    async function load(append = false, follow = false) {
+    async function load(append = false, follow = false, cachedPage = null) {
       if (!current() || loading || posting) return;
       if (!append && editing) {
         if (editing.saving || editDirty() && !confirm('Discard your unsaved announcement changes?')) return;
@@ -4369,11 +4413,11 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
       }
       loading = true; active.following = follow; older.disabled = retry.disabled = newButton.disabled = true; updateSend();
       try {
-        const value = !previewing() && !openingRecorded && !append
-          ? await request('/api/announcements/open', { method: 'POST', body: { id: openingId } })
-          : await request('/api/announcements' + (append && nextCursor ? '?cursor=' + encodeURIComponent(nextCursor) : append && nextBefore ? '?before=' + nextBefore : ''));
+        const value = cachedPage || (append
+          ? await request('/api/announcements' + (nextCursor ? '?cursor=' + encodeURIComponent(nextCursor) : '?before=' + nextBefore))
+          : await fetchFirstPage());
         if (!current() || !append && editing || follow && !atLatest()) return;
-        openingRecorded = true;
+        pageLoaded = true;
         if (messageStatus.dataset.source === 'load') notice('');
         const restorePosition = append ? rememberFeedPosition(false) : scrollToLatest;
         const previous = new Map(messages);
@@ -4384,7 +4428,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
           messages.set(item.id, next); list.insertAdjacentHTML('beforeend', card(next));
         }
         if (!messages.size) list.innerHTML = '<p class="cal-empty">No announcements yet.</p>';
-        if (!append) { active.latest = Math.max(active.latest, value.total); knownEditCount = value.editCount || 0; }
+        if (!append) { active.latest = Math.max(active.latest, value.total); knownEditCount = value.editCount || 0; knownDeletedCount = value.deletedCount || 0; }
         else knownEditCount = Math.min(knownEditCount, value.editCount || 0);
         nextBefore = value.nextBefore; nextCursor = value.nextCursor || null; older.hidden = !nextCursor && !nextBefore; retry.hidden = true; status(value); sortMessages();
         restorePosition();
@@ -4436,7 +4480,12 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     older.addEventListener('click', () => load(true));
     newButton.addEventListener('click', () => load());
     retry.addEventListener('click', () => { markRead(); syncDeleted(); syncEdits(); load(); });
-    await load();
+    await load(false, false, cached);
+    if (!matches(id) || previewing()) return;
+    try {
+      const value = await request('/api/announcements/open', { method: 'POST', body: { id: crypto.randomUUID(), recordOnly: true } });
+      if (matches(id)) await applyStatus(value);
+    } catch (error) { failed(error, id); }
   }
   return { start, stop, bind, markup, open, dispose: stop };
 }

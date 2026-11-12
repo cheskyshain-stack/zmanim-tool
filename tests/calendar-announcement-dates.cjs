@@ -72,7 +72,39 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
    const {chromium}=require('playwright'),{calendarAnnouncementLocalTime}=await import('../js/calendar/announcement-model.js');
    const browser=await chromium.launch({executablePath:process.env.CHROME_BIN||'/usr/bin/chromium',headless:true}),errors=[],output=fs.mkdtempSync(path.join(os.tmpdir(),'announcement-date-browser-'));
    try{
-    const prepare=async(session,width)=>{const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));await page.goto(origin+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();await page.locator('[data-cal-announcements]').click();await page.locator('.cal-announcement-message').first().waitFor();return page;};
+    const prepare=async(session,width)=>{
+     const context=await browser.newContext({viewport:{width,height:900},timezoneId:'Asia/Jerusalem'});
+     await context.addInitScript(value=>{localStorage.setItem('zmanim-nocount','1');localStorage.setItem('zmanim-admin-unlock',JSON.stringify({at:Date.now()}));sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(value));},session);
+     const page=await context.newPage(), requests=[];
+     const isFirstPage=url=>{const parsed=new URL(url);return parsed.pathname==='/api/announcements'&&!parsed.searchParams.has('cursor')&&!parsed.searchParams.has('before');};
+     page.on('pageerror',e=>errors.push(e.message));
+     page.on('request',request=>{if(request.method()!=='OPTIONS')requests.push(new URL(request.url()).pathname);});
+     const preloaded=page.waitForResponse(response=>isFirstPage(response.url())&&response.request().method()==='GET'&&response.ok());
+     await page.goto(origin+'/admin/calendar/');
+     await page.locator('.shul-calendar').waitFor();
+     const initial=await (await preloaded).json();
+     assert(initial.unread>0,'The preload fixture includes unread messages');
+     await page.locator(`[data-cal-announcements][aria-label$=", ${initial.unread} unread"]`).waitFor();
+     assert(!requests.includes('/api/announcements/open')&&!requests.includes('/api/announcements/read'),'Preloading neither opens nor reads messages');
+     let pageFetches=0;
+     const blockFirstPage=route=>{pageFetches++;return route.abort();};
+     await page.route(isFirstPage,blockFirstPage);
+     for(let opening=0;opening<2;opening++){
+      if(opening)await page.locator('.cal-announcements-dialog [data-cal-close]').click();
+      const recorded=page.waitForResponse(response=>new URL(response.url()).pathname==='/api/announcements/open'&&response.request().method()==='POST'&&response.ok());
+      const firstFrame=await page.evaluate(()=>{
+       document.querySelector('[data-cal-announcements]').click();
+       const feed=document.querySelector('.cal-announcement-feed');
+       const cards=feed.querySelectorAll('[data-announcement-id]');
+       return {count:cards.length,last:cards[cards.length-1]?.dataset.announcementId,atBottom:feed.scrollHeight-feed.clientHeight-feed.scrollTop<=2};
+      });
+      assert.deepEqual(firstFrame,{count:initial.messages.length,last:fresh.id,atBottom:true},'The first render opens the preloaded feed at the newest message');
+      assert(!Object.hasOwn(await (await recorded).json(),'messages'),'Recording an open does not download the feed again');
+     }
+     assert.equal(pageFetches,0,'Opening and reopening an unchanged feed require no first-page request');
+     await page.unroute(isFirstPage,blockFirstPage);
+     return page;
+    };
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
     const managerDialog = manager.getByRole('dialog', { name: 'Announcements' });
     const managerFeed = managerDialog.locator('.cal-announcement-feed');
