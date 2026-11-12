@@ -111,7 +111,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
      await congregant.waitForFunction(() => parseFloat(document.querySelector('.cal-announcement-reader').style.getPropertyValue('--cal-dialog-height')) === (window.visualViewport?.height || innerHeight) - 32);
      const geometry = await readerDialog.evaluate(dialog => {
       const box = dialog.getBoundingClientRect();
-      const header = dialog.querySelector('.cal-dialog-header').getBoundingClientRect();
+      const footer = dialog.querySelector('.cal-dialog-header').getBoundingClientRect();
       const close = dialog.querySelector('[data-cal-close]');
       const closeTop = close.getBoundingClientRect().top;
       const feed = dialog.querySelector('.cal-announcement-feed');
@@ -121,12 +121,16 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
       const fixedClose = close.getBoundingClientRect().top === closeTop;
       feed.scrollTop = 0;
       return { top: box.top, left: box.left, right: innerWidth - box.right, bottom: innerHeight - box.bottom,
-       headerGap: list.top - header.bottom, listHeight: list.height, outerOverflow: dialog.scrollHeight - dialog.clientHeight,
+       footerGap: footer.top - list.bottom, listHeight: list.height, outerOverflow: dialog.scrollHeight - dialog.clientHeight,
        closeHeight: close.getBoundingClientRect().height, scrolled, fixedClose };
      });
-     const { top, left, right, bottom, headerGap, listHeight, outerOverflow, closeHeight, scrolled, fixedClose } = geometry;
+     const { top, left, right, bottom, footerGap, listHeight, outerOverflow, closeHeight, scrolled, fixedClose } = geometry;
      assert(top >= 12 && left >= 12 && right >= 12 && bottom >= 12 && bottom <= 24, JSON.stringify({ width, height, ...geometry }));
-     assert(headerGap <= 12 && listHeight > height * .48 && outerOverflow <= 1 && closeHeight >= 44 && scrolled && fixedClose, JSON.stringify({ width, height, ...geometry }));
+     assert(footerGap >= 0 && footerGap <= 12 && listHeight > height * .48 && outerOverflow <= 1 && closeHeight >= 44 && scrolled && fixedClose, JSON.stringify({ width, height, ...geometry }));
+     if (width === 393) {
+      await readerFeed.evaluate(feed => { feed.scrollTop = feed.scrollHeight; });
+      await congregant.screenshot({ path: path.join(output, 'reader-messages-footer.png') });
+     }
     }
     await congregant.setViewportSize({ width: 393, height: 900 });
     const older = readerFeed.getByRole('button',{name:'Load older messages',exact:true});
