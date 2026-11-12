@@ -4144,14 +4144,14 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     document.addEventListener('visibilitychange', visible); window.addEventListener('focus', visible);
     timer = setInterval(refresh, 30000); refresh();
   }
-  function bind(container, openPhoneReminders) {
+  function bind(container) {
     button = container.querySelector('[data-cal-announcements]');
-    button?.addEventListener('click', () => open(openPhoneReminders)); paint();
+    button?.addEventListener('click', open); paint();
   }
   function markup({ label = 'Announcements', icon = false } = {}) {
     return `<button type="button" data-cal-announcements data-cal-announcement-label="${escAttr(label)}">${icon ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>' : ''}<span>${escText(label)}</span><span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>`;
   }
-  async function open(openPhoneReminders) {
+  async function open() {
     if (!actor || active) return;
     const id = actor, reader = id.role === 'viewer';
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
@@ -4175,15 +4175,9 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
     if (reader) {
       view.el.classList.add('cal-announcement-reader');
-      if (openPhoneReminders) {
-        const setup = document.createElement('button');
-        setup.type = 'button'; setup.textContent = 'Phone reminders'; setup.disabled = previewing();
-        view.el.querySelector('.cal-dialog-header').after(setup);
-        setup.addEventListener('click', () => {
-          view.close();
-          if (!view.el.isConnected) openPhoneReminders();
-        });
-      }
+      const controls = view.el.querySelector('.cal-dialog-header');
+      view.el.append(controls);
+      controls.querySelector('[data-cal-close]').focus({ preventScroll: true });
     }
     const feed = view.el.querySelector('.cal-announcement-feed'), form = view.el.querySelector('form');
     const list = feed.querySelector('[data-cal-message-list]');
@@ -5116,7 +5110,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
-    announcements.bind(container, isReader && phoneRemindersAvailable() ? showPhoneReminders : undefined);
+    announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {

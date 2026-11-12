@@ -70,8 +70,16 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.goto(site + '/admin/calendar/?preview=congregation');
     await reader.getByRole('button', { name: /^Messages/ }).click();
     const messages = reader.getByRole('dialog', { name: 'Messages' });
-    await messages.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await messages.waitFor();
+    assert.equal(await messages.getByRole('button', { name: 'Phone reminders', exact: true }).count(), 0);
+    await messages.getByRole('button', { name: 'Close', exact: true }).click();
     await messages.waitFor({ state: 'detached' });
+    const openPhoneReminders = async () => {
+      await reader.getByRole('button', { name: 'Calendar options', exact: true }).click();
+      const options = reader.getByRole('dialog', { name: 'Calendar options' });
+      await options.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    };
+    await openPhoneReminders();
     const turnOn = reader.getByRole('button', { name: 'Turn on phone reminders' });
     await reader.getByText('Your browser reports that notifications for this site are blocked.').waitFor();
     await turnOn.click();
@@ -137,8 +145,7 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await save.click();
     await saved.waitFor();
     await reader.keyboard.press('Escape');
-    await reader.getByRole('button', { name: /^Messages/ }).click();
-    await messages.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await openPhoneReminders();
     await sameTime.waitFor();
     assert(await sameTime.isChecked());
     assert.equal(await reminderTime.inputValue(), '10:15');
@@ -152,8 +159,7 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     await reader.keyboard.press('Escape');
     await reader.evaluate(() => window.seedStaleReminder());
-    await reader.getByRole('button', { name: /^Messages/ }).click();
-    await messages.getByRole('button', { name: 'Phone reminders', exact: true }).click();
+    await openPhoneReminders();
     await reader.getByRole('button', { name: 'Reconnect phone reminders' }).click();
     await reader.getByText('Phone reminders are on for this device.').waitFor();
     await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
@@ -200,10 +206,10 @@ async function checkPhoneControls(site, owner, viewer, device) {
     await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
     await manager.keyboard.press('Escape');
     await manager.locator('[data-cal-view]').selectOption('viewer');
-    await manager.getByRole('button', { name: /^Messages/ }).click();
-    const previewSetup = manager.getByRole('dialog', { name: 'Messages' }).getByRole('button', { name: 'Phone reminders', exact: true });
-    await previewSetup.waitFor();
-    assert(await previewSetup.isDisabled(), 'View as Congregation shows the setup without changing device settings');
+    await manager.getByRole('button', { name: 'Calendar options', exact: true }).click();
+    const previewOptions = manager.getByRole('dialog', { name: 'Calendar options' });
+    await previewOptions.waitFor();
+    assert.equal(await previewOptions.getByRole('button', { name: 'Phone reminders', exact: true }).count(), 0, 'View as Congregation cannot change device settings');
   } finally { await browser.close(); }
 }
 

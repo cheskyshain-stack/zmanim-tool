@@ -290,7 +290,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
-    announcements.bind(container, isReader && phoneRemindersAvailable() ? showPhoneReminders : undefined);
+    announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {
