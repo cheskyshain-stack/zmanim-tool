@@ -3,8 +3,9 @@ import { seatsDescribeChanges, seatsRecordMetadata } from '../../js/seats/activi
 import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
 import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
 import { SEATS_RESERVATION_MS } from '../../js/seats/reservation.js';
+import { shulSessionExpiration } from '../../js/session-expiration.js';
 
-const SEATS_SHARED_SESSION_MS = 24 * 60 * 60 * 1000;
+const SEATS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
 const seatsWorkerHash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const seatsWorkerJson = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
@@ -72,10 +73,10 @@ export class SeatsWorkspace {
           if (!valid) { attempts.count++; await this.ctx.storage.put(key, attempts); return seatsWorkerJson({ error: 'That PIN did not match.' }, 401); }
           const name = String(body.name || 'Organizer').trim().slice(0, 60) || 'Organizer';
           const token = [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
-          const session = { name, expires: now + SEATS_SHARED_SESSION_MS };
+          const session = { name, expires: shulSessionExpiration(now) };
           await this.ctx.storage.put('session:' + await seatsWorkerHash(token), session);
           await this.ctx.storage.delete(key);
-          await this.ctx.storage.setAlarm(now + SEATS_SHARED_SESSION_MS);
+          await this.ctx.storage.setAlarm(now + SEATS_CLEANUP_INTERVAL_MS);
           return seatsWorkerJson({ ...session, token });
         });
       } catch { return seatsWorkerJson({ error: 'Enter your name and the Seats PIN.' }, 400); }
@@ -160,7 +161,7 @@ export class SeatsWorkspace {
         const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
         if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
         if (request.method === 'GET') return record.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(record);
-        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); await this.ctx.storage.setAlarm(Date.now() + SEATS_SHARED_SESSION_MS); this.broadcast({ type: 'name-lists-changed' }); }
+        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); await this.ctx.storage.setAlarm(Date.now() + SEATS_CLEANUP_INTERVAL_MS); this.broadcast({ type: 'name-lists-changed' }); }
         return seatsWorkerJson({ deleted: true });
       });
     }
@@ -211,7 +212,7 @@ export class SeatsWorkspace {
         if (!record.deletedAt) {
           const now = new Date().toISOString(), next = { ...record, ...seatsRecordMetadata(record), deletedAt: now, deletedBy: session.name, revision: record.revision + 1, updatedAt: now, updatedBy: session.name, historyFromRevision: record.historyFromRevision || record.revision };
           await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(match[1], record.revision)]: seatsLegacyHistory(record) } : {}), [seatsHistoryKey(match[1], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Deleted chart from the website'] } });
-          await this.ctx.storage.setAlarm(Date.now() + SEATS_SHARED_SESSION_MS);
+          await this.ctx.storage.setAlarm(Date.now() + SEATS_CLEANUP_INTERVAL_MS);
           this.broadcast({ type: 'plan-deleted', id: match[1] }); this.broadcast({ type: 'plans-changed' });
         }
         return seatsWorkerJson({ deleted: true });
@@ -330,7 +331,7 @@ export class SeatsWorkspace {
         }
       }
     }
-    if (pendingTrash || (await this.ctx.storage.list({ prefix: 'session:', limit: 1 })).size) await this.ctx.storage.setAlarm(now + SEATS_SHARED_SESSION_MS);
+    if (pendingTrash || (await this.ctx.storage.list({ prefix: 'session:', limit: 1 })).size) await this.ctx.storage.setAlarm(now + SEATS_CLEANUP_INTERVAL_MS);
     });
   }
 }

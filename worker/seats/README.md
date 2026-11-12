@@ -5,9 +5,10 @@ stores shared plans in a SQLite Durable Object and broadcasts changes through
 WebSockets. It does not use or change the statistics Worker's archive or secret.
 
 Each organizer enters a name and the existing Seats PIN, 4444. PIN checks happen
-on the server before any plan can be read or changed. Sessions last 24 hours;
-tokens stay in sessionStorage and are sent in an authorization header or the first
-WebSocket message, never a URL. Failed PIN attempts are limited per IP address.
+on the server before any plan can be read or changed. New sessions expire at the
+first 3 a.m. in New York after at least seven full days, regardless of activity.
+The browser remembers the session across visits. Tokens are sent in an authorization
+header or the first WebSocket message, never a URL. Failed PIN attempts are limited per IP address.
 Only the congregation site's origin is allowed. Request logging is disabled.
 
 Local plans and backups stay available. Sharing is opt-in: choose Save to site,
