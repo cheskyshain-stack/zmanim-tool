@@ -501,6 +501,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     assert.equal(deletedAgain.status, 200); assert.equal(deletedAgain.body.deletedCount, 1, 'Deletion retries are idempotent');
     assert.equal((await call('/api/announcements/' + editorPostId, 'PUT', { text: 'Restore deleted', revision: 1, operationId: crypto.randomUUID() }, owner)).status, 404);
     assert.equal((await call('/api/announcements', 'POST', { id: editorPostId, text: 'Second calendar update' }, editor)).status, 409, 'Old post retries cannot restore deleted messages');
+    await editorPage.reload();
     await editorPage.locator('[data-cal-announcements]').click();
     await editorPage.waitForFunction(() => document.querySelectorAll('.cal-announcement-message').length === 30);
     await editorPage.locator('[data-cal-older-announcements]').click();
