@@ -10,6 +10,7 @@ const SEATS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
 const seatsWorkerHash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const seatsWorkerJson = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+const seatsPrivatePin = env => /^[0-9]{6,8}$/.test(env.SEATS_PRIVATE_PIN || '') ? env.SEATS_PRIVATE_PIN : '';
 const seatsWorkerId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,100}$/.test(value);
 const seatsHistoryKey = (id, revision) => 'history:' + id + ':' + String(revision).padStart(12, '0');
 const seatsLegacyHistory = record => ({ revision: record.revision, at: record.updatedAt, by: record.updatedBy, details: ['Last saved change before change history was enabled. Earlier changes were not recorded.'] });
@@ -57,6 +58,7 @@ export class SeatsWorkspace {
   }
   async fetch(request) {
     const url = new URL(request.url);
+    const privatePin = seatsPrivatePin(this.env);
     if (url.pathname === '/api/live' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
       const pair = new WebSocketPair();
       this.ctx.acceptWebSocket(pair[1]); pair[1].serializeAttachment({ authenticated: false, connected: Date.now() });
@@ -70,22 +72,32 @@ export class SeatsWorkspace {
           const key = 'attempt:' + await seatsWorkerHash(ip), now = Date.now();
           const saved = await this.ctx.storage.get(key), attempts = saved?.until > now ? saved : { count: 0, until: now + 15 * 60 * 1000 };
           if (attempts.count >= 10) return seatsWorkerJson({ error: 'Too many PIN attempts. Try again in 15 minutes.' }, 429);
-          const valid = typeof body.pin === 'string' && /^\d{4}$/.test(body.pin) && await seatsWorkerHash(body.pin + 'lakewood-commons/seats/v1') === 'c5eebef6b017a917b05502fb6016a9dadfd75f31b2e48aa445175a5827a6cc55';
+          const privateAccess = Boolean(privatePin && body.pin === privatePin);
+          const valid = privateAccess || typeof body.pin === 'string' && /^\d{4}$/.test(body.pin)
+            && await seatsWorkerHash(body.pin + 'lakewood-commons/seats/v1') === 'c5eebef6b017a917b05502fb6016a9dadfd75f31b2e48aa445175a5827a6cc55';
           if (!valid) { attempts.count++; await this.ctx.storage.put(key, attempts); return seatsWorkerJson({ error: 'That PIN did not match.' }, 401); }
           const name = String(body.name || 'Organizer').trim().slice(0, 60) || 'Organizer';
           const token = [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
           const session = { name, expires: shulSessionExpiration(now) };
-          await this.ctx.storage.put('session:' + await seatsWorkerHash(token), session);
-          await this.ctx.storage.delete(key);
+          const privateProof = privateAccess ? await seatsWorkerHash(privatePin + ':' + token) : '';
+          await this.ctx.storage.put('session:' + await seatsWorkerHash(token), { ...session, privateProof });
+          if (!privatePin || privateAccess) await this.ctx.storage.delete(key);
           await this.ctx.storage.setAlarm(now + SEATS_CLEANUP_INTERVAL_MS);
           return seatsWorkerJson({ ...session, token });
         });
       } catch { return seatsWorkerJson({ error: 'Enter your name and the Seats PIN.' }, 400); }
     }
-    const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
+    const token = request.headers.get('Authorization')?.replace(/^Bearer /, '');
+    const session = await this.session(token);
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: true });
-    if (url.pathname === '/api/yahrzeits' || url.pathname.startsWith('/api/yahrzeits/')) return this.yahrzeits(request, url.pathname);
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin) });
+    if (url.pathname === '/api/yahrzeits' || url.pathname.startsWith('/api/yahrzeits/')) {
+      if (!privatePin) return seatsWorkerJson({ error: 'Yahrzeit sign-in has not been set up yet.' }, 503);
+      if (session.privateProof !== await seatsWorkerHash(privatePin + ':' + token)) {
+        return seatsWorkerJson({ error: 'Sign in with the current Seats PIN to open the Yahrzeit Calendar.', code: 'yahrzeit-sign-in' }, 403);
+      }
+      return this.yahrzeits(request, url.pathname);
+    }
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {

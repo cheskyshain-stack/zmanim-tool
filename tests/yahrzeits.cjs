@@ -31,9 +31,10 @@ test('the private register uses the existing Seats login and saves to the shared
   t.after(() => new Promise(resolve => server.close(resolve)));
   origin = 'http://127.0.0.1:' + server.address().port;
   const bundle = await build({ entryPoints: [path.resolve(__dirname, '../worker/seats/worker.js')], bundle: true, write: false, format: 'esm' });
+  const privatePin = '13792478';
   const worker = new Miniflare(convertV4MiniflareOptions({
     name: 'yahrzeits-test', modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-10-01',
-    bindings: { ALLOWED_ORIGIN: origin }, durableObjects: { SEATS_WORKSPACE: { className: 'SeatsWorkspace', useSQLite: true } },
+    bindings: { ALLOWED_ORIGIN: origin, SEATS_PRIVATE_PIN: privatePin }, durableObjects: { SEATS_WORKSPACE: { className: 'SeatsWorkspace', useSQLite: true } },
   }));
   t.after(() => worker.dispose());
   endpoint = (await worker.ready).origin;
@@ -41,6 +42,12 @@ test('the private register uses the existing Seats login and saves to the shared
     ...options, headers: { Origin: origin, 'Content-Type': 'application/json', ...options.headers },
   });
   assert.equal((await api('yahrzeits')).status, 401);
+  const legacyLogin = await api('session', { method: 'POST', body: JSON.stringify({ name: 'Synthetic legacy organizer', pin: '4444' }) });
+  assert.equal(legacyLogin.status, 200);
+  const legacyToken = (await legacyLogin.json()).token;
+  const legacyHeaders = { Authorization: 'Bearer ' + legacyToken };
+  assert.equal((await api('plans', { headers: legacyHeaders })).status, 200);
+  assert.equal((await api('yahrzeits', { headers: legacyHeaders })).status, 403);
   assert.equal((await api('yahrzeits/example-id', { method: 'POST', body: '{}' })).status, 401);
   assert.equal((await api('yahrzeits/example-id', { method: 'DELETE', body: '{}' })).status, 401);
   assert.equal((await api('yahrzeits', { headers: { Origin: 'https://example.org' } })).status, 403);
@@ -58,7 +65,7 @@ test('the private register uses the existing Seats login and saves to the shared
   };
   const signIn = async (page, button) => {
     await page.getByLabel('Your name').fill('Synthetic organizer');
-    await page.getByLabel('PIN', { exact: true }).fill('4444');
+    await page.getByLabel('PIN', { exact: true }).fill(privatePin);
     await page.getByRole('button', { name: button, exact: true }).click();
   };
   const checkWidth = page => page.evaluate(() => {

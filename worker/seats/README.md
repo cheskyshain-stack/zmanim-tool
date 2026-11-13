@@ -4,7 +4,7 @@ The existing Seats page stays on GitHub Pages. This separate Cloudflare Worker
 stores shared plans in a SQLite Durable Object and broadcasts changes through
 WebSockets. It does not use or change the statistics Worker's archive or secret.
 
-Each organizer enters a name and the existing Seats PIN, 4444. PIN checks happen
+Each organizer enters a name and the shared Seats PIN. PIN checks happen
 on the server before any plan can be read or changed. New sessions expire at the
 first 3 a.m. in New York after at least seven full days, regardless of activity.
 The browser remembers the session across visits. Tokens are sent in an authorization
@@ -53,8 +53,14 @@ the entry records the family's preference when there are two Adars or a missing
 The new routes require the same origin and bearer session as Seats. The member
 list is at GET /api/yahrzeits. POST and DELETE at /api/yahrzeits/:id take the record
 revision so a change from a second organizer cannot silently overwrite an edit.
+Set the Cloudflare Worker secret SEATS_PRIVATE_PIN to a new private 6–8 digit
+Seats PIN before publishing /yahrzeits/. The old PIN was documented publicly,
+so the Worker never grants it yahrzeit access. The private PIN opens both tools
+with one sign-in. Ordinary Seats sign-in and existing sessions still open seating
+charts. Never commit the private PIN.
 Deploy the Seats service before publishing /yahrzeits/. Authenticated GET /api/info
-reports yahrzeits: true. Keep the existing account, Worker name, and binding.
+reports yahrzeits: true when the private PIN is set. Keep the existing account,
+Worker name, and binding.
 
 ## Activate through GitHub
 

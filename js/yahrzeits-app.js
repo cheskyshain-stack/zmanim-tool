@@ -31,6 +31,9 @@ async function openYahrzeitCalendar() {
     }
     if (response.status === 404 && !path) throw new Error('The shared yahrzeit calendar is unavailable. Try again later.');
     const result = await response.json().catch(() => ({}));
+    if (response.status === 403 && result.code === 'yahrzeit-sign-in') {
+      throw Object.assign(new Error(result.error), { signIn: auth.lock });
+    }
     if (!response.ok) throw new Error(result.error || 'The yahrzeit calendar could not be updated.');
     return result;
   };
@@ -244,5 +247,7 @@ async function openYahrzeitCalendar() {
 if (yahrzeitRoot) openYahrzeitCalendar().catch(error => {
   yahrzeitRoot.innerHTML = '<div class="seats-loading"><h1>Yahrzeit Calendar</h1><p role="status"></p><button type="button">Try again</button></div>';
   yahrzeitRoot.querySelector('[role=status]').textContent = error.message || 'The calendar could not be opened.';
-  yahrzeitRoot.querySelector('button').addEventListener('click', () => location.reload());
+  const button = yahrzeitRoot.querySelector('button');
+  if (error.signIn) button.textContent = 'Sign in';
+  button.addEventListener('click', error.signIn || (() => location.reload()));
 });

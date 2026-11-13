@@ -57,6 +57,8 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_OUTPUT,'endpoint='+endpoint+'\n');
           JS
       - name: Verify the live service before enabling it
+        env:
+          SEATS_VERIFICATION_PIN: ${{ secrets.SEATS_VERIFICATION_PIN }}
         run: |
           node --input-type=module <<'JS'
           import assert from 'node:assert/strict';
@@ -65,7 +67,8 @@ jobs:
           assert.equal(denied.status,401,'The plan list must require the Seats PIN.');
           const yahrzeitsDenied=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers});
           assert.equal(yahrzeitsDenied.status,401,'The yahrzeit register must require a Seats session.');
-          const login=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:'4444'})});
+          const privatePin=process.env.SEATS_VERIFICATION_PIN;
+          const login=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin || '4444'})});
           assert.equal(login.status,200,'The Seats PIN must open a server session.');
           const session=await login.json();
           assert.equal(typeof session.token,'string');
@@ -78,13 +81,16 @@ jobs:
           assert.equal(features.editNameFiles,true);
           assert.equal(features.trash60Days,true);
           assert.equal(features.seatReservationMinutes,30);
-          assert.equal(features.yahrzeits,true);
+          if (privatePin) assert.equal(features.yahrzeits,true);
           const plans=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:{...headers,Authorization:'Bearer '+session.token}});
           assert.equal(plans.status,200,'Authenticated plan storage must be available.');
           assert.ok(Array.isArray((await plans.json()).plans));
           const yahrzeits=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers:{...headers,Authorization:'Bearer '+session.token}});
-          assert.equal(yahrzeits.status,200,'Authenticated yahrzeit storage must be available.');
-          assert.ok(Array.isArray((await yahrzeits.json()).members));
+          if (!privatePin) assert.ok([403,503].includes(yahrzeits.status),'The legacy Seats PIN must not unlock the yahrzeit register.');
+          else {
+            assert.equal(yahrzeits.status,200,'Authenticated yahrzeit storage must be available.');
+            await yahrzeits.body.cancel();
+          }
           console.log('Verified server PIN protection and authenticated storage.');
           JS
   publish:
