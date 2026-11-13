@@ -105,7 +105,7 @@ const server = http.createServer((req,res) => {
     assert.ok(Math.max(...rowGaps)-Math.min(...rowGaps)<.1,'All ordinary table gaps should match front to back');
     assert.ok(starting.plans[0].tables.filter(table=>/^[BC]9$/.test(table.id)).every(table=>table.y===824));
     assert.equal(await page.locator('#seats-print header p').count(),0,'Only the minyan wordmark should be in the print header');
-    assert.equal(await page.locator('#seats-print .minyan-logo').textContent(),'7:30 Minyan');
+    assert.equal(await page.locator('#seats-print .minyan-logo').textContent(),'7:30 Shabbos Minyan');
     const sizes=await page.locator('.room-stage').evaluate(stage=>['.amud-surface','.shtender-surface'].map(selector=>{
       const box=stage.querySelector(selector).getBoundingClientRect();return {width:box.width,height:box.height};
     }));

@@ -1,4 +1,5 @@
 export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 916 };
+export const SEATS_CHART_PRINT_TITLE = '7:30 Shabbos Minyan';
 
 export function seatsPrintGeometry(paper, footer = 0) {
   const tabloid = paper === 'tabloid', width = tabloid ? 17 : paper === 'legal' ? 14 : 11, height = tabloid ? 11 : 8.5;

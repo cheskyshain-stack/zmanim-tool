@@ -13,6 +13,8 @@ import fitz,sys,json
 d=fitz.open(sys.argv[1]);assert len(d)==1,'Notes must not add another page'
 p=d[0];header=sys.argv[2];footer=sys.argv[3];text=' '.join(p.get_text().split())
 assert 'Synthetic Person' in text,'Assigned names must stay searchable'
+title=p.search_for('7:30 Shabbos Minyan')
+assert len(title)==1 and title[0].x1<p.rect.width*.65 and title[0].y1<65,'Keep the Shabbos heading on one line at the top left'
 for value in [header,footer]:
  if value:assert value in text,('Missing note',value)
 if not header:assert 'First Draft' not in text and 'Second Draft' not in text
