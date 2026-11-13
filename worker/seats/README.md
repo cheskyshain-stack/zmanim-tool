@@ -40,6 +40,22 @@ the connection returns. A local pending copy must sync before it is discarded.
 The shared connection is separate from downloaded backups. Restoring a backup
 creates independent local plans and cannot overwrite an online plan.
 
+## Yahrzeit Calendar
+
+The private page at /yahrzeits/ uses the existing Seats name and PIN session.
+Records are stored under their own prefix in the existing Seats Durable Object
+and are shared with everyone who can sign in to Seats. Calendar and roster pages
+do not include these records. Each member can have one Father and one Mother
+entry and additional custom relationships. The Hebrew dates repeat automatically;
+the entry records the family's preference when there are two Adars or a missing
+30 Cheshvan or Kislev.
+
+The new routes require the same origin and bearer session as Seats. The member
+list is at GET /api/yahrzeits. POST and DELETE at /api/yahrzeits/:id take the record
+revision so a change from a second organizer cannot silently overwrite an edit.
+Deploy the Seats service before publishing /yahrzeits/. Authenticated GET /api/info
+reports yahrzeits: true. Keep the existing account, Worker name, and binding.
+
 ## Activate through GitHub
 
 The source ships with `data/seats-sync.json` disabled, so the current local tool

@@ -4,6 +4,7 @@ import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
 import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
 import { SEATS_RESERVATION_MS } from '../../js/seats/reservation.js';
 import { shulSessionExpiration } from '../../js/session-expiration.js';
+import { yahrzeitMember } from '../../js/yahrzeits/model.js';
 
 const SEATS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
@@ -83,7 +84,8 @@ export class SeatsWorkspace {
     }
     const session = await this.session(request.headers.get('Authorization')?.replace(/^Bearer /, ''));
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30 });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: true });
+    if (url.pathname === '/api/yahrzeits' || url.pathname.startsWith('/api/yahrzeits/')) return this.yahrzeits(request, url.pathname);
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
@@ -239,6 +241,40 @@ export class SeatsWorkspace {
     }
     if (expired) this.presence();
   }
+  async yahrzeits(request, path) {
+    const prefix = 'yahrzeit:', storage = this.ctx.storage;
+    if (path === '/api/yahrzeits' && request.method === 'GET') {
+      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()] });
+    }
+    const id = path.slice('/api/yahrzeits/'.length);
+    if (!seatsWorkerId(id) || !['POST', 'DELETE'].includes(request.method)) return seatsWorkerJson({ error: 'Unknown yahrzeit request.' }, 404);
+    let body, contents;
+    try {
+      body = await this.body(request);
+      if (!Number.isSafeInteger(body?.revision) || body.revision < (request.method === 'DELETE' ? 1 : 0)) throw new Error('The saved version is missing.');
+      if (request.method === 'POST') contents = yahrzeitMember(body);
+    } catch (error) {
+      return seatsWorkerJson({ error: error instanceof SyntaxError ? 'Enter a valid yahrzeit record.' : error.message }, 400);
+    }
+    const key = prefix + id;
+    return this.ctx.blockConcurrencyWhile(async () => {
+      const current = await storage.get(key);
+      if (body.revision !== (current?.revision || 0)) {
+        return seatsWorkerJson({ error: 'Someone else changed this record. Close it and reload before trying again.' }, 409);
+      }
+      if (request.method === 'DELETE') {
+        await storage.delete(key);
+        return seatsWorkerJson({ deleted: true });
+      }
+      if (!current && (await storage.list({ prefix, limit: 2000 })).size >= 2000) {
+        return seatsWorkerJson({ error: 'The yahrzeit register is full.' }, 409);
+      }
+      const record = { id, ...contents, revision: body.revision + 1 };
+      await storage.put(key, record);
+      return seatsWorkerJson(record, current ? 200 : 201);
+    });
+  }
+
   async webSocketMessage(socket, raw) {
     try {
       if (typeof raw !== 'string' || new TextEncoder().encode(raw).byteLength > SEATS_SHARED_LIMIT) throw new Error('This shared update is too large.');

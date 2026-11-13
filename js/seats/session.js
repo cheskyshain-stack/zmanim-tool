@@ -1,4 +1,4 @@
-import { escAttr } from '../util.js';
+import { escAttr, escText } from '../util.js';
 import { shulSessionExpiration } from '../session-expiration.js';
 
 export const SEATS_SESSION_KEY = 'lakewood-commons-seats-session-v1';
@@ -30,7 +30,7 @@ function clearSession() {
   try { sessionStorage.removeItem(onlineKey); sessionStorage.removeItem(SEATS_SESSION_KEY); sessionStorage.removeItem(SEATS_UNLOCK_KEY); } catch { /* The current view still locks. */ }
 }
 
-export async function seatsOpenSession(root) {
+export async function seatsOpenSession(root, { title = 'Seats', intro = 'Sign in to open charts and name files.', requireOnline = false } = {}) {
   let endpoint = '', configError = '';
   try {
     const response = await fetch('/data/seats-sync.json', { cache: 'no-store' });
@@ -42,6 +42,7 @@ export async function seatsOpenSession(root) {
       endpoint = url.origin;
     }
   } catch { endpoint = storedSession()?.endpoint || ''; configError = 'Could not connect to the website. Check your connection and try again.'; }
+  if (requireOnline && !endpoint) throw new Error(configError || 'The shared yahrzeit calendar is unavailable. Reload to try again.');
   let session = storedSession(), profile = session?.name || '';
   try {
     const saved = JSON.parse(localStorage.getItem('lakewood-commons-seats-shared-v1') || 'null');
@@ -57,7 +58,7 @@ export async function seatsOpenSession(root) {
   } catch { /* A malformed old session returns to the entry form. */ }
   if (!seatsSessionValid(session, endpoint)) {
     document.body.classList.add('seats-locked');
-    root.innerHTML = `<section class="seats-lock no-print"><img class="seats-lock-photo" src="/assets/shul-240.jpg" alt="" width="240" height="141"><h1>Seats</h1><p>Sign in to open charts and name files.</p><form id="seats-unlock"><label for="seats-name">Your name</label><input id="seats-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="name" required><label for="seats-pin">PIN</label><input id="seats-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required aria-describedby="pin-message"><button class="primary" type="submit">Open Seats</button><p id="pin-message" role="status" aria-live="polite"></p></form></section>`;
+    root.innerHTML = `<section class="seats-lock no-print"><img class="seats-lock-photo" src="/assets/shul-240.jpg" alt="" width="240" height="141"><h1>${escText(title)}</h1><p>${escText(intro)}</p><form id="seats-unlock"><label for="seats-name">Your name</label><input id="seats-name" name="name" value="${escAttr(profile)}" maxlength="60" autocomplete="name" required><label for="seats-pin">PIN</label><input id="seats-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" required aria-describedby="pin-message"><button class="primary" type="submit">Open ${escText(title)}</button><p id="pin-message" role="status" aria-live="polite"></p></form></section>`;
     if (configError) root.querySelector('#pin-message').textContent = configError;
     session = await new Promise(resolve => root.querySelector('form').addEventListener('submit', async event => {
       event.preventDefault();
