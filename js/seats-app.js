@@ -9,7 +9,7 @@ import { seatsEditorIcon } from './seats/editor-icons.js';
 import { seatsCreateZoom } from './seats/zoom.js';
 import { seatsCreateAssignment, seatsCanDragNames } from './seats/assignment.js';
 import { seatsCreateWorkspace } from './seats/workspace.js';
-import { seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
+import { SEATS_CHART_PRINT_TITLE, seatsPrintGeometry, seatsPreparePrint } from './seats/print.js';
 import { seatsPrintNotes, seatsNormalizePrintNotes, seatsPrintLayout } from './seats/print-notes.js';
 import { seatsBuildCmykPdf, seatsBuildRgbPdf } from './seats/cmyk-pdf.js';
 import { seatsChartPdfPage, seatsRosterPdfPages } from './seats/pdf-pages.js';
@@ -542,7 +542,7 @@ function seatsStart(root, auth, updates) {
     setPrintPage('@page { size: ' + (printPaper() === 'auto' ? 'landscape' : geometry.width + 'in ' + geometry.height + 'in') + '; margin: ' + geometry.margin + 'in; }');
     const lines = values => values.map(value => `<span dir="auto">${html(value)}</span>`).join('');
     const target = root.querySelector('#seats-print');
-    target.innerHTML = `<header><h1 class="minyan-logo" aria-label="7:30 Minyan"><span class="minyan-logo-time">7:30</span> <span class="minyan-logo-name">Minyan</span></h1><div class="chart-print-header">${lines(headerLines)}</div></header>${diagram(false, geometry)}${footerLines.length ? `<footer class="chart-print-footer">${lines(footerLines)}</footer>` : ''}`;
+    target.innerHTML = `<header><h1 class="minyan-logo">${SEATS_CHART_PRINT_TITLE}</h1><div class="chart-print-header">${lines(headerLines)}</div></header>${diagram(false, geometry)}${footerLines.length ? `<footer class="chart-print-footer">${lines(footerLines)}</footer>` : ''}`;
     seatsPreparePrint(target.querySelector('.room-diagram'), geometry);
     for (const [selector, value] of [['.chart-header-preview', notes.printHeader], ['.chart-footer-preview', notes.printFooter]]) {
       const preview = root.querySelector(selector); preview.textContent = value; preview.hidden = !value;

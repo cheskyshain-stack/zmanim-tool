@@ -1,4 +1,5 @@
 import { seatsPrintLayout } from './print-notes.js';
+import { SEATS_CHART_PRINT_TITLE } from './print.js';
 
 const SEATS_PDF_NS = 'http://www.w3.org/2000/svg';
 const SEATS_PDF_STYLES = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-linecap', 'stroke-linejoin', 'stroke-dasharray', 'opacity', 'color', 'font-size', 'font-weight', 'font-style', 'letter-spacing', 'text-anchor', 'dominant-baseline', 'visibility', 'filter'];
@@ -56,7 +57,7 @@ export async function seatsChartPdfPage(source, paper, plan = {}) {
   room.setAttribute('x', geometry.margin * 72); room.setAttribute('y', (geometry.margin + geometry.header) * 72);
   room.setAttribute('width', geometry.contentWidth * 72); room.setAttribute('height', (geometry.contentHeight - geometry.header - geometry.footer) * 72);
   room.setAttribute('viewBox', geometry.viewBox); room.setAttribute('preserveAspectRatio', 'none'); room.style.overflow = 'visible';
-  page.append(seatsPdfText('7:30 Minyan', geometry.margin * 72, geometry.margin * 72 + 17, 17, true, true), room);
+  page.append(seatsPdfText(SEATS_CHART_PRINT_TITLE, geometry.margin * 72, geometry.margin * 72 + 17, 17, true, true), room);
   for (let index = 0; index < headerLines.length; index++) {
     const text = seatsPdfText(headerLines[index], (geometry.width - geometry.margin) * 72, geometry.margin * 72 + headerFont + index * 11, headerFont, true);
     text.setAttribute('text-anchor', 'end'); page.append(text);
