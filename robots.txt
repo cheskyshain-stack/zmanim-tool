@@ -19,6 +19,7 @@
 User-agent: *
 Disallow: /admin/
 Disallow: /seats/
+Disallow: /yahrzeits/
 Disallow: /offline/
 
 Sitemap: https://baismedrashoflakewoodcommons.org/sitemap.xml
