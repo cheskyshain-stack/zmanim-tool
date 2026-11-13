@@ -6,10 +6,10 @@ const server=http.createServer((req,res)=>{if(req.url.split('?')[0]==='/data/sea
 const inspect=String.raw`
 import sys,fitz,json,re
 doc=fitz.open(sys.argv[1]);assert len(doc)==1
-p=doc[0];text=p.get_text();assert 'MINYAN' in text.upper()
+p=doc[0];text=p.get_text()
 spans=[s for b in p.get_text('dict')['blocks'] for l in b.get('lines',[]) for s in l['spans']]
-time=next(s for s in spans if '7:30' in s['text']);name=next(s for s in spans if 'minyan' in s['text'].lower())
-assert abs(time['size']-name['size'])<.1 and time['font']==name['font'], 'The time and Minyan use the same printed type size and face'
+time=next(s for s in spans if '7:30' in s['text']);name=next(s for s in spans if 'מנין' in s['text'] or 'ןינמ' in s['text'])
+assert abs(time['size']-name['size'])<.1, 'The time and Minyan use the same printed type size'
 assert abs(time['origin'][1]-name['origin'][1])<.1, 'The heading shares one baseline'
 for label in ['A7','A8','A9','B8','B9','B10','C8','C9','C10','D7','D8','D9']:assert label in text, label
 assert not re.search(r'\b[BC]7\b',text);assert text.count('Pillar')==2

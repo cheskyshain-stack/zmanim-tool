@@ -542,7 +542,7 @@ function seatsStart(root, auth, updates) {
     setPrintPage('@page { size: ' + (printPaper() === 'auto' ? 'landscape' : geometry.width + 'in ' + geometry.height + 'in') + '; margin: ' + geometry.margin + 'in; }');
     const lines = values => values.map(value => `<span dir="auto">${html(value)}</span>`).join('');
     const target = root.querySelector('#seats-print');
-    target.innerHTML = `<header><h1 class="minyan-logo">${SEATS_CHART_PRINT_TITLE}</h1><div class="chart-print-header">${lines(headerLines)}</div></header>${diagram(false, geometry)}${footerLines.length ? `<footer class="chart-print-footer">${lines(footerLines)}</footer>` : ''}`;
+    target.innerHTML = `<header><h1 class="minyan-logo" lang="he" dir="rtl">${SEATS_CHART_PRINT_TITLE}</h1><div class="chart-print-header">${lines(headerLines)}</div></header>${diagram(false, geometry)}${footerLines.length ? `<footer class="chart-print-footer">${lines(footerLines)}</footer>` : ''}`;
     seatsPreparePrint(target.querySelector('.room-diagram'), geometry);
     for (const [selector, value] of [['.chart-header-preview', notes.printHeader], ['.chart-footer-preview', notes.printFooter]]) {
       const preview = root.querySelector(selector); preview.textContent = value; preview.hidden = !value;
