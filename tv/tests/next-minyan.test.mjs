@@ -5,10 +5,10 @@ import {nextMinyanHTML} from '../public/display-assets/renderer.js';
 const next = {name:'מעריב',place:'למטה',time:'11:00',at:'2026-09-29T03:00:00.000Z'};
 test('next minyan preserves schedule time and location with a New York period and countdown',()=>{
   const html=nextMinyanHTML(next,'2026-09-29T02:44:00.000Z');
-  for(const text of ['מעריב','למטה','11:00','PM','in 16 minutes'])assert.ok(html.includes(text),text);
+  for(const text of ['מעריב','למטה','11:00','PM','in 0 hours 16 minutes'])assert.ok(html.includes(text),text);
   assert.doesNotMatch(html,/<svg|<img|⏳/);
   assert.ok(nextMinyanHTML(next,'2026-09-29T01:59:00Z').includes('in 1 hour 1 minute'));
-  assert.ok(nextMinyanHTML(next,'2026-09-29T02:59:01Z').includes('in 1 minute'));
+  assert.ok(nextMinyanHTML(next,'2026-09-29T02:59:01Z').includes('in 0 hours 1 minute'));
   assert.ok(nextMinyanHTML(next,next.at).includes('>now</p>'));
 });
 test('a just-started minyan retains its name, location and time through five minutes',()=>{
@@ -34,4 +34,12 @@ test('saved labels are escaped as text',()=>{
   const html=nextMinyanHTML({...next,name:'<img src=x>',place:'<script>'},next.at);
   assert.ok(html.includes('&lt;img src=x&gt;'));
   assert.doesNotMatch(html,/<img|<script/);
+});
+
+test('the large next-minyan card puts prayer, time, location and hours/minutes in order',()=>{
+  const html=nextMinyanHTML(next,'2026-09-29T01:00:00Z');
+  const order=['next-service','next-time','next-location','next-countdown'].map(name=>html.indexOf(`class="${name}"`));
+  assert.ok(order.every((position,index)=>position>=0&&(!index||position>order[index-1])));
+  assert.match(html,/in 2 hours 0 minutes/);
+  assert.match(nextMinyanHTML(next,'2026-09-29T02:00:00Z'),/in 1 hour 0 minutes/);
 });

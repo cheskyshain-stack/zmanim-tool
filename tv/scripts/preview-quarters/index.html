@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shul View layout preview</title>
+  <link rel="stylesheet" href="/display-assets/display.css">
+  <link rel="stylesheet" href="/preview.css">
+</head>
+<body class="quarter-preview">
+  <header class="preview-controls">
+    <div class="preview-intro"><strong>Shul View preview</strong><span>Local design review</span></div>
+    <div class="preview-samples" aria-label="Schedule examples">
+      <button type="button" data-sample="weekday">Morning</button>
+      <button type="button" data-sample="midday">Midday</button>
+      <button type="button" data-sample="evening">Evening</button>
+      <button type="button" data-sample="midnight">After midnight</button>
+      <button type="button" data-sample="shabbos">Shabbos</button>
+      <button type="button" data-sample="sukkos">Sukkos</button>
+      <button type="button" data-sample="rosh-hashana">Rosh Hashana</button>
+      <button type="button" id="current-time">Now</button>
+    </div>
+    <form id="preview-form">
+      <label>New York date and time<input id="preview-time" type="datetime-local" step="60" required></label>
+      <label>Appearance<select id="preview-theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+      <label>Parnes Hayom<select id="preview-sponsor"><option value="published">Published sponsors</option><option value="sample">Example sponsor</option><option value="none">No sponsor</option></select></label>
+      <button type="submit">Show</button>
+      <button type="button" id="next-five">+5 minutes</button>
+      <button type="button" id="next-hour">+1 hour</button>
+      <button type="button" id="demo-transition">Next handoff</button>
+      <button type="button" id="demo-prayers">Prayer handoff</button>
+      <button type="button" id="demo-zmanim">Zman handoff</button>
+      <label class="preview-run"><input type="checkbox" id="run-clock">Run clock</label>
+      <button type="button" id="full-screen">Full screen</button>
+      <button type="button" id="measure-layout">Measure layout</button>
+    </form>
+    <p id="preview-status" role="status">Loading the approved shul schedule...</p>
+  </header>
+  <main id="screen" aria-label="TV design preview"></main>
+  <dialog id="layout-measurements" aria-labelledby="measurement-title">
+    <form method="dialog"><h2 id="measurement-title">Layout measurements</h2><button type="submit">Close</button></form>
+    <p>Measured from the displayed preview. Partial rows and overflowing panels should be empty.</p>
+    <pre id="layout-report"></pre>
+  </dialog>
+  <script type="module" src="/preview.js"></script>
+</body>
+</html>

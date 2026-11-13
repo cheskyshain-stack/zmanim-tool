@@ -1,0 +1,23 @@
+.quarter-preview{margin:0;background:#101f31;color:#192d42;font:14px/1.4 Arial,sans-serif;overflow:auto}
+.preview-controls{position:relative;z-index:10;background:#f8f5ee;padding:14px 22px 10px;border-bottom:1px solid #cbb478}
+.preview-intro{display:flex;align-items:baseline;gap:12px;margin-bottom:10px}
+.preview-intro strong{font-size:21px}.preview-intro span{color:#5d6871}
+.preview-samples{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.quarter-preview button,.quarter-preview select,.quarter-preview input[type=datetime-local]{border:1px solid #c9cdd1;border-radius:8px;background:white;color:#142a42;padding:8px 12px;min-height:38px}
+.quarter-preview button:hover{background:#eee8d8;border-color:#b29a5b}
+.quarter-preview button:focus-visible,.quarter-preview input:focus-visible,.quarter-preview select:focus-visible{outline:3px solid #bda35a;outline-offset:2px}
+#preview-form{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end}
+#preview-form label{display:flex;flex-direction:column;gap:3px;font-size:12px;font-weight:600}
+#preview-form .preview-run{display:flex;flex-direction:row;align-items:center;align-self:center;font-size:14px;gap:6px;margin:18px 0 0}
+#preview-status{margin:8px 0 0;min-height:20px;font-size:12px;color:#5c6872}
+.quarter-preview #screen{position:relative;width:100%;aspect-ratio:16/9;min-height:0;overflow:hidden;max-height:none}
+.quarter-preview.clean .preview-controls{display:none}
+.quarter-preview.clean #screen{height:100vh;height:100dvh;aspect-ratio:auto}
+.quarter-preview #screen:fullscreen{width:100vw;height:100vh;background:#101f31}
+@media(max-width:700px){.preview-controls{padding:12px}.preview-intro{flex-wrap:wrap;gap:3px 12px}#preview-form{gap:7px}.quarter-preview button{padding:8px 10px}#preview-form .preview-run{margin:0}}
+#layout-measurements{width:min(820px,94vw);max-height:90dvh;padding:22px;border:1px solid #b29a5b;border-radius:14px;background:#f8f5ee;color:#142a42;overflow:auto}
+#layout-measurements::backdrop{background:rgb(9 22 38 / .65)}
+#layout-measurements form{display:flex;justify-content:space-between;align-items:center;gap:16px}
+#layout-measurements h2{margin:0;font-size:22px}
+#layout-measurements p{font-size:13px;color:#5c6872}
+#layout-report{margin:14px 0 0;padding:16px;border-radius:8px;background:white;font:12px/1.6 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}

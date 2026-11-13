@@ -6,7 +6,7 @@ import {publicPosterSections} from '../../js/ui/posters-view.js';
 import {dateFromHebrew,excelWeekday} from '../../js/hebrew-calendar.js';
 import {dateFromSerial} from '../../js/zmanim/solar.js';
 import {localToISO} from '../public/display-assets/time.js';
-import {createOfflineSeed} from '../src/offline-seed.js';
+import {createOfflineSeed,OFFLINE_ENGINE} from '../src/offline-seed.js';
 import {offlineSnapshot} from '../public/display-assets/offline-engine.js';
 
 const civil=serial=>dateFromSerial(serial).toISOString().slice(0,10);
@@ -46,7 +46,7 @@ test('the combined occasion page retains the connected RH and Shabbos window thr
 
 test('offline and server snapshots agree across the attached Shabbos retention boundary',()=>{
  const at='2028-09-23T16:00:00.000Z',seed=createOfflineSeed([],{mode:'dark',darkStart:'19:00',lightStart:'07:00'},at);
- assert.match(seed.engine,/^shul-calendar-v7-/);
+ assert.equal(seed.engine,OFFLINE_ENGINE);
  const sheet=scheduleSnapshot(at).specialSheet;
  for(const instant of [sheet.previewStartsAt,at,new Date(Date.parse(sheet.endsAt)-1).toISOString(),sheet.endsAt])
   assert.deepEqual(offlineSnapshot(seed,instant).schedule,scheduleSnapshot(instant));

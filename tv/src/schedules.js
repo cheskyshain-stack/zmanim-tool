@@ -1,5 +1,5 @@
 import * as dailyZmanim from '../../js/zmanim/zmanim.js';
-import { schedulePresentation, ordinaryShabbos } from './presentation.js';
+import { schedulePresentation, ordinaryShabbos, hebrewDay } from './presentation.js';
 import { publicPosterSections, publicOccasionSheet } from '../../js/ui/posters-view.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
@@ -12,7 +12,8 @@ import { minyanimForDay, chartMinyanimForDay, candleLightingForDay, clock } from
 import { dateFromSerial, excelSerial, shulNow } from "../../js/zmanim/solar.js";
 import { sunsetElev } from "../../js/zmanim/zmanim.js";
 import { hebrewDateExtended, hebrewYear, dateFromHebrew, jewishDateString, hasParsha, excelWeekday, hasTaanis, hasYomTov, hasRoshChodesh } from "../../js/hebrew-calendar.js";
-import { agendaDayKind } from "../../js/ui/weekly-agenda.js";
+import { agendaDayKind, weeklyAgenda } from "../../js/ui/weekly-agenda.js";
+import { readerWeekIndex, weeklyReaderData } from "../../js/ui/weekly-reader.js";
 import { buildRoshHashanaPoster } from "../../js/posters/roshhashana.js";
 import { buildYomKippurPoster } from "../../js/posters/yomkippur.js";
 import { buildSukkosPoster } from "../../js/posters/sukkos.js";
@@ -52,7 +53,55 @@ const sheetTimelines = /* @__PURE__ */ new Map();
 const highHolidaySheets = /* @__PURE__ */ new WeakMap();
 const sheetTitles = {rh:'ראש השנה',yk:'יום כיפור',sukkos:'סוכות',pesach:'פסח',gedalia:'צום גדליה'};
 const RETAIN_MS = MINYAN_HOLD_MS;
-let cachedYear, cachedState;
+let cachedYear, cachedState, cachedReaderIndex;
+const ordinaryAgendaDays = new Map();
+
+// Read ordinary Friday/Shabbos details with the same parser as the congregation
+// day cards. It knows that a drasha printed inside a Mincha cell is a separate
+// event, and retains the named Plag/reckoning information from the chart.
+function ordinaryAgendaDay(serial,state) {
+  if(ordinaryAgendaDays.has(serial))return ordinaryAgendaDays.get(serial);
+  const weekday=excelWeekday(serial),kind=agendaDayKind(serial,settings);
+  const ordinary=weekday===7&&kind.holy==='Shabbos' || weekday===6&&!kind.holy&&!kind.chol&&agendaDayKind(serial+1,settings).holy==='Shabbos';
+  if(!ordinary)return [];
+  const showing=serial+7-weekday;
+  if(!cachedReaderIndex.has(showing))return [];
+  const source=weeklyReaderData(showing,cachedReaderIndex,state,settings);
+  const agenda=weeklyAgenda({regular:[],special:[],shabbos:source.shabbos},showing,state,settings,new Date(civil(serial)+'T00:00:00Z'));
+  const events=agenda.sections.flatMap(section=>section.events).filter(event=>event.serial===serial)
+    .map(({next,started,...event})=>event);
+  ordinaryAgendaDays.set(serial,events);
+  return events;
+}
+
+const dayZmanimCache = new Map();
+function zmanimForDate(serial) {
+  if(dayZmanimCache.has(serial))return dayZmanimCache.get(serial);
+  const zmanim = [
+    ['עלות','alos72'],
+    [agendaDayKind(serial, settings).holy ? 'טלית' : 'טלית ותפילין','misheyakir10_2'],
+    ['נץ','sunrise'],
+    ['סזק"ש מ"א','sofZmanShmaMGA72'],
+    ['סזק"ש גר"א','sofZmanShmaGRA'],
+    ['סז"ת מ"א','sofZmanTfilaMGA72'],
+    ['סז"ת גר"א','sofZmanTfilaGRA'],
+    ['חצות','solarNoon'],
+    ['שקיעה','sunset'],
+    ["צאת ג' כוכבים",'tzaisGeonim8_5'],
+    ['צאת 72','tzais72'],
+  ].map(([label,key])=>{
+    const f=dailyZmanim[key](dateFromSerial(serial),settings);
+    const total=Math.round((((f%1)+1)%1)*86400);
+    const hour=Math.floor(total/3600),minute=Math.floor(total/60)%60,second=total%60;
+    // Keep the published clock text unchanged. An absolute instant lets the
+    // screen expire a time without guessing AM or PM from that printed text.
+    const minuteAt=localToISO(`${civil(serial)}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
+    return {key,label,time:(hour%12||12)+':'+String(minute).padStart(2,'0')+':'+String(second).padStart(2,'0'),at:new Date(Date.parse(minuteAt)+second*1000).toISOString()};
+  });
+  if(dayZmanimCache.size>=100)dayZmanimCache.delete(dayZmanimCache.keys().next().value);
+  dayZmanimCache.set(serial,zmanim);
+  return zmanim;
+}
 
 // Calendar dates and resolved minyan events are the source of display boundaries.
 // In particular, neither an English heading nor a printed time is parsed here.
@@ -203,15 +252,21 @@ export function scheduleSnapshot(instant, controls = []) {
   if (cachedYear !== h.year) {
     cachedState = buildAutomaticCharts(withoutRetiredDrasha(config), tables, now);
     cachedYear = h.year;
+    cachedReaderIndex = readerWeekIndex(cachedState);
+    ordinaryAgendaDays.clear();
   }
   const state = cachedState;
   const active = controls.filter((c) => visible(c, instant)).sort((a, b) => b.data.precedence - a.data.precedence);
   const controlKey = JSON.stringify(active.map((c) => [c.title, c.data]));
-  const day = (s) => {
-    const cacheKey = s + "|" + controlKey;
+  const day = (s, byEventTime = false) => {
+    const datedControls = byEventTime ? controls.filter(c=>c.status==="published"&&c.data.appliesFrom<=civil(s)&&c.data.appliesTo>=civil(s)).sort((a,b)=>b.data.precedence-a.data.precedence) : active;
+    const datedKey = byEventTime ? JSON.stringify(datedControls.map(c=>[c.title,c.data,c.startsAt,c.endsAt])) : controlKey;
+    const cacheKey = s + "|" + (byEventTime?"dated:":"live:") + datedKey;
     if (dayCache.has(cacheKey)) return dayCache.get(cacheKey);
     const d = civil(s), kind = agendaDayKind(s, settings);
     let events = minyanimForDay(s, state, settings);
+    const chartEvents=ordinaryAgendaDay(s,state);
+    if(chartEvents.length)events=excelWeekday(s)===6?[...events.filter(event=>event.mins<720),...chartEvents]:chartEvents;
     let note = "";
     const hd = hebrewDateExtended(s);
     if (hd.month === 7 && hd.dayOfMonth === 2 && excelWeekday(s) === 6) {
@@ -235,7 +290,26 @@ export function scheduleSnapshot(instant, controls = []) {
     }
     let names = [];
     const won = /* @__PURE__ */ new Set();
-    for (const c of active) {
+    if(byEventTime) {
+      // A future panel describes events on its source date, not which control
+      // happens to be active when someone looks at the screen. Resolve each
+      // event against its actual instant so separate activation windows and
+      // overnight entries cannot overwrite one another.
+      const candidates=datedControls.map(control=>{
+        const events=source(control.data.source).events.filter(event=>event.serial===s);
+        const cats=control.data.portion==="all"?[...new Set(events.map(category))]:[control.data.portion];
+        return {control,events,cats};
+      });
+      const atEvent=event=>eventInstant({...event,serial:s});
+      const winner=event=>candidates.find(candidate=>candidate.cats.includes(category(event))&&visible(candidate.control,atEvent(event)));
+      const used=new Set();
+      events=events.filter(event=>{const selected=winner(event);if(selected)used.add(selected);return !selected;});
+      for(const candidate of candidates)for(const event of candidate.events) {
+        if(!candidate.cats.includes(category(event))||winner(event)!==candidate)continue;
+        used.add(candidate);events.push(event);
+      }
+      names=candidates.filter(candidate=>used.has(candidate)).map(candidate=>candidate.control.title);
+    } else for (const c of active) {
       const x = c.data;
       if (d < x.appliesFrom || d > x.appliesTo) continue;
       const sourceEvents = source(x.source).events.filter((e) => e.serial === s);
@@ -256,16 +330,16 @@ export function scheduleSnapshot(instant, controls = []) {
       unique.add(key);
       return true;
     }).sort((a, b) => a.mins - b.mins);
-    const result = { date: d, title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.place || "בית מדרש", at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
+    const result = { date: d, hebrewTitle: hebrewDay(s,settings), hebrewDate: jewishDateString(s,false), title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.place || "בית מדרש", at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
     if (dayCache.size >= 100) dayCache.delete(dayCache.keys().next().value);
     dayCache.set(cacheKey, result);
     return result;
   };
-  const days = Array.from({ length: 9 }, (_, i) => day(serial + i));
+  const days = Array.from({ length: 9 }, (_, i) => day(serial + i, i !== 0));
   // Yesterday can own a midnight Maariv. Its hold continues across the date
   // change without changing today's schedule or any resolved special overrides.
   const earliest = Date.parse(instant) - MINYAN_HOLD_MS;
-  const next = [day(serial - 1), ...days].flatMap((d) => d.events).filter((e) => !e.auxiliary && Date.parse(e.at) >= earliest).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
+  const next = [day(serial - 1, true), ...days].flatMap((d) => d.events).filter((e) => !e.auxiliary && Date.parse(e.at) >= earliest).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
   // Keep the full civil week and extend each sacred block across week boundaries.
   const weekStart = serial - (excelWeekday(serial) - 1);
   const week = Array.from({length:7}, (_,i)=>day(weekStart+i));
@@ -281,20 +355,9 @@ export function scheduleSnapshot(instant, controls = []) {
   const eveningHebrew = instant >= sunset(civil(serial)) ? serial + 1 : serial;
   const presentation = schedulePresentation({serial,state,settings,tables,day,instant,sunset});
   const {specialSheet,nextChangeAt} = originalSheetState(instant,h.year,day,controls,controlKey,state);
-  const zmanim = [
-    ['עלות','alos72'],
-    [agendaDayKind(serial, settings).holy ? 'טלית' : 'טלית ותפילין','misheyakir10_2'],
-    ['נץ','sunrise'],
-    ['סזק"ש מ"א','sofZmanShmaMGA72'],
-    ['סזק"ש גר"א','sofZmanShmaGRA'],
-    ['סז"ת מ"א','sofZmanTfilaMGA72'],
-    ['סז"ת גר"א','sofZmanTfilaGRA'],
-    ['חצות','solarNoon'],
-    ['שקיעה','sunset'],
-    ["צאת ג' כוכבים",'tzaisGeonim8_5'],
-    ['צאת 72','tzais72'],
-  ].map(([label,key])=>{const f=dailyZmanim[key](dateFromSerial(serial),settings);const total=Math.round((((f%1)+1)%1)*86400);return {label,time:(Math.floor(total/3600)%12||12)+':'+String(Math.floor(total/60)%60).padStart(2,'0')+':'+String(total%60).padStart(2,'0')};});
-  return { presentation, specialSheet, nextChangeAt, zmanim, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
+  const zmanim = zmanimForDate(serial);
+  const displayDays = Array.from({length:9},(_,index)=>{const sourceSerial=serial+index-1;const value=day(sourceSerial,sourceSerial!==serial);return {...value,zmanim:zmanimForDate(sourceSerial)};});
+  return { presentation, specialSheet, nextChangeAt, zmanim, displayDays, week, sacredGroups, today: days[0], shabbos: [day(sat - 1), day(sat)], next, clock: localStamp(now).slice(11), date: civil(serial), hebrewDate: jewishDateString(eveningHebrew, false), parsha: hasParsha(sat, settings, tables) || agendaDayKind(sat, settings).holyDay, shulName: settings.shulName, sourcePublishedAt: config.publishedAt, year: h.year };
 }
 
 
