@@ -4,11 +4,18 @@ import { themeAt } from '../public/display-assets/appearance.js';
 import { actor, allow, ApiError, CAPABILITIES } from "./auth.js";
 import { validate, conflicts, publicItem, publicItems, warnings, text } from "./model.js";
 import { scheduleSnapshot, catalog, dateInfo, previewMonth } from "./schedules.js";
-import { phase, localStamp } from "../public/display-assets/time.js";
+import { phase, localStamp, addDays } from "../public/display-assets/time.js";
 import {nextMinyanChangeAt} from '../public/display-assets/minyan-timing.js';
 const json = (x, status = 200) => Response.json(x, { status });
 const decode = (r) => ({ id: r.id, kind: r.kind, status: r.status, internalName: r.internal_name, title: r.title, startsAt: r.starts_at, endsAt: r.ends_at, data: JSON.parse(r.data_json), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by, updatedBy: r.updated_by });
 const list = async (db) => (await db.prepare("SELECT * FROM display_items ORDER BY updated_at DESC").all()).results.map(decode);
+// A source date can own a midnight minyan retained after its control ends.
+// Keep only yesterday-or-later published controls; public projection still
+// filters active items and strips private metadata in both responses.
+async function publicSourceItems(db, at) {
+  const earliestSourceDay = addDays(localStamp(at).slice(0, 10), -1);
+  return (await db.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>? OR (kind='schedule' AND json_extract(data_json,'$.appliesTo')>=?))").bind(at, earliestSourceDay).all()).results.map(decode);
+}
 async function body(req) {
   if (!req.headers.get("Content-Type")?.includes("application/json")) throw new ApiError(415, "Expected JSON.");
   const reader = req.body?.getReader();
@@ -62,12 +69,12 @@ async function handle(req, env) {
   }
   if (path === '/api/display/offline' && req.method === 'GET') {
     const at=new Date().toISOString();
-    const items=(await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
+    const items=await publicSourceItems(env.DB, at);
     return json(createOfflineSeed(items,await readAppearance(env.DB),at));
   }
   if (path === "/api/display/public" && req.method === "GET") {
     const at = new Date().toISOString();
-    const items = (await env.DB.prepare("SELECT * FROM display_items WHERE status='published' AND (ends_at IS NULL OR ends_at>?)").bind(at).all()).results.map(decode);
+    const items = await publicSourceItems(env.DB, at);
     return json(await snapshot(items, at, false, await readAppearance(env.DB)));
   }
   const isAdmin = path.startsWith("/admin/display") || path.startsWith("/api/display/");
