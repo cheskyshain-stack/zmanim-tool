@@ -21,21 +21,25 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false } = {}) {
+export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
-  let reminderPublicKey = '', reminderSchedules = false, eventAudienceDetails = false;
+  let reminderPublicKey = '', reminderSchedules = false, eventAudienceDetails = false, messageAlerts = false;
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
   const readerCache = new Map(), readerPending = new Map();
   let cacheEpoch = 0, swipe = null, swipeFrame = 0, suppressClickUntil = 0;
   const wheel = { last: 0, distance: 0, moved: false };
   const dialogs = new Set();
-  const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id, onSessionExpired: message => {
-    calendarSession(null); user = null; events = []; signIn(message);
-  } });
+  const announcements = createCalendarAnnouncements({ dialog, timeZone: settings.timezone.id,
+    messageAlertsAvailable: () => phoneRemindersAvailable() && messageAlerts && !previewing(),
+    openMessageAlerts: () => openCalendarPhoneReminders(dialog, reminderPublicKey, false, 'messages'),
+    onSessionExpired: message => {
+      calendarSession(null); user = null; events = []; signIn(message);
+    },
+  });
 
   function previewBackupMarkup() {
     return standalone ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
@@ -193,6 +197,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     user = session.user; reminderPublicKey = session.reminderPublicKey || '';
     reminderSchedules = session.reminderSchedules === true;
     eventAudienceDetails = session.eventAudienceDetails === true;
+    messageAlerts = session.messageAlerts === true;
     const { calendarRefresh, ...historyState } = history.state || {};
     if (calendarRefresh) {
       history.replaceState(historyState, '');
@@ -212,6 +217,13 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const loading = loadEvents();
     if (calendarRefresh?.focus) container.querySelector('[data-cal-refresh]')?.focus({ preventScroll: true });
     await loading;
+    if (openMessages && !disposed && user === session.user) {
+      openMessages = false;
+      const url = new URL(location.href);
+      url.searchParams.delete('messages'); history.replaceState(history.state, '', url);
+      announcements.open();
+      return;
+    }
     if (requested && !disposed && user === session.user) {
       const event = eventId && visibleEvents().find(item => item.id === eventId);
       openDay(target, { event, missingEvent: !!eventId && !event && !loadError, remindToPost: reminderPost && (!eventId || !!event) });

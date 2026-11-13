@@ -2,7 +2,7 @@ import { calendarRequest, calendarSession } from '../calendar/api.js';
 import { calendarAnnouncementText, calendarAnnouncementDate, calendarAnnouncementOrder, calendarAnnouncementLocalTime, calendarAnnouncementInstant } from '../calendar/announcement-model.js';
 import { escText, escAttr } from '../util.js';
 
-export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired }) {
+export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messageAlertsAvailable, openMessageAlerts }) {
   let actor = null, timer = null, button = null, active = null;
   let firstPage = null, firstPageRequest = null;
   let total = 0, readCount = 0, deletedCount = 0, editCount = 0, canPost = false, canDelete = false, canEdit = false, unavailable = false;
@@ -155,9 +155,14 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       },
     });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
+    const controls = view.el.querySelector('.cal-dialog-header');
+    if (messageAlertsAvailable()) {
+      const close = controls.querySelector('[data-cal-close]');
+      close.insertAdjacentHTML('beforebegin', '<button type="button" data-cal-message-alerts>Message alerts</button>');
+      controls.querySelector('[data-cal-message-alerts]').addEventListener('click', openMessageAlerts);
+    }
     if (reader) {
       view.el.classList.add('cal-announcement-reader');
-      const controls = view.el.querySelector('.cal-dialog-header');
       view.el.append(controls);
       controls.querySelector('[data-cal-close]').focus({ preventScroll: true });
     }

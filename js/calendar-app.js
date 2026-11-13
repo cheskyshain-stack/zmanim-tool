@@ -19,6 +19,7 @@ refreshCalendarPhoneReminderWorker().catch(() => { /* The calendar can open whil
     if (!response.ok) throw new Error('Calendar settings could not be loaded. Reload to try again.');
     const config = await response.json();
     renderCalendar(calendarHost, resolveSettings(config.settings), tables, { standalone: true, setupToken: calendarSetupToken, inviteToken: calendarInviteToken, congregationPreview: calendarCongregationPreview,
-      reminderDate: calendarQuery.get('simcha') || '', reminderEventId: calendarQuery.get('event') || '', reminderPost: calendarQuery.get('post') === '1' });
+      reminderDate: calendarQuery.get('simcha') || '', reminderEventId: calendarQuery.get('event') || '', reminderPost: calendarQuery.get('post') === '1',
+      openMessages: calendarQuery.get('messages') === '1' });
   } catch (error) { calendarHost.textContent = error.message || 'The calendar could not be loaded. Reload to try again.'; }
 })();

@@ -7,6 +7,7 @@ import { lcTextCalendarScript } from './gmail-bridge.js';
 import { calendarSessionExpiration } from './session-expiration.js';
 import { calendarReminderSchedule, calendarSupportsReminderSchedule, DEFAULT_CALENDAR_REMINDER_SCHEDULE } from '../../js/calendar/reminder-date.js';
 import { nextSimchaReminder, pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, reminderRegistrationExpired, runSimchaReminders, scheduleCalendarAlarm, sendCalendarPush } from './simcha-reminders.js';
+import { queueCalendarMessageAlert, runCalendarMessageAlerts } from './message-alerts.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -118,7 +119,7 @@ export class CommunityCalendar extends DurableObject {
     return { token, expires, ...this.sessionInfo(user) };
   }
   sessionInfo(user) {
-    return { user: userView(user), eventVisibility: true, eventAudienceDetails: true, ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey, reminderSchedules: true } : {}) };
+    return { user: userView(user), eventVisibility: true, eventAudienceDetails: true, ...(this.reminderKeys ? { reminderPublicKey: this.reminderKeys.publicKey, reminderSchedules: true, messageAlerts: true } : {}) };
   }
   async phoneReminders(request, user, path) {
     const method = request.method, statusOnly = path === '/api/phone-reminders/status' && method === 'POST';
@@ -127,6 +128,8 @@ export class CommunityCalendar extends DurableObject {
     if (!statusOnly && !scheduleOnly && !testOnly && (path !== '/api/phone-reminders' || !['PUT', 'DELETE'].includes(method))) fail('Phone reminder setting not found.', 404);
     if (!this.reminderKeys && method !== 'DELETE') fail('Phone reminders are not available yet.', 503);
     const body = await this.body(request, 4096);
+    const mode = body.mode;
+    if (mode !== undefined && !['simcha', 'messages'].includes(mode) && !(method === 'DELETE' && mode === 'all')) fail('Choose a phone alert setting.');
     const enrolling = method === 'PUT' && !scheduleOnly;
     const subscription = enrolling ? pushSubscription(body.subscription) : null;
     const endpoint = enrolling ? subscription?.endpoint : pushEndpoint(body.endpoint);
@@ -135,12 +138,13 @@ export class CommunityCalendar extends DurableObject {
     if (statusOnly || testOnly) {
       const device = await storage.get(key);
       const owned = device?.userId === user.id && device.version === user.version;
-      const enabled = owned && !device.expiredAt;
-      if (statusOnly) return json({ enabled, ...(owned ? { expired: !!device.expiredAt, lastDelivery: device.lastDelivery || null } : {}),
+      const registered = owned && !device.expiredAt, enabled = registered && device.simchaEnabled !== false;
+      const messageAlerts = registered && device.messageAlertAfter != null;
+      if (statusOnly) return json({ registered, enabled, messageAlerts, ...(owned ? { expired: !!device.expiredAt, lastDelivery: device.lastDelivery || null } : {}),
         ...(enabled ? { schedule: device.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE, nextAt: await nextSimchaReminder(storage, device.reminderSchedule) } : {}) });
-      if (!enabled) fail('Reconnect phone reminders for this device before sending a test alert.', 409);
+      if (mode === 'messages' ? !messageAlerts : !enabled) fail('Reconnect phone alerts for this device before sending a test alert.', 409);
       await this.limited(request, 'phone-reminder-test:' + user.id, 5);
-      const status = await sendCalendarPush(storage, key, device, this.reminderKeys, this.env.ALLOWED_ORIGIN, { test: true }, { ttl: 60, urgency: 'high' });
+      const status = await sendCalendarPush(storage, key, device, this.reminderKeys, this.env.ALLOWED_ORIGIN, { test: true, ...(mode === 'messages' ? { messageAlert: true } : {}) }, { ttl: 60, urgency: 'high' });
       const now = Date.now(), expired = reminderRegistrationExpired(status, device, now);
       if (expired) {
         const current = await storage.get(key);
@@ -159,13 +163,28 @@ export class CommunityCalendar extends DurableObject {
     const result = await storage.transaction(async transaction => {
       const current = await transaction.get(key);
       if (method === 'DELETE') {
-        if (current?.userId === user.id) await transaction.delete(key);
-        return { enabled: false };
+        if (current?.userId !== user.id) return { enabled: false, registered: false };
+        if (mode === 'all' || mode === undefined) {
+          await transaction.delete(key);
+          return { enabled: false, registered: false };
+        }
+        const keepMessages = mode === 'simcha' && current.messageAlertAfter != null;
+        const keepSimchas = mode === 'messages' && current.simchaEnabled !== false;
+        if (keepMessages || keepSimchas) {
+          const updated = { ...current, id: crypto.randomUUID(), simchaEnabled: keepSimchas };
+          if (!keepMessages) {
+            delete updated.messageAlertAfter;
+            delete updated.messageAlertsSince;
+            delete updated.messageAlertRetry;
+          }
+          await transaction.put(key, updated);
+        } else await transaction.delete(key);
+        return { enabled: keepSimchas, messageAlerts: keepMessages, registered: keepMessages || keepSimchas };
       }
       const sameDevice = current?.userId === user.id && current.version === user.version;
       const now = Date.now();
       if (scheduleOnly) {
-        if (!sameDevice || current.expiredAt) fail('Turn on reminders for this phone before setting times.', 403);
+        if (!sameDevice || current.expiredAt || current.simchaEnabled === false) fail('Turn on reminders for this phone before setting times.', 403);
         if (schedule.revision !== (current.reminderSchedule?.revision || 0)) fail('The reminder times changed in another tab. Reopen them before saving.', 409);
         const updated = { ...schedule, revision: schedule.revision + 1, effectiveAt: now };
         await transaction.put(key, { ...current, id: crypto.randomUUID(), reminderSchedule: updated });
@@ -185,10 +204,15 @@ export class CommunityCalendar extends DurableObject {
         }
       }
       if (replaced) await transaction.delete(previousKey);
-      const retained = sameDevice ? current : replaced?.reminderSchedule ? { reminderSchedule: replaced.reminderSchedule } : {};
-      await transaction.put(key, { ...retained, id: crypto.randomUUID(), userId: user.id, version: user.version, subscription, enabledAt: retained.enabledAt ?? now });
+      const retained = sameDevice ? current : replaced ? { reminderSchedule: replaced.reminderSchedule, simchaEnabled: replaced.simchaEnabled,
+        messageAlertAfter: replaced.messageAlertAfter, messageAlertsSince: replaced.messageAlertsSince } : {};
+      const simchaEnabled = mode !== 'messages' || Boolean((sameDevice || replaced) && retained.simchaEnabled !== false);
+      const messageAlertAfter = retained.messageAlertAfter ?? (mode === 'messages' ? await transaction.get('announcement-count') || 0 : null);
+      await transaction.put(key, { ...retained, id: crypto.randomUUID(), userId: user.id, version: user.version, subscription, simchaEnabled,
+        enabledAt: retained.enabledAt ?? now, messageAlertAfter, messageAlertsSince: retained.messageAlertsSince ?? (mode === 'messages' ? now : null) });
       await scheduleCalendarAlarm(transaction, now + 1000);
-      return { enabled: true, schedule: retained.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE };
+      return { registered: true, enabled: simchaEnabled, messageAlerts: messageAlertAfter != null,
+        ...(simchaEnabled ? { schedule: retained.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE } : {}) };
     });
     return json({ ...result, ...(result.schedule ? { nextAt: await nextSimchaReminder(storage, result.schedule) } : {}) });
   }
@@ -329,7 +353,8 @@ export class CommunityCalendar extends DurableObject {
       const message = { id: body.id, sequence, text, authorId: user.id, authorName: 'Shul', revision: 1, createdAt: new Date().toISOString(), ...(addedAt ? { addedAt } : {}) };
       await storage.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
         [announcementDateKey(message)]: body.id,
-        ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt) });
+        ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt),
+        ...await this.messageAlertEntry(storage, message) });
       return json({ message: calendarAnnouncementView(message), ...await status() }, 201);
     }
     if (method === 'GET') {
@@ -358,6 +383,12 @@ export class CommunityCalendar extends DurableObject {
       try { return await this.route(request); }
       catch (error) { return json({ error: error.status ? error.message : 'The calendar request could not be completed.' }, error.status || 500); }
     });
+  }
+  async messageAlertEntry(storage, message, imported = false) {
+    const cutoff = midnight(shiftDate(civilDate(Date.now()), 1 - CALENDAR_ANNOUNCEMENT_HISTORY_DAYS));
+    if (!this.reminderKeys || Date.parse(calendarAnnouncementDate(message)) < cutoff) return {};
+    await scheduleCalendarAlarm(storage, Date.now() + 1000);
+    return queueCalendarMessageAlert(message, imported ? Date.parse(message.createdAt) : Date.now());
   }
   emailConnectionView(record) {
     const { keyHash, ...value } = record || { enabled: false, revision: 0, importedCount: 0, reviewCount: 0 };
@@ -404,7 +435,7 @@ export class CommunityCalendar extends DurableObject {
         [announcementDateKey(message)]: id,
         'announcement-count': sequence, [receiptKey]: { bodyHash, announcementId: id, receivedAt: now },
         'config:sms-import': { ...config, importedCount: (config.importedCount || 0) + 1, lastCheckedAt: now, lastImportedAt: now },
-        ...activityFields(['announcementsPosted'], now) });
+        ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
     });
     return json({ accepted: true, posted: true, duplicate: false, announcementId: id }, 201);
   }
@@ -417,7 +448,7 @@ export class CommunityCalendar extends DurableObject {
       await transaction.put({ ['announcement:' + id]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: id,
         [announcementDateKey(message)]: id,
         'announcement-count': sequence, ['lc-receipt:' + receipt.digest]: { digest: receipt.digest, receivedAt: receipt.receivedAt, status: 'posted', announcementId: id },
-        'config:email-import': next, ...activityFields(['announcementsPosted'], now) });
+        'config:email-import': next, ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
       await transaction.delete('lc-review:' + receipt.digest);
     });
     return { accepted: true, posted: true };
@@ -488,7 +519,7 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -643,7 +674,9 @@ export class CommunityCalendar extends DurableObject {
       cleanup = now + 86400000;
       await storage.put('config:calendar-cleanup', cleanup);
     }
-    const next = this.reminderKeys ? await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, now) : Infinity;
-    await scheduleCalendarAlarm(storage, Math.min(cleanup, next));
+    if (!this.reminderKeys) { await scheduleCalendarAlarm(storage, cleanup); return; }
+    const alerts = await runCalendarMessageAlerts(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, now);
+    const next = await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, Date.now());
+    await scheduleCalendarAlarm(storage, Math.min(cleanup, next, alerts));
   }
 }

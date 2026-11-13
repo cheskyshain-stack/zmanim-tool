@@ -166,6 +166,33 @@ async function checkPhoneControls(site, owner, viewer, device, detailsDate) {
     await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
     assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
 
+    await reader.goto(site + '/admin/calendar/?preview=congregation&messages=1');
+    await messages.getByRole('button', { name: 'Message alerts', exact: true }).click();
+    const alerts = reader.getByRole('dialog', { name: 'Message alerts' });
+    await alerts.getByRole('button', { name: 'Turn on message alerts' }).click();
+    await alerts.getByText('Message alerts are on for this device.').waitFor();
+    await alerts.getByRole('button', { name: 'Send test alert' }).click();
+    await alerts.getByText('Test alert accepted.', { exact: false }).waitFor();
+    await alerts.getByRole('button', { name: 'Close' }).click();
+    for (const width of [375, 393]) {
+      await reader.setViewportSize({ width, height: 720 });
+      assert(await messages.locator('.cal-dialog-header').evaluate(header => {
+        const box = header.getBoundingClientRect();
+        return [...header.children].every(item => {
+          const bounds = item.getBoundingClientRect();
+          return bounds.left >= box.left && bounds.right <= box.right;
+        });
+      }));
+    }
+    await messages.getByRole('button', { name: 'Close' }).click();
+    await openPhoneReminders();
+    await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
+    await reader.getByRole('button', { name: 'Close' }).click();
+    await reader.getByRole('button', { name: /^Messages/ }).click();
+    await messages.getByRole('button', { name: 'Message alerts', exact: true }).click();
+    await alerts.getByRole('button', { name: 'Turn off message alerts' }).click();
+    await alerts.getByRole('button', { name: 'Turn on message alerts' }).waitFor();
+
     await reader.goto(site + '/admin/calendar/?preview=congregation&simcha=' + detailsDate);
     const readerDay = reader.getByRole('dialog', { name: 'Day details' });
     const dayShortcut = readerDay.getByRole('button', { name: 'Phone reminders', exact: true });
@@ -237,20 +264,23 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     host = 'http://127.0.0.1:' + server.address().port;
   }
   let providerStatus = 201, pushes = 0;
+  const messagePushes = [];
   const backend = new Miniflare(convertV4MiniflareOptions({ name: 'simcha-test', modules: true, script: bundle.outputFiles[0].text, compatibilityDate: '2026-10-01',
     bindings: { ALLOWED_ORIGIN: host, BOOTSTRAP_SHA256: createHash('sha256').update(setupToken).digest('hex'), CALENDAR_REMINDER_VAPID: vapid },
     durableObjects: { CALENDAR: { className: 'CommunityCalendar', useSQLite: true } },
     outboundService: async request => {
       assert.equal(new URL(request.url).hostname, 'fcm.googleapis.com');
       assert.equal(request.headers.get('content-encoding'), 'aes128gcm');
+      const topic = request.headers.get('topic');
+      if (topic?.startsWith('shul-message-')) messagePushes.push([new URL(request.url).pathname, topic]);
       pushes++;
       return new WorkerResponse(null, { status: providerStatus });
     },
   }));
   try {
-    const call = async (route, method = 'GET', body, token) => {
+    const call = async (route, method = 'GET', body, token, extraHeaders = {}) => {
       const response = await backend.dispatchFetch('https://worker.example.test' + route, { method, headers: { Origin: host,
-        ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}) }, ...(body ? { body: JSON.stringify(body) } : {}) });
+        ...(token ? { Authorization: 'Bearer ' + token } : {}), ...(body ? { 'Content-Type': 'application/json' } : {}), ...extraHeaders }, ...(body ? { body: JSON.stringify(body) } : {}) });
       return { status: response.status, body: await response.json() };
     };
     const device = subscription('synthetic-device'), settings = '/api/phone-reminders';
@@ -315,6 +345,30 @@ test('real Worker protects enrollment and lets a manager set, retain, and clear 
     const custom = await call('/api/events/custom-event', 'PUT', { ...newSimcha, type: 'custom', customCategory: 'Other event' }, owner.token);
     assert.equal(custom.status, 201);
     assert.equal(custom.body.event.reminder, undefined);
+    const messageDevice = subscription('message-only'), simchaDevice = subscription('simcha-only');
+    const post = { id: 'announcement-alert-01', text: 'First new Shul message for opted-in devices' };
+    assert.equal((await call('/api/announcements', 'POST', { ...post, id: 'announcement-before' }, owner.token)).status, 201);
+    assert.equal((await call(settings, 'PUT', { subscription: simchaDevice }, owner.token)).body.enabled, true);
+    const enrolled = await call(settings, 'PUT', { subscription: messageDevice, mode: 'messages' }, viewer.token);
+    assert.equal(enrolled.body.messageAlerts, true);
+    assert.equal(enrolled.body.enabled, false);
+    assert.equal((await call(settings + '/test', 'POST', { endpoint: messageDevice.endpoint, mode: 'messages' }, owner.token)).status, 409);
+    const saved = await call('/api/announcements', 'POST', post, owner.token);
+    assert.equal(saved.status, 201);
+    assert.equal((await call('/api/announcements', 'POST', post, owner.token)).status, 200);
+    for (let i = 0; i < 40 && !messagePushes.length; i++) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.deepEqual(messagePushes, [['/fcm/send/message-only', 'shul-message-' + saved.body.message.sequence]]);
+    const smsConnection = await call('/api/sms-import', 'POST', { revision: 0 }, owner.token);
+    const smsHeaders = { 'X-Calendar-SMS-Key': smsConnection.body.key };
+    const sms = { id: 'synthetic-alert-sms', text: 'A message accepted by the SMS bridge', receivedAt: new Date().toISOString() };
+    assert.equal((await call('/api/sms-import/receive', 'POST', { ...sms, id: 'older-alert-sms', receivedAt: new Date(Date.now() - 300000).toISOString() }, null, smsHeaders)).status, 201);
+    assert.equal((await call('/api/sms-import/receive', 'POST', sms, null, smsHeaders)).status, 201);
+    assert.equal((await call('/api/sms-import/receive', 'POST', sms, null, smsHeaders)).body.duplicate, true);
+    for (let i = 0; i < 40 && messagePushes.length < 2; i++) await new Promise(resolve => setTimeout(resolve, 100));
+    assert.deepEqual(messagePushes.map(([, topic]) => topic), ['shul-message-' + saved.body.message.sequence, 'shul-message-' + (saved.body.message.sequence + 2)]);
+    assert.equal((await call(settings, 'PUT', { subscription: messageDevice, mode: 'simcha' }, viewer.token)).body.messageAlerts, true);
+    assert.equal((await call(settings, 'DELETE', { endpoint: messageDevice.endpoint, mode: 'messages' }, viewer.token)).body.enabled, true);
+    assert.equal((await call(settings + '/status', 'POST', { endpoint: messageDevice.endpoint }, viewer.token)).body.messageAlerts, false);
   } finally { await backend.dispose(); server?.close(); }
 });
 
@@ -490,4 +544,12 @@ test('phone notifications hide private text and link to the specific event', asy
   await pending;
   assert.equal(notification.title, 'Calendar test alert');
   assert.equal(notification.data, origin + '/admin/calendar/');
+  handlers.push({ data: { json: () => ({ messageAlert: true, sequence: 9, text: 'Private announcement' }) }, waitUntil: work => { pending = work; } });
+  await pending;
+  assert.equal(notification.title, 'New Shul message');
+  assert.equal(notification.tag, 'shul-message-9');
+  assert(!JSON.stringify(notification).includes('Private announcement'));
+  handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
+  await pending;
+  assert.equal(opened, origin + '/admin/calendar/?messages=1');
 });
