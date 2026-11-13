@@ -2,7 +2,7 @@ import { buildPushPayload } from '@block65/webcrypto-web-push';
 import { calendarReminderShabbos, calendarReminderSlot } from '../../js/calendar/reminder-date.js';
 import { civilDate, shiftDate, HOUR, TIMEZONE } from '../traffic-calendar.js';
 
-const devicePrefix = 'simcha-phone:';
+export const calendarPhoneDevicePrefix = 'simcha-phone:';
 const batchSize = 16;
 const deliveryWindow = 2 * HOUR;
 const localTime = new Intl.DateTimeFormat('en-GB', { timeZone: TIMEZONE, hourCycle: 'h23', hour: '2-digit', minute: '2-digit' });
@@ -38,7 +38,7 @@ export function pushSubscription(value) {
 
 export async function reminderDeviceKey(endpoint) {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(endpoint));
-  return devicePrefix + [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
+  return calendarPhoneDevicePrefix + [...new Uint8Array(digest)].map(byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
 function reminderInstant({ date, time }) {
@@ -154,14 +154,14 @@ export async function nextSimchaReminder(storage, schedule, now = Date.now()) {
 }
 
 export async function runSimchaReminders(storage, keys, origin, now = Date.now(), send = fetch) {
-  const devices = await storage.list({ prefix: devicePrefix });
+  const devices = await storage.list({ prefix: calendarPhoneDevicePrefix });
   if (!devices.size) return Infinity;
   const cutoff = now - deliveryWindow;
   const groups = reminderEventGroups(await storage.list({ prefix: 'event:' }), civilDate(cutoff), shiftDate(civilDate(now), 1));
   const agendas = new Map(), jobs = [];
   let next = Infinity;
   for (const [key, device] of devices) {
-    if (device.expiredAt) continue;
+    if (device.expiredAt || device.simchaEnabled === false) continue;
     const schedule = device.reminderSchedule;
     const agendaKey = JSON.stringify([schedule?.standard, schedule?.sameTime === true ? null : schedule?.categories]);
     if (!agendas.has(agendaKey)) agendas.set(agendaKey, reminderAgenda(groups, schedule, now, cutoff));

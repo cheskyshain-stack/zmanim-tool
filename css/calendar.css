@@ -19,6 +19,8 @@
 .cal-announcements-dialog > :not(.cal-announcement-feed) { flex:none; }
 .cal-announcements-dialog > :is(.cal-dialog-header,.cal-announcement-status,.cal-announcement-intro) { margin:0; }
 .cal-announcement-reader > .cal-dialog-header { border-top:1px solid #dedccf; padding-top:.4rem; }
+.cal-announcements-dialog > .cal-dialog-header { gap:.4rem; }
+.cal-announcements-dialog > .cal-dialog-header > [data-cal-message-alerts] { margin-inline-start:auto; padding:.35rem .55rem; font-size:.8rem; }
 .cal-announcement-intro { color:#60717d; }
 .cal-announcement-status:empty { position:absolute; }
 .cal-announcement-feed { min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; padding:.25rem; }

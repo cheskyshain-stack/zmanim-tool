@@ -65,6 +65,12 @@ replaces an expired browser subscription and retains that device's saved times.
 Android can opt in through Chrome. On iPhone or iPad, open the calendar as a Home
 Screen web app before allowing notifications.
 
+Message alerts in the Messages panel use the same phone subscription and have a
+separate on/off setting. New announcements from an admin or an import can alert
+opted-in devices. Earlier messages and source retries do not generate alerts.
+Only the generic alert appears on the phone. Tapping it opens the signed-in
+Messages panel. Sign-out turns off alerts and reminders on that device.
+
 The alarm combines events due at the same time on the same device into one alert.
 Tapping it opens the selected simcha’s event details and offers the event's
 manager a prompt to post an announcement. Older alerts open the simcha date.
