@@ -39,6 +39,7 @@ async function seatsEntry() {
   if (await updates.check()) return;
   updates.protect(() => !root.querySelector('#seats-unlock'));
   const nameFontReady = document.fonts.load('450 13px "Seats Serif"', 'Aaאב').catch(() => {});
+  document.fonts.load('700 17pt "Seats David"', SEATS_CHART_PRINT_TITLE).catch(() => {});
   const auth = await seatsOpenSession(root);
   await nameFontReady;
   window.dispatchEvent(new Event('zmanim-seats-open'));
@@ -681,6 +682,7 @@ function seatsStart(root, auth, updates) {
       preparingPrint = true;
       const currentId = plan().id, currentScreen = screen;
       try {
+        if (currentScreen === 'editor') await document.fonts.load('700 17pt "Seats David"', SEATS_CHART_PRINT_TITLE).catch(() => {});
         if (screen === 'editor' && roomDesign()) await seatsWaitForFixturePictures();
         if (screen === currentScreen && plan().id === currentId) window.print();
       } catch { alertMessage('Room pictures could not load. Check your connection and try printing again.'); }

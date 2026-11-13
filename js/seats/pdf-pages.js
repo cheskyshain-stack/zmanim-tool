@@ -57,7 +57,9 @@ export async function seatsChartPdfPage(source, paper, plan = {}) {
   room.setAttribute('x', geometry.margin * 72); room.setAttribute('y', (geometry.margin + geometry.header) * 72);
   room.setAttribute('width', geometry.contentWidth * 72); room.setAttribute('height', (geometry.contentHeight - geometry.header - geometry.footer) * 72);
   room.setAttribute('viewBox', geometry.viewBox); room.setAttribute('preserveAspectRatio', 'none'); room.style.overflow = 'visible';
-  page.append(seatsPdfText(SEATS_CHART_PRINT_TITLE, geometry.margin * 72, geometry.margin * 72 + 17, 17, true, true), room);
+  const title = seatsPdfText(SEATS_CHART_PRINT_TITLE, geometry.margin * 72, geometry.margin * 72 + 17, 17, true);
+  title.setAttribute('font-family', 'SeatsDavid');
+  page.append(title, room);
   for (let index = 0; index < headerLines.length; index++) {
     const text = seatsPdfText(headerLines[index], (geometry.width - geometry.margin) * 72, geometry.margin * 72 + headerFont + index * 11, headerFont, true);
     text.setAttribute('text-anchor', 'end'); page.append(text);

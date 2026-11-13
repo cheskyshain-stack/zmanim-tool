@@ -13,9 +13,13 @@ import fitz,sys,json
 d=fitz.open(sys.argv[1]);assert len(d)==1,'Notes must not add another page'
 p=d[0];header=sys.argv[2];footer=sys.argv[3];text=' '.join(p.get_text().split())
 assert 'Synthetic Person' in text,'Assigned names must stay searchable'
-title=[c for b in p.get_text('rawdict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] for c in s['chars'] if c['bbox'][2]<p.rect.width*.65 and c['bbox'][3]<65 and c['origin'][1]<50 and not c['c'].isspace()]
-visual=''.join(c['c'] for c in sorted(title,key=lambda c:c['origin'][0]))
-assert visual=='ןינמ7:30תבש' and max(c['origin'][1] for c in title)-min(c['origin'][1] for c in title)<.2, ('Shabbos heading must read right to left on one line',visual)
+title=[(c,s) for b in p.get_text('rawdict')['blocks'] for l in b.get('lines',[]) for s in l['spans'] for c in s['chars'] if c['bbox'][2]<p.rect.width*.65 and c['bbox'][3]<65 and c['origin'][1]<50 and not c['c'].isspace()]
+visual=''.join(c['c'] for c,s in sorted(title,key=lambda pair:pair[0]['origin'][0]))
+assert visual=='ןינמ7:30תבש' and max(c['origin'][1] for c,s in title)-min(c['origin'][1] for c,s in title)<.2, ('Shabbos heading must read right to left on one line',visual)
+title_fonts={s['font'] for c,s in title}
+assert len(title_fonts)==1 and all(abs(s['size']-17)<.2 for c,s in title), ('The Hebrew and time must use one font at 17 pt',title_fonts)
+font=next(f for f in p.get_fonts() if f[3].split('+')[-1] in title_fonts)
+assert fitz.Font(fontbuffer=d.extract_font(font[0])[3]).name.replace(' ','')=='DavidLibreBold', ('The PDF must embed the David Libre Bold outlines',font)
 for value in [header,footer]:
  if value:assert value in text,('Missing note',value)
 if not header:assert 'First Draft' not in text and 'Second Draft' not in text
@@ -44,6 +48,9 @@ print(json.dumps({'pages':1,'header':header,'footer':footer}))
   // Clicking Print while the note is focused must export that last edit on the first click.
   await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testNotesPdf,null,{timeout:120000});
   const bytes=await page.evaluate(async()=>Array.from(new Uint8Array(await window.testNotesPdf.arrayBuffer()))),file=path.join(output,width+'-notes-CMYK.pdf');fs.writeFileSync(file,Buffer.from(bytes));console.log(execFileSync('python',['-c',inspect,file,'Second Draft',footer],{encoding:'utf8'}).trim());for(const tab of context.pages())if(tab!==page)await tab.close();
+  await page.locator('#pdf-colors').selectOption('rgb');await page.evaluate(()=>{window.testNotesPdf=null;});
+  await page.getByRole('button',{name:'Print / PDF',exact:true}).click();await page.waitForFunction(()=>window.testNotesPdf,null,{timeout:120000});
+  const rgb=path.join(output,width+'-notes-RGB.pdf');fs.writeFileSync(rgb,Buffer.from(await page.evaluate(async()=>Array.from(new Uint8Array(await window.testNotesPdf.arrayBuffer())))));console.log(execFileSync('python',['-c',inspect,rgb,'Second Draft',footer],{encoding:'utf8'}).trim());for(const tab of context.pages())if(tab!==page)await tab.close();
   await page.reload();await page.locator('#chart-name').waitFor();await openPrintOptions(page);await page.locator('#chart-print-notes summary').click();assert.equal(await page.locator('#print-header').inputValue(),'Second Draft');assert.equal(await page.locator('#print-footer').inputValue(),footer);
   await page.locator('#print-header').fill('Browser Draft');await page.evaluate(()=>window.dispatchEvent(new Event('beforeprint')));assert.equal(await page.locator('#seats-print .chart-print-header').textContent(),'Browser Draft');await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
   await page.locator('#print-header').fill('');await page.locator('#print-header').press('Tab');await page.locator('#print-footer').fill('');await page.locator('#print-footer').press('Tab');assert.equal(await page.locator('#seats-print footer').count(),0);assert.equal(await page.locator('#seats-print .room-diagram').getAttribute('viewBox'),seatsPrintGeometry('letter').viewBox,'Blank notes must restore the original print geometry');

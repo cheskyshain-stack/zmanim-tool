@@ -1,6 +1,14 @@
 import { PRINT_TILE_WIDTH, PRINT_TILE_HEIGHT, printRasterSize, printRasterTiles } from '../print-quality.js';
 
 const SEATS_CMYK_PROFILE = '/assets/print/FOGRA39L_coated.icc';
+const SEATS_PDF_FONTS = [
+  { url: '/assets/print/LiberationSans-Regular.ttf', name: 'SeatsSans', bold: false },
+  { url: '/assets/print/LiberationSans-Bold.ttf', name: 'SeatsSans', bold: true },
+  { url: '/assets/print/LiberationSerif-Regular.ttf', name: 'SeatsSerif', bold: false },
+  { url: '/assets/print/LiberationSerif-Bold.ttf', name: 'SeatsSerif', bold: true },
+  { url: '/assets/print/SeatsSerif-Regular.ttf', name: 'SeatsNames', bold: false },
+  { url: '/assets/fonts/DavidLibre-Bold.ttf', name: 'SeatsDavid', bold: true },
+];
 let seatsPdfLibraries, seatsCmykLibraries;
 
 function seatsPdfScript(src) {
@@ -28,11 +36,11 @@ async function seatsLoadPdfTools() {
   if (!seatsPdfLibraries) seatsPdfLibraries = (async () => {
     await seatsPdfScript('/vendor/cmyk/jspdf-4.2.1.umd.min.js');
     await seatsPdfScript('/vendor/cmyk/svg2pdf-2.9.0.umd.min.js');
-    const fonts = await Promise.all(['LiberationSans-Regular', 'LiberationSans-Bold', 'LiberationSerif-Regular', 'LiberationSerif-Bold', 'SeatsSerif-Regular'].map(name => seatsPdfBytes('/assets/print/' + name + '.ttf')));
-    const names = ['SeatsSans', 'SeatsSans', 'SeatsSerif', 'SeatsSerif', 'SeatsNames'];
-    await Promise.all(fonts.map(async (bytes, index) => {
-      const face = new FontFace(names[index], bytes, { weight: index % 2 ? '700' : '400' });
+    const fonts = await Promise.all(SEATS_PDF_FONTS.map(async ({ url, name, bold }) => {
+      const bytes = await seatsPdfBytes(url);
+      const face = new FontFace(name, bytes, { weight: bold ? '700' : '400' });
       await face.load(); document.fonts.add(face);
+      return { bytes, name, bold };
     }));
     return { fonts, jsPDF: window.jspdf.jsPDF };
   })().catch(error => { seatsPdfLibraries = null; throw error; });
@@ -172,8 +180,9 @@ async function seatsBuildPdf(pages, { monochrome = false, progress = () => {}, r
   });
   for (let index = 0; index < tools.fonts.length; index++) {
     const file = 'seats-font-' + index + '.ttf';
-    doc.addFileToVFS(file, seatsPdfBinary(tools.fonts[index]));
-    doc.addFont(file, index === 4 ? 'SeatsNames' : index < 2 ? 'SeatsSans' : 'SeatsSerif', index % 2 ? 'bold' : 'normal');
+    const { bytes, name, bold } = tools.fonts[index];
+    doc.addFileToVFS(file, seatsPdfBinary(bytes));
+    doc.addFont(file, name, bold ? 'bold' : 'normal');
   }
   if (rgbMode) doc.internal.events.subscribe('putPage', () => { doc.internal.write('/Group << /Type /Group /S /Transparency /CS /DeviceRGB /I true >>'); });
   else seatsPdfOutputIntent(doc, tools.profile);
