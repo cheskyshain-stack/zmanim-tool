@@ -4,7 +4,7 @@ The existing Seats page stays on GitHub Pages. This separate Cloudflare Worker
 stores shared plans in a SQLite Durable Object and broadcasts changes through
 WebSockets. It does not use or change the statistics Worker's archive or secret.
 
-Each organizer enters a name and the existing Seats PIN, 4444. PIN checks happen
+Each organizer enters a name and the shared Seats PIN. PIN checks happen
 on the server before any plan can be read or changed. New sessions expire at the
 first 3 a.m. in New York after at least seven full days, regardless of activity.
 The browser remembers the session across visits. Tokens are sent in an authorization
@@ -39,6 +39,29 @@ the connection returns. A local pending copy must sync before it is discarded.
 
 The shared connection is separate from downloaded backups. Restoring a backup
 creates independent local plans and cannot overwrite an online plan.
+
+## Yahrzeit Calendar
+
+The private page at /yahrzeits/ has its own sign-in and uses the same private
+organizer PIN as Seats. Records are stored under their own prefix in the
+existing Seats Durable Object and require a Yahrzeit Calendar session.
+Each member can have one Father and one Mother
+entry and additional custom relationships. The Hebrew dates repeat automatically;
+the entry records the family's preference when there are two Adars or a missing
+30 Cheshvan or Kislev.
+
+The new routes require the same origin as Seats and a bearer session issued by
+POST /api/session with scope yahrzeits. The member list is at GET /api/yahrzeits.
+POST and DELETE at /api/yahrzeits/:id take the record
+revision so a change from a second organizer cannot silently overwrite an edit.
+Set the Cloudflare Worker secret SEATS_PRIVATE_PIN to a new private 6–8 digit
+Seats PIN before publishing /yahrzeits/. The old PIN was documented publicly,
+so the Worker never grants it yahrzeit access. Enter the private PIN separately
+on each page. Ordinary Seats sign-in and existing sessions still open seating
+charts. Never commit the private PIN.
+Deploy the Seats service before publishing /yahrzeits/. Authenticated GET /api/info
+reports yahrzeits: true when the private PIN is set. Keep the existing account,
+Worker name, and binding.
 
 ## Activate through GitHub
 

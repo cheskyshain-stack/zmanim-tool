@@ -10,5 +10,6 @@ export function seatsStartMarkup() {
       <button type="button" class="seats-start-card seats-start-primary" data-action="start-saved" aria-label="View saved charts" aria-describedby="seats-start-saved-help"><span class="seats-start-icon">${seatsStartFolder}</span><span class="seats-start-card-copy"><strong>View saved charts</strong><span id="seats-start-saved-help">Continue editing a saved chart.</span></span>${seatsStartArrow}</button>
       <button type="button" class="seats-start-card" data-action="start-create" aria-label="Create new chart" aria-describedby="seats-start-create-help"><span class="seats-start-icon">${seatsStartChart}</span><span class="seats-start-card-copy"><strong>Create new chart</strong><span id="seats-start-create-help">Start with an empty chart.</span></span>${seatsStartArrow}</button>
     </div>
+    <p><a href="/yahrzeits/">Yahrzeit Calendar</a></p>
   </section>`;
 }

@@ -1021,7 +1021,7 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "yahrzeits", "offline"]
 DIST_FILES = ["index.html", "404.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
@@ -1161,6 +1161,8 @@ def main():
     stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
     stamp_analytics(ROOT / "seats" / "index.html", ready_event="zmanim-seats-open")
     stamp_seats_build()
+    stamp_css_versions(ROOT / "yahrzeits" / "index.html", "../")
+    stamp_js_versions(ROOT / "yahrzeits" / "index.html", "../", "yahrzeits-app.js")
     stamp_css_versions(ROOT / "admin" / "calendar" / "index.html", "../../")
     stamp_js_versions(ROOT / "admin" / "calendar" / "index.html", "../../", "calendar-app.js")
     stamp_analytics(ROOT / "admin" / "calendar" / "index.html", ready_event="zmanim-calendar-open", exclude_account_links=True)
@@ -1214,7 +1216,11 @@ def main():
 
     css_out = OUT_DIR / "css"
     css_out.mkdir(exist_ok=True)
+    # The yahrzeit register requires the shared Seats service.
+    (css_out / "yahrzeits.css").unlink(missing_ok=True)
     for f in (ROOT / "css").glob("*.css"):
+        if f.name == "yahrzeits.css":
+            continue
         (css_out / f.name).write_text(inline_fonts(f.read_text(encoding="utf-8")), encoding="utf-8")
 
     print(f"Built {OUT_DIR} ({len(order)} modules, {len(bundle.splitlines())} lines)")
