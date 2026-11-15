@@ -13,6 +13,7 @@
 .yr-card .cal-content { max-height:calc(20px + var(--cal-weeks) * var(--yr-row-preferred)); border-top:0; }
 .yr-card .cal-grid-wrap { overflow:hidden; }
 .yr-card .cal-month-title { display:flex; align-items:center; justify-content:center; gap:.25rem; white-space:normal; }
+.yr-card :is([data-yr-jump],[data-yr-hebrew-month]) { -webkit-user-select:none; user-select:none; }
 .yr-card .cal-month-title .yr-english-month { color:#142b46; font:700 clamp(15px,4.7vw,23px)/1.15 Georgia,serif; }
 .yr-card .cal-month-nav > div { min-width:0; }
 .yr-card .cal-toolbar button[data-yr-step] { border-color:#dfddd3; }
@@ -66,6 +67,7 @@
 }
 
 .yr-dialog .cal-dialog-header { position:sticky; top:-1.4rem; background:#faf7f0; z-index:1; padding:.45rem 0; }
+.yr-date-mode { margin-bottom:.75rem; }
 .yr-dialog label { display:grid; align-content:start; gap:.25rem; font-weight:600; min-width:0; }
 .yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
 .yr-date-fields { display:grid; grid-template-columns:minmax(4.1rem, .55fr) minmax(0, 1.45fr); gap:.65rem; }

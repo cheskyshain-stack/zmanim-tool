@@ -76,7 +76,7 @@ async function openYahrzeitCalendar() {
     </div></header>
     <div class="cal-toolbar" data-yr-calendar><div class="cal-month-nav">
       <button type="button" data-yr-step="-1" aria-label="Previous month">‹</button>
-      <div><button type="button" class="cal-month-title" data-yr-jump aria-live="polite"><span class="yr-english-month"></span><span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl" data-yr-hebrew-month></p></div>
+      <div><button type="button" class="cal-month-title" data-yr-jump aria-haspopup="dialog" aria-live="polite"><span class="yr-english-month"></span><span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl" data-yr-hebrew-month></p></div>
       <button type="button" data-yr-step="1" aria-label="Next month">›</button>
     </div><button type="button" data-yr-today>Today</button></div>
     <div class="cal-content" data-yr-calendar><div class="cal-grid-wrap"></div></div>
@@ -114,7 +114,7 @@ async function openYahrzeitCalendar() {
     onDay = yahrzeitsByDay(members, grid.days);
     yahrzeitRoot.style.setProperty('--cal-weeks', grid.days.length / 7);
     yahrzeitRoot.querySelector('.yr-english-month').textContent = grid.title;
-    yahrzeitRoot.querySelector('[data-yr-jump]').setAttribute('aria-label', grid.title + ', choose a month or find a Hebrew date');
+    yahrzeitRoot.querySelector('[data-yr-jump]').setAttribute('aria-label', grid.title + ', find a date');
     yahrzeitRoot.querySelector('[data-yr-hebrew-month]').textContent = grid.hebrewRange;
     if (view === 'list') list.update(members);
     yahrzeitRoot.querySelector('[data-yr-step="-1"]').disabled = month <= '1900-01';
@@ -162,7 +162,6 @@ async function openYahrzeitCalendar() {
       <button type="button" data-yr-manage>Members</button>
       <button type="button" data-yr-add>Add member</button>
       <button type="button" data-yr-import>Import spreadsheet</button>
-      <button type="button" data-yr-find>Find Hebrew date</button>
       <button type="button" data-yr-logout>Log out</button>
     </div>`);
   }
@@ -244,12 +243,30 @@ async function openYahrzeitCalendar() {
     });
   }
 
-  function openHebrewDateSearch() {
+  function goToDate(date) {
+    month = date.slice(0, 7);
+    renderGrid();
+    openDay(date);
+  }
+
+  function openDateSearch() {
     const now = today();
     const current = hebrewDateExtended(calendarSerial(month === now.slice(0, 7) ? now : month + '-15'));
     const min = hebrewDateExtended(calendarSerial('1900-01-01')).year;
     const max = hebrewDateExtended(calendarSerial('2299-12-31')).year;
-    show('Find Hebrew date', `<form class="yr-import-controls">
+    const englishDate = selected.startsWith(month) ? selected : month + '-01';
+    show('Find a date', `<div class="yr-view-switch yr-date-mode" role="group" aria-label="Date type">
+      <button type="button" data-yr-date-mode="english" aria-pressed="true">English date</button>
+      <button type="button" data-yr-date-mode="hebrew" aria-pressed="false">Hebrew date</button>
+    </div>
+    <form class="yr-import-controls" data-yr-date-form="english">
+      <label>English date<input type="date" name="date" min="1900-01-01" max="2299-12-31" value="${escAttr(englishDate)}" required></label>
+      <div class="yr-dialog-actions">
+        <button class="cal-primary" type="submit" value="day">Find date</button>
+        <button type="submit" value="month">Go to month</button>
+      </div>
+    </form>
+    <form class="yr-import-controls" data-yr-date-form="hebrew" hidden>
       <div class="yr-date-fields">
         <label>Hebrew day<select name="hebrewDay" required></select></label>
         <label>Hebrew month<select name="hebrewMonth" required></select></label>
@@ -261,7 +278,27 @@ async function openYahrzeitCalendar() {
       <div class="yr-dialog-actions"><button class="cal-primary" type="submit">Find date</button></div>
       <p class="yr-status" role="status"></p>
     </form>`);
-    const form = dialog.querySelector('form');
+    const forms = [...dialog.querySelectorAll('[data-yr-date-form]')];
+    const buttons = [...dialog.querySelectorAll('[data-yr-date-mode]')];
+    for (const button of buttons) {
+      button.addEventListener('click', () => {
+        for (const option of buttons) option.setAttribute('aria-pressed', String(option === button));
+        for (const form of forms) form.hidden = form.dataset.yrDateForm !== button.dataset.yrDateMode;
+      });
+    }
+    const [english, form] = forms;
+    english.addEventListener('submit', event => {
+      event.preventDefault();
+      const date = english.elements.date.value;
+      if (!Number.isFinite(calendarSerial(date))) return;
+      if (event.submitter?.value === 'month') {
+        month = date.slice(0, 7);
+        renderGrid();
+        dialog.close();
+      } else {
+        goToDate(date);
+      }
+    });
     const months = form.elements.hebrewMonth, days = form.elements.hebrewDay, years = form.elements.hebrewYear;
     const refreshDays = preferred => {
       const year = Number(years.value), selectedMonth = Number(months.value);
@@ -294,9 +331,7 @@ async function openYahrzeitCalendar() {
         form.querySelector('[role=status]').textContent = 'Choose a valid Hebrew date within the calendar range.';
         return;
       }
-      month = date.slice(0, 7);
-      renderGrid();
-      openDay(date);
+      goToDate(date);
     });
   }
 
@@ -431,7 +466,6 @@ async function openYahrzeitCalendar() {
     if (action.dataset.yrAdd !== undefined) openMemberForm();
     if (action.dataset.yrManage !== undefined) openMemberList();
     if (action.dataset.yrImport !== undefined) openMemberImport();
-    if (action.dataset.yrFind !== undefined) openHebrewDateSearch();
     if (action.dataset.yrOptions !== undefined) openCalendarOptions();
     if (action.dataset.yrView) showView(action.dataset.yrView);
     if (action.dataset.yrRefresh !== undefined) {
@@ -446,20 +480,8 @@ async function openYahrzeitCalendar() {
     }
     if (action.dataset.yrToday !== undefined) { selected = today(); month = selected.slice(0, 7); renderGrid(); }
     if (action.dataset.yrDay) openDay(action.dataset.yrDay);
-    if (action.dataset.yrListDay) {
-      month = action.dataset.yrListDay.slice(0, 7);
-      renderGrid();
-      openDay(action.dataset.yrListDay);
-    }
-    if (action.dataset.yrJump !== undefined) {
-      show('Choose a month', `<form><label>Month and year<input type="month" name="month" min="1900-01" max="2299-12" value="${escAttr(month)}" required></label><div class="yr-dialog-actions"><button type="button" data-yr-find>Find Hebrew date</button><button type="submit" class="cal-primary">Go to month</button></div></form>`);
-      dialog.querySelector('form').addEventListener('submit', event => {
-        event.preventDefault();
-        const next = event.target.elements.month.value;
-        if (!Number.isFinite(calendarSerial(next + '-01'))) return;
-        month = next; renderGrid(); dialog.close();
-      });
-    }
+    if (action.dataset.yrListDay) goToDate(action.dataset.yrListDay);
+    if (action.dataset.yrJump !== undefined) openDateSearch();
   });
   showView(view);
   renderGrid();
