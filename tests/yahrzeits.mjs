@@ -5,6 +5,7 @@ import { hebrewDateExtended, roshHashana } from '../js/hebrew-calendar.js';
 import { yahrzeitDates, yahrzeitMember, yahrzeitsByDay, yahrzeitHebrewDateSerial } from '../js/yahrzeits/model.js';
 
 import { yahrzeitMembersFromRows, yahrzeitPlanImport } from '../js/yahrzeits/import.js';
+import { yahrzeitListRange, yahrzeitListDays } from '../js/yahrzeits/list.js';
 
 const dates = (entry, year) => yahrzeitDates(entry, year).map(calendarISO);
 const father = { kind: 'father', month: 7, day: 10 };
@@ -77,6 +78,29 @@ test('every date in a full Hebrew calendar cycle maps back to its own day', () =
       assert.equal(yahrzeitHebrewDateSerial(dayOfMonth, month, year), serial);
     }
   }
+});
+
+test('list filters use whole Sunday to Shabbos weeks and both calendar years', () => {
+  const bounds = (...args) => Object.values(yahrzeitListRange(...args)).map(calendarISO);
+  assert.deepEqual(bounds('week', '2026-11-14'), ['2026-11-08', '2026-11-14']);
+  assert.deepEqual(bounds('week', '2026-11-15'), ['2026-11-15', '2026-11-21']);
+  assert.deepEqual(bounds('next-week', '2026-12-30'), ['2027-01-03', '2027-01-09']);
+  assert.deepEqual(bounds('year', '2026-11-15'), ['2026-01-01', '2026-12-31']);
+  assert.deepEqual(bounds('hebrew-year', '2026-11-15'), ['2026-09-12', '2027-10-01']);
+  assert.equal(yahrzeitListRange('custom', '2026-11-15', '2026-12-01', '2026-11-30'), null);
+  assert.equal(yahrzeitListRange('custom', '2026-11-15', '2026-02-30', '2026-12-31'), null);
+});
+
+test('list results are chronological and include both ends and both Adars when chosen', () => {
+  const rows = [
+    yahrzeitMember({ name: 'Member one', observances: [mother, father] }),
+    yahrzeitMember({ name: 'Member two', observances: [{ ...father, kind: 'mother' }] }),
+    yahrzeitMember({ name: 'A member without dates', observances: [] }),
+  ];
+  const range = yahrzeitListRange('custom', '2026-11-15', '2026-09-21', '2027-03-28');
+  const groups = [...yahrzeitListDays(rows, range)];
+  assert.deepEqual(groups.map(group => calendarISO(group.serial)), ['2026-09-21', '2027-02-26', '2027-03-28']);
+  assert.deepEqual(groups[0].entries.map(item => item.member.name), ['Member one', 'Member two']);
 });
 
 test('the same civil date shows every matching observance', () => {

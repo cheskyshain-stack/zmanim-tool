@@ -1,6 +1,7 @@
 import { calendarMonth, calendarStepMonth, calendarSerial, calendarISO } from './calendar/model.js';
 import { loadTables } from './data-loader.js';
 import { seatsOpenSession } from './seats/session.js';
+import { createYahrzeitList } from './yahrzeits/list.js';
 import { seatsReadSpreadsheetRows } from './seats/import.js';
 import { YAHRZEIT_IMPORT_COLUMNS, yahrzeitMembersFromRows, yahrzeitPlanImport } from './yahrzeits/import.js';
 import { escAttr, escText } from './util.js';
@@ -51,13 +52,14 @@ async function openYahrzeitCalendar() {
 
   const [tables, initial] = await Promise.all([loadTables(), request()]);
   const today = () => websiteLocalFields(new Date(), 'America/New_York').date;
-  const refreshMonthKey = 'lakewood-commons-yahrzeit-refresh-month';
-  let month = today().slice(0, 7), selected = today();
+  const refreshViewKey = 'lakewood-commons-yahrzeit-refresh-view';
+  let restored;
   try {
-    const previous = sessionStorage.getItem(refreshMonthKey);
-    sessionStorage.removeItem(refreshMonthKey);
-    if (previous && Number.isFinite(calendarSerial(previous + '-01'))) month = previous;
-  } catch { /* Start on the current month if storage is unavailable. */ }
+    restored = JSON.parse(sessionStorage.getItem(refreshViewKey));
+    sessionStorage.removeItem(refreshViewKey);
+  } catch { /* Start in the calendar if storage is unavailable. */ }
+  let month = Number.isFinite(calendarSerial(restored?.month + '-01')) ? restored.month : today().slice(0, 7);
+  let selected = today(), view = restored?.view === 'list' ? 'list' : 'calendar';
   let members = initial.members, grid, onDay, dialogReturn;
   const sortMembers = () => members.sort((a, b) => a.name.localeCompare(b.name));
   sortMembers();
@@ -66,18 +68,33 @@ async function openYahrzeitCalendar() {
   yahrzeitRoot.innerHTML = `<section class="shul-calendar yr-card" aria-labelledby="yr-heading">
     <header class="cal-reader-heading"><h1 id="yr-heading">Yahrzeit Calendar</h1><div class="cal-reader-actions">
       <button type="button" class="cal-reader-refresh" data-yr-refresh aria-label="Refresh calendar" title="Refresh calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>
-      <button type="button" data-yr-find><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="5.5"/><path d="m15 15 4 4"/></svg>Find Hebrew date</button>
+      <div class="yr-view-switch" role="group" aria-label="Calendar display">
+        <button type="button" data-yr-view="calendar" aria-pressed="true">Calendar</button>
+        <button type="button" data-yr-view="list" aria-pressed="false">List</button>
+      </div>
       <button type="button" data-cal-options data-yr-options aria-label="Calendar options" title="Calendar options">⋯</button>
     </div></header>
-    <div class="cal-toolbar"><div class="cal-month-nav">
+    <div class="cal-toolbar" data-yr-calendar><div class="cal-month-nav">
       <button type="button" data-yr-step="-1" aria-label="Previous month">‹</button>
-      <div><button type="button" class="cal-month-title" data-yr-jump aria-live="polite"><span class="yr-hebrew-month" lang="he" dir="rtl"></span><span aria-hidden="true">⌄</span></button><p data-yr-english-month></p></div>
+      <div><button type="button" class="cal-month-title" data-yr-jump aria-live="polite"><span class="yr-english-month"></span><span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl" data-yr-hebrew-month></p></div>
       <button type="button" data-yr-step="1" aria-label="Next month">›</button>
     </div><button type="button" data-yr-today>Today</button></div>
-    <div class="cal-content"><div class="cal-grid-wrap"></div></div>
+    <div class="cal-content" data-yr-calendar><div class="cal-grid-wrap"></div></div>
+    <section class="yr-agenda" aria-label="Yahrzeit list" hidden></section>
     <p class="cal-reader-status" role="status" data-yr-summary></p>
   </section><dialog class="cal-dialog yr-dialog" aria-labelledby="yr-dialog-title"></dialog>`;
   const host = yahrzeitRoot.querySelector('.cal-grid-wrap'), dialog = yahrzeitRoot.querySelector('dialog');
+  const agenda = yahrzeitRoot.querySelector('.yr-agenda'), list = createYahrzeitList(agenda, today, restored?.range);
+  function showView(next) {
+    view = next;
+    const showList = view === 'list';
+    agenda.hidden = !showList;
+    yahrzeitRoot.querySelectorAll('[data-yr-calendar]').forEach(part => { part.hidden = showList; });
+    for (const button of yahrzeitRoot.querySelectorAll('[data-yr-view]')) {
+      button.setAttribute('aria-pressed', String(button.dataset.yrView === view));
+    }
+    if (showList) list.update(members);
+  }
   const show = (title, content) => {
     if (!dialog.open) dialogReturn = document.activeElement;
     dialog.innerHTML = `<header class="cal-dialog-header"><h2 id="yr-dialog-title">${escText(title)}</h2><button type="button" aria-label="Close" data-yr-close>×</button></header>${content}`;
@@ -94,9 +111,10 @@ async function openYahrzeitCalendar() {
     grid = calendarMonth(month, { inIsrael: false }, tables);
     onDay = yahrzeitsByDay(members, grid.days);
     yahrzeitRoot.style.setProperty('--cal-weeks', grid.days.length / 7);
-    yahrzeitRoot.querySelector('.yr-hebrew-month').textContent = grid.hebrewRange;
-    yahrzeitRoot.querySelector('[data-yr-jump]').setAttribute('aria-label', grid.hebrewRange + ', ' + grid.title + ', choose an English month');
-    yahrzeitRoot.querySelector('[data-yr-english-month]').textContent = grid.title;
+    yahrzeitRoot.querySelector('.yr-english-month').textContent = grid.title;
+    yahrzeitRoot.querySelector('[data-yr-jump]').setAttribute('aria-label', grid.title + ', choose a month or find a Hebrew date');
+    yahrzeitRoot.querySelector('[data-yr-hebrew-month]').textContent = grid.hebrewRange;
+    if (view === 'list') list.update(members);
     yahrzeitRoot.querySelector('[data-yr-step="-1"]').disabled = month <= '1900-01';
     yahrzeitRoot.querySelector('[data-yr-step="1"]').disabled = month >= '2299-12';
     const now = today(), weeks = [];
@@ -105,15 +123,15 @@ async function openYahrzeitCalendar() {
         const count = onDay.get(day.serial)?.length || 0;
         const fact = day.parsha || day.facts[0] || day.specialLabel || (day.mevarchim ? 'מברכים' : '');
         const label = [
-          day.hebrewLabel, yahrzeitFullDate.format(new Date(day.iso + 'T12:00:00Z')), fact,
+          yahrzeitFullDate.format(new Date(day.iso + 'T12:00:00Z')), day.hebrewLabel, fact,
           count ? count + (count === 1 ? ' yahrzeit' : ' yahrzeits') : '',
         ].filter(Boolean).join('. ');
         return `<td role="cell" class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}">
           <button type="button" class="cal-day ${day.iso === now ? 'is-today' : ''} ${day.iso === selected ? 'is-selected' : ''}" data-yr-day="${day.iso}" aria-pressed="${day.iso === selected}" aria-label="${escAttr(label)}" ${day.iso === now ? 'aria-current="date"' : ''}>
-            <span class="cal-date-numbers"><span class="cal-hebrew-day" lang="he" dir="rtl">${escText(day.hebrewDay)}</span></span>
+            <span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
             <span class="cal-facts" lang="he" dir="rtl">${fact ? `<span class="${day.parsha ? 'cal-parsha' : 'cal-observance'}">${escText(fact)}</span>` : ''}</span>
             ${count ? `<span class="yr-day-count">${count} <span>${count === 1 ? 'entry' : 'entries'}</span></span>` : ''}
-            <span class="cal-english-day">${day.day}</span>
+            <span class="cal-hebrew-day" lang="he" dir="rtl">${escText(day.hebrewDay)}</span>
           </button></td>`;
       }).join('') + '</tr>');
     }
@@ -132,7 +150,7 @@ async function openYahrzeitCalendar() {
     current?.setAttribute('aria-pressed', 'true');
     const rows = onDay.get(day.serial) || [];
     const labels = [...new Set([day.specialLabel, ...day.facts, day.parsha ? 'פרשת ' + day.parsha : '', day.mevarchim ? 'מברכים' : ''].filter(Boolean))];
-    show('Yahrzeits', `<div class="cal-day-heading"><h3 lang="he" dir="rtl">${escText(day.hebrewLabel)}</h3><p>${escText(yahrzeitFullDate.format(new Date(date + 'T12:00:00Z')))}</p></div>
+    show('Yahrzeits', `<div class="cal-day-heading"><h3>${escText(yahrzeitFullDate.format(new Date(date + 'T12:00:00Z')))}</h3><p lang="he" dir="rtl">${escText(day.hebrewLabel)}</p></div>
       ${labels.length ? `<div class="cal-day-facts" lang="he" dir="rtl">${labels.map(label => `<p>${escText(label)}</p>`).join('')}</div>` : ''}
       ${rows.length ? `<ul class="yr-list">${rows.map(({ member, entry }) => `<li><div><strong dir="auto">${escText(member.name)}</strong><p dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</p>${yahrzeitEntryDetails(entry)}</div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('')}</ul>` : '<p>No yahrzeits on this date.</p>'}`);
   }
@@ -142,6 +160,7 @@ async function openYahrzeitCalendar() {
       <button type="button" data-yr-manage>Members</button>
       <button type="button" data-yr-add>Add member</button>
       <button type="button" data-yr-import>Import spreadsheet</button>
+      <button type="button" data-yr-find>Find Hebrew date</button>
       <button type="button" data-yr-logout>Log out</button>
     </div>`);
   }
@@ -394,8 +413,10 @@ async function openYahrzeitCalendar() {
     if (action.dataset.yrImport !== undefined) openMemberImport();
     if (action.dataset.yrFind !== undefined) openHebrewDateSearch();
     if (action.dataset.yrOptions !== undefined) openCalendarOptions();
+    if (action.dataset.yrView) showView(action.dataset.yrView);
     if (action.dataset.yrRefresh !== undefined) {
-      try { sessionStorage.setItem(refreshMonthKey, month); } catch { /* The refresh still works. */ }
+      try { sessionStorage.setItem(refreshViewKey, JSON.stringify({ month, view, range: list.settings() })); }
+      catch { /* The refresh still works. */ }
       location.reload();
     }
     if (action.dataset.yrLogout !== undefined) auth.lock();
@@ -405,8 +426,13 @@ async function openYahrzeitCalendar() {
     }
     if (action.dataset.yrToday !== undefined) { selected = today(); month = selected.slice(0, 7); renderGrid(); }
     if (action.dataset.yrDay) openDay(action.dataset.yrDay);
+    if (action.dataset.yrListDay) {
+      month = action.dataset.yrListDay.slice(0, 7);
+      renderGrid();
+      openDay(action.dataset.yrListDay);
+    }
     if (action.dataset.yrJump !== undefined) {
-      show('Choose a month', `<form><label>Month and year<input type="month" name="month" min="1900-01" max="2299-12" value="${escAttr(month)}" required></label><div class="yr-dialog-actions"><button type="submit" class="cal-primary">Go to month</button></div></form>`);
+      show('Choose a month', `<form><label>Month and year<input type="month" name="month" min="1900-01" max="2299-12" value="${escAttr(month)}" required></label><div class="yr-dialog-actions"><button type="button" data-yr-find>Find Hebrew date</button><button type="submit" class="cal-primary">Go to month</button></div></form>`);
       dialog.querySelector('form').addEventListener('submit', event => {
         event.preventDefault();
         const next = event.target.elements.month.value;
@@ -415,6 +441,7 @@ async function openYahrzeitCalendar() {
       });
     }
   });
+  showView(view);
   renderGrid();
 }
 

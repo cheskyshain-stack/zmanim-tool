@@ -94,7 +94,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   const calendarBounds = page => page.evaluate(() => {
     const grid = document.querySelector('.cal-grid').getBoundingClientRect();
     const header = document.querySelector('.cal-editor-header').getBoundingClientRect();
-    const actions = [...document.querySelectorAll('.cal-reader-actions button')].map(button => button.getBoundingClientRect());
+    const actions = [...document.querySelectorAll('.cal-reader-actions > *')].map(button => button.getBoundingClientRect());
     const rows = [...document.querySelectorAll('.cal-grid tbody tr')].map(row => row.getBoundingClientRect().height);
     return { fillsWidth: grid.left <= 2 && grid.right >= innerWidth - 2,
       fitsHeight: grid.bottom <= innerHeight && document.documentElement.scrollHeight <= innerHeight,
@@ -115,9 +115,10 @@ test('the private register shares the PIN with Seats and uses a separate login',
   assert.equal(await first.getByRole('link', { name: /Shul admin/ }).getAttribute('href'), '/admin/');
   assert.deepEqual(await calendarBounds(first), { fillsWidth: true, fitsHeight: true, equalRows: true, oneActionRow: true, enoughSpace: true });
   assert.ok(await first.locator('.cal-facts').getByText('ר״ח כסלו').count());
-  const hebrewIsLarger = await first.locator('.cal-day').first().evaluate(day =>
-    parseFloat(getComputedStyle(day.querySelector('.cal-hebrew-day')).fontSize) > parseFloat(getComputedStyle(day.querySelector('.cal-english-day')).fontSize));
-  assert.ok(hebrewIsLarger, 'Hebrew dates should be more prominent than English dates');
+  const englishIsLarger = await first.locator('.cal-day').first().evaluate(day =>
+    parseFloat(getComputedStyle(day.querySelector('.cal-english-day')).fontSize) > parseFloat(getComputedStyle(day.querySelector('.cal-hebrew-day')).fontSize));
+  assert.ok(englishIsLarger, 'English dates should be larger, with Hebrew dates still visible');
+  assert.equal(await first.locator('.yr-english-month').innerText(), 'November 2026');
   await first.getByRole('button', { name: 'Next month' }).click();
   await first.getByRole('table', { name: 'December 2026' }).waitFor();
   await first.getByRole('button', { name: 'Next month' }).click();
@@ -129,7 +130,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('table', { name: 'December 2026' }).waitFor();
   await first.getByRole('button', { name: 'Previous month' }).click();
   await first.getByRole('table', { name: 'November 2026' }).waitFor();
-  await first.getByRole('button', { name: 'Find Hebrew date', exact: true }).click();
+  await chooseCalendarOption(first, 'Find Hebrew date');
   await first.getByLabel('Hebrew month').selectOption('8');
   await first.getByLabel('Hebrew day').selectOption('30');
   await first.getByRole('button', { name: 'Find date', exact: true }).click();
@@ -167,6 +168,31 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('button', { name: 'Close' }).click();
   assert.ok(await checkWidth(first), 'calendar should fit 375 pixels');
   if (process.env.YAHRZEIT_SCREENSHOT) await first.screenshot({ path: process.env.YAHRZEIT_SCREENSHOT });
+  await first.getByRole('button', { name: 'List', exact: true }).click();
+  const agenda = first.getByRole('region', { name: 'Yahrzeit list', exact: true });
+  await agenda.getByText('Jan 1, 2026 to Dec 31, 2026').waitFor();
+  assert.equal(await first.getByRole('table').count(), 0);
+  await agenda.getByText('Synthetic Member', { exact: true }).first().waitFor();
+  await first.getByLabel('Date range').selectOption('week');
+  await agenda.getByText('Nov 8, 2026 to Nov 14, 2026').waitFor();
+  await agenda.getByRole('button', { name: /View details for Mon, Nov 9/ }).click();
+  await first.getByRole('dialog', { name: 'Yahrzeits' }).getByText('Grandfather: ר׳ דוד <test>').waitFor();
+  await first.getByRole('button', { name: 'Close', exact: true }).click();
+  await first.getByLabel('Date range').selectOption('next-week');
+  await agenda.getByText('No yahrzeits in this date range.').waitFor();
+  await first.getByLabel('Date range').selectOption('custom');
+  await agenda.getByLabel('From', { exact: true }).fill('2026-11-09');
+  await agenda.getByLabel('To', { exact: true }).fill('2026-11-09');
+  await agenda.getByRole('button', { name: 'Apply dates' }).click();
+  await agenda.getByText('Synthetic Member', { exact: true }).first().waitFor();
+  assert.ok(await checkWidth(first), 'custom date controls should fit 375 pixels');
+  if (process.env.YAHRZEIT_SCREENSHOT) await first.screenshot({ path: process.env.YAHRZEIT_SCREENSHOT.replace(/\.png$/, '-list.png') });
+  await first.getByRole('button', { name: 'Refresh calendar' }).click();
+  await first.getByRole('button', { name: 'List', exact: true, pressed: true }).waitFor();
+  assert.equal(await first.getByLabel('Date range').inputValue(), 'custom');
+  await agenda.getByText('Synthetic Member', { exact: true }).first().waitFor();
+  await first.getByRole('button', { name: 'Calendar', exact: true }).click();
+  await first.getByRole('table').waitFor();
 
   const second = await setup(393);
   await second.goto(origin + '/yahrzeits/');
