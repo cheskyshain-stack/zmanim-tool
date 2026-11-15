@@ -12,8 +12,8 @@
 .yr-card .cal-reader-heading h1 { margin:0; text-align:center; color:#142b46; font:700 clamp(27px,7vw,36px)/1.15 Georgia,serif; letter-spacing:-.025em; }
 .yr-card [hidden] { display:none !important; }
 .yr-view-switch { display:grid; align-self:stretch; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px; padding:3px; border:1px solid #dfddd3; border-radius:12px; background:#fff; }
-.yr-card .yr-view-switch button { min-height:44px; border:0; border-radius:8px; padding:.35rem .3rem; background:transparent; box-shadow:none; }
-.yr-card .yr-view-switch button[aria-pressed="true"] { background:#142b46; color:#fff; }
+:is(.yr-card .yr-view-switch,.yr-dialog .yr-date-mode) > button { min-height:44px; border:0; border-radius:8px; padding:.35rem .3rem; background:transparent; box-shadow:none; }
+:is(.yr-card .yr-view-switch,.yr-dialog .yr-date-mode) > button[aria-pressed="true"] { background:#142b46; color:#fff; }
 .yr-card .cal-content { max-height:calc(20px + var(--cal-weeks) * var(--yr-row-preferred)); border-top:0; }
 .yr-card .cal-grid-wrap { overflow:hidden; }
 .yr-card .cal-month-title { display:flex; align-items:center; justify-content:center; gap:.25rem; white-space:normal; }
@@ -75,10 +75,7 @@
 }
 
 .yr-dialog .cal-dialog-header { position:sticky; top:-1.4rem; background:#faf7f0; z-index:1; padding:.45rem 0; }
-.yr-dialog .yr-date-mode { position:relative; display:flex; align-items:center; justify-content:center; gap:.7rem; min-height:44px; margin-bottom:.75rem; color:#53616e; cursor:pointer; }
-.yr-dialog .yr-date-mode input { min-height:0; padding:0; }
-.yr-date-mode .cal-reminder-track { flex:none; background:#142b46; }
-.yr-date-mode:not(:has(input:checked)) .yr-date-english, .yr-date-mode:has(input:checked) .yr-date-hebrew { color:#142b46; font-weight:700; }
+.yr-date-mode { margin-bottom:.75rem; }
 .yr-dialog label { display:grid; align-content:start; gap:.25rem; font-weight:600; min-width:0; }
 .yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
 .yr-date-fields { display:grid; grid-template-columns:minmax(4.1rem, .55fr) minmax(0, 1.45fr); gap:.65rem; }
