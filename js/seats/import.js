@@ -1,4 +1,4 @@
-export function seatsParseDelimited(text) {
+export function seatsParseDelimited(text, keepBlankRows = false) {
   const input = String(text).replace(/^\uFEFF/, '');
   const line = input.split(/\r?\n/)[0];
   const delimiter = ['\t', ';', ','].sort((a, b) => line.split(b).length - line.split(a).length)[0];
@@ -17,7 +17,7 @@ export function seatsParseDelimited(text) {
   }
   if (quoted) throw new Error('The CSV has an unclosed quote. Check the file and try again.');
   if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows.filter(cells => cells.some(value => String(value).trim()));
+  return keepBlankRows ? rows : rows.filter(cells => cells.some(value => String(value).trim()));
 }
 
 export function seatsNamesFromRows(rows) {
@@ -38,7 +38,7 @@ export function seatsNamesFromRows(rows) {
   }).filter(name => /\p{L}/u.test(name));
 }
 
-export async function seatsReadNames(file) {
+export async function seatsReadSpreadsheetRows(file, { keepBlankRows = false } = {}) {
   if (file.size > 5 * 1024 * 1024) throw new Error('Choose a file smaller than 5 MB.');
   const ext = file.name.split('.').pop().toLowerCase();
   let rows;
@@ -51,11 +51,17 @@ export async function seatsReadNames(file) {
       document.head.appendChild(script);
     });
     const book = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellHTML: false, cellFormula: false, sheetRows: 2052 });
-    rows = window.XLSX.utils.sheet_to_json(book.Sheets[book.SheetNames[0]], { header: 1, defval: '', blankrows: false });
+    const sheet = book.Sheets[book.SheetNames[0]];
+    if (!sheet) throw new Error('The workbook has no sheets.');
+    rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: keepBlankRows });
   } else if (ext === 'txt') rows = (await file.text()).replace(/^\uFEFF/, '').split(/\r?\n/).map(line => [line]);
-  else if (['csv', 'tsv'].includes(ext)) rows = seatsParseDelimited(await file.text());
+  else if (['csv', 'tsv'].includes(ext)) rows = seatsParseDelimited(await file.text(), keepBlankRows);
   else throw new Error('Choose an Excel, CSV, TSV, or text file.');
-  const names = seatsNamesFromRows(rows);
+  return rows;
+}
+
+export async function seatsReadNames(file) {
+  const names = seatsNamesFromRows(await seatsReadSpreadsheetRows(file));
   if (names.length > 2000) throw new Error('Import up to 2,000 names at a time.');
   if (!names.length) throw new Error('No names found. Use a Name column, or First name and Last name columns.');
   return names;

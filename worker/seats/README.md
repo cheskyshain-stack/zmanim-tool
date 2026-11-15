@@ -54,6 +54,10 @@ The new routes require the same origin as Seats and a bearer session issued by
 POST /api/session with scope yahrzeits. The member list is at GET /api/yahrzeits.
 POST and DELETE at /api/yahrzeits/:id take the record
 revision so a change from a second organizer cannot silently overwrite an edit.
+A member can have no dates. POST /api/yahrzeits/import imports named members in
+one transaction. It adds missing addresses and dates to matching names and leaves saved details
+intact. Newly added members and yahrzeits get the signed-in organizer name and server time.
+Editing keeps those details, and records saved before tracking have no attribution.
 Set the Cloudflare Worker secret SEATS_PRIVATE_PIN to a new private 6–8 digit
 Seats PIN before publishing /yahrzeits/. The old PIN was documented publicly,
 so the Worker never grants it yahrzeit access. Enter the private PIN separately
