@@ -143,7 +143,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await signIn(first, 'Open Yahrzeit Calendar');
   await first.getByRole('table', { name: 'November 2026' }).waitFor();
   assert.equal(await first.getByRole('link', { name: 'Back to Seats' }).count(), 0);
-  assert.equal(await first.getByRole('link', { name: /Shul admin/ }).getAttribute('href'), '/admin/');
+  assert.equal(await first.getByRole('link', { name: 'Back to Home' }).getAttribute('href'), '/');
   assert.deepEqual(await calendarBounds(first), { fillsWidth: true, fitsHeight: true, equalRows: true, oneActionRow: true, enoughSpace: true });
   assert.ok(await first.locator('.cal-facts').getByText('ר״ח כסלו').count());
   const englishIsLarger = await first.locator('.cal-day').first().evaluate(day =>
@@ -316,6 +316,9 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.goto(origin + '/seats/');
   await first.getByRole('link', { name: 'Yahrzeit Calendar' }).waitFor();
   assert.equal(signIns.length, 3, 'Logging out of the Yahrzeit Calendar leaves Seats signed in');
+  await second.getByRole('link', { name: 'Back to Home' }).click();
+  await second.waitForURL(origin + '/');
+  assert.match(await second.title(), /Lakewood Commons Shul/);
   await second.goto(origin + '/seats/');
   await second.getByRole('button', { name: 'Open Seats', exact: true }).waitFor();
   assert.equal(signIns.length, 3, 'Signing in to the Yahrzeit Calendar leaves Seats locked');
