@@ -80,14 +80,13 @@ test('every date in a full Hebrew calendar cycle maps back to its own day', () =
   }
 });
 
-test('list filters use whole Sunday to Shabbos weeks and both calendar years', () => {
+test('list filters use inclusive Shabbos to Shabbos weeks and both calendar years', () => {
   const bounds = (...args) => Object.values(yahrzeitListRange(...args)).map(calendarISO);
-  assert.deepEqual(bounds('week', '2026-11-14'), ['2026-11-08', '2026-11-14']);
-  assert.deepEqual(bounds('week', '2026-11-15'), ['2026-11-15', '2026-11-21']);
-  assert.deepEqual(bounds('next-week', '2026-12-30'), ['2027-01-03', '2027-01-09']);
-  assert.deepEqual(bounds('day', '2026-11-15'), ['2026-11-15', '2026-11-15']);
+  assert.deepEqual(bounds('week', '2026-11-13'), ['2026-11-07', '2026-11-14']);
+  assert.deepEqual(bounds('week', '2026-11-14'), ['2026-11-14', '2026-11-21']);
+  assert.deepEqual(bounds('week', '2026-11-15'), ['2026-11-14', '2026-11-21']);
+  assert.deepEqual(bounds('next-week', '2026-12-30'), ['2027-01-02', '2027-01-09']);
   assert.deepEqual(bounds('year', '2026-11-15'), ['2026-01-01', '2026-12-31']);
-  assert.deepEqual(bounds('next-year', '2026-11-15'), ['2027-01-01', '2027-12-31']);
   assert.deepEqual(bounds('hebrew-year', '2026-11-15'), ['2026-09-12', '2027-10-01']);
   assert.equal(yahrzeitListRange('custom', '2026-11-15', '2026-12-01', '2026-11-30'), null);
   assert.equal(yahrzeitListRange('custom', '2026-11-15', '2026-02-30', '2026-12-31'), null);

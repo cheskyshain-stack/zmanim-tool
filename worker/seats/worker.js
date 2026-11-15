@@ -17,18 +17,54 @@ const yahrzeitRecordWithEntryIds = member => ({
   ...member, observances: member.observances.map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) })),
 });
 
-function yahrzeitEntryInfo(entries, earlier, name, addedAt) {
+const YAHRZEIT_ACTIVITY_KEY = 'yahrzeit-activity';
+const YAHRZEIT_ACTIVITY_LIMIT = 50;
+
+function yahrzeitActivityItem(action, member, entry, by, at) {
+  return { action, member, by, at, kind: entry.kind, relationship: entry.relationship,
+    deceasedName: entry.deceasedName, month: entry.month, day: entry.day };
+}
+
+function yahrzeitEntryChanges(entries, earlier, member, name, addedAt) {
   const previous = (earlier?.observances || []).map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) }));
-  const used = new Set();
-  return entries.map(entry => {
+  const used = new Set(), activity = [];
+  const observances = entries.map(entry => {
     const existing = previous.find(candidate => !used.has(candidate.id) && candidate.kind === entry.kind
       && (entry.id ? candidate.id === entry.id : candidate.kind !== 'custom'
         || candidate.relationship === entry.relationship && candidate.day === entry.day && candidate.month === entry.month));
     if (existing) used.add(existing.id);
     const id = existing && !existing.id.startsWith('legacy-') ? existing.id : crypto.randomUUID();
     if (existing) return { ...entry, id, ...(existing.addedAt ? { addedAt: existing.addedAt, addedBy: existing.addedBy } : {}) };
+    activity.push(yahrzeitActivityItem('added', member, entry, name, addedAt));
     return { ...entry, id, addedAt, addedBy: name };
   });
+  for (const entry of previous) {
+    if (!used.has(entry.id)) activity.push(yahrzeitActivityItem('deleted', member, entry, name, addedAt));
+  }
+  return { observances, activity };
+}
+
+async function recordYahrzeitActivity(txn, activity) {
+  if (!activity.length) return;
+  const recent = await txn.get(YAHRZEIT_ACTIVITY_KEY) || [];
+  await txn.put(YAHRZEIT_ACTIVITY_KEY, activity.concat(recent).slice(0, YAHRZEIT_ACTIVITY_LIMIT));
+}
+
+async function readYahrzeitActivity(txn, prefix) {
+  const recent = await txn.get(YAHRZEIT_ACTIVITY_KEY) || [];
+  if (recent.length >= YAHRZEIT_ACTIVITY_LIMIT) return recent;
+  const earliest = recent.at(-1)?.at;
+  const members = await txn.list({ prefix });
+  const earlier = [];
+  for (const member of members.values()) {
+    for (const entry of member.observances) {
+      if (entry.addedAt && entry.addedBy && (!earliest || entry.addedAt < earliest)) {
+        earlier.push(yahrzeitActivityItem('added', member.name, entry, entry.addedBy, entry.addedAt));
+      }
+    }
+  }
+  earlier.sort((a, b) => b.at.localeCompare(a.at));
+  return recent.concat(earlier).slice(0, YAHRZEIT_ACTIVITY_LIMIT);
 }
 
 const seatsWorkerId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,100}$/.test(value);
@@ -122,7 +158,7 @@ export class SeatsWorkspace {
     }
     const session = await this.session(token);
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin), yahrzeitMemberImport: true });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin), yahrzeitMemberImport: true, yahrzeitActivity: true });
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
@@ -281,7 +317,10 @@ export class SeatsWorkspace {
   async yahrzeits(request, path, name) {
     const prefix = 'yahrzeit:', storage = this.ctx.storage;
     if (path === '/api/yahrzeits' && request.method === 'GET') {
-      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()].map(yahrzeitRecordWithEntryIds) });
+      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()].map(yahrzeitRecordWithEntryIds), activityAvailable: true });
+    }
+    if (path === '/api/yahrzeits/activity' && request.method === 'GET') {
+      return seatsWorkerJson({ activity: await storage.transaction(txn => readYahrzeitActivity(txn, prefix)) });
     }
     if (path === '/api/yahrzeits/import' && request.method === 'POST') return this.importYahrzeitMembers(request, prefix, name);
     const id = path.slice('/api/yahrzeits/'.length);
@@ -295,23 +334,26 @@ export class SeatsWorkspace {
       return seatsWorkerJson({ error: error instanceof SyntaxError ? 'Enter a valid yahrzeit record.' : error.message }, 400);
     }
     const key = prefix + id;
-    return this.ctx.blockConcurrencyWhile(async () => {
-      const current = await storage.get(key);
+    return storage.transaction(async txn => {
+      const current = await txn.get(key);
       if (body.revision !== (current?.revision || 0)) {
         return seatsWorkerJson({ error: 'Someone else changed this record. Close it and reload before trying again.' }, 409);
       }
+      const now = new Date().toISOString();
       if (request.method === 'DELETE') {
-        await storage.delete(key);
+        const { activity } = yahrzeitEntryChanges([], current, current.name, name, now);
+        await recordYahrzeitActivity(txn, activity);
+        await txn.delete(key);
         return seatsWorkerJson({ deleted: true });
       }
-      if (!current && (await storage.list({ prefix, limit: YAHRZEIT_MAX_MEMBERS })).size >= YAHRZEIT_MAX_MEMBERS) {
+      if (!current && (await txn.list({ prefix, limit: YAHRZEIT_MAX_MEMBERS })).size >= YAHRZEIT_MAX_MEMBERS) {
         return seatsWorkerJson({ error: 'The yahrzeit register is full.' }, 409);
       }
-      const now = new Date().toISOString();
-      const observances = yahrzeitEntryInfo(contents.observances, current, name, now);
+      const { observances, activity } = yahrzeitEntryChanges(contents.observances, current, contents.name, name, now);
+      await recordYahrzeitActivity(txn, activity);
       const added = current ? (current.addedAt ? { addedAt: current.addedAt, addedBy: current.addedBy } : {}) : { addedAt: now, addedBy: name };
       const record = { id, ...contents, ...added, observances, revision: body.revision + 1 };
-      await storage.put(key, record);
+      await txn.put(key, record);
       return seatsWorkerJson(record, current ? 200 : 201);
     });
   }
@@ -336,10 +378,15 @@ export class SeatsWorkspace {
         return seatsWorkerJson({ error: 'This import would exceed the 2,000-member limit.' }, 409);
       }
       const addedAt = new Date().toISOString();
-      const newRecords = plan.added.map(member => ({ ...member, id: crypto.randomUUID(), revision: 1, addedAt, addedBy: name,
-        observances: yahrzeitEntryInfo(member.observances, null, name, addedAt) }));
-      const updated = plan.updated.map(member => ({ ...member,
-        observances: yahrzeitEntryInfo(member.observances, records.get(prefix + member.id), name, addedAt) }));
+      const activity = [];
+      const withEntryInfo = (member, previous) => {
+        const result = yahrzeitEntryChanges(member.observances, previous, member.name, name, addedAt);
+        activity.push(...result.activity);
+        return { ...member, observances: result.observances };
+      };
+      const newRecords = plan.added.map(member => withEntryInfo({ ...member, id: crypto.randomUUID(), revision: 1, addedAt, addedBy: name }));
+      const updated = plan.updated.map(member => withEntryInfo(member, records.get(prefix + member.id)));
+      await recordYahrzeitActivity(txn, activity);
       const writes = [...newRecords, ...updated];
       for (let i = 0; i < writes.length; i += 100) {
         const batch = writes.slice(i, i + 100).map(member => [prefix + member.id, member]);

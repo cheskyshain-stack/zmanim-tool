@@ -2,6 +2,7 @@ import { calendarMonth, calendarStepMonth, calendarSerial, calendarISO } from '.
 import { loadTables } from './data-loader.js';
 import { seatsOpenSession } from './seats/session.js';
 import { createYahrzeitList } from './yahrzeits/list.js';
+import { exportYahrzeitMembers, openYahrzeitReports } from './yahrzeits/reports.js';
 import { seatsReadSpreadsheetRows } from './seats/import.js';
 import { YAHRZEIT_IMPORT_COLUMNS, yahrzeitMembersFromRows, yahrzeitPlanImport } from './yahrzeits/import.js';
 import { escAttr, escText } from './util.js';
@@ -84,7 +85,7 @@ async function openYahrzeitCalendar() {
     <p class="cal-reader-status" role="status" data-yr-summary></p>
   </section><dialog class="cal-dialog yr-dialog" aria-labelledby="yr-dialog-title"></dialog>`;
   const host = yahrzeitRoot.querySelector('.cal-grid-wrap'), dialog = yahrzeitRoot.querySelector('dialog');
-  const agenda = yahrzeitRoot.querySelector('.yr-agenda'), list = createYahrzeitList(agenda, today, restored?.range);
+  const agenda = yahrzeitRoot.querySelector('.yr-agenda'), list = createYahrzeitList(agenda, today, tables, restored?.range);
   function showView(next) {
     const opening = next === 'list' && agenda.hidden;
     view = next;
@@ -163,20 +164,62 @@ async function openYahrzeitCalendar() {
     const labels = [...new Set([day.specialLabel, ...day.facts, day.parsha ? 'פרשת ' + day.parsha : '', day.mevarchim ? 'מברכים' : ''].filter(Boolean))];
     show('Yahrzeits', `<div class="cal-day-heading"><h3>${escText(yahrzeitFullDate.format(new Date(date + 'T12:00:00Z')))}</h3><p lang="he" dir="rtl">${escText(day.hebrewLabel)}</p></div>
       ${labels.length ? `<div class="cal-day-facts" lang="he" dir="rtl">${labels.map(label => `<p>${escText(label)}</p>`).join('')}</div>` : ''}
-      ${rows.length ? `<ul class="yr-list">${rows.map(({ member, entry }) => `<li><div><strong dir="auto">${escText(member.name)}</strong><p dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</p>${yahrzeitEntryDetails(entry)}</div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('')}</ul>` : '<p>No yahrzeits on this date.</p>'}`, { dismissOnBackdrop: true });
+      ${rows.length ? `<ul class="yr-list">${rows.map(({ member, entry }) => `<li><div><strong dir="auto">${escText(member.name)}</strong><p dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</p>${yahrzeitEntryDetails(entry)}</div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('')}</ul>` : '<p>No yahrzeits on this date.</p>'}
+      ${Number.isFinite(calendarSerial(date)) ? `<div class="yr-dialog-actions"><button type="button" class="cal-primary" data-yr-add-date="${date}">Add yahrzeit</button></div>` : ''}`, { dismissOnBackdrop: true });
+  }
+
+  function chooseMemberForDate(date) {
+    show('Add yahrzeit', `<p lang="he" dir="rtl">${escText(jewishDateString(calendarSerial(date), false))}</p>
+      <label>Congregation member<input type="search" dir="auto" maxlength="100" data-yr-member-name></label>
+      <ul class="yr-list" data-yr-member-matches></ul>
+      <div class="yr-dialog-actions"><button type="button" data-yr-new-dated-member>Add new member</button></div>`);
+    const input = dialog.querySelector('[data-yr-member-name]');
+    const matches = dialog.querySelector('[data-yr-member-matches]');
+    const addMember = dialog.querySelector('[data-yr-new-dated-member]');
+    const render = () => {
+      const query = input.value.trim().toLocaleLowerCase();
+      matches.innerHTML = (query ? members.filter(member => member.name.toLocaleLowerCase().includes(query)) : members)
+        .slice(0, 12).map(member => `<li><div><strong dir="auto">${escText(member.name)}</strong>${member.address ? `<p dir="auto">${escText(member.address)}</p>` : ''}</div>
+          <button type="button" data-yr-member-id="${escAttr(member.id)}" aria-label="${escAttr('Choose ' + member.name)}">Choose</button></li>`).join('');
+      addMember.disabled = members.some(member => member.name.toLocaleLowerCase() === query);
+    };
+    input.addEventListener('input', render);
+    matches.addEventListener('click', event => {
+      const button = event.target.closest('[data-yr-member-id]');
+      if (button) openMemberForm(members.find(member => member.id === button.dataset.yrMemberId), { date });
+    });
+    addMember.addEventListener('click', () => openMemberForm(null, { date, name: input.value.trim() }));
+    render();
   }
 
   function openCalendarOptions() {
     show('Calendar options', `<div class="yr-option-list">
       <button type="button" data-yr-manage>Members</button>
-      <button type="button" data-yr-add>Add member</button>
-      <button type="button" data-yr-import>Import spreadsheet</button>
+      <button type="button" data-yr-reports>Print / Export</button>
+      ${initial.activityAvailable ? '<button type="button" data-yr-history>Recent activity</button>' : ''}
       <button type="button" data-yr-logout>Log out</button>
     </div>`);
   }
 
+  async function openYahrzeitHistory() {
+    show('Recent yahrzeit activity', '<p role="status" class="yr-status">Loading…</p><ul class="yr-list"></ul>', { dismissOnBackdrop: true });
+    const status = dialog.querySelector('[role=status]'), list = dialog.querySelector('.yr-list');
+    try {
+      const { activity } = await request('/activity');
+      list.innerHTML = activity.map(entry => {
+        const date = yahrzeitAddedDate.format(new Date(entry.at));
+        const action = entry.action === 'deleted' ? 'Deleted' : 'Added';
+        return `<li><div><strong>${action} · <bdi>${escText(entry.member)}</bdi></strong>
+          <p><bdi>${escText(yahrzeitRelationship(entry))}</bdi>${entry.deceasedName ? ': <bdi>' + escText(entry.deceasedName) + '</bdi>' : ''}
+          · ${entry.day} ${escText(yahrzeitMonthLabel(entry.month))}</p>
+          <p class="yr-help"><bdi>${escText(entry.by)}</bdi> · <time datetime="${escAttr(entry.at)}">${escText(date)}</time></p></div></li>`;
+      }).join('');
+      status.textContent = activity.length ? '' : 'No yahrzeit activity recorded yet.';
+    } catch (error) { status.textContent = error.message; }
+  }
+
   function openMemberList() {
-    show('Members', `<div class="yr-dialog-actions yr-member-actions"><button type="button" data-yr-reload>Refresh</button><button type="button" data-yr-import>Import spreadsheet</button><button type="button" data-yr-add class="cal-primary">+ Add member</button></div>
+    show('Members', `<div class="yr-dialog-actions yr-member-actions"><button type="button" data-yr-reload>Refresh</button><button type="button" data-yr-import>Import spreadsheet</button><button type="button" data-yr-export-members>Export all members</button><button type="button" data-yr-add class="cal-primary">+ Add member</button></div>
       <label>Find by name or address<input type="search" data-yr-search></label>
       <p class="yr-status" role="status"></p><ul class="yr-list"></ul><p class="yr-help" data-yr-empty></p>`);
     const search = dialog.querySelector('[data-yr-search]');
@@ -344,46 +387,55 @@ async function openYahrzeitCalendar() {
     });
   }
 
-  function openMemberForm(member) {
+  function openMemberForm(member, { date, name = member?.name } = {}) {
     const id = member?.id || crypto.randomUUID(), revision = member?.revision || 0;
-    show(member ? 'Edit member' : 'Add member', `<form>
-      <label>Congregation member<input name="name" dir="auto" maxlength="100" value="${escAttr(member?.name)}" required></label>
-      <label>Address (optional)<input name="address" dir="auto" maxlength="240" value="${escAttr(member?.address)}" autocomplete="street-address"></label>
-      ${member ? yahrzeitEntryDetails(member, 'Member info') : ''}
-      <p class="yr-help">All yahrzeit dates are optional. You can add them later.</p>
-      <div class="yr-entries"></div><button type="button" data-yr-custom>+ Custom relationship</button>
+    const addressField = `<label>Address (optional)<input name="address" dir="auto" maxlength="240" value="${escAttr(member?.address)}" autocomplete="street-address"></label>`;
+    show(date ? 'Add yahrzeit' : member ? 'Edit member' : 'Add member', `<form>
+      ${date && member ? `<p><strong dir="auto">${escText(member.name)}</strong></p>` : `<label>Congregation member<input name="name" dir="auto" maxlength="100" value="${escAttr(name)}" required></label>`}
+      ${date ? '' : addressField}
+      ${member && !date ? yahrzeitEntryDetails(member, 'Member info') : ''}
+      <div class="yr-entries"></div>${date ? '' : '<button type="button" data-yr-new-entry>+ Add yahrzeit</button>'}
       <div class="yr-dialog-actions">
-        ${member ? '<button type="button" class="danger yr-remove-member">Delete member</button>' : ''}
-        <button type="button" data-yr-close>Cancel</button><button type="submit" class="cal-primary">Save member</button>
+        ${member && !date ? '<button type="button" class="danger yr-remove-member">Delete member</button>' : ''}
+        <button type="button" data-yr-close>Cancel</button><button type="submit" class="cal-primary">${date ? 'Save yahrzeit' : 'Save member'}</button>
       </div><p class="yr-status" role="status"></p></form>`);
     const form = dialog.querySelector('form'), entries = form.querySelector('.yr-entries'), status = form.querySelector('.yr-status');
-    const custom = form.querySelector('[data-yr-custom]');
-    const parentCount = () => [...entries.children].filter(row => row.dataset.kind !== 'custom' && (row.querySelector('[data-yr-month]').value || row.querySelector('[data-yr-day-select]').value || row.querySelector('[data-yr-deceased]').value.trim())).length;
-    const updateLimit = () => { custom.disabled = entries.querySelectorAll('[data-kind="custom"]').length + parentCount() >= YAHRZEIT_MAX_OBSERVANCES; };
+    const addButton = form.querySelector('[data-yr-new-entry]');
+    const updateLimit = () => { if (addButton) addButton.disabled = entries.children.length >= YAHRZEIT_MAX_OBSERVANCES; };
     const addEntry = (entry, focus = false) => {
       const row = document.createElement('fieldset');
       row.className = 'yr-entry';
-      row.dataset.kind = entry.kind;
+      row.dataset.kind = entry.kind || '';
       if (entry.id) row.dataset.entryId = entry.id;
-      row.innerHTML = `<legend>${entry.kind === 'custom' ? 'Custom relationship' : yahrzeitRelationship(entry)}</legend><div class="yr-entry-fields">
-        ${entry.kind === 'custom' ? `<label>Relationship<input dir="auto" data-yr-relationship maxlength="60" required placeholder="For example, grandfather" value="${escAttr(entry.relationship)}"></label>` : ''}
+      row.innerHTML = `<legend>${entry.id ? escText(yahrzeitRelationship(entry)) : 'Yahrzeit'}</legend><div class="yr-entry-fields">
+        ${entry.id ? '' : `<label>Relationship (optional)<select data-yr-kind>
+          <option value="">Choose a relationship</option><option value="father">Father</option><option value="mother">Mother</option><option value="custom">Other</option>
+        </select></label>`}
+        <label data-yr-custom-label hidden>Other relationship (optional)<input dir="auto" data-yr-relationship maxlength="60" placeholder="For example, grandfather" value="${escAttr(entry.relationship === 'Other' ? '' : entry.relationship)}"></label>
+        <label data-yr-deceased-label hidden>Name of the deceased (optional)<input dir="auto" data-yr-deceased maxlength="140" value="${escAttr(entry.deceasedName)}"></label>
         <div class="yr-date-fields">
-          <label>Hebrew day<select data-yr-day-select><option value="">Day</option></select></label>
-          <label>Hebrew month<select data-yr-month><option value="">Month</option>${YAHRZEIT_MONTHS.map(value => `<option value="${value}" ${entry.month === value ? 'selected' : ''}>${escText(yahrzeitMonthLabel(value))}</option>`).join('')}</select></label>
+          <label>Hebrew day<select data-yr-day-select required><option value="">Day</option></select></label>
+          <label>Hebrew month<select data-yr-month required><option value="">Month</option>${YAHRZEIT_MONTHS.map(value => `<option value="${value}" ${entry.month === value ? 'selected' : ''}>${escText(yahrzeitMonthLabel(value))}</option>`).join('')}</select></label>
         </div>
-        <label>Name of the deceased (optional)<input dir="auto" data-yr-deceased maxlength="140" value="${escAttr(entry.deceasedName)}"></label>
         <label data-yr-adar-rule hidden>In a leap year<select data-yr-adar><option value="first">Adar I</option><option value="second">Adar II</option><option value="both">Both Adars</option></select></label>
         <label data-yr-short-rule hidden>In years without the 30th<select data-yr-short><option value="">Choose the family’s custom</option><option value="previous">Use the 29th</option><option value="next">Use the 1st of the next month</option><option value="both">Show both dates</option></select></label>
         ${entry.id ? yahrzeitEntryDetails(entry) : ''}
-        ${entry.kind === 'custom' ? '<button type="button" class="danger" data-yr-remove>Remove this yahrzeit</button>' : ''}
+        ${date ? '' : '<button type="button" class="danger" data-yr-remove>Remove this yahrzeit</button>'}
       </div>`;
       const monthField = row.querySelector('[data-yr-month]'), dayField = row.querySelector('[data-yr-day-select]');
       const adar = row.querySelector('[data-yr-adar]'), short = row.querySelector('[data-yr-short]');
       adar.value = entry.adar || 'first'; short.value = entry.shortMonth || '';
+      const kindField = row.querySelector('[data-yr-kind]');
+      const showNames = () => {
+        if (kindField) row.dataset.kind = kindField.value;
+        row.querySelector('[data-yr-custom-label]').hidden = row.dataset.kind !== 'custom';
+        row.querySelector('[data-yr-deceased-label]').hidden = !row.dataset.kind;
+      };
+      kindField?.addEventListener('change', showNames);
+      showNames();
       const showRules = () => {
         row.querySelector('[data-yr-adar-rule]').hidden = Number(monthField.value) !== 12;
         row.querySelector('[data-yr-short-rule]').hidden = !yahrzeitVariableMonth(Number(monthField.value), Number(dayField.value));
-        updateLimit();
       };
       const setDays = selected => {
         const limit = yahrzeitMonthLimit(Number(monthField.value));
@@ -393,14 +445,19 @@ async function openYahrzeitCalendar() {
       };
       monthField.addEventListener('change', () => setDays(dayField.value));
       dayField.addEventListener('change', showRules);
-      row.querySelector('[data-yr-deceased]').addEventListener('input', updateLimit);
-      row.querySelector('[data-yr-remove]')?.addEventListener('click', () => { row.remove(); updateLimit(); custom.focus(); });
-      entries.append(row); setDays(entry.day);
-      if (focus) row.querySelector('input').focus();
+      row.querySelector('[data-yr-remove]')?.addEventListener('click', () => { row.remove(); updateLimit(); addButton.focus(); });
+      entries.append(row);
+      setDays(entry.day);
+      updateLimit();
+      if (focus) kindField?.focus();
     };
-    for (const kind of ['father', 'mother']) addEntry(member?.observances.find(entry => entry.kind === kind) || { kind });
-    for (const entry of member?.observances.filter(item => item.kind === 'custom') || []) addEntry(entry);
-    custom.addEventListener('click', () => addEntry({ kind: 'custom' }, true));
+    if (date) {
+      const hebrew = hebrewDateExtended(calendarSerial(date));
+      addEntry({ month: hebrew.month, day: hebrew.dayOfMonth });
+    } else {
+      for (const entry of member?.observances || []) addEntry(entry);
+      addButton.addEventListener('click', () => addEntry({}, true));
+    }
     const lockForm = value => {
       for (const control of form.elements) control.disabled = value;
       if (!value) updateLimit();
@@ -412,14 +469,17 @@ async function openYahrzeitCalendar() {
         members = members.filter(item => item.id !== id);
         if (method !== 'DELETE') members.push(saved);
         sortMembers();
-        if (!member && method !== 'DELETE') {
+        if (!date && !member && method !== 'DELETE') {
           const serial = calendarSerial(today()), { year } = hebrewDateExtended(serial);
           const next = Math.min(...saved.observances.flatMap(entry => [year, year + 1].flatMap(y => yahrzeitDates(entry, y))).filter(date => date >= serial));
           if (Number.isFinite(next)) month = calendarISO(next).slice(0, 7);
         }
         yahrzeitRoot.querySelector('[data-yr-summary]').textContent = method === 'DELETE' ? 'Member removed.' : 'Saved to the website.';
-        renderGrid();
-        dialog.close();
+        if (date && form.isConnected && dialog.open) goToDate(date);
+        else {
+          renderGrid();
+          if (form.isConnected && dialog.open) dialog.close();
+        }
       } catch (error) { status.textContent = error.message; }
       finally { lockForm(false); }
     };
@@ -427,13 +487,19 @@ async function openYahrzeitCalendar() {
       event.preventDefault();
       try {
         const observances = [...entries.children].map(row => ({
-          id: row.dataset.entryId, kind: row.dataset.kind, relationship: row.querySelector('[data-yr-relationship]')?.value,
-          deceasedName: row.querySelector('[data-yr-deceased]').value,
+          id: row.dataset.entryId, kind: row.dataset.kind || 'custom',
+          relationship: (row.dataset.kind === 'custom' && row.querySelector('[data-yr-relationship]').value.trim()) || 'Other',
+          deceasedName: row.dataset.kind ? row.querySelector('[data-yr-deceased]').value : '',
           month: Number(row.querySelector('[data-yr-month]').value),
           day: Number(row.querySelector('[data-yr-day-select]').value),
           adar: row.querySelector('[data-yr-adar]').value, shortMonth: row.querySelector('[data-yr-short]').value,
-        })).filter(entry => entry.kind === 'custom' || entry.month || entry.day || entry.deceasedName.trim());
-        save('POST', yahrzeitMember({ name: form.elements.name.value, address: form.elements.address.value, observances }));
+        }));
+        if (date && member) observances.unshift(...member.observances);
+        save('POST', yahrzeitMember({
+          name: form.elements.name?.value || member?.name,
+          address: form.elements.address?.value ?? member?.address,
+          observances,
+        }));
       } catch (error) { status.textContent = error.message; }
     });
     form.querySelector('.yr-remove-member')?.addEventListener('click', () => {
@@ -473,8 +539,12 @@ async function openYahrzeitCalendar() {
     const action = event.target.closest('button');
     if (!action) return;
     if (action.dataset.yrAdd !== undefined) openMemberForm();
+    if (action.dataset.yrAddDate) chooseMemberForDate(action.dataset.yrAddDate);
     if (action.dataset.yrManage !== undefined) openMemberList();
     if (action.dataset.yrImport !== undefined) openMemberImport();
+    if (action.dataset.yrReports !== undefined) openYahrzeitReports({ show, dialog, members, today, tables, selection: list.settings() });
+    if (action.dataset.yrExportMembers !== undefined) exportYahrzeitMembers(members, action, dialog.querySelector('[role=status]'));
+    if (action.dataset.yrHistory !== undefined) openYahrzeitHistory();
     if (action.dataset.yrOptions !== undefined) openCalendarOptions();
     if (action.dataset.yrView) showView(action.dataset.yrView);
     if (action.dataset.yrRefresh !== undefined) {

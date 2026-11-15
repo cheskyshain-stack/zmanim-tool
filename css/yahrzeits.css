@@ -37,7 +37,9 @@
 .yr-list-filters :is(input,select) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:.45rem .55rem; border-color:#dfddd3; border-radius:9px; color:#142b46; }
 .yr-custom-dates { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)) auto; gap:.5rem; align-items:end; margin:0; padding:0; border:0; min-inline-size:0; }
 .yr-custom-dates label { display:grid; gap:.25rem; min-width:0; font-size:.8rem; }
-.yr-range-note { grid-column:1/-1; margin:0; color:#5b6871; font-size:.8rem; }
+.yr-list-tools { grid-column:1/-1; display:flex; gap:.6rem; justify-content:space-between; align-items:center; }
+.yr-range-note { margin:0; color:#5b6871; font-size:.8rem; }
+.yr-card .yr-list-tools button { flex:none; padding-inline:.65rem; }
 .yr-list-scroll { flex:1; min-height:0; overflow:auto; overflow-anchor:none; overscroll-behavior:contain; padding:0 1rem 1rem; border-top:1px solid #ebe5d7; }
 .yr-list-scroll:focus-visible { outline-offset:-3px; }
 .yr-list-scroll > [data-yr-list-history], .yr-list-upcoming { max-width:46rem; margin:auto; }
@@ -78,6 +80,7 @@
 .yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
 .yr-date-fields { display:grid; grid-template-columns:minmax(4.1rem, .55fr) minmax(0, 1.45fr); gap:.65rem; }
 .yr-entries { display:grid; gap:.7rem; margin:1rem 0 .7rem; }
+.yr-entries:empty { margin:.7rem 0 0; }
 .yr-entry { min-inline-size:0; margin:0; padding:.6rem; border:1px solid #dedccf; border-radius:9px; }
 .yr-entry legend { padding:0 .3rem; font-weight:700; }
 .yr-entry-fields { display:grid; gap:.55rem; }
@@ -104,3 +107,17 @@
 .yr-help { color:#4f626f; margin:.25rem 0; }
 .yr-status { color:#883626; margin:.6rem 0 0; }
 .yr-status:empty { display:none; }
+.yr-report-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; }
+.yr-dialog .yr-report-dates label { margin:0; }
+.yr-report-member-export { padding-top:.7rem; border-top:1px solid #e3dfd3; }
+.yr-print-sheet { display:none; }
+@media print {
+  .yahrzeit-page.cal-reader-page { display:block; overflow:visible; }
+  #yahrzeit-app { width:auto; max-width:none; padding:0; }
+  .yr-print-sheet { display:block; font:11pt/1.35 system-ui,sans-serif; }
+  .yr-print-sheet h1 { font:700 20pt Georgia,serif; }
+  .yr-print-sheet table { width:100%; table-layout:fixed; border-collapse:collapse; }
+  .yr-print-sheet thead { display:table-header-group; }
+  .yr-print-sheet tr { break-inside:avoid; }
+  .yr-print-sheet th, .yr-print-sheet td { border-bottom:1px solid #aaa; text-align:start; padding:5pt 4pt; overflow-wrap:anywhere; vertical-align:top; }
+}
