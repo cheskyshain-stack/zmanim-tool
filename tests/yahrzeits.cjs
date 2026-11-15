@@ -93,7 +93,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   };
   const calendarBounds = page => page.evaluate(() => {
     const grid = document.querySelector('.cal-grid').getBoundingClientRect();
-    const header = document.querySelector('.cal-editor-header').getBoundingClientRect();
+    const header = document.querySelector('.seats-header').getBoundingClientRect();
     const actions = [...document.querySelectorAll('.cal-reader-actions > *')].map(button => button.getBoundingClientRect());
     const rows = [...document.querySelectorAll('.cal-grid tbody tr')].map(row => row.getBoundingClientRect().height);
     return { fillsWidth: grid.left <= 2 && grid.right >= innerWidth - 2,
@@ -150,7 +150,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await signIn(first, 'Open Yahrzeit Calendar');
   await first.getByRole('table', { name: 'November 2026' }).waitFor();
   assert.equal(await first.getByRole('link', { name: 'Back to Seats' }).count(), 0);
-  assert.equal(await first.getByRole('link', { name: 'Back to Home' }).getAttribute('href'), '/');
+  assert.equal(await first.getByRole('link', { name: 'Bais Medrash of Lakewood Commons, Home' }).getAttribute('href'), '/');
   assert.deepEqual(await calendarBounds(first), { fillsWidth: true, fitsHeight: true, equalRows: true, oneActionRow: true, enoughSpace: true });
   assert.ok(await first.locator('.cal-facts').getByText('ר״ח כסלו').count());
   const englishIsLarger = await first.locator('.cal-day').first().evaluate(day =>
@@ -189,6 +189,9 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('button', { name: 'December 2026, find a date' }).tap();
   await picker.getByRole('button', { name: 'Hebrew date', exact: true }).tap();
   assert.ok(await checkWidth(first), 'Hebrew date picker should fit 375 pixels');
+  const dayField = await picker.getByLabel('Hebrew day').boundingBox();
+  const monthField = await picker.getByLabel('Hebrew month').boundingBox();
+  assert.ok(Math.abs(dayField.y - monthField.y) < 1, 'Hebrew day and month inputs align');
   await first.getByLabel('Hebrew month').selectOption('8');
   await first.getByLabel('Hebrew day').selectOption('30');
   await first.getByRole('button', { name: 'Find date', exact: true }).click();
@@ -239,6 +242,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   const earlierDate = agenda.getByRole('button', { name: /View details for Mon, Nov 9, 2026/ });
   const upcomingDate = agenda.getByRole('button', { name: /View details for Mon, Nov 29, 2027/ });
   await upcomingDate.waitFor();
+  await agenda.locator('.yr-list-year').filter({ hasText: /^2027$/ }).waitFor();
   await earlierDate.evaluate(button => {
     const node = button.closest('.yr-list-scroll');
     node.scrollTop += button.getBoundingClientRect().top - node.getBoundingClientRect().top - 4;
@@ -248,6 +252,8 @@ test('the private register shares the PIN with Seats and uses a separate login',
     return bounds.top >= node.top && bounds.bottom <= node.bottom;
   });
   assert.ok(earlierVisible, 'scrolling up reveals an earlier date');
+  await agenda.getByRole('button', { name: 'Today', exact: true }).tap();
+  assert.ok(await startsToday(), 'Today jumps back after scrolling');
   await first.getByRole('button', { name: 'Calendar', exact: true }).click();
   await first.getByRole('button', { name: 'List', exact: true }).click();
   assert.ok(await startsToday(), 'reopening the default list returns to Today');
@@ -255,6 +261,13 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await agenda.getByText('Jan 1, 2026 to Dec 31, 2026').waitFor();
   assert.equal(await first.getByRole('table').count(), 0);
   await agenda.getByText('Synthetic Member', { exact: true }).first().waitFor();
+  await first.getByLabel('Date range').selectOption('next-year');
+  await agenda.getByText('Jan 1, 2027 to Dec 31, 2027').waitFor();
+  await upcomingDate.waitFor();
+  assert.equal(await earlierDate.count(), 0);
+  await agenda.getByRole('button', { name: 'Today', exact: true }).tap();
+  assert.equal(await first.getByLabel('Date range').inputValue(), 'today');
+  assert.ok(await startsToday(), 'Today resets the year filter and jumps to the current date');
   await first.getByLabel('Date range').selectOption('week');
   await agenda.getByText('Nov 8, 2026 to Nov 14, 2026').waitFor();
   await agenda.getByRole('button', { name: /View details for Mon, Nov 9/ }).click();
@@ -352,7 +365,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.goto(origin + '/seats/');
   await first.getByRole('link', { name: 'Yahrzeit Calendar' }).waitFor();
   assert.equal(signIns.length, 3, 'Logging out of the Yahrzeit Calendar leaves Seats signed in');
-  await second.getByRole('link', { name: 'Back to Home' }).click();
+  await second.getByRole('link', { name: 'Bais Medrash of Lakewood Commons, Home' }).click();
   await second.waitForURL(origin + '/');
   assert.match(await second.title(), /Lakewood Commons Shul/);
   await second.goto(origin + '/seats/');
