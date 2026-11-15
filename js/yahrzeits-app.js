@@ -307,12 +307,10 @@ async function openYahrzeitCalendar() {
     const min = hebrewDateExtended(calendarSerial('1900-01-01')).year;
     const max = hebrewDateExtended(calendarSerial('2299-12-31')).year;
     const englishDate = selected.startsWith(month) ? selected : month + '-01';
-    show('Find a date', `<label class="yr-date-mode cal-reminder-toggle">
-      <span class="yr-date-english" aria-hidden="true">English</span>
-      <input type="checkbox" role="switch" aria-label="Hebrew date" aria-controls="yr-date-english yr-date-hebrew">
-      <span class="cal-reminder-track" aria-hidden="true"></span>
-      <span class="yr-date-hebrew" aria-hidden="true">Hebrew</span>
-    </label>
+    show('Find a date', `<div class="yr-view-switch yr-date-mode" role="group" aria-label="Date language">
+      <button type="button" data-yr-date-mode="english" aria-pressed="true" aria-controls="yr-date-english">English</button>
+      <button type="button" data-yr-date-mode="hebrew" aria-pressed="false" aria-controls="yr-date-hebrew">Hebrew</button>
+    </div>
     <form id="yr-date-english" class="yr-import-controls">
       <label>English date<input type="date" name="date" min="1900-01-01" max="2299-12-31" value="${escAttr(englishDate)}" required></label>
       <div class="yr-dialog-actions">
@@ -332,14 +330,16 @@ async function openYahrzeitCalendar() {
       <div class="yr-dialog-actions"><button class="cal-primary" type="submit">Find date</button></div>
       <p class="yr-status" role="status"></p>
     </form>`);
-    const dateMode = dialog.querySelector('[role="switch"]');
     const english = dialog.querySelector('#yr-date-english'), form = dialog.querySelector('#yr-date-hebrew');
-    const updateDateMode = () => {
-      english.hidden = dateMode.checked;
-      form.hidden = !dateMode.checked;
-    };
-    dateMode.addEventListener('change', updateDateMode);
-    updateDateMode();
+    const modes = dialog.querySelectorAll('[data-yr-date-mode]');
+    for (const button of modes) {
+      button.addEventListener('click', () => {
+        const useHebrew = button.dataset.yrDateMode === 'hebrew';
+        english.hidden = useHebrew;
+        form.hidden = !useHebrew;
+        for (const mode of modes) mode.setAttribute('aria-pressed', String(mode === button));
+      });
+    }
     english.addEventListener('submit', event => {
       event.preventDefault();
       const date = english.elements.date.value;
