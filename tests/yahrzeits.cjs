@@ -87,6 +87,22 @@ test('the private register shares the PIN with Seats and uses a separate login',
     return document.documentElement.scrollWidth === innerWidth && (!dialog || dialog.scrollWidth <= dialog.clientWidth);
   });
 
+  const chooseCalendarOption = async (page, name) => {
+    await page.getByRole('button', { name: 'Calendar options', exact: true }).click();
+    await page.getByRole('dialog', { name: 'Calendar options' }).getByRole('button', { name, exact: true }).click();
+  };
+  const calendarBounds = page => page.evaluate(() => {
+    const grid = document.querySelector('.cal-grid').getBoundingClientRect();
+    const header = document.querySelector('.cal-editor-header').getBoundingClientRect();
+    const actions = [...document.querySelectorAll('.cal-reader-actions button')].map(button => button.getBoundingClientRect());
+    const rows = [...document.querySelectorAll('.cal-grid tbody tr')].map(row => row.getBoundingClientRect().height);
+    return { fillsWidth: grid.left <= 2 && grid.right >= innerWidth - 2,
+      fitsHeight: grid.bottom <= innerHeight && document.documentElement.scrollHeight <= innerHeight,
+      equalRows: Math.max(...rows) - Math.min(...rows) < 1,
+      oneActionRow: actions.every(button => button.top === actions[0].top && button.height >= 44),
+      enoughSpace: grid.top > header.bottom && grid.height >= 350 };
+  });
+
   const first = await setup(375);
   await first.goto(origin + '/seats/');
   await signIn(first, 'Open Seats');
@@ -96,11 +112,20 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await signIn(first, 'Open Yahrzeit Calendar');
   await first.getByRole('table', { name: 'November 2026' }).waitFor();
   assert.equal(await first.getByRole('link', { name: 'Back to Seats' }).count(), 0);
+  assert.equal(await first.getByRole('link', { name: /Shul admin/ }).getAttribute('href'), '/admin/');
+  assert.deepEqual(await calendarBounds(first), { fillsWidth: true, fitsHeight: true, equalRows: true, oneActionRow: true, enoughSpace: true });
   assert.ok(await first.locator('.cal-facts').getByText('ר״ח כסלו').count());
   const hebrewIsLarger = await first.locator('.cal-day').first().evaluate(day =>
     parseFloat(getComputedStyle(day.querySelector('.cal-hebrew-day')).fontSize) > parseFloat(getComputedStyle(day.querySelector('.cal-english-day')).fontSize));
   assert.ok(hebrewIsLarger, 'Hebrew dates should be more prominent than English dates');
   await first.getByRole('button', { name: 'Next month' }).click();
+  await first.getByRole('table', { name: 'December 2026' }).waitFor();
+  await first.getByRole('button', { name: 'Next month' }).click();
+  await first.getByRole('table', { name: 'January 2027' }).waitFor();
+  await first.getByRole('button', { name: 'Refresh calendar' }).click();
+  await first.getByRole('table', { name: 'January 2027' }).waitFor();
+  assert.ok((await calendarBounds(first)).fitsHeight);
+  await first.getByRole('button', { name: 'Previous month' }).click();
   await first.getByRole('table', { name: 'December 2026' }).waitFor();
   await first.getByRole('button', { name: 'Previous month' }).click();
   await first.getByRole('table', { name: 'November 2026' }).waitFor();
@@ -110,7 +135,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('button', { name: 'Find date', exact: true }).click();
   await first.getByText('Tuesday, November 10, 2026', { exact: true }).waitFor();
   await first.getByRole('button', { name: 'Close', exact: true }).click();
-  await first.getByRole('button', { name: '+ Add member' }).click();
+  await chooseCalendarOption(first, 'Add member');
   assert.equal(signIns.length, 2, 'The same PIN opens the Yahrzeit Calendar in its own session');
   await first.getByLabel('Congregation member').fill('Synthetic Member');
   const entry = (page, kind) => page.locator('[data-kind=' + kind + ']');
@@ -128,6 +153,9 @@ test('the private register shares the PIN with Seats and uses a separate login',
   assert.ok(await checkWidth(first), 'form should fit 375 pixels');
   await first.getByRole('button', { name: 'Save member' }).click();
   await first.getByText('Saved to the website.', { exact: false }).waitFor();
+  const eventCount = first.getByRole('button', { name: /3 yahrzeits/ }).locator('.yr-day-count');
+  assert.equal(await eventCount.innerText(), '3 entries');
+  assert.ok(await eventCount.evaluate(count => count.scrollWidth <= count.clientWidth));
   await first.getByRole('button', { name: /3 yahrzeits/ }).click();
   await first.getByText('Grandfather: ר׳ דוד <test>').waitFor();
   const grandfather = first.getByRole('listitem').filter({ hasText: 'Grandfather:' });
@@ -138,16 +166,17 @@ test('the private register shares the PIN with Seats and uses a separate login',
   assert.ok(Number.isFinite(Date.parse(originallyAddedAt)));
   await first.getByRole('button', { name: 'Close' }).click();
   assert.ok(await checkWidth(first), 'calendar should fit 375 pixels');
+  if (process.env.YAHRZEIT_SCREENSHOT) await first.screenshot({ path: process.env.YAHRZEIT_SCREENSHOT });
 
   const second = await setup(393);
   await second.goto(origin + '/yahrzeits/');
   await signIn(second, 'Open Yahrzeit Calendar', 'Synthetic second organizer');
-  await second.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(second, 'Members');
   await second.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   assert.equal(await entry(second, 'custom').getByLabel('Name of the deceased (optional)').inputValue(), 'ר׳ דוד <test>');
   assert.ok(await checkWidth(second), 'form should fit 393 pixels');
   assert.equal(signIns.length, 3);
-  await first.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(first, 'Members');
   await first.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   await second.getByLabel('Congregation member').fill('Renamed Member');
   await second.getByRole('button', { name: 'Save member' }).click();
@@ -158,20 +187,20 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await conflict;
   await first.getByText('Someone else changed this record.', { exact: false }).waitFor();
   await first.reload();
-  await first.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(first, 'Members');
   await first.getByRole('button', { name: 'Edit Renamed Member' }).click();
   const savedTime = await entry(first, 'custom').locator('time').getAttribute('datetime');
   assert.equal(savedTime, originallyAddedAt, 'An edit must preserve the original date and organizer');
   first.once('dialog', confirm => confirm.accept());
   await first.getByRole('button', { name: 'Delete member' }).click();
   await first.getByText('Member removed.').waitFor();
-  await first.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(first, 'Members');
   await first.getByText('No members have been added yet.').waitFor();
   await first.getByRole('dialog', { name: 'Members' }).getByRole('button', { name: '+ Add member' }).click();
   await first.getByLabel('Congregation member').fill('Member without Dates');
   await first.getByRole('button', { name: 'Save member' }).click();
   await first.getByText('Saved to the website.').waitFor();
-  await first.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(first, 'Members');
   await first.getByText('No yahrzeits entered').waitFor();
   await first.getByRole('button', { name: 'Import spreadsheet', exact: true }).click();
   const book = XLSX.utils.book_new();
@@ -192,14 +221,14 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByText('Member info', { exact: true }).click();
   await first.getByText('Synthetic organizer').waitFor();
   await first.getByRole('button', { name: 'Close', exact: true }).click();
-  await first.getByRole('button', { name: 'Members', exact: true }).click();
+  await chooseCalendarOption(first, 'Members');
   await first.getByRole('button', { name: 'Edit Imported with Dates' }).click();
   assert.equal(await entry(first, 'mother').getByLabel('Hebrew day').inputValue(), '29');
   assert.equal(await entry(first, 'mother').getByLabel('Hebrew month').inputValue(), '8');
   await entry(first, 'mother').getByText('Entry info').click();
   await entry(first, 'mother').getByText('Synthetic organizer').waitFor();
   await first.getByRole('button', { name: 'Close', exact: true }).click();
-  await first.getByRole('button', { name: 'Log out' }).click();
+  await chooseCalendarOption(first, 'Log out');
   await first.getByRole('button', { name: 'Open Yahrzeit Calendar', exact: true }).waitFor();
   await first.goto(origin + '/seats/');
   await first.getByRole('link', { name: 'Yahrzeit Calendar' }).waitFor();
