@@ -1,29 +1,45 @@
-#yahrzeit-app { max-width:68rem; padding:clamp(.5rem, 2vw, 1.25rem); margin:auto; }
-.yr-card .cal-brand { flex-wrap:wrap; gap:.65rem 1rem; }
-.yr-card .cal-brand h1 { font-size:clamp(1.7rem, 5vw, 2.35rem); }
-.yr-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
-.yr-card .cal-toolbar { display:flex; justify-content:center; gap:.5rem; }
-.yr-card .cal-month-nav { flex:0 1 24rem; min-width:0; gap:.35rem; }
-.yr-card .cal-month-title { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; max-width:100%; }
-.yr-card .cal-month-title .yr-hebrew-month { color:#142b46; font:700 clamp(.9rem, 3.5vw, 1.45rem)/1.2 Arial,sans-serif; }
-.yr-card [data-yr-english-month] { margin-top:-.15rem; }
-.yr-card .cal-grid-wrap { border:1px solid #e0e3e1; }
-.yr-card .cal-grid td { height:clamp(74px, 13vw, 112px); }
-.yr-card .cal-grid .cal-day { min-height:0; padding:.2rem .13rem .15rem; gap:.2rem; }
+.yahrzeit-page.seats-app { background:#faf7f0; font-family:system-ui,sans-serif; }
+.yahrzeit-page .cal-site-back { color:#f3ecdc; }
+#yahrzeit-app { box-sizing:border-box; width:100%; max-width:78rem; margin:0 auto; }
+#yahrzeit-app.is-cal-congregation {
+  --yr-row-preferred:clamp(72px,19.286vw,128px);
+  --cal-reader-cell:min(var(--yr-row-preferred),calc((var(--cal-reader-space) - 178px) / var(--cal-weeks)));
+}
+.yr-card .cal-reader-heading h1 { margin:0; text-align:center; color:#142b46; font:700 clamp(27px,7vw,36px)/1.15 Georgia,serif; letter-spacing:-.025em; }
+.yr-card [data-yr-find] svg { width:19px; height:19px; flex:none; color:#997d3a; }
+.yr-card .cal-content { max-height:calc(20px + var(--cal-weeks) * var(--yr-row-preferred)); border-top:0; }
+.yr-card .cal-grid-wrap { overflow:hidden; }
+.yr-card .cal-month-title { display:flex; align-items:center; justify-content:center; gap:.25rem; white-space:normal; }
+.yr-card .cal-month-title .yr-hebrew-month { color:#142b46; font:700 clamp(14px,4.3vw,23px)/1.15 Arial,sans-serif; }
+.yr-card .cal-month-nav > div { min-width:0; }
+.yr-card .cal-toolbar button[data-yr-step] { border-color:#dfddd3; }
+.yr-card .cal-grid .cal-day { padding:3px 4px 14px; }
 .yr-card .cal-grid .cal-day:focus-visible { outline-offset:-3px; }
-.yr-card .cal-grid td.cal-outside { background:#e5e9ee; }
-.yr-card .cal-outside .cal-day { opacity:.7; }
-.yr-card .cal-date-numbers { display:flex; justify-content:space-between; align-items:center; gap:2px; }
-.yr-card .cal-english-day, .yr-card .is-today .cal-english-day { color:#5b6871; background:none; min-width:0; padding-inline:2px; height:auto; font-size:clamp(.67rem, 2.4vw, .86rem); font-variant-numeric:tabular-nums; }
-.yr-card .cal-hebrew-day { display:grid; place-items:center; position:static; border-radius:50%; min-width:1.55em; height:1.55em; color:#142b46; font:700 clamp(.97rem, 3.55vw, 1.4rem)/1 Arial,sans-serif; }
+.yr-card .cal-date-numbers { display:flex; justify-content:flex-start; }
+.yr-card .cal-hebrew-day { display:inline-grid; place-items:center; position:static; width:1.55em; height:1.55em; border-radius:50%; color:#142b46; font:700 clamp(13px,calc(var(--cal-reader-cell) * .22),22px)/1 Arial,sans-serif; }
 .yr-card .is-today .cal-hebrew-day { color:#fff; background:#142b46; }
+.yr-card .cal-english-day, .yr-card .is-today .cal-english-day {
+  position:absolute; bottom:3px; right:4px; width:auto; min-width:0; height:auto;
+  color:#5b6871; background:none; font-size:clamp(9px,calc(var(--cal-reader-cell) * .14),13px); font-variant-numeric:tabular-nums;
+}
+.yr-day-count { flex:none; color:#263e5a; font:700 clamp(8px,2.35vw,12px)/1.15 system-ui,sans-serif; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.yr-day-count::after { display:block; height:3px; margin:1px 2px 0; border-radius:2px; background:#24736c; content:""; }
+.yr-card .cal-reader-status { color:#263e5a; }
+.yr-option-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+@media (max-height:460px) {
+  .yr-card .cal-reader-heading h1 { flex:1; font-size:clamp(19px,4.5vw,24px); text-align:left; }
+  .yr-card .cal-reader-actions [data-yr-find] { gap:4px; padding-inline:6px; font-size:12px; }
+  .yr-card .cal-reader-actions [data-yr-find] svg { display:none; }
+  .yr-card .cal-grid .cal-day { padding:2px 3px; }
+  .yr-card .cal-english-day, .yr-card .is-today .cal-english-day { top:4px; bottom:auto; }
+}
+@media (max-width:350px) {
+  .yr-card .cal-reader-heading button { padding-inline:6px; }
+  .yr-card .cal-month-title .yr-hebrew-month { font-size:14px; }
+  .yr-day-count span { display:none; }
+}
+
 .yr-dialog .cal-day-heading h3[lang=he] { font-family:Arial,sans-serif; }
-.yr-card .cal-facts { flex:1; justify-content:center; margin:0; }
-.yr-card .cal-facts > span { line-height:1.1; }
-.yr-day-count { color:#175b55; border-bottom:3px solid #24736c; text-align:center; font-weight:700; line-height:1.1; font-size:clamp(.58rem, 2.35vw, .77rem); }
-.yr-footer { display:flex; align-items:center; justify-content:space-between; gap:.25rem; padding:.2rem .55rem; }
-.yr-footer .cal-interaction-hint { padding:.35rem .2rem; }
-.yr-footer button { flex:none; font-size:.78rem; }
 .yr-dialog .cal-dialog-header { position:sticky; top:-1.4rem; background:#faf7f0; z-index:1; padding:.45rem 0; }
 .yr-dialog label { display:grid; align-content:start; gap:.25rem; font-weight:600; min-width:0; }
 .yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
@@ -53,12 +69,3 @@
 .yr-help { color:#4f626f; margin:.25rem 0; }
 .yr-status { color:#883626; margin:.6rem 0 0; }
 .yr-status:empty { display:none; }
-@media (max-width:420px) {
-  .yahrzeit-page .seats-header { padding-inline:.55rem; gap:.55rem; }
-  .yahrzeit-page .seats-brand { gap:.45rem; }
-  .yr-card .cal-brand { padding:.7rem .5rem; }
-  .yr-card .cal-toolbar { padding:0 .45rem .6rem; }
-  .yr-card .cal-toolbar button { padding-inline:.45rem; }
-  .yr-card .cal-facts > span { font-size:clamp(.57rem, 2.15vw, .68rem); }
-  .yr-day-count span { display:none; }
-}
