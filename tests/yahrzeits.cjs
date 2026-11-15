@@ -213,17 +213,20 @@ test('the private register shares the PIN with Seats and uses a separate login',
     await first.getByRole('button', { name: '+ Add yahrzeit', exact: true }).click();
     const row = first.locator('.yr-entry').last();
     assert.equal(await row.getByLabel('Name of the deceased (optional)').isVisible(), false);
-    await row.locator('[data-yr-kind]').selectOption(kind);
+    const option = row.getByRole('button', { name: kind, exact: true });
+    await option.tap();
+    assert.equal(await option.getAttribute('aria-pressed'), 'true');
+    assert.ok(await row.getByLabel('Name of the deceased (optional)').isVisible());
     return row;
   };
-  await fillDate(await addEntry('father'), 8, 29);
-  await fillDate(await addEntry('mother'), 8, 29);
-  const custom = await addEntry('custom');
+  await fillDate(await addEntry('Father'), 8, 29);
+  await fillDate(await addEntry('Mother'), 8, 29);
+  const custom = await addEntry('Other');
   await custom.getByRole('textbox', { name: 'Other relationship (optional)', exact: true }).fill('Grandfather');
   await custom.getByLabel('Name of the deceased (optional)').fill('ר׳ דוד <test>');
   await fillDate(custom, 8, 29);
   assert.ok(await checkWidth(first), 'form should fit 375 pixels');
-  await first.getByRole('button', { name: 'Save member' }).click();
+  await first.getByRole('button', { name: 'Save yahrzeit', exact: true }).click();
   await first.getByText('Saved to the website.', { exact: false }).waitFor();
   const eventCount = first.getByRole('button', { name: /3 yahrzeits/ }).locator('.yr-day-count');
   assert.equal(await eventCount.innerText(), '3 entries');
@@ -276,8 +279,9 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await agenda.getByRole('button', { name: 'Today', exact: true }).tap();
   assert.equal(await first.getByLabel('Date range').inputValue(), 'hebrew-year');
   assert.ok(await startsToday(), 'Today keeps the Hebrew-year range and scrolls to its Today marker');
-  assert.equal(await agenda.getByRole('option', { name: /^This week · Parshas / }).count(), 1);
-  assert.equal(await agenda.getByRole('option', { name: /^Next week · Parshas / }).count(), 1);
+  for (const name of ['This week · פרשת תולדות', 'Next week · פרשת ויצא', 'This year תשפ״ז', 'This year 2026']) {
+    assert.equal(await agenda.getByRole('option', { name, exact: true }).count(), 1);
+  }
   await first.getByLabel('Date range').selectOption('week');
   await agenda.getByText('Nov 7, 2026 to Nov 14, 2026').waitFor();
   await agenda.getByRole('button', { name: /View details for Mon, Nov 9/ }).click();
@@ -347,11 +351,11 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await chooseCalendarOption(first, 'Members');
   await first.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   await second.getByLabel('Congregation member').fill('Renamed Member');
-  await second.getByRole('button', { name: 'Save member' }).click();
+  await second.getByRole('button', { name: 'Save yahrzeit', exact: true }).click();
   await second.getByText('Saved to the website.', { exact: false }).waitFor();
   await first.getByLabel('Congregation member').fill('Older copy');
   const conflict = first.waitForResponse(response => response.url().includes('/api/yahrzeits/') && response.status() === 409);
-  await first.getByRole('button', { name: 'Save member' }).click();
+  await first.getByRole('button', { name: 'Save yahrzeit', exact: true }).click();
   await conflict;
   await first.getByText('Someone else changed this record.', { exact: false }).waitFor();
   await first.reload();
@@ -418,7 +422,14 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('button', { name: 'Choose Imported Names Only', exact: true }).tap();
   assert.equal(await first.getByLabel('Hebrew month').inputValue(), '9');
   assert.equal(await first.getByLabel('Hebrew day').inputValue(), '3');
-  assert.equal(await first.locator('[data-yr-kind]').inputValue(), '');
+  const relationship = first.getByRole('group', { name: 'Relationship (optional)', exact: true });
+  const other = relationship.getByRole('button', { name: 'Other', exact: true });
+  assert.equal(await relationship.getByRole('button', { pressed: true }).count(), 0);
+  await other.tap();
+  assert.ok(await first.getByLabel('Other relationship (optional)').isVisible());
+  await other.tap();
+  assert.equal(await relationship.getByRole('button', { pressed: true }).count(), 0);
+  assert.equal(await first.getByLabel('Other relationship (optional)').isVisible(), false);
   await first.getByRole('button', { name: 'Save yahrzeit', exact: true }).tap();
   const dayDetails = first.getByRole('dialog', { name: 'Yahrzeits' });
   await dayDetails.getByText('Imported Names Only', { exact: true }).waitFor();
@@ -426,7 +437,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await datedButton.tap();
   assert.equal(await first.getByLabel('Address (optional)').inputValue(), '8 Example Street');
   await first.getByRole('button', { name: 'Remove this yahrzeit' }).click();
-  await first.getByRole('button', { name: 'Save member', exact: true }).click();
+  await first.getByRole('button', { name: 'Save yahrzeit', exact: true }).click();
   await first.getByRole('dialog').waitFor({ state: 'hidden' });
   await chooseCalendarOption(first, 'Recent activity');
   const removedDate = history.getByRole('listitem').filter({ hasText: 'Deleted · Imported Names Only' });

@@ -85,6 +85,11 @@
 .yr-entry legend { padding:0 .3rem; font-weight:700; }
 .yr-entry-fields { display:grid; gap:.55rem; }
 .yr-entry button { justify-self:start; }
+.yr-entry-relationship { border:0; margin:0; padding:0; min-inline-size:0; }
+.yr-entry-relationship legend { padding:0; margin-bottom:.25rem; font-weight:600; }
+.yr-relationship-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.yr-dialog .yr-relationship-options button { justify-self:stretch; padding:.4rem .25rem; border-color:transparent; border-radius:8px; }
+.yr-dialog .yr-relationship-options button[aria-pressed="true"] { background:#142b46; color:#fff; }
 .yr-list { list-style:none; display:grid; gap:.55rem; padding:0; margin:.85rem 0 0; }
 .yr-list li { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.65rem .75rem; background:#fff; border:1px solid #dedfd9; border-radius:9px; overflow-wrap:anywhere; }
 .yr-list li button { flex:none; }
