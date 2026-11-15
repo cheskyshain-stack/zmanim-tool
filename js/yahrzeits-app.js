@@ -226,7 +226,7 @@ async function openYahrzeitCalendar() {
     const render = () => {
       const query = search.value.trim().toLocaleLowerCase();
       const found = members.filter(member => member.name.toLocaleLowerCase().includes(query) || member.address?.toLocaleLowerCase().includes(query));
-      dialog.querySelector('.yr-list').innerHTML = found.map(member => `<li><div><strong dir="auto">${escText(member.name)}</strong>${member.address ? `<p dir="auto">${escText(member.address)}</p>` : ''}<p class="yr-help" dir="auto">${escText(member.observances.map(entry => yahrzeitRelationship(entry) + ': ' + entry.day + ' ' + JEWISH_MONTHS_EN[entry.month - 1]).join(' · ') || 'No yahrzeits entered')}</p></div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('');
+      dialog.querySelector('.yr-list').innerHTML = found.map(member => `<li><div><strong dir="auto">${escText(member.name)}</strong>${member.address ? `<p dir="auto">${escText(member.address)}</p>` : ''}<p class="yr-help" dir="auto">${escText(member.observances.map(entry => yahrzeitRelationship(entry) + ': ' + entry.day + ' ' + JEWISH_MONTHS_EN[entry.month - 1]).join(' · ') || 'No yahrzeits')}</p></div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('');
       dialog.querySelector('[data-yr-empty]').textContent = found.length ? '' : query ? 'No matching members.' : 'No members have been added yet.';
     };
     search.addEventListener('input', render);

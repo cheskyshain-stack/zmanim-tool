@@ -376,7 +376,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await first.getByRole('button', { name: 'Save member' }).click();
   await first.getByText('Saved to the website.').waitFor();
   await chooseCalendarOption(first, 'Members');
-  await first.getByText('No yahrzeits entered').waitFor();
+  await first.getByText('No yahrzeits', { exact: true }).waitFor();
   await first.getByRole('button', { name: 'Import spreadsheet', exact: true }).click();
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, XLSX.utils.aoa_to_sheet([
