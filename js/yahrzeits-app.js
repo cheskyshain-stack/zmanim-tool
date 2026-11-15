@@ -397,15 +397,33 @@ async function openYahrzeitCalendar() {
     });
   }
 
-  for (const arrow of yahrzeitRoot.querySelectorAll('[data-yr-step]')) {
-    arrow.addEventListener('click', () => {
-      const next = calendarStepMonth(month, Number(arrow.dataset.yrStep));
-      if (Number.isFinite(calendarSerial(next + '-01'))) {
-        month = next;
-        renderGrid();
-      }
-    });
+  function stepMonth(amount) {
+    const next = calendarStepMonth(month, amount);
+    if (!Number.isFinite(calendarSerial(next + '-01'))) return;
+    month = next;
+    renderGrid();
   }
+
+  for (const arrow of yahrzeitRoot.querySelectorAll('[data-yr-step]')) {
+    arrow.addEventListener('click', () => stepMonth(Number(arrow.dataset.yrStep)));
+  }
+
+  let swipeStart;
+  host.addEventListener('touchstart', event => {
+    swipeStart = event.touches.length === 1 ? event.touches[0] : null;
+  }, { passive: true });
+  host.addEventListener('touchcancel', () => { swipeStart = null; }, { passive: true });
+  host.addEventListener('touchend', event => {
+    const start = swipeStart, end = event.changedTouches[0];
+    swipeStart = null;
+    if (!start || event.touches.length || end.identifier !== start.identifier) return;
+    const x = end.clientX - start.clientX;
+    const y = end.clientY - start.clientY;
+    if (Math.abs(x) < Math.max(45, host.clientWidth * .15) || Math.abs(x) < Math.abs(y) * 1.4) return;
+    // A swipe that starts on a day should only navigate the month.
+    if (event.cancelable) event.preventDefault();
+    stepMonth(x < 0 ? 1 : -1);
+  }, { passive: false });
 
   yahrzeitRoot.addEventListener('click', event => {
     const action = event.target.closest('button');
