@@ -20,7 +20,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
   const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless:true });
   const checks = [], errors = [], unexpected = [];
   try {
-    for (const month of ['2026-11','2026-08','2027-05','2027-06','2028-04']) {
+    for (const month of ['2026-11','2026-12','2026-08','2027-05','2027-06','2028-04']) {
       const context = await browser.newContext({ viewport:{ width:375, height:640 }, serviceWorkers:'block' });
       await context.addInitScript(() => {
         try {
@@ -74,7 +74,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
             header:box(document.querySelector('.cal-editor-header')), calendar:box(document.querySelector('.shul-calendar')), controls:[...document.querySelectorAll('.cal-reader-heading button,.cal-site-back,.cal-month-nav button,.cal-toolbar > button')].map(box),
             days:[...document.querySelectorAll('[data-cal-day]')].map(button => {
               const parsha = button.querySelector('.cal-parsha'), words = [];
-              if (parsha && getComputedStyle(parsha).visibility !== 'hidden') {
+              if (parsha && !parsha.hidden && getComputedStyle(parsha).visibility !== 'hidden') {
                 const text = parsha.firstChild;
                 for (const word of parsha.textContent.matchAll(/\S+/g)) { const range = document.createRange(); range.setStart(text, word.index); range.setEnd(text, word.index + word[0].length); words.push({ text:word[0], fragments:[...range.getClientRects()].map(r => ({ left:r.left, right:r.right, top:r.top, bottom:r.bottom })) }); }
               }
@@ -82,8 +82,8 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
               return { date:button.dataset.calDay, cell:box(button.closest('td')), english:box(button.querySelector('.cal-english-day')), hebrew:box(button.querySelector('.cal-hebrew-day')), words,
                 markers:markers ? box(markers) : null, colors:markers ? [...markers.querySelectorAll('i')].map(box) : [], count:markers?.querySelector('.cal-event-total').textContent,
                 countFits:!markers || markers.querySelector('.cal-event-total').scrollWidth <= markers.querySelector('.cal-event-total').clientWidth,
-                facts:[...button.querySelectorAll('.cal-facts > span')].filter(label => getComputedStyle(label).visibility !== 'hidden').map(label => ({ text:label.textContent, ...box(label) })),
-                label:parsha && getComputedStyle(parsha).visibility !== 'hidden' ? box(parsha) : null };
+                facts:[...button.querySelectorAll('.cal-facts > span')].filter(label => !label.hidden && getComputedStyle(label).visibility !== 'hidden').map(label => ({ text:label.textContent, ...box(label) })),
+                label:parsha && !parsha.hidden && getComputedStyle(parsha).visibility !== 'hidden' ? box(parsha) : null };
             }) };
         });
         assert(geometry.pageWidth <= width && geometry.pageHeight <= height, JSON.stringify({ month, width, height, reason:'Page does not scroll', visual:geometry.visualHeight, readerHeight:geometry.readerHeight, pageWidth:geometry.pageWidth, pageHeight:geometry.pageHeight, calendar:geometry.calendar }));
@@ -101,6 +101,11 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         assert.equal(await page.locator('.cal-reader-heading a').count(), 0, 'The Home link lives in the page header');
         assert(await page.getByRole('button', { name:'Refresh calendar', exact:true }).isVisible());
         assert(Math.abs(geometry.calendar.top - geometry.header.bottom) <= 1 && geometry.calendar.bottom <= height + 1, 'Calendar fits below the subpage header');
+        if (month === '2026-12' && width === 375) {
+          const chanukah = geometry.days.find(day => day.date === '2026-12-05');
+          assert(chanukah.facts.some(fact => /חנוכה/.test(fact.text)), 'Chanukah is visible on a Shabbos with events');
+          assert(chanukah.facts.some(fact => fact.text === 'וישב'), 'The parsha remains visible beside Chanukah');
+        }
         assert(geometry.days.every(day => day.cell.height <= 129), 'Month rows remain compact on tall screens');
         if (width === 393 && height === 852) assert(geometry.days.every(day => day.cell.height <= 77), 'Tall phones keep compact month rows');
         assert(geometry.controls.every(control => control.height >= 44 && control.left >= 0 && control.right <= width + 1), 'Navigation controls fit and retain 44px touch targets');

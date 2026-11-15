@@ -163,6 +163,18 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await checkMonthSwipes(first);
   await first.getByRole('button', { name: 'Next month' }).click();
   await first.getByRole('table', { name: 'December 2026' }).waitFor();
+  const chanukah = first.locator('[data-yr-day="2026-12-05"]');
+  assert.ok(await chanukah.getByText('א׳ חנוכה', { exact: true }).isVisible());
+  assert.ok(await chanukah.getByText('וישב', { exact: true }).isVisible());
+  assert.ok(await chanukah.evaluate(day => {
+    const labels = [...day.querySelectorAll('.cal-facts > span:not([hidden])')];
+    const top = day.querySelector('.cal-english-day').getBoundingClientRect().bottom;
+    const bottom = day.querySelector('.cal-hebrew-day').getBoundingClientRect().top;
+    return labels.every(label => {
+      const box = label.getBoundingClientRect();
+      return box.top >= top && box.bottom <= bottom;
+    });
+  }), 'Chanukah and the parsha both fit between the date numbers');
   await first.getByRole('button', { name: 'Next month' }).click();
   await first.getByRole('table', { name: 'January 2027' }).waitFor();
   await first.getByRole('button', { name: 'Refresh calendar' }).click();

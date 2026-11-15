@@ -1,3 +1,4 @@
+import { calendarCompactDayFacts, fitCalendarDayFacts } from './ui/calendar-day-facts.js';
 import { calendarMonth, calendarStepMonth, calendarSerial, calendarISO } from './calendar/model.js';
 import { loadTables } from './data-loader.js';
 import { seatsOpenSession } from './seats/session.js';
@@ -86,6 +87,8 @@ async function openYahrzeitCalendar() {
   </section><dialog class="cal-dialog yr-dialog" aria-labelledby="yr-dialog-title"></dialog>`;
   const host = yahrzeitRoot.querySelector('.cal-grid-wrap'), dialog = yahrzeitRoot.querySelector('dialog');
   const agenda = yahrzeitRoot.querySelector('.yr-agenda'), list = createYahrzeitList(agenda, today, tables, restored?.range);
+  const fitGridFacts = () => { if (view === 'calendar') fitCalendarDayFacts(host, true); };
+  new ResizeObserver(fitGridFacts).observe(host);
   function showView(next) {
     const opening = next === 'list' && agenda.hidden;
     view = next;
@@ -133,21 +136,22 @@ async function openYahrzeitCalendar() {
     for (let i = 0; i < grid.days.length; i += 7) {
       weeks.push('<tr role="row">' + grid.days.slice(i, i + 7).map(day => {
         const count = onDay.get(day.serial)?.length || 0;
-        const fact = day.parsha || day.facts[0] || day.specialLabel || (day.mevarchim ? 'מברכים' : '');
         const label = [
-          yahrzeitFullDate.format(new Date(day.iso + 'T12:00:00Z')), day.hebrewLabel, fact,
+          yahrzeitFullDate.format(new Date(day.iso + 'T12:00:00Z')), day.hebrewLabel, ...day.facts,
+          day.parsha ? 'פרשת ' + day.parsha : '', day.specialLabel, day.mevarchim ? 'מברכים' : '',
           count ? count + (count === 1 ? ' yahrzeit' : ' yahrzeits') : '',
         ].filter(Boolean).join('. ');
         return `<td role="cell" class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}">
           <button type="button" class="cal-day ${day.iso === now ? 'is-today' : ''} ${day.iso === selected ? 'is-selected' : ''}" data-yr-day="${day.iso}" aria-pressed="${day.iso === selected}" aria-label="${escAttr(label)}" ${day.iso === now ? 'aria-current="date"' : ''}>
             <span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
-            <span class="cal-facts" lang="he" dir="rtl">${fact ? `<span class="${day.parsha ? 'cal-parsha' : 'cal-observance'}">${escText(fact)}</span>` : ''}</span>
+            <span class="cal-facts" lang="he" dir="rtl">${calendarCompactDayFacts(day)}</span>
             ${count ? `<span class="yr-day-count">${count} <span>${count === 1 ? 'entry' : 'entries'}</span></span>` : ''}
             <span class="cal-hebrew-day" lang="he" dir="rtl">${escText(day.hebrewDay)}</span>
           </button></td>`;
       }).join('') + '</tr>');
     }
     host.innerHTML = `<table role="table" class="cal-grid" aria-label="${escAttr(grid.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(label => `<th role="columnheader" scope="col">${label}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.join('')}</tbody></table>`;
+    fitGridFacts();
   }
 
   function openDay(date) {
