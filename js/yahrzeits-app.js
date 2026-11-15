@@ -97,14 +97,23 @@ async function openYahrzeitCalendar() {
     if (opening) list.open(members);
     else if (showList) list.update(members);
   }
-  const show = (title, content) => {
+  const show = (title, content, { dismissOnBackdrop = false } = {}) => {
     if (!dialog.open) dialogReturn = document.activeElement;
+    dialog.toggleAttribute('data-yr-dismiss-on-backdrop', dismissOnBackdrop);
     dialog.innerHTML = `<header class="cal-dialog-header"><h2 id="yr-dialog-title">${escText(title)}</h2><button type="button" aria-label="Close" data-yr-close>×</button></header>${content}`;
     if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
     dialog.querySelector('[data-yr-close]').focus({ preventScroll: true });
   };
-  dialog.addEventListener('click', event => { if (event.target.closest('[data-yr-close]')) dialog.close(); });
+  dialog.addEventListener('click', event => {
+    if (event.target.closest('[data-yr-close]')) {
+      dialog.close();
+      return;
+    }
+    if (event.target !== dialog || !dialog.hasAttribute('data-yr-dismiss-on-backdrop')) return;
+    const { left, right, top, bottom } = dialog.getBoundingClientRect();
+    if (event.clientX < left || event.clientX > right || event.clientY < top || event.clientY > bottom) dialog.close();
+  });
   dialog.addEventListener('close', () => {
     (dialogReturn?.isConnected ? dialogReturn : yahrzeitRoot.querySelector('[data-yr-options]'))?.focus({ preventScroll: true });
   });
@@ -154,7 +163,7 @@ async function openYahrzeitCalendar() {
     const labels = [...new Set([day.specialLabel, ...day.facts, day.parsha ? 'פרשת ' + day.parsha : '', day.mevarchim ? 'מברכים' : ''].filter(Boolean))];
     show('Yahrzeits', `<div class="cal-day-heading"><h3>${escText(yahrzeitFullDate.format(new Date(date + 'T12:00:00Z')))}</h3><p lang="he" dir="rtl">${escText(day.hebrewLabel)}</p></div>
       ${labels.length ? `<div class="cal-day-facts" lang="he" dir="rtl">${labels.map(label => `<p>${escText(label)}</p>`).join('')}</div>` : ''}
-      ${rows.length ? `<ul class="yr-list">${rows.map(({ member, entry }) => `<li><div><strong dir="auto">${escText(member.name)}</strong><p dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</p>${yahrzeitEntryDetails(entry)}</div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('')}</ul>` : '<p>No yahrzeits on this date.</p>'}`);
+      ${rows.length ? `<ul class="yr-list">${rows.map(({ member, entry }) => `<li><div><strong dir="auto">${escText(member.name)}</strong><p dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</p>${yahrzeitEntryDetails(entry)}</div><button type="button" data-yr-edit="${escAttr(member.id)}" aria-label="${escAttr('Edit ' + member.name)}">Edit</button></li>`).join('')}</ul>` : '<p>No yahrzeits on this date.</p>'}`, { dismissOnBackdrop: true });
   }
 
   function openCalendarOptions() {
