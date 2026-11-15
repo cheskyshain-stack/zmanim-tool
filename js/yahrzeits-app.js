@@ -12,8 +12,8 @@ const yahrzeitFullDate = new Intl.DateTimeFormat('en-US', { dateStyle: 'full', t
 async function openYahrzeitCalendar() {
   const auth = await seatsOpenSession(yahrzeitRoot, {
     title: 'Yahrzeit Calendar',
-    intro: 'Sign in with the same name and PIN you use for Seats.',
-    requireOnline: true,
+    intro: 'Enter your name and the private organizer PIN.',
+    scope: 'yahrzeits',
   });
   const { endpoint, token } = auth.session;
   if (!endpoint || !token) throw new Error('The shared yahrzeit calendar is unavailable. Reload to try again.');
@@ -27,7 +27,7 @@ async function openYahrzeitCalendar() {
     } catch { throw new Error('Could not reach the website. Check your connection and try again.'); }
     if (response.status === 401) {
       auth.lock();
-      throw new Error('Sign in again to open the calendar.');
+      throw new Error('Sign in again to open the Yahrzeit Calendar.');
     }
     if (response.status === 404 && !path) throw new Error('The shared yahrzeit calendar is unavailable. Try again later.');
     const result = await response.json().catch(() => ({}));

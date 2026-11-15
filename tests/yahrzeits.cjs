@@ -10,7 +10,7 @@ const { build } = require(require.resolve('esbuild', { paths: [runtime] }));
 const { Miniflare, convertV4MiniflareOptions } = require(require.resolve('miniflare', { paths: [runtime] }));
 const root = path.resolve(__dirname, '../dist');
 
-test('the private register uses the existing Seats login and saves to the shared Worker', async t => {
+test('the private register shares the PIN with Seats and uses a separate login', async t => {
   let endpoint, origin;
   const types = { '.html':'text/html', '.css':'text/css', '.js':'text/javascript', '.json':'application/json', '.jpg':'image/jpeg', '.png':'image/png', '.woff2':'font/woff2' };
   const server = http.createServer(async (req, res) => {
@@ -47,7 +47,19 @@ test('the private register uses the existing Seats login and saves to the shared
   const legacyToken = (await legacyLogin.json()).token;
   const legacyHeaders = { Authorization: 'Bearer ' + legacyToken };
   assert.equal((await api('plans', { headers: legacyHeaders })).status, 200);
-  assert.equal((await api('yahrzeits', { headers: legacyHeaders })).status, 403);
+  assert.equal((await api('yahrzeits', { headers: legacyHeaders })).status, 401);
+  const wrongPin = await api('session', { method: 'POST', body: JSON.stringify({ name: 'Synthetic organizer', pin: '4444', scope: 'yahrzeits' }) });
+  assert.equal(wrongPin.status, 401);
+  const signInFor = async scope => {
+    const login = await api('session', { method: 'POST', body: JSON.stringify({ name: 'Synthetic organizer', pin: privatePin, scope }) });
+    assert.equal(login.status, 200);
+    return { Authorization: 'Bearer ' + (await login.json()).token };
+  };
+  const seatsHeaders = await signInFor('seats'), calendarHeaders = await signInFor('yahrzeits');
+  assert.equal((await api('plans', { headers: seatsHeaders })).status, 200);
+  assert.equal((await api('yahrzeits', { headers: seatsHeaders })).status, 401);
+  assert.equal((await api('yahrzeits', { headers: calendarHeaders })).status, 200);
+  assert.equal((await api('plans', { headers: calendarHeaders })).status, 401);
   assert.equal((await api('yahrzeits/example-id', { method: 'POST', body: '{}' })).status, 401);
   assert.equal((await api('yahrzeits/example-id', { method: 'DELETE', body: '{}' })).status, 401);
   assert.equal((await api('yahrzeits', { headers: { Origin: 'https://example.org' } })).status, 403);
@@ -77,8 +89,11 @@ test('the private register uses the existing Seats login and saves to the shared
   await first.goto(origin + '/seats/');
   await signIn(first, 'Open Seats');
   await first.getByRole('link', { name: 'Yahrzeit Calendar' }).click();
+  await first.getByRole('button', { name: 'Open Yahrzeit Calendar', exact: true }).waitFor();
+  assert.equal(signIns.length, 1, 'Signing in to Seats leaves the Yahrzeit Calendar locked');
+  await signIn(first, 'Open Yahrzeit Calendar');
   await first.getByRole('button', { name: '+ Add member' }).click();
-  assert.equal(signIns.length, 1, 'Seats session should transfer without another PIN');
+  assert.equal(signIns.length, 2, 'The same PIN opens the Yahrzeit Calendar in its own session');
   await first.getByLabel('Congregation member').fill('Synthetic Member');
   const entry = (page, kind) => page.locator('[data-kind=' + kind + ']');
   const fillDate = async (row, month, day) => {
@@ -107,7 +122,7 @@ test('the private register uses the existing Seats login and saves to the shared
   await second.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   assert.equal(await entry(second, 'custom').getByLabel('Name of the deceased (optional)').inputValue(), 'ר׳ דוד <test>');
   assert.ok(await checkWidth(second), 'form should fit 393 pixels');
-  assert.equal(signIns.length, 2);
+  assert.equal(signIns.length, 3);
   await first.getByRole('button', { name: 'Members', exact: true }).click();
   await first.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   await second.getByLabel('Congregation member').fill('Renamed Member');
@@ -126,5 +141,14 @@ test('the private register uses the existing Seats login and saves to the shared
   await first.getByText('Member removed.').waitFor();
   await first.getByRole('button', { name: 'Members', exact: true }).click();
   await first.getByText('No members have been added yet.').waitFor();
+  await first.getByRole('button', { name: 'Close', exact: true }).click();
+  await first.getByRole('button', { name: 'Log out' }).click();
+  await first.getByRole('button', { name: 'Open Yahrzeit Calendar', exact: true }).waitFor();
+  await first.getByRole('link', { name: 'Back to Seats' }).click();
+  await first.getByRole('link', { name: 'Yahrzeit Calendar' }).waitFor();
+  assert.equal(signIns.length, 3, 'Logging out of the Yahrzeit Calendar leaves Seats signed in');
+  await second.getByRole('link', { name: 'Back to Seats' }).click();
+  await second.getByRole('button', { name: 'Open Seats', exact: true }).waitFor();
+  assert.equal(signIns.length, 3, 'Signing in to the Yahrzeit Calendar leaves Seats locked');
   assert.deepEqual(errors, []);
 });

@@ -86,10 +86,17 @@ jobs:
           assert.equal(plans.status,200,'Authenticated plan storage must be available.');
           assert.ok(Array.isArray((await plans.json()).plans));
           const yahrzeits=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers:{...headers,Authorization:'Bearer '+session.token}});
-          if (!privatePin) assert.ok([403,503].includes(yahrzeits.status),'The legacy Seats PIN must not unlock the yahrzeit register.');
-          else {
-            assert.equal(yahrzeits.status,200,'Authenticated yahrzeit storage must be available.');
-            await yahrzeits.body.cancel();
+          assert.equal(yahrzeits.status,401,'A Seats session must not unlock the yahrzeit register.');
+          if (privatePin) {
+            const yahrzeitLogin=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin,scope:'yahrzeits'})});
+            assert.equal(yahrzeitLogin.status,200,'The private PIN must open a separate yahrzeit session.');
+            const {token}=await yahrzeitLogin.json();
+            const calendarHeaders={...headers,Authorization:'Bearer '+token};
+            const calendar=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers:calendarHeaders});
+            assert.equal(calendar.status,200,'Authenticated yahrzeit storage must be available.');
+            await calendar.body.cancel();
+            const seats=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:calendarHeaders});
+            assert.equal(seats.status,401,'A yahrzeit session must not unlock Seats.');
           }
           console.log('Verified server PIN protection and authenticated storage.');
           JS
