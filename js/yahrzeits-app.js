@@ -400,17 +400,25 @@ async function openYahrzeitCalendar() {
         <button type="button" data-yr-close>Cancel</button><button type="submit" class="cal-primary">${date ? 'Save yahrzeit' : 'Save member'}</button>
       </div><p class="yr-status" role="status"></p></form>`);
     const form = dialog.querySelector('form'), entries = form.querySelector('.yr-entries'), status = form.querySelector('.yr-status');
-    const addButton = form.querySelector('[data-yr-new-entry]');
-    const updateLimit = () => { if (addButton) addButton.disabled = entries.children.length >= YAHRZEIT_MAX_OBSERVANCES; };
+    const addButton = form.querySelector('[data-yr-new-entry]'), saveButton = form.querySelector('[type="submit"]');
+    const updateEntryActions = () => {
+      if (addButton) addButton.disabled = entries.children.length >= YAHRZEIT_MAX_OBSERVANCES;
+      saveButton.textContent = date || entries.children.length || member?.observances.length ? 'Save yahrzeit' : 'Save member';
+    };
     const addEntry = (entry, focus = false) => {
       const row = document.createElement('fieldset');
       row.className = 'yr-entry';
       row.dataset.kind = entry.kind || '';
       if (entry.id) row.dataset.entryId = entry.id;
       row.innerHTML = `<legend>${entry.id ? escText(yahrzeitRelationship(entry)) : 'Yahrzeit'}</legend><div class="yr-entry-fields">
-        ${entry.id ? '' : `<label>Relationship (optional)<select data-yr-kind>
-          <option value="">Choose a relationship</option><option value="father">Father</option><option value="mother">Mother</option><option value="custom">Other</option>
-        </select></label>`}
+        ${entry.id ? '' : `<fieldset class="yr-entry-relationship">
+          <legend>Relationship (optional)</legend>
+          <div class="yr-view-switch yr-relationship-options">
+            <button type="button" data-yr-kind="father" aria-pressed="false">Father</button>
+            <button type="button" data-yr-kind="mother" aria-pressed="false">Mother</button>
+            <button type="button" data-yr-kind="custom" aria-pressed="false">Other</button>
+          </div>
+        </fieldset>`}
         <label data-yr-custom-label hidden>Other relationship (optional)<input dir="auto" data-yr-relationship maxlength="60" placeholder="For example, grandfather" value="${escAttr(entry.relationship === 'Other' ? '' : entry.relationship)}"></label>
         <label data-yr-deceased-label hidden>Name of the deceased (optional)<input dir="auto" data-yr-deceased maxlength="140" value="${escAttr(entry.deceasedName)}"></label>
         <div class="yr-date-fields">
@@ -425,13 +433,19 @@ async function openYahrzeitCalendar() {
       const monthField = row.querySelector('[data-yr-month]'), dayField = row.querySelector('[data-yr-day-select]');
       const adar = row.querySelector('[data-yr-adar]'), short = row.querySelector('[data-yr-short]');
       adar.value = entry.adar || 'first'; short.value = entry.shortMonth || '';
-      const kindField = row.querySelector('[data-yr-kind]');
+      const kindButtons = row.querySelectorAll('[data-yr-kind]');
       const showNames = () => {
-        if (kindField) row.dataset.kind = kindField.value;
+        for (const button of kindButtons) button.setAttribute('aria-pressed', String(button.dataset.yrKind === row.dataset.kind));
         row.querySelector('[data-yr-custom-label]').hidden = row.dataset.kind !== 'custom';
         row.querySelector('[data-yr-deceased-label]').hidden = !row.dataset.kind;
       };
-      kindField?.addEventListener('change', showNames);
+      for (const button of kindButtons) {
+        button.addEventListener('click', () => {
+          const kind = button.dataset.yrKind;
+          row.dataset.kind = row.dataset.kind === kind ? '' : kind;
+          showNames();
+        });
+      }
       showNames();
       const showRules = () => {
         row.querySelector('[data-yr-adar-rule]').hidden = Number(monthField.value) !== 12;
@@ -445,11 +459,11 @@ async function openYahrzeitCalendar() {
       };
       monthField.addEventListener('change', () => setDays(dayField.value));
       dayField.addEventListener('change', showRules);
-      row.querySelector('[data-yr-remove]')?.addEventListener('click', () => { row.remove(); updateLimit(); addButton.focus(); });
+      row.querySelector('[data-yr-remove]')?.addEventListener('click', () => { row.remove(); updateEntryActions(); addButton.focus(); });
       entries.append(row);
       setDays(entry.day);
-      updateLimit();
-      if (focus) kindField?.focus();
+      updateEntryActions();
+      if (focus) kindButtons[0]?.focus();
     };
     if (date) {
       const hebrew = hebrewDateExtended(calendarSerial(date));
@@ -460,7 +474,7 @@ async function openYahrzeitCalendar() {
     }
     const lockForm = value => {
       for (const control of form.elements) control.disabled = value;
-      if (!value) updateLimit();
+      if (!value) updateEntryActions();
     };
     const save = async (method, contents = {}) => {
       lockForm(true); status.textContent = '';

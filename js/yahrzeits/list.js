@@ -1,5 +1,5 @@
 import { calendarISO, calendarSerial } from '../calendar/model.js';
-import { hasParsha, hebrewDateExtended, jewishDateString, roshHashana } from '../hebrew-calendar.js';
+import { hasParsha, hebrewDateExtended, hebrewYear, jewishDateString, roshHashana } from '../hebrew-calendar.js';
 import { escAttr, escText } from '../util.js';
 import { yahrzeitDates, yahrzeitRelationship } from './model.js';
 
@@ -7,17 +7,22 @@ const yahrzeitListPresets = [
   ['today', 'Around today'],
   ['week', 'This week'],
   ['next-week', 'Next week'],
-  ['hebrew-year', 'This Hebrew year'],
-  ['year', 'This English year'],
+  ['hebrew-year', 'This year'],
+  ['year', 'This year'],
   ['custom', 'Custom dates'],
 ];
 
 export function yahrzeitRangeOptions(today, tables) {
   return yahrzeitListPresets.map(([value, name]) => {
+    if (value === 'hebrew-year') {
+      const { year } = hebrewDateExtended(calendarSerial(today));
+      return [value, `${name} ${hebrewYear(year)}`];
+    }
+    if (value === 'year') return [value, `${name} ${today.slice(0, 4)}`];
     if (value !== 'week' && value !== 'next-week') return [value, name];
     const { end } = yahrzeitListRange(value, today);
-    const parsha = hasParsha(end, { english: true, inIsrael: false }, tables);
-    return [value, parsha ? `${name} · Parshas ${parsha}` : name];
+    const parsha = hasParsha(end, { english: false, inIsrael: false }, tables);
+    return [value, parsha ? `${name} · פרשת ${parsha}` : name];
   });
 }
 const yahrzeitListDate = new Intl.DateTimeFormat('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC' });
