@@ -38,22 +38,35 @@ export function seatsNamesFromRows(rows) {
   }).filter(name => /\p{L}/u.test(name));
 }
 
+let seatsSpreadsheetLoader;
+export function seatsLoadSpreadsheet() {
+  if (window.XLSX) return Promise.resolve(window.XLSX);
+  seatsSpreadsheetLoader ??= new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = '/vendor/xlsx-0.20.3.min.js';
+    script.onload = () => resolve(window.XLSX);
+    script.onerror = () => {
+      script.remove();
+      seatsSpreadsheetLoader = null;
+      reject(new Error('Excel support could not load. Try again.'));
+    };
+    document.head.appendChild(script);
+  });
+  return seatsSpreadsheetLoader;
+}
+
 export async function seatsReadSpreadsheetRows(file, { keepBlankRows = false } = {}) {
   if (file.size > 5 * 1024 * 1024) throw new Error('Choose a file smaller than 5 MB.');
   const ext = file.name.split('.').pop().toLowerCase();
   let rows;
   if (['xlsx', 'xls'].includes(ext)) {
-    if (!window.XLSX) await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = '/vendor/xlsx-0.20.3.min.js';
-      script.onload = resolve;
-      script.onerror = () => { script.remove(); reject(new Error('Excel import could not load. Try again, or save the spreadsheet as CSV.')); };
-      document.head.appendChild(script);
+    const xlsx = await seatsLoadSpreadsheet().catch(() => {
+      throw new Error('Excel import could not load. Try again, or save the spreadsheet as CSV.');
     });
-    const book = window.XLSX.read(await file.arrayBuffer(), { type: 'array', cellHTML: false, cellFormula: false, sheetRows: 2052 });
+    const book = xlsx.read(await file.arrayBuffer(), { type: 'array', cellHTML: false, cellFormula: false, sheetRows: 2052 });
     const sheet = book.Sheets[book.SheetNames[0]];
     if (!sheet) throw new Error('The workbook has no sheets.');
-    rows = window.XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: keepBlankRows });
+    rows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '', blankrows: keepBlankRows });
   } else if (ext === 'txt') rows = (await file.text()).replace(/^\uFEFF/, '').split(/\r?\n/).map(line => [line]);
   else if (['csv', 'tsv'].includes(ext)) rows = seatsParseDelimited(await file.text(), keepBlankRows);
   else throw new Error('Choose an Excel, CSV, TSV, or text file.');
