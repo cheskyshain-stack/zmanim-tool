@@ -1,4 +1,5 @@
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, CALENDAR_EVENT_DETAILS_MAX, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
+import { calendarCompactDayFacts, fitCalendarDayFacts } from './calendar-day-facts.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
 import { calendarConfig, calendarRequest, calendarSession, calendarSessionWasCleared, restoreCalendarSession } from '../calendar/api.js';
 import { calendarReminderSlot, calendarSupportsReminderSchedule } from '../calendar/reminder-date.js';
@@ -244,36 +245,10 @@ export function renderCalendar(container, settings, tables, { standalone = false
         : viewport - top - bottom;
       container.style.setProperty('--cal-reader-height', `${Math.max(0, Math.floor(Math.min(available, chrome + rows * rowHeight)))}px`);
     } else container.style.removeProperty('--cal-reader-height');
-    // Fit complete Hebrew words to a narrow Shabbos column without breaking them.
-    const context = document.createElement('canvas').getContext('2d');
-    if (reader()) container.querySelectorAll('.cal-facts > span').forEach(label => { label.style.fontSize = ''; });
-    for (const label of container.querySelectorAll('.cal-parsha')) {
-      label.style.fontSize = '';
-      const style = getComputedStyle(label); context.font = `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-      const widest = Math.max(...label.textContent.split(/\s+/).map(word => context.measureText(word).width));
-      const width = label.getBoundingClientRect().width;
-      if (widest > width && width > 0) label.style.fontSize = `${parseFloat(style.fontSize) * (width - 1) / widest}px`;
-    }
-    // Holidays can share a cell with other labels and event markers too.
-    if (reader()) for (const facts of container.querySelectorAll('.cal-facts')) {
-      facts.classList.remove('is-clipped');
-      if (getComputedStyle(facts).visibility === 'hidden') continue;
-      const labels = [...facts.children], space = facts.getBoundingClientRect();
-      const fits = () => labels.every(label => { const box = label.getBoundingClientRect(); return box.top >= space.top + .5 && box.bottom <= space.bottom - .5; });
-      while (!fits() && labels.some(label => parseFloat(getComputedStyle(label).fontSize) > 7)) {
-        for (const label of labels) {
-          const size = parseFloat(getComputedStyle(label).fontSize);
-          if (size > 7) label.style.fontSize = `${Math.max(7, size - .25)}px`;
-        }
-      }
-      facts.classList.toggle('is-clipped', !fits());
-    }
+    fitCalendarDayFacts(container, reader());
   }
   function gridFacts(day) {
-    if (reader()) {
-      const text = day.parsha || day.facts[0] || day.specialLabel || (day.mevarchim ? 'מברכים' : '');
-      return text ? `<span class="${day.parsha ? 'cal-parsha' : 'cal-observance'}">${calEscape(text)}</span>` : '';
-    }
+    if (reader()) return calendarCompactDayFacts(day);
     return `${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}`;
   }
   function mobileEvents(list) {
