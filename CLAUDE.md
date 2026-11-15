@@ -263,13 +263,13 @@ that fakes a tint is a row of magic numbers nobody can check. The icon links liv
 `build-offline.py` strips that block, because the paths are site absolute and a web
 manifest cannot be fetched over `file://` at all.
 
-Calendar and Seating have their own installable identities: manifests under
-`/admin/calendar/` and `/seats/` use those exact paths for id, scope and start_url.
-Installing either tool must launch that tool, without replacing the main site's or
-main admin's app. Their matching navy/cream/gold artwork lives in
-`icons/calendar/source.svg` and `icons/seats/source.svg`. Run
-`node scripts/make-tool-icons.cjs` with the test Playwright and Chrome setup after
-editing either SVG; commit the generated PNGs. It creates ordinary 192/512px icons,
+Calendar, Seating and Yahrzeit have their own installable identities. The manifests
+use `/admin/calendar/`, `/seats/` and `/yahrzeits/` as their respective id, scope and
+start_url. Each installation opens its own tool. Their matching navy, cream and gold
+artwork lives under `icons/calendar/`, `icons/seats/` and `icons/yahrzeits/`.
+Run `node scripts/make-tool-icons.cjs` with the test Playwright and Chrome setup after
+editing a source SVG. Pass a tool folder name to rebuild only its art. Commit the
+generated PNGs. It creates ordinary 192/512px icons,
 maskable versions with all artwork inside the central 80%-diameter safe circle,
 180px Apple touch icons and mark-only 16/32px favicons. Keep the page icon URLs
 and manifest icon URLs versioned when changing artwork. Leave the original
