@@ -307,18 +307,20 @@ async function openYahrzeitCalendar() {
     const min = hebrewDateExtended(calendarSerial('1900-01-01')).year;
     const max = hebrewDateExtended(calendarSerial('2299-12-31')).year;
     const englishDate = selected.startsWith(month) ? selected : month + '-01';
-    show('Find a date', `<div class="yr-view-switch yr-date-mode" role="group" aria-label="Date type">
-      <button type="button" data-yr-date-mode="english" aria-pressed="true">English date</button>
-      <button type="button" data-yr-date-mode="hebrew" aria-pressed="false">Hebrew date</button>
-    </div>
-    <form class="yr-import-controls" data-yr-date-form="english">
+    show('Find a date', `<label class="yr-date-mode cal-reminder-toggle">
+      <span class="yr-date-english" aria-hidden="true">English</span>
+      <input type="checkbox" role="switch" aria-label="Hebrew date" aria-controls="yr-date-english yr-date-hebrew">
+      <span class="cal-reminder-track" aria-hidden="true"></span>
+      <span class="yr-date-hebrew" aria-hidden="true">Hebrew</span>
+    </label>
+    <form id="yr-date-english" class="yr-import-controls">
       <label>English date<input type="date" name="date" min="1900-01-01" max="2299-12-31" value="${escAttr(englishDate)}" required></label>
       <div class="yr-dialog-actions">
         <button class="cal-primary" type="submit" value="day">Find date</button>
         <button type="submit" value="month">Go to month</button>
       </div>
     </form>
-    <form class="yr-import-controls" data-yr-date-form="hebrew" hidden>
+    <form id="yr-date-hebrew" class="yr-import-controls" hidden>
       <div class="yr-date-fields">
         <label>Hebrew day<select name="hebrewDay" required></select></label>
         <label>Hebrew month<select name="hebrewMonth" required></select></label>
@@ -330,15 +332,14 @@ async function openYahrzeitCalendar() {
       <div class="yr-dialog-actions"><button class="cal-primary" type="submit">Find date</button></div>
       <p class="yr-status" role="status"></p>
     </form>`);
-    const forms = [...dialog.querySelectorAll('[data-yr-date-form]')];
-    const buttons = [...dialog.querySelectorAll('[data-yr-date-mode]')];
-    for (const button of buttons) {
-      button.addEventListener('click', () => {
-        for (const option of buttons) option.setAttribute('aria-pressed', String(option === button));
-        for (const form of forms) form.hidden = form.dataset.yrDateForm !== button.dataset.yrDateMode;
-      });
-    }
-    const [english, form] = forms;
+    const dateMode = dialog.querySelector('[role="switch"]');
+    const english = dialog.querySelector('#yr-date-english'), form = dialog.querySelector('#yr-date-hebrew');
+    const updateDateMode = () => {
+      english.hidden = dateMode.checked;
+      form.hidden = !dateMode.checked;
+    };
+    dateMode.addEventListener('change', updateDateMode);
+    updateDateMode();
     english.addEventListener('submit', event => {
       event.preventDefault();
       const date = english.elements.date.value;
