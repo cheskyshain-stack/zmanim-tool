@@ -8,6 +8,20 @@ function html(node, value) {
   node.innerHTML = value;
   node._html = value;
 }
+// Layout offsets ignore FLIP transforms, including an animated ancestor that
+// temporarily becomes an offset parent. Shared density refits must not treat a
+// row still moving into place as overflow.
+function layoutTop(node, ancestor) {
+  let top = 0;
+  for (let current = node; current && current !== ancestor; current = current.offsetParent) {
+    top += current.offsetTop;
+    // offsetTop starts at its parent's padding edge, inside any border.
+    if (current.offsetParent && current.offsetParent !== ancestor) top += current.offsetParent.clientTop;
+  }
+  return top;
+}
+const layoutBottom = (node, ancestor) => layoutTop(node, ancestor) + node.offsetHeight;
+
 function timeHTML(event) {
   return `<span class="quarter-time" data-time="${esc(event.at)}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span>`;
 }
@@ -37,11 +51,15 @@ export class QuarterPanel {
     }
     return rows;
   }
-  update(data, instant) {
+  update(data, instant, {deferFit = false} = {}) {
     const rows = this.descriptors(data), key = JSON.stringify(rows);
+    const headings = rows.filter(row => row.type === 'heading');
+    // Include overnight carryover above today. When today is finished, reserve
+    // the first upcoming source date instead of only yesterday's last group.
+    this.requiredDay = headings.find(row => row.day >= data.date)?.day || headings[0]?.day || null;
     const stamp = Date.parse(instant), previousInstant = this.instant;
     this.instant = stamp;
-    if (key === this.key) return;
+    if (key === this.key) return false;
     const animate = Boolean(this.key) && stamp >= previousInstant && stamp-previousInstant < 120000 && !matchMedia('(prefers-reduced-motion: reduce)').matches;
     const old = new Map();
     // Capture the painted position before canceling an interrupted movement.
@@ -77,18 +95,54 @@ export class QuarterPanel {
       empty.textContent = 'The next dates are not available in the saved schedule.';
       this.flow.replaceChildren(empty);
     }
+    this.pendingMotion = animate ? old : null;
+    if (!deferFit) this.refit();
+    return true;
+  }
+  revealRows() {
+    for (const node of this.flow.children) {
+      node.hidden = false;
+      for (const time of node.querySelectorAll('[data-time]')) time.hidden = false;
+    }
+  }
+  /** Natural height through the whole remaining current day, including any
+   * earlier carryover. Values use design pixels and ignore active transforms.
+   * Hidden flags are restored before returning, without replacing any nodes. */
+  firstDayMetrics() {
+    const rows = [...this.flow.children];
+    const targets = rows.filter(node => node.dataset.day === this.requiredDay);
+    const availableHeight = this.viewport.clientHeight;
+    if (!targets.length) return {date:null,startDate:null,requiredHeight:0,availableHeight,fits:true};
+    const flags = [...new Set([...rows,...this.flow.querySelectorAll('[data-time]')])].map(node => [node,node.hidden]);
+    this.revealRows();
+    let requiredHeight;
+    try {
+      const last = targets.at(-1);
+      requiredHeight = layoutBottom(last, this.viewport) - layoutTop(this.flow, this.viewport);
+    } finally {
+      for (const [node,hidden] of flags) node.hidden = hidden;
+    }
+    return {date:this.requiredDay,startDate:rows.find(node => node.dataset.day)?.dataset.day || this.requiredDay,
+      requiredHeight,availableHeight,fits:requiredHeight <= availableHeight + .5};
+  }
+  /** Refit after a shared density change. Staged updates animate only after
+   * both panels have their final geometry, keeping the original moving rows. */
+  refit() {
+    this.revealRows();
     this.fitRows();
-    if (animate) this.moveRows(old);
+    const old = this.pendingMotion;
+    this.pendingMotion = null;
+    if (old) this.moveRows(old);
   }
   fitRows() {
-    const bottom = this.viewport.getBoundingClientRect().bottom;
+    const bottom = this.viewport.clientHeight;
     let ended = false,total = 0,hidden = 0;
     const visibleDays = new Set();
     for (const node of this.flow.children) {
       if (node.dataset.rowType === 'heading') { node.hidden = ended; continue; }
       const times = node.matches('[data-time]') ? [node] : [...node.querySelectorAll('[data-time]')];
       if (!times.length) {
-        node.hidden = ended || node.getBoundingClientRect().bottom > bottom + .5;
+        node.hidden = ended || layoutBottom(node, this.viewport) > bottom + .5;
         if (!node.hidden && node.dataset.day) visibleDays.add(node.dataset.day);
         else ended = true;
         continue;
@@ -98,8 +152,9 @@ export class QuarterPanel {
       const size = node.dataset.rowType === 'prayer' ? 3 : 1;
       for (let i=0;i<times.length;i+=size) {
         const line=times.slice(i,i+size);
-        const labelBottom = i === 0 ? node.querySelector('h4')?.getBoundingClientRect().bottom || 0 : 0;
-        if (ended || Math.max(labelBottom,...line.map(time=>time.getBoundingClientRect().bottom)) > bottom + .5) {
+        const label = i === 0 ? node.querySelector('h4') : null;
+        const labelBottom = label ? layoutBottom(label, this.viewport) : 0;
+        if (ended || Math.max(labelBottom,...line.map(time=>layoutBottom(time, this.viewport))) > bottom + .5) {
           ended = true;
           for (const time of line) { time.hidden = true; hidden++; }
         }

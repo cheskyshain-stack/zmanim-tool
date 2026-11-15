@@ -75,7 +75,7 @@ export class DisplayView {
     this.observer = new ResizeObserver(this.resize);
     this.observer.observe(host);
     this.resize();
-    const fontsReady = document.fonts ? Promise.all([document.fonts.ready, document.fonts.load('700 40px David')]).catch(() => {}) : Promise.resolve();
+    const fontsReady = document.fonts ? Promise.all([document.fonts.ready, document.fonts.load('400 40px David', 'אבג ABC 0123456789'), document.fonts.load('700 40px David', 'אבג ABC 0123456789')]).catch(() => {}) : Promise.resolve();
     fontsReady.then(() => {
       if (this.destroyed) return;
       this.zmanimPanel.invalidate();
@@ -112,8 +112,21 @@ export class DisplayView {
       this.fitDedicationSlot();
     }
     const data = quarterSchedule(s, instant);
-    this.zmanimPanel.update(data, instant);
-    this.prayerPanel.update(data, instant);
+    const zmanimChanged = this.zmanimPanel.update(data, instant, {deferFit:true});
+    const prayersChanged = this.prayerPanel.update(data, instant, {deferFit:true});
+    if (zmanimChanged || prayersChanged) {
+      // Both panels use one type size and spacing scale. Fit today's remaining
+      // information first, then fill spare space with the following dates.
+      let density = 1;
+      for (let step=0;step<=25;step++) {
+        density = 1-step*.02;
+        this.stage.style.setProperty('--quarter-density', String(density));
+        if (this.zmanimPanel.firstDayMetrics().fits && this.prayerPanel.firstDayMetrics().fits) break;
+      }
+      this.stage.dataset.scheduleDensity = density.toFixed(2);
+      this.zmanimPanel.refit();
+      this.prayerPanel.refit();
+    }
     setHTML(this.next, nextMinyanHTML(s.next, instant));
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
     if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;
