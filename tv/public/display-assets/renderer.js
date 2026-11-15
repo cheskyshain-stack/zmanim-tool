@@ -21,7 +21,8 @@ export function nextMinyanHTML(next, instant) {
   const label = '<div class="next-label">NEXT MINYAN</div>';
   if (!Number.isFinite(remaining) || remaining < -MINYAN_HOLD_MS) return label + '<p class="next-empty">No further minyan in the loaded schedule</p>';
   const minutes = Math.max(0, Math.ceil(remaining / 60000)), hours = Math.floor(minutes / 60), rest = minutes % 60;
-  const countdown = remaining <= 0 ? 'now' : `in ${hours} hour${hours === 1 ? '' : 's'} ${rest} minute${rest === 1 ? '' : 's'}`;
+  const units = [hours ? `${hours} hour${hours === 1 ? '' : 's'}` : '', rest ? `${rest} minute${rest === 1 ? '' : 's'}` : ''].filter(Boolean);
+  const countdown = remaining <= 0 ? 'now' : `in ${units.join(' ')}`;
   const period = nextPeriod.formatToParts(new Date(next.at)).find(part => part.type === 'dayPeriod')?.value || '';
   return `${label}<div class="next-service" dir="rtl"><strong lang="he">${esc(next.name)}</strong></div><div class="next-time" dir="ltr"><bdi>${esc(next.time)}</bdi> <span class="next-period">${esc(period)}</span></div>${next.place ? `<div class="next-location"><span class="next-location-label">Location</span><span class="next-place" lang="he" dir="rtl">${esc(next.place)}</span></div>` : ''}<p class="next-countdown">${countdown}</p>`;
 }
@@ -127,6 +128,7 @@ export class DisplayView {
       this.zmanimPanel.refit();
       this.prayerPanel.refit();
     }
+    this.prayerPanel.highlightNext(s.next, instant);
     setHTML(this.next, nextMinyanHTML(s.next, instant));
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
     if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;

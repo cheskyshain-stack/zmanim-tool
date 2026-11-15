@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {scheduleSnapshot} from '../src/schedules.js';
+import {scheduleSnapshot,settings} from '../src/schedules.js';
+import {weeklyAgenda} from '../../js/ui/weekly-agenda.js';
+import {excelSerial} from '../../js/zmanim/solar.js';
+import {excelWeekday} from '../../js/hebrew-calendar.js';
 import {createOfflineSeed} from '../src/offline-seed.js';
 import {offlineSnapshot} from '../public/display-assets/offline-engine.js';
 import {quarterSchedule,eventMarks,PRAYER_HOLD_MS,ZMAN_HOLD_MS} from '../public/display-assets/quarter-schedules.js';
@@ -51,7 +54,7 @@ test('every zman stays for thirty minutes, then later dates remain in chronologi
   assert.deepEqual(late.zmanDays.map(day=>day.date),[...late.zmanDays.map(day=>day.date)].sort());
 });
 
-test('all published prayer times and room marks remain until one hour after the last time of that prayer',()=>{
+test('all published prayer times and room marks remain until five minutes after the last time of that prayer',()=>{
   const at=localToISO('2026-11-15T05:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
   assert.deepEqual(view.groups.map(group=>group.label),['שחרית','מנחה','מעריב']);
   assert.deepEqual(flattened(view).map(event=>[event.at,event.time,event.name,event.place]),schedule.today.events.map(event=>[event.at,event.time,event.name,event.place]));
@@ -70,13 +73,34 @@ test('all published prayer times and room marks remain until one hour after the 
   assert.deepEqual(eventMarks({place:'באולם השמחות'}),{underlined:false,mark:'**'});
 });
 
+test('ordinary and midnight prayer groups expire together at the congregation agenda boundary',()=>{
+  for(const date of ['2026-11-15','2026-09-28']) {
+    const at=localToISO(date+'T05:00'),schedule=scheduleSnapshot(at),serial=excelSerial(new Date(date+'T12:00:00Z'));
+    const showing=serial+7-excelWeekday(serial);
+    const agendaData={regular:[{serial,events:schedule.today.events}],special:[],shabbos:[]};
+    const identity=event=>[event.name,event.mins%1440,event.place || ''];
+    for(const group of quarterSchedule(schedule,at).groups.filter(group=>!group.auxiliary)) {
+      const last=group.events.at(-1);
+      for(const elapsed of [5*60000-1,5*60000,5*60000+1]) {
+        const instant=atOffset(last.at,elapsed);
+        const congregation=weeklyAgenda(agendaData,showing,{},settings,new Date(instant)).sections
+          .flatMap(section=>section.events).filter(event=>event.name===group.label);
+        const tv=quarterSchedule(schedule,instant).prayerDays.find(day=>day.date===date)?.groups
+          .filter(candidate=>candidate.label===group.label).flatMap(candidate=>candidate.events) || [];
+        assert.deepEqual(tv.map(identity),congregation.map(identity),date+' '+group.label+' '+elapsed);
+        assert.equal(tv.length,elapsed<=5*60000?group.events.length:0,'The full group uses the same five-minute grace as the congregation');
+      }
+    }
+  }
+});
+
 test('Mincha groups separated by a drasha share their source-day last-Mincha boundary',()=>{
   const at=localToISO('2027-04-17T05:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
   const minchas=view.groups.filter(group=>group.family==='mincha');
   assert.equal(minchas.length,2);
   assert.deepEqual(minchas.map(times),[['1:40','5:25'],['6:53','7:08']]);
   assert.equal(new Set(minchas.map(group=>group.expiresAt)).size,1);
-  assert.equal(minchas[0].expiresAt,localToISO('2027-04-17T20:08'));
+  assert.equal(minchas[0].expiresAt,localToISO('2027-04-17T19:13'));
   const held=quarterSchedule(schedule,minchas[0].expiresAt);
   assert.deepEqual(held.groups.filter(group=>group.family==='mincha').map(times),minchas.map(times));
   assert.ok(!quarterSchedule(schedule,atOffset(minchas[0].expiresAt,1)).groups.some(group=>group.family==='mincha'));
@@ -90,13 +114,13 @@ test('special-day early Mincha and later Mincha keep their original labels and o
   assert.equal(view.groups[0].events.at(-1).mark,'**');
   const minchas=view.groups.filter(group=>group.family==='mincha');
   assert.equal(new Set(minchas.map(group=>group.expiresAt)).size,1);
-  assert.equal(minchas[0].expiresAt,localToISO('2026-10-02T19:22'));
+  assert.equal(minchas[0].expiresAt,localToISO('2026-10-02T18:27'));
   const candles=flattened(view).find(event=>event.auxiliary);
   assert.ok(flattened(quarterSchedule(schedule,atOffset(candles.at,ZMAN_HOLD_MS))).some(event=>event.key===candles.key));
   assert.ok(!flattened(quarterSchedule(schedule,atOffset(candles.at,ZMAN_HOLD_MS+1))).some(event=>event.key===candles.key));
 });
 
-test('yesterday retains its full midnight Maariv for one hour with stable source-day identity',()=>{
+test('yesterday retains its full midnight Maariv for five minutes with stable source-day identity',()=>{
   const midnight='2026-09-29T04:00:00.000Z';
   const before=viewAt(atOffset(midnight,-1)).prayerDays.find(day=>day.date==='2026-09-28');
   const full=before.groups.find(group=>group.family==='maariv');
@@ -113,7 +137,7 @@ test('yesterday retains its full midnight Maariv for one hour with stable source
   assert.equal(later.prayerDays[0].groups[0].label,'שחרית');
 });
 
-test('next-minyan selection still advances after five minutes, independently of one-hour prayer visibility',()=>{
+test('next-minyan selection still advances after five minutes, while earlier times remain until the final prayer option expires',()=>{
   const at=localToISO('2026-11-15T06:59'),schedule=scheduleSnapshot(at),first=schedule.next;
   assert.equal(scheduleSnapshot(atOffset(first.at,300000)).next.at,first.at);
   assert.notEqual(scheduleSnapshot(atOffset(first.at,300001)).next.at,first.at);
@@ -199,11 +223,11 @@ test('dated controls must overlap the actual event, not merely some time on its 
 
 test('yesterday keeps its published source control through the retained midnight Maariv',()=>{
   const control={id:'overnight-control',kind:'schedule',status:'published',title:'Approved Monday Maariv',startsAt:localToISO('2026-09-28T00:00'),endsAt:localToISO('2026-09-29T00:01'),data:{source:'sukkos:5787',appliesFrom:'2026-09-28',appliesTo:'2026-09-28',portion:'maariv',precedence:50}};
-  const at=localToISO('2026-09-29T00:30'),view=quarterSchedule(scheduleSnapshot(at,[control]),at);
+  const at=localToISO('2026-09-29T00:03'),view=quarterSchedule(scheduleSnapshot(at,[control]),at);
   const yesterday=view.prayerDays.find(day=>day.date==='2026-09-28');
   assert.equal(yesterday.sourceTitle,control.title);
   assert.equal(yesterday.groups[0].events.length,11);
-  assert.equal(yesterday.groups[0].expiresAt,localToISO('2026-09-29T01:00'));
+  assert.equal(yesterday.groups[0].expiresAt,localToISO('2026-09-29T00:05'));
 });
 
 test('combined Mincha and Maariv remains through the later expiry of both prayer families',()=>{
@@ -218,7 +242,7 @@ test('combined Mincha and Maariv remains through the later expiry of both prayer
 });
 
 test('offline seed retains only recent ended schedule controls needed for source-day carryover',()=>{
-  const at=localToISO('2026-09-29T00:30');
+  const at=localToISO('2026-09-29T00:03');
   const schedule={id:'recent-control',kind:'schedule',status:'published',title:'Approved Monday Maariv',startsAt:localToISO('2026-09-28T00:00'),endsAt:localToISO('2026-09-29T00:01'),data:{source:'sukkos:5787',appliesFrom:'2026-09-28',appliesTo:'2026-09-28',portion:'maariv',precedence:50}};
   const notice={id:'old-notice',kind:'announcement',status:'published',title:'Ended notice',startsAt:schedule.startsAt,endsAt:schedule.endsAt,data:{message:'Do not show early or after expiry.'}};
   const sponsor={...notice,id:'old-sponsor',kind:'dedication',data:{sponsor:'Ended sponsor'}};

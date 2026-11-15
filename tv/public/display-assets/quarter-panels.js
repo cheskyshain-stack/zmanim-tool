@@ -1,3 +1,4 @@
+import { minyanKey, nextMinyanKey } from './minyan-timing.js';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function clockHTML(time) {
   const parts = String(time).match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
@@ -23,7 +24,7 @@ function layoutTop(node, ancestor) {
 const layoutBottom = (node, ancestor) => layoutTop(node, ancestor) + node.offsetHeight;
 
 function timeHTML(event) {
-  return `<span class="quarter-time" data-time="${esc(event.at)}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span>`;
+  return `<span class="quarter-time" data-time="${esc(event.at)}" data-minyan="${esc(minyanKey(event))}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span>`;
 }
 
 /** Keep source-date rows mounted. Only expired content leaves the frame. */
@@ -72,6 +73,7 @@ export class QuarterPanel {
     for (const ghost of this.departing) ghost.remove();
     this.departing.clear();
     this.key = key;
+    this.highlightedKey = null;
     const existing = new Map([...this.flow.children].map(node => [node.dataset.motion,node]));
     const retained = new Set();
     let cursor = this.flow.firstElementChild;
@@ -100,6 +102,17 @@ export class QuarterPanel {
     this.pendingMotion = animate ? old : null;
     if (!deferFit) this.refit();
     return true;
+  }
+  highlightNext(next, instant) {
+    const key = nextMinyanKey(next, instant);
+    if (this.highlightedKey === key) return;
+    this.highlightedKey = key;
+    for (const time of this.flow.querySelectorAll('[data-minyan]')) {
+      const active = Boolean(key) && time.dataset.minyan === key;
+      time.classList.toggle('is-next-minyan', active);
+      if (active) time.setAttribute('aria-current', 'time');
+      else time.removeAttribute('aria-current');
+    }
   }
   revealRows() {
     for (const node of this.flow.children) {

@@ -1,6 +1,7 @@
 import { addDays, localStamp } from './time.js';
+import { MINYAN_HOLD_MS } from './minyan-timing.js';
 
-export const PRAYER_HOLD_MS = 60 * 60000;
+export const PRAYER_HOLD_MS = MINYAN_HOLD_MS;
 export const ZMAN_HOLD_MS = 30 * 60000;
 
 const eventKey = (date,event) => JSON.stringify([date,event.at,event.name,event.place || '',event.reckoning || '']);
@@ -78,7 +79,8 @@ function zmanDay(day,currentDate,now) {
 }
 
 /** Dated streams shared by the live screen and admin preview.
- * A prayer's full source-day list remains until one hour after its last minyan.
+ * A prayer's full source-day list remains through the congregation's five-minute
+ * hold after its last minyan.
  * Daily zmanim and other timed information stay for thirty minutes. */
 export function quarterSchedule(schedule, instant) {
   const now=new Date(instant).getTime();

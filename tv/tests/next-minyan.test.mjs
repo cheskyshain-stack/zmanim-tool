@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {nextMinyanHTML} from '../public/display-assets/renderer.js';
+import {minyanKey,nextMinyanKey} from '../public/display-assets/minyan-timing.js';
 
 const next = {name:'מעריב',place:'למטה',time:'11:00',at:'2026-09-29T03:00:00.000Z'};
 test('next minyan preserves schedule time and location with a New York period and countdown',()=>{
   const html=nextMinyanHTML(next,'2026-09-29T02:44:00.000Z');
-  for(const text of ['מעריב','למטה','11:00','PM','in 0 hours 16 minutes'])assert.ok(html.includes(text),text);
+  for(const text of ['מעריב','למטה','11:00','PM','in 16 minutes'])assert.ok(html.includes(text),text);
   assert.doesNotMatch(html,/<svg|<img|⏳/);
   assert.ok(nextMinyanHTML(next,'2026-09-29T01:59:00Z').includes('in 1 hour 1 minute'));
-  assert.ok(nextMinyanHTML(next,'2026-09-29T02:59:01Z').includes('in 0 hours 1 minute'));
+  assert.ok(nextMinyanHTML(next,'2026-09-29T02:59:01Z').includes('in 1 minute'));
   assert.ok(nextMinyanHTML(next,next.at).includes('>now</p>'));
 });
 test('a just-started minyan retains its name, location and time through five minutes',()=>{
@@ -40,6 +41,24 @@ test('the large next-minyan card puts prayer, time, location and hours/minutes i
   const html=nextMinyanHTML(next,'2026-09-29T01:00:00Z');
   const order=['next-service','next-time','next-location','next-countdown'].map(name=>html.indexOf(`class="${name}"`));
   assert.ok(order.every((position,index)=>position>=0&&(!index||position>order[index-1])));
-  assert.match(html,/in 2 hours 0 minutes/);
-  assert.match(nextMinyanHTML(next,'2026-09-29T02:00:00Z'),/in 1 hour 0 minutes/);
+  assert.match(html,/in 2 hours/);
+  assert.match(nextMinyanHTML(next,'2026-09-29T02:00:00Z'),/in 1 hour/);
+});
+test('countdown omits zero hours and zero minutes',()=>{
+  for (const at of ['2026-09-29T02:44:00Z','2026-09-29T02:00:00Z','2026-09-29T01:00:00Z']) {
+    const html = nextMinyanHTML(next,at);
+    assert.doesNotMatch(html,/\b0 (?:hours|minutes)\b/);
+  }
+});
+
+test('schedule highlight follows the center card through its hold and distinguishes rooms and prayers',()=>{
+  for (const offset of [-60000,0,299999,300000])
+    assert.equal(nextMinyanKey(next,new Date(Date.parse(next.at)+offset).toISOString()),minyanKey(next));
+  assert.equal(nextMinyanKey(next,'2026-09-29T03:05:00.001Z'),'');
+  assert.equal(nextMinyanKey(null,next.at),'');
+  assert.equal(nextMinyanKey({...next,at:'invalid'},next.at),'');
+  assert.equal(minyanKey({...next,auxiliary:true}),'');
+  assert.notEqual(minyanKey({...next,place:'בית מדרש'}),minyanKey(next));
+  assert.notEqual(minyanKey({...next,name:'מנחה'}),minyanKey(next));
+  assert.equal(minyanKey({...next,at:'2026-09-28T23:00:00-04:00'}),minyanKey(next));
 });

@@ -43,7 +43,7 @@ function draw(){
   view.update(snapshot,{now:instant,preview:true,theme:controls.theme.value});
   recordMotion();
   lastSnapshot=snapshot;
-  controls.status.textContent=`${source}. Prayer groups stay until one hour after their last time; daily zmanim stay for 30 minutes. ${controls.sponsor.value==='sample'?'The sponsor is an example for this preview. ':''}${view.warning?.length?view.warning.join(' '):'This preview does not change the live screen.'}`;
+  controls.status.textContent=`${source}. Prayer groups stay until five minutes after their last time; daily zmanim stay for 30 minutes. ${controls.sponsor.value==='sample'?'The sponsor is an example for this preview. ':''}${view.warning?.length?view.warning.join(' '):'This preview does not change the live screen.'}`;
 }
 function jump(value){recentMotion.length=0;instant=value;lastClock=performance.now();controls.time.value=localStamp(new Date(instant)).slice(0,16);remember();draw();}
 function showTransition(kind){

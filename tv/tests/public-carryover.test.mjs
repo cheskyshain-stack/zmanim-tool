@@ -9,7 +9,7 @@ import {localToISO} from '../public/display-assets/time.js';
 // Run the Worker queries against SQLite rather than a permissive mock that
 // returns rows the production WHERE clause would have removed.
 test('public routes retain yesterday schedule controls through midnight without exposing ended content or private fields',async t=>{
-  const at=localToISO('2026-09-29T00:30');
+  const at=localToISO('2026-09-29T00:03');
   t.mock.timers.enable({apis:['Date'],now:Date.parse(at)});
   const db=new DatabaseSync(':memory:');
   t.after(()=>db.close());
@@ -49,7 +49,7 @@ test('public routes retain yesterday schedule controls through midnight without 
     const yesterday=quarterSchedule(snapshot.schedule,at).prayerDays.find(day=>day.date==='2026-09-28');
     assert.equal(yesterday.sourceTitle,'Approved Monday Maariv');
     assert.equal(yesterday.groups[0].events.length,11);
-    assert.equal(yesterday.groups[0].expiresAt,localToISO('2026-09-29T01:00'));
+    assert.equal(yesterday.groups[0].expiresAt,localToISO('2026-09-29T00:05'));
   }
   assert.deepEqual(saved.schedule.displayDays,live.schedule.displayDays);
 });
