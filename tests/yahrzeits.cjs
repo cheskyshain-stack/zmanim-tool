@@ -126,9 +126,16 @@ test('the private register shares the PIN with Seats and uses a separate login',
       await month('November').waitFor({ timeout: 3000 });
       await swipe(0, -90);
       assert.ok(await month('November').isVisible(), 'Vertical swipes keep the same month');
-      await page.locator('[data-yr-day="2026-11-13"]').tap();
-      await page.getByRole('dialog').waitFor({ timeout: 3000 });
-      await page.getByRole('button', { name: 'Close', exact: true }).click();
+      const day = page.locator('[data-yr-day="2026-11-13"]');
+      await day.tap();
+      const popup = page.getByRole('dialog', { name: 'Yahrzeits' });
+      await popup.waitFor({ timeout: 3000 });
+      const box = await popup.boundingBox();
+      await page.touchscreen.tap(box.x + 8, box.y + box.height / 2);
+      assert.ok(await popup.isVisible(), 'A tap in the padding keeps the day details open');
+      await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height + 16);
+      await popup.waitFor({ state: 'hidden', timeout: 3000 });
+      assert.equal(await day.getAttribute('aria-pressed'), 'true', 'A backdrop tap does not select a different day');
     } finally {
       await cdp.detach();
     }
@@ -171,6 +178,9 @@ test('the private register shares the PIN with Seats and uses a separate login',
   await monthHeading.tap();
   const picker = first.getByRole('dialog', { name: 'Find a date' });
   assert.ok(await checkWidth(first), 'English date picker should fit 375 pixels');
+  const pickerBox = await picker.boundingBox();
+  await first.touchscreen.tap(pickerBox.x + pickerBox.width / 2, pickerBox.y + pickerBox.height + 16);
+  assert.ok(await picker.isVisible(), 'A backdrop tap keeps the date form open');
   await picker.getByLabel('English date', { exact: true }).fill('2026-12-07');
   await picker.getByRole('button', { name: 'Find date', exact: true }).click();
   await first.getByText('Monday, December 7, 2026', { exact: true }).waitFor();
