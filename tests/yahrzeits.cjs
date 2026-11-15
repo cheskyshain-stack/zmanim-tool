@@ -70,7 +70,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   t.after(() => browser.close());
   const errors = [], signIns = [];
   const setup = async width => {
-    const page = await browser.newPage({ viewport: { width, height: 740 } });
+    const page = await browser.newPage({ viewport: { width, height: 740 }, hasTouch: true });
     page.on('pageerror', error => errors.push(error.message));
     page.on('console', message => { if (message.type() === 'error' && !message.text().includes('409 (Conflict)')) errors.push(message.text()); });
     page.on('request', request => { if (request.url().endsWith('/api/session') && request.method() === 'POST') signIns.push(1); });
@@ -103,6 +103,37 @@ test('the private register shares the PIN with Seats and uses a separate login',
       enoughSpace: grid.top > header.bottom && grid.height >= 350 };
   });
 
+  const checkMonthSwipes = async page => {
+    const cdp = await page.context().newCDPSession(page);
+    const month = name => page.getByRole('table', { name: name + ' 2026' });
+    const swipe = async (horizontal, vertical = 0) => {
+      const grid = await page.locator('.cal-grid-wrap').boundingBox();
+      const x = grid.x + grid.width * (horizontal < 0 ? .8 : .2);
+      const y = grid.y + grid.height * .5;
+      const point = step => ({ x: x + grid.width * horizontal * step, y: y + vertical * step, id: 1 });
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [point(0)] });
+      for (let i = 1; i <= 5; i++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [point(i / 5)] });
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    };
+    try {
+      await month('November').waitFor();
+      await swipe(-.6);
+      await month('December').waitFor({ timeout: 3000 });
+      assert.equal(await page.getByRole('dialog').count(), 0, 'A swipe never opens a day');
+      await swipe(.6);
+      await month('November').waitFor({ timeout: 3000 });
+      await swipe(0, -90);
+      assert.ok(await month('November').isVisible(), 'Vertical swipes keep the same month');
+      await page.locator('[data-yr-day="2026-11-13"]').tap();
+      await page.getByRole('dialog').waitFor({ timeout: 3000 });
+      await page.getByRole('button', { name: 'Close', exact: true }).click();
+    } finally {
+      await cdp.detach();
+    }
+  };
+
   const first = await setup(375);
   await first.goto(origin + '/seats/');
   await signIn(first, 'Open Seats');
@@ -119,6 +150,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
     parseFloat(getComputedStyle(day.querySelector('.cal-english-day')).fontSize) > parseFloat(getComputedStyle(day.querySelector('.cal-hebrew-day')).fontSize));
   assert.ok(englishIsLarger, 'English dates should be larger, with Hebrew dates still visible');
   assert.equal(await first.locator('.yr-english-month').innerText(), 'November 2026');
+  await checkMonthSwipes(first);
   await first.getByRole('button', { name: 'Next month' }).click();
   await first.getByRole('table', { name: 'December 2026' }).waitFor();
   await first.getByRole('button', { name: 'Next month' }).click();
@@ -221,6 +253,7 @@ test('the private register shares the PIN with Seats and uses a separate login',
   const second = await setup(393);
   await second.goto(origin + '/yahrzeits/');
   await signIn(second, 'Open Yahrzeit Calendar', 'Synthetic second organizer');
+  await checkMonthSwipes(second);
   await chooseCalendarOption(second, 'Members');
   await second.getByRole('button', { name: 'Edit Synthetic Member' }).click();
   assert.equal(await entry(second, 'custom').getByLabel('Name of the deceased (optional)').inputValue(), 'ר׳ דוד <test>');
