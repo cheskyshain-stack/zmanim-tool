@@ -44,7 +44,9 @@ export class QuarterPanel {
     for (const day of days) {
       const entries = this.kind === 'zmanim' ? day.zmanim : day.groups;
       if (!entries?.length && !day.note) continue;
-      rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl"><span>${esc(day.title)}</span>${day.relativeLabel ? `<small>${esc(day.relativeLabel)}</small>` : ''}</h3><p lang="he" dir="rtl">${esc(day.hebrewDate)}</p>`});
+      const heading = day.relativeLabel || [day.title,day.hebrewDate.split(',')[0].trim()].filter(Boolean).join(' · ');
+      const fullDate = [day.relativeLabel,day.title,day.hebrewDate].filter(Boolean).join(' · ');
+      rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
       if (!entries?.length) rows.push({key:`note:${day.date}`,day:day.date,type:'note',html:esc(day.note)});
       else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
       else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',long:String(group.label).length>13||String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>`});

@@ -1070,10 +1070,8 @@ button {
 
 .quarter-board .quarter-panel-head {padding-bottom:18px}
 .quarter-board .quarter-panel-head h2 {font:700 40px/1.15 David,serif;color:var(--screen-gold)}
-.quarter-day-heading {padding:18px 0 22px;text-align:center;border-top:2px solid var(--quarter-rule);background:var(--screen-card)}
+.quarter-day-heading {padding:16px 0;text-align:center;border-top:2px solid var(--quarter-rule);background:var(--screen-card)}
 .quarter-day-heading h3 {display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:10px;margin:0;font:700 34px/1.15 David,serif}
-.quarter-day-heading h3 small {font:700 18px/1.2 David,serif;color:var(--screen-gold);border:1px solid var(--quarter-rule);border-radius:20px;padding:4px 10px}
-.quarter-day-heading p {margin:9px 0 0;font:700 25px/1.15 David,serif;color:var(--quarter-muted)}
 .quarter-board .quarter-more {font-size:17px}
 .quarter-board .next-location {display:flex;align-items:baseline;justify-content:center;gap:14px}
 .quarter-board .next-location-label {font:19px/1.2 David,serif;color:var(--quarter-muted)}
