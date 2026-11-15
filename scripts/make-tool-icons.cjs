@@ -1,17 +1,20 @@
-// Rebuild only the Calendar and Seating artwork, using the Playwright/Chrome test setup.
+// Rebuild the tool artwork using the Playwright/Chrome test setup.
 // The original Zmanim and admin icons still belong to make-icons.py.
 const fs = require('node:fs'), path = require('node:path');
 const { chromium } = require('playwright');
 const root = path.resolve(__dirname, '..');
+const available = ['calendar', 'seats', 'yahrzeits'];
+const tools = process.argv.length > 2 ? process.argv.slice(2) : available;
 
 (async () => {
+  if (tools.some(tool => !available.includes(tool))) throw new Error('Choose calendar, seats or yahrzeits.');
   const browser = await chromium.launch({
     executablePath: process.env.CHROME_BIN || (process.platform === 'win32' ? 'C:/Program Files/Google/Chrome/Application/chrome.exe' : '/usr/bin/chromium'),
     headless: true,
   });
   try {
     const page = await browser.newPage({ deviceScaleFactor: 1 });
-    for (const tool of ['calendar', 'seats']) {
+    for (const tool of tools) {
       const directory = path.join(root, 'icons', tool), source = fs.readFileSync(path.join(directory, 'source.svg'), 'utf8');
       const variants = [
         ['icon-512.png', 512], ['icon-192.png', 192], ['apple-touch-icon.png', 180],
