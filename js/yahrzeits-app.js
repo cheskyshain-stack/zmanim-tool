@@ -86,6 +86,7 @@ async function openYahrzeitCalendar() {
   const host = yahrzeitRoot.querySelector('.cal-grid-wrap'), dialog = yahrzeitRoot.querySelector('dialog');
   const agenda = yahrzeitRoot.querySelector('.yr-agenda'), list = createYahrzeitList(agenda, today, restored?.range);
   function showView(next) {
+    const opening = next === 'list' && agenda.hidden;
     view = next;
     const showList = view === 'list';
     agenda.hidden = !showList;
@@ -93,7 +94,8 @@ async function openYahrzeitCalendar() {
     for (const button of yahrzeitRoot.querySelectorAll('[data-yr-view]')) {
       button.setAttribute('aria-pressed', String(button.dataset.yrView === view));
     }
-    if (showList) list.update(members);
+    if (opening) list.open(members);
+    else if (showList) list.update(members);
   }
   const show = (title, content) => {
     if (!dialog.open) dialogReturn = document.activeElement;
