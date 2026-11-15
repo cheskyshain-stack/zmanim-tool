@@ -75,7 +75,10 @@
 }
 
 .yr-dialog .cal-dialog-header { position:sticky; top:-1.4rem; background:#faf7f0; z-index:1; padding:.45rem 0; }
-.yr-date-mode { margin-bottom:.75rem; }
+.yr-dialog .yr-date-mode { position:relative; display:flex; align-items:center; justify-content:center; gap:.7rem; min-height:44px; margin-bottom:.75rem; color:#53616e; cursor:pointer; }
+.yr-dialog .yr-date-mode input { min-height:0; padding:0; }
+.yr-date-mode .cal-reminder-track { flex:none; background:#142b46; }
+.yr-date-mode:not(:has(input:checked)) .yr-date-english, .yr-date-mode:has(input:checked) .yr-date-hebrew { color:#142b46; font-weight:700; }
 .yr-dialog label { display:grid; align-content:start; gap:.25rem; font-weight:600; min-width:0; }
 .yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
 .yr-date-fields { display:grid; grid-template-columns:minmax(4.1rem, .55fr) minmax(0, 1.45fr); gap:.65rem; }
@@ -106,7 +109,7 @@
 .yr-import-steps li + li { margin-top:.35rem; }
 .yr-dialog form label + label { margin-top:.5rem; }
 .yr-dialog .yr-date-fields label + label { margin-top:0; }
-[data-yr-date-form="hebrew"] .yr-date-fields { grid-template-columns:minmax(6rem, .95fr) minmax(0, 1.55fr); align-items:end; }
+#yr-date-hebrew .yr-date-fields { grid-template-columns:minmax(6rem, .95fr) minmax(0, 1.55fr); align-items:end; }
 .yr-import-controls [role=status]:empty { display:none; }
 .yr-import-controls input { width:100%; }
 .yr-help { color:#4f626f; margin:.25rem 0; }
