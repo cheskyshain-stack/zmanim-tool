@@ -170,6 +170,30 @@ test('the private register shares the PIN with Seats and uses a separate login',
   if (process.env.YAHRZEIT_SCREENSHOT) await first.screenshot({ path: process.env.YAHRZEIT_SCREENSHOT });
   await first.getByRole('button', { name: 'List', exact: true }).click();
   const agenda = first.getByRole('region', { name: 'Yahrzeit list', exact: true });
+  const scroller = agenda.getByRole('region', { name: 'Yahrzeits by date' });
+  await agenda.getByText('Today · Fri, Nov 13, 2026').waitFor();
+  assert.equal(await first.getByLabel('Date range').inputValue(), 'today');
+  const startsToday = () => scroller.evaluate(node => {
+    const top = node.querySelector('[data-yr-list-today]').getBoundingClientRect().top;
+    return node.scrollTop > 0 && Math.abs(top - node.getBoundingClientRect().top - node.clientTop) < 2;
+  });
+  assert.ok(await startsToday(), 'opening the list should position Today at the top, even with older dates loaded');
+  const earlierDate = agenda.getByRole('button', { name: /View details for Mon, Nov 9, 2026/ });
+  const upcomingDate = agenda.getByRole('button', { name: /View details for Mon, Nov 29, 2027/ });
+  await upcomingDate.waitFor();
+  await earlierDate.evaluate(button => {
+    const node = button.closest('.yr-list-scroll');
+    node.scrollTop += button.getBoundingClientRect().top - node.getBoundingClientRect().top - 4;
+  });
+  const earlierVisible = await earlierDate.evaluate(button => {
+    const bounds = button.getBoundingClientRect(), node = button.closest('.yr-list-scroll').getBoundingClientRect();
+    return bounds.top >= node.top && bounds.bottom <= node.bottom;
+  });
+  assert.ok(earlierVisible, 'scrolling up reveals an earlier date');
+  await first.getByRole('button', { name: 'Calendar', exact: true }).click();
+  await first.getByRole('button', { name: 'List', exact: true }).click();
+  assert.ok(await startsToday(), 'reopening the default list returns to Today');
+  await first.getByLabel('Date range').selectOption('year');
   await agenda.getByText('Jan 1, 2026 to Dec 31, 2026').waitFor();
   assert.equal(await first.getByRole('table').count(), 0);
   await agenda.getByText('Synthetic Member', { exact: true }).first().waitFor();

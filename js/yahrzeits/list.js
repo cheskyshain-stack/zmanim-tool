@@ -4,6 +4,8 @@ import { escAttr, escText } from '../util.js';
 import { yahrzeitDates, yahrzeitRelationship } from './model.js';
 
 const yahrzeitListPresets = [
+  ['today', 'Around today'],
+  ['day', 'Today only'],
   ['year', 'This year'],
   ['hebrew-year', 'Hebrew year'],
   ['week', 'This week'],
@@ -17,6 +19,8 @@ const yahrzeitDateTime = serial => new Date(calendarISO(serial) + 'T12:00:00Z');
 export function yahrzeitListRange(preset, today, from, to) {
   const now = calendarSerial(today);
   const year = today.slice(0, 4);
+  if (preset === 'today') return { start: calendarSerial('1900-01-01'), end: calendarSerial('2299-12-31') };
+  if (preset === 'day') return { start: now, end: now };
   if (preset === 'year') return { start: calendarSerial(year + '-01-01'), end: calendarSerial(year + '-12-31') };
   if (preset === 'hebrew-year') {
     const hebrew = hebrewDateExtended(now).year;
@@ -31,11 +35,12 @@ export function yahrzeitListRange(preset, today, from, to) {
   return { start, end };
 }
 
-export function* yahrzeitListDays(members, { start, end }) {
+export function* yahrzeitListDays(members, { start, end }, newestFirst = false) {
   const tracked = members.filter(member => member.observances.length);
-  if (!tracked.length) return;
+  if (!tracked.length || start > end) return;
   const first = hebrewDateExtended(start).year, last = hebrewDateExtended(end).year;
-  for (let year = first; year <= last; year++) {
+  const order = newestFirst ? -1 : 1, stop = newestFirst ? first : last;
+  for (let year = newestFirst ? last : first; (stop - year) * order >= 0; year += order) {
     const matches = new Map();
     for (const member of tracked) {
       for (const entry of member.observances) {
@@ -46,12 +51,12 @@ export function* yahrzeitListDays(members, { start, end }) {
         }
       }
     }
-    for (const serial of [...matches.keys()].sort((a, b) => a - b)) yield { serial, entries: matches.get(serial) };
+    for (const serial of [...matches.keys()].sort((a, b) => (a - b) * order)) yield { serial, entries: matches.get(serial) };
   }
 }
 
 export function createYahrzeitList(host, today, saved) {
-  const preset = yahrzeitListPresets.some(([value]) => value === saved?.preset) ? saved.preset : 'year';
+  const preset = yahrzeitListPresets.some(([value]) => value === saved?.preset) ? saved.preset : 'today';
   host.innerHTML = `<form class="yr-list-filters">
     <label for="yr-range-preset">Date range</label>
     <select id="yr-range-preset" name="preset">
@@ -65,20 +70,32 @@ export function createYahrzeitList(host, today, saved) {
     <p class="yr-range-note" role="status"></p>
   </form>
   <div class="yr-list-scroll" role="region" aria-label="Yahrzeits by date" tabindex="0">
-    <div data-yr-list-results></div>
-    <button type="button" data-yr-list-more hidden>Show more dates</button>
+    <button type="button" data-yr-list-earlier hidden>Show earlier dates</button>
+    <div data-yr-list-history></div>
+    <div class="yr-list-upcoming">
+      <p class="yr-today-marker" data-yr-list-today hidden></p>
+      <div data-yr-list-results></div>
+      <button type="button" data-yr-list-more hidden>Show more dates</button>
+    </div>
   </div>`;
   const form = host.querySelector('form'), custom = form.querySelector('fieldset');
   const note = host.querySelector('[role=status]'), scroll = host.querySelector('.yr-list-scroll');
   const results = host.querySelector('[data-yr-list-results]'), more = host.querySelector('[data-yr-list-more]');
+  const history = host.querySelector('[data-yr-list-history]'), earlier = host.querySelector('[data-yr-list-earlier]');
+  const todayMarker = host.querySelector('[data-yr-list-today]');
   form.elements.from.value = Number.isFinite(calendarSerial(saved?.from)) ? saved.from : today();
   form.elements.to.value = Number.isFinite(calendarSerial(saved?.to)) ? saved.to : calendarISO(calendarSerial(today()) + 6);
-  let members, active, activeRange, days, next;
+  let members, active, activeRange, appliedDay, future, past, needsTodayPosition;
 
-  function append() {
+  function pageFor(range, newestFirst = false) {
+    const days = yahrzeitListDays(members || [], range, newestFirst);
+    return { days, next: days.next() };
+  }
+
+  function append(listPage, target, button, newestFirst = false) {
     const groups = [];
-    for (let i = 0; i < 60 && !next.done; i++, next = days.next()) {
-      const { serial, entries } = next.value, date = calendarISO(serial);
+    for (let i = 0; i < 60 && !listPage.next.done; i++, listPage.next = listPage.days.next()) {
+      const { serial, entries } = listPage.next.value, date = calendarISO(serial);
       const english = yahrzeitListDate.format(yahrzeitDateTime(serial));
       groups.push(`<section class="yr-list-date" aria-labelledby="yr-list-${date}">
         <h2 id="yr-list-${date}"><button type="button" data-yr-list-day="${date}" aria-label="${escAttr('View details for ' + english)}">
@@ -88,30 +105,56 @@ export function createYahrzeitList(host, today, saved) {
           <span dir="auto">${escText(yahrzeitRelationship(entry))}${entry.deceasedName ? ': ' + escText(entry.deceasedName) : ''}</span></li>`).join('')}</ul>
       </section>`);
     }
-    results.insertAdjacentHTML('beforeend', groups.join(''));
-    more.hidden = next.done;
+    target.insertAdjacentHTML(newestFirst ? 'afterbegin' : 'beforeend', (newestFirst ? groups.reverse() : groups).join(''));
+    button.hidden = listPage.next.done;
+  }
+
+  function placeToday() {
+    if (todayMarker.hidden || !scroll.clientHeight) return;
+    scroll.style.setProperty('--yr-list-min-upcoming', scroll.clientHeight + 'px');
+    if (!needsTodayPosition) return;
+    scroll.scrollTop += todayMarker.getBoundingClientRect().top - scroll.getBoundingClientRect().top - scroll.clientTop;
+    needsTodayPosition = false;
   }
 
   function render() {
     results.replaceChildren();
+    history.replaceChildren();
     scroll.scrollTop = 0;
-    days = yahrzeitListDays(members || [], activeRange);
-    next = days.next();
-    if (next.done) results.innerHTML = '<p class="yr-list-empty">No yahrzeits in this date range.</p>';
-    append();
+    scroll.style.removeProperty('--yr-list-min-upcoming');
+    const aroundToday = active.preset === 'today', pivot = calendarSerial(appliedDay);
+    todayMarker.hidden = !aroundToday;
+    needsTodayPosition = aroundToday;
+    if (aroundToday) {
+      past = pageFor({ start: activeRange.start, end: pivot - 1 }, true);
+      append(past, history, earlier, true);
+      todayMarker.textContent = 'Today · ' + yahrzeitListDate.format(yahrzeitDateTime(pivot));
+    } else {
+      past = null;
+      earlier.hidden = true;
+    }
+    future = pageFor({ start: aroundToday ? pivot : activeRange.start, end: activeRange.end });
+    if (future.next.done) results.innerHTML = '<p class="yr-list-empty">No yahrzeits in this date range.</p>';
+    append(future, results, more);
+    placeToday();
   }
 
   function apply() {
     const selection = { preset: form.elements.preset.value, from: form.elements.from.value, to: form.elements.to.value };
-    const range = yahrzeitListRange(selection.preset, today(), selection.from, selection.to);
+    const todayISO = today();
+    const range = yahrzeitListRange(selection.preset, todayISO, selection.from, selection.to);
     if (!range) {
       note.textContent = 'Choose a From date and a To date in order.';
       return;
     }
     active = selection;
     activeRange = range;
-    const start = yahrzeitListBound.format(yahrzeitDateTime(range.start)), end = yahrzeitListBound.format(yahrzeitDateTime(range.end));
-    note.textContent = start === end ? start : start + ' to ' + end;
+    appliedDay = todayISO;
+    if (active.preset === 'today') note.textContent = 'Scroll up for earlier dates or down for upcoming ones.';
+    else {
+      const start = yahrzeitListBound.format(yahrzeitDateTime(range.start)), end = yahrzeitListBound.format(yahrzeitDateTime(range.end));
+      note.textContent = start === end ? start : start + ' to ' + end;
+    }
     render();
   }
 
@@ -125,11 +168,23 @@ export function createYahrzeitList(host, today, saved) {
   form.addEventListener('submit', event => { event.preventDefault(); apply(); });
   more.addEventListener('click', () => {
     const before = results.children.length;
-    append();
+    append(future, results, more);
     results.children[before]?.querySelector('button')?.focus({ preventScroll: true });
   });
+  earlier.addEventListener('click', () => {
+    const first = history.firstElementChild, height = scroll.scrollHeight, top = scroll.scrollTop;
+    append(past, history, earlier, true);
+    scroll.scrollTop = top + scroll.scrollHeight - height;
+    (first?.previousElementSibling || history.lastElementChild)?.querySelector('button')?.focus({ preventScroll: true });
+  });
+  if (typeof ResizeObserver === 'function') new ResizeObserver(placeToday).observe(scroll);
   updatePreset();
   return {
+    open(nextMembers) {
+      if (appliedDay !== today()) { members = nextMembers; apply(); }
+      else if (nextMembers !== members) { members = nextMembers; render(); }
+      else if (active.preset === 'today') { needsTodayPosition = true; placeToday(); }
+    },
     update(nextMembers) {
       if (nextMembers === members) return;
       members = nextMembers;

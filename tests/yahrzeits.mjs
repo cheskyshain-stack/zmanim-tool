@@ -85,6 +85,7 @@ test('list filters use whole Sunday to Shabbos weeks and both calendar years', (
   assert.deepEqual(bounds('week', '2026-11-14'), ['2026-11-08', '2026-11-14']);
   assert.deepEqual(bounds('week', '2026-11-15'), ['2026-11-15', '2026-11-21']);
   assert.deepEqual(bounds('next-week', '2026-12-30'), ['2027-01-03', '2027-01-09']);
+  assert.deepEqual(bounds('day', '2026-11-15'), ['2026-11-15', '2026-11-15']);
   assert.deepEqual(bounds('year', '2026-11-15'), ['2026-01-01', '2026-12-31']);
   assert.deepEqual(bounds('hebrew-year', '2026-11-15'), ['2026-09-12', '2027-10-01']);
   assert.equal(yahrzeitListRange('custom', '2026-11-15', '2026-12-01', '2026-11-30'), null);
@@ -101,6 +102,7 @@ test('list results are chronological and include both ends and both Adars when c
   const groups = [...yahrzeitListDays(rows, range)];
   assert.deepEqual(groups.map(group => calendarISO(group.serial)), ['2026-09-21', '2027-02-26', '2027-03-28']);
   assert.deepEqual(groups[0].entries.map(item => item.member.name), ['Member one', 'Member two']);
+  assert.deepEqual([...yahrzeitListDays(rows, range, true)].map(group => calendarISO(group.serial)), ['2027-03-28', '2027-02-26', '2026-09-21']);
 });
 
 test('the same civil date shows every matching observance', () => {
