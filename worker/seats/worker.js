@@ -4,13 +4,33 @@ import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
 import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
 import { SEATS_RESERVATION_MS } from '../../js/seats/reservation.js';
 import { shulSessionExpiration } from '../../js/session-expiration.js';
-import { yahrzeitMember } from '../../js/yahrzeits/model.js';
+import { YAHRZEIT_MAX_MEMBERS, yahrzeitMember } from '../../js/yahrzeits/model.js';
+import { yahrzeitPlanImport } from '../../js/yahrzeits/import.js';
 
 const SEATS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
 const seatsWorkerHash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
 const seatsWorkerJson = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 const seatsPrivatePin = env => /^[0-9]{6,8}$/.test(env.SEATS_PRIVATE_PIN || '') ? env.SEATS_PRIVATE_PIN : '';
+const yahrzeitEntryId = (entry, index) => entry.id || 'legacy-' + index;
+const yahrzeitRecordWithEntryIds = member => ({
+  ...member, observances: member.observances.map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) })),
+});
+
+function yahrzeitEntryInfo(entries, earlier, name, addedAt) {
+  const previous = (earlier?.observances || []).map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) }));
+  const used = new Set();
+  return entries.map(entry => {
+    const existing = previous.find(candidate => !used.has(candidate.id) && candidate.kind === entry.kind
+      && (entry.id ? candidate.id === entry.id : candidate.kind !== 'custom'
+        || candidate.relationship === entry.relationship && candidate.day === entry.day && candidate.month === entry.month));
+    if (existing) used.add(existing.id);
+    const id = existing && !existing.id.startsWith('legacy-') ? existing.id : crypto.randomUUID();
+    if (existing) return { ...entry, id, ...(existing.addedAt ? { addedAt: existing.addedAt, addedBy: existing.addedBy } : {}) };
+    return { ...entry, id, addedAt, addedBy: name };
+  });
+}
+
 const seatsWorkerId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,100}$/.test(value);
 const seatsHistoryKey = (id, revision) => 'history:' + id + ':' + String(revision).padStart(12, '0');
 const seatsLegacyHistory = record => ({ revision: record.revision, at: record.updatedAt, by: record.updatedBy, details: ['Last saved change before change history was enabled. Earlier changes were not recorded.'] });
@@ -98,11 +118,11 @@ export class SeatsWorkspace {
       if (session.privateProof !== await seatsWorkerHash(privatePin + ':' + token)) {
         return seatsWorkerJson({ error: 'Sign in with the current private organizer PIN to open the Yahrzeit Calendar.', code: 'yahrzeit-sign-in' }, 403);
       }
-      return this.yahrzeits(request, url.pathname);
+      return this.yahrzeits(request, url.pathname, session.name);
     }
     const session = await this.session(token);
     if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
-    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin) });
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin), yahrzeitMemberImport: true });
     if (url.pathname === '/api/trash' && request.method === 'GET') {
       const files = [];
       for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
@@ -258,11 +278,12 @@ export class SeatsWorkspace {
     }
     if (expired) this.presence();
   }
-  async yahrzeits(request, path) {
+  async yahrzeits(request, path, name) {
     const prefix = 'yahrzeit:', storage = this.ctx.storage;
     if (path === '/api/yahrzeits' && request.method === 'GET') {
-      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()] });
+      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()].map(yahrzeitRecordWithEntryIds) });
     }
+    if (path === '/api/yahrzeits/import' && request.method === 'POST') return this.importYahrzeitMembers(request, prefix, name);
     const id = path.slice('/api/yahrzeits/'.length);
     if (!seatsWorkerId(id) || !['POST', 'DELETE'].includes(request.method)) return seatsWorkerJson({ error: 'Unknown yahrzeit request.' }, 404);
     let body, contents;
@@ -283,12 +304,49 @@ export class SeatsWorkspace {
         await storage.delete(key);
         return seatsWorkerJson({ deleted: true });
       }
-      if (!current && (await storage.list({ prefix, limit: 2000 })).size >= 2000) {
+      if (!current && (await storage.list({ prefix, limit: YAHRZEIT_MAX_MEMBERS })).size >= YAHRZEIT_MAX_MEMBERS) {
         return seatsWorkerJson({ error: 'The yahrzeit register is full.' }, 409);
       }
-      const record = { id, ...contents, revision: body.revision + 1 };
+      const now = new Date().toISOString();
+      const observances = yahrzeitEntryInfo(contents.observances, current, name, now);
+      const added = current ? (current.addedAt ? { addedAt: current.addedAt, addedBy: current.addedBy } : {}) : { addedAt: now, addedBy: name };
+      const record = { id, ...contents, ...added, observances, revision: body.revision + 1 };
       await storage.put(key, record);
       return seatsWorkerJson(record, current ? 200 : 201);
+    });
+  }
+
+  async importYahrzeitMembers(request, prefix, name) {
+    let rows;
+    try {
+      const body = await this.body(request);
+      if (!Array.isArray(body?.members) || !body.members.length || body.members.length > YAHRZEIT_MAX_MEMBERS) {
+        throw new Error('Choose a spreadsheet with 1 to 2,000 member rows.');
+      }
+      rows = body.members.map(yahrzeitMember);
+    } catch (error) {
+      return seatsWorkerJson({ error: error instanceof SyntaxError ? 'Enter a valid member list.' : error.message }, 400);
+    }
+    return this.ctx.storage.transaction(async txn => {
+      const records = await txn.list({ prefix });
+      let plan;
+      try { plan = yahrzeitPlanImport([...records.values()].map(yahrzeitRecordWithEntryIds), rows); }
+      catch (error) { return seatsWorkerJson({ error: error.message }, 409); }
+      if (records.size + plan.added.length > YAHRZEIT_MAX_MEMBERS) {
+        return seatsWorkerJson({ error: 'This import would exceed the 2,000-member limit.' }, 409);
+      }
+      const addedAt = new Date().toISOString();
+      const newRecords = plan.added.map(member => ({ ...member, id: crypto.randomUUID(), revision: 1, addedAt, addedBy: name,
+        observances: yahrzeitEntryInfo(member.observances, null, name, addedAt) }));
+      const updated = plan.updated.map(member => ({ ...member,
+        observances: yahrzeitEntryInfo(member.observances, records.get(prefix + member.id), name, addedAt) }));
+      const writes = [...newRecords, ...updated];
+      for (let i = 0; i < writes.length; i += 100) {
+        const batch = writes.slice(i, i + 100).map(member => [prefix + member.id, member]);
+        await txn.put(Object.fromEntries(batch));
+        for (const [key, member] of batch) records.set(key, member);
+      }
+      return seatsWorkerJson({ added: newRecords.length, updated: plan.updated.length, unchanged: plan.unchanged, members: [...records.values()].map(yahrzeitRecordWithEntryIds) });
     });
   }
 

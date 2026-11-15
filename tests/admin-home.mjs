@@ -52,6 +52,7 @@ test('admin landing opens home and navigation keeps screen routes distinct', asy
   assert.match(f.nav.innerHTML, /aria-expanded="false"/);
   assert.match(f.nav.innerHTML, /href="\/admin\/display\/"/);
   assert.match(f.nav.innerHTML, /href="\/tv\/"/);
+  assert.match(f.nav.innerHTML, /href="\/yahrzeits\/"[^>]*>[\s\S]*?Yahrzeit Calendar/);
   assert(!f.nav.innerHTML.includes('href="/display/"'));
 });
 

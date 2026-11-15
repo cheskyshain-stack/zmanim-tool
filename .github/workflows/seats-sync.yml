@@ -82,6 +82,7 @@ jobs:
           assert.equal(features.trash60Days,true);
           assert.equal(features.seatReservationMinutes,30);
           if (privatePin) assert.equal(features.yahrzeits,true);
+          assert.equal(features.yahrzeitMemberImport,true);
           const plans=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:{...headers,Authorization:'Bearer '+session.token}});
           assert.equal(plans.status,200,'Authenticated plan storage must be available.');
           assert.ok(Array.isArray((await plans.json()).plans));

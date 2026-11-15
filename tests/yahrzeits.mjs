@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { calendarISO } from '../js/calendar/model.js';
 import { hebrewDateExtended, roshHashana } from '../js/hebrew-calendar.js';
-import { yahrzeitDates, yahrzeitMember, yahrzeitsByDay } from '../js/yahrzeits/model.js';
+import { yahrzeitDates, yahrzeitMember, yahrzeitsByDay, yahrzeitHebrewDateSerial } from '../js/yahrzeits/model.js';
+
+import { yahrzeitMembersFromRows, yahrzeitPlanImport } from '../js/yahrzeits/import.js';
 
 const dates = (entry, year) => yahrzeitDates(entry, year).map(calendarISO);
 const father = { kind: 'father', month: 7, day: 10 };
@@ -15,10 +17,39 @@ test('member records support one parent, two parents and optional custom relatio
   assert.equal(member.name, 'Test member');
   assert.equal(member.observances[2].relationship, 'Grandfather');
   assert.equal(member.observances[2].deceasedName, 'ר׳ דוד');
-  assert.throws(() => yahrzeitMember({ name: 'Test', observances: [] }), /at least one/);
+  assert.deepEqual(yahrzeitMember({ name: 'Test', observances: [] }), { name: 'Test', address: '', observances: [] });
   assert.throws(() => yahrzeitMember({ name: 'Test', observances: [father, father] }), /only one/);
   assert.throws(() => yahrzeitMember({ name: 'Test', observances: [{ ...custom, shortMonth: '' }] }), /without the 30th/);
   assert.throws(() => yahrzeitMember({ name: 'Test', observances: [{ ...father, month: 2, day: 30 }] }), /valid Hebrew date/);
+});
+
+test('spreadsheets accept names only and Hebrew dates and preserve recorded dates on reimport', () => {
+  const { members: rows } = yahrzeitMembersFromRows([
+    ['First Name', 'Last Name', 'Father Hebrew Date', 'Mother Hebrew Date', 'Custom Relationship', 'Custom Hebrew Date'],
+    ['One', 'Member', '', ''],
+    ['Two', 'Member', 'י״ב בתשרי', '19 Adar II', 'Grandfather', '30 Kislev (next month)'],
+  ]);
+  assert.deepEqual(rows[0], { name: 'One Member', address: '', observances: [] });
+  assert.deepEqual(rows[1].observances.map(({ month, day, shortMonth }) => [month, day, shortMonth]), [[7, 12, ''], [14, 19, ''], [9, 30, 'next']]);
+  assert.deepEqual(yahrzeitMembersFromRows([['One Member'], ['Two Member']]).members.map(member => member.name), ['One Member', 'Two Member']);
+  assert.throws(() => yahrzeitMembersFromRows([['Name', 'Father Hebrew Date'], ['One Member', 45957]]), /Row 2.*Hebrew date/);
+  assert.throws(() => yahrzeitMembersFromRows([['Name', 'Yahrzeit'], ['One Member', '12 Tishrei']]), /Father Hebrew Date/);
+  const roster = yahrzeitMembersFromRows([
+    ['Last Name', "Father's Name", "Mother's Name", 'Address', 'Father Cell'],
+    ['Last', 'Father', 'Mother', '5 Example Street', 'ignore this'],
+    ['Other', '', 'Mother', '8 Example Street', 'ignore this'],
+  ]);
+  assert.deepEqual(roster.members, [{ name: 'Father Last', address: '5 Example Street', observances: [] }]);
+  assert.deepEqual(roster.skippedRows, [3]);
+  const newAddress = yahrzeitPlanImport([{ id: 'existing-member', revision: 1, name: 'Father Last', observances: [] }], roster.members);
+  assert.equal(newAddress.updated[0].address, '5 Example Street');
+  assert.equal(newAddress.updated[0].revision, 2);
+  const saved = [{ id: 'synthetic-one', revision: 5, ...rows[1] }];
+  const updated = yahrzeitPlanImport(saved, rows);
+  assert.equal(updated.added.length, 1);
+  assert.equal(updated.updated.length, 0);
+  assert.equal(updated.unchanged, 1);
+  assert.throws(() => yahrzeitPlanImport(saved, [{ name: 'Two Member', observances: [father] }]), /Two different father dates/);
 });
 
 test('observances recur on the matching civil date and follow the chosen Adar custom', () => {
@@ -43,6 +74,7 @@ test('every date in a full Hebrew calendar cycle maps back to its own day', () =
     for (let serial = roshHashana(year - 3761); serial < roshHashana(year - 3760); serial++) {
       const { month, dayOfMonth } = hebrewDateExtended(serial);
       assert.deepEqual(yahrzeitDates({ month, day: dayOfMonth }, year), [serial]);
+      assert.equal(yahrzeitHebrewDateSerial(dayOfMonth, month, year), serial);
     }
   }
 });

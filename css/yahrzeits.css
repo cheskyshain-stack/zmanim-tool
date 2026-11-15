@@ -1,21 +1,25 @@
 #yahrzeit-app { max-width:68rem; padding:clamp(.5rem, 2vw, 1.25rem); margin:auto; }
-.yr-back { color:#fff; font-weight:600; flex:none; text-decoration:none; }
-.yr-back:hover { text-decoration:underline; }
 .yr-card .cal-brand { flex-wrap:wrap; gap:.65rem 1rem; }
 .yr-card .cal-brand h1 { font-size:clamp(1.7rem, 5vw, 2.35rem); }
 .yr-actions { display:flex; flex-wrap:wrap; gap:.45rem; }
 .yr-card .cal-toolbar { display:flex; justify-content:center; gap:.5rem; }
-.yr-card .cal-month-nav { flex:0 1 24rem; gap:.35rem; }
-.yr-month { font:700 clamp(1rem, 4.2vw, 1.45rem)/1.3 Georgia,serif; }
+.yr-card .cal-month-nav { flex:0 1 24rem; min-width:0; gap:.35rem; }
+.yr-card .cal-month-title { display:inline-flex; align-items:center; justify-content:center; gap:.3rem; max-width:100%; }
+.yr-card .cal-month-title .yr-hebrew-month { color:#142b46; font:700 clamp(.9rem, 3.5vw, 1.45rem)/1.2 Arial,sans-serif; }
+.yr-card [data-yr-english-month] { margin-top:-.15rem; }
 .yr-card .cal-grid-wrap { border:1px solid #e0e3e1; }
 .yr-card .cal-grid td { height:clamp(74px, 13vw, 112px); }
 .yr-card .cal-grid .cal-day { min-height:0; padding:.2rem .13rem .15rem; gap:.2rem; }
 .yr-card .cal-grid .cal-day:focus-visible { outline-offset:-3px; }
 .yr-card .cal-grid td.cal-outside { background:#e5e9ee; }
 .yr-card .cal-outside .cal-day { opacity:.7; }
-.yr-card .cal-english-day { width:24px; min-width:24px; height:24px; font-variant-numeric:tabular-nums; }
-.yr-card .cal-hebrew-day { position:static; align-self:flex-end; margin-top:auto; font-size:.8rem; }
-.yr-parsha { font-size:.68rem; text-align:center; font-weight:600; line-height:1.1; }
+.yr-card .cal-date-numbers { display:flex; justify-content:space-between; align-items:center; gap:2px; }
+.yr-card .cal-english-day, .yr-card .is-today .cal-english-day { color:#5b6871; background:none; min-width:0; padding-inline:2px; height:auto; font-size:clamp(.67rem, 2.4vw, .86rem); font-variant-numeric:tabular-nums; }
+.yr-card .cal-hebrew-day { display:grid; place-items:center; position:static; border-radius:50%; min-width:1.55em; height:1.55em; color:#142b46; font:700 clamp(.97rem, 3.55vw, 1.4rem)/1 Arial,sans-serif; }
+.yr-card .is-today .cal-hebrew-day { color:#fff; background:#142b46; }
+.yr-dialog .cal-day-heading h3[lang=he] { font-family:Arial,sans-serif; }
+.yr-card .cal-facts { flex:1; justify-content:center; margin:0; }
+.yr-card .cal-facts > span { line-height:1.1; }
 .yr-day-count { color:#175b55; border-bottom:3px solid #24736c; text-align:center; font-weight:700; line-height:1.1; font-size:clamp(.58rem, 2.35vw, .77rem); }
 .yr-footer { display:flex; align-items:center; justify-content:space-between; gap:.25rem; padding:.2rem .55rem; }
 .yr-footer .cal-interaction-hint { padding:.35rem .2rem; }
@@ -35,16 +39,26 @@
 .yr-list li p { margin:.2rem 0 0; }
 .yr-dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.45rem; margin:.7rem 0 0; }
 .yr-remove-member { margin-inline-end:auto; }
+.yr-member-actions { margin:0 0 .8rem; justify-content:flex-start; }
+.yr-entry-info { color:#4f626f; margin-top:.35rem; font-size:.84rem; }
+.yr-entry-info summary { cursor:pointer; }
+.yr-entry-info p { margin:.25rem 0 0; }
+.yr-import-controls { display:grid; gap:.75rem; }
+.yr-import-controls [role=status], .yr-import-steps { margin:0; }
+.yr-import-steps { padding-inline-start:1.25rem; }
+.yr-import-steps li + li { margin-top:.35rem; }
+.yr-dialog form label + label { margin-top:.5rem; }
+.yr-import-controls [role=status]:empty { display:none; }
+.yr-import-controls input { width:100%; }
 .yr-help { color:#4f626f; margin:.25rem 0; }
 .yr-status { color:#883626; margin:.6rem 0 0; }
 .yr-status:empty { display:none; }
 @media (max-width:420px) {
   .yahrzeit-page .seats-header { padding-inline:.55rem; gap:.55rem; }
   .yahrzeit-page .seats-brand { gap:.45rem; }
-  .yr-back { font-size:.75rem; }
   .yr-card .cal-brand { padding:.7rem .5rem; }
   .yr-card .cal-toolbar { padding:0 .45rem .6rem; }
   .yr-card .cal-toolbar button { padding-inline:.45rem; }
-  .yr-parsha { font-size:.59rem; }
+  .yr-card .cal-facts > span { font-size:clamp(.57rem, 2.15vw, .68rem); }
   .yr-day-count span { display:none; }
 }

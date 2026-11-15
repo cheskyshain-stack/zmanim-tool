@@ -1,6 +1,7 @@
-import { roshHashana, JEWISH_MONTHS_EN, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
+import { roshHashana, hebrewDateExtended, JEWISH_MONTHS_EN, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 
 export const YAHRZEIT_MAX_OBSERVANCES = 12;
+export const YAHRZEIT_MAX_MEMBERS = 2000;
 export const YAHRZEIT_MONTHS = [7, 8, 9, 10, 11, 12, 13, 14, 1, 2, 3, 4, 5, 6];
 export const yahrzeitMonthLabel = month => `${JEWISH_MONTHS_EN[month - 1]} (${JEWISH_MONTHS_HE[month - 1]})`;
 export const yahrzeitRelationship = entry => entry.kind === 'custom' ? entry.relationship : entry.kind === 'father' ? 'Father' : 'Mother';
@@ -15,8 +16,8 @@ function yahrzeitText(value, message, limit, required = false) {
 
 export function yahrzeitMember(value) {
   const name = yahrzeitText(value?.name, 'Enter a congregation member’s name (up to 100 characters).', 100, true);
-  if (!Array.isArray(value.observances) || !value.observances.length || value.observances.length > YAHRZEIT_MAX_OBSERVANCES) {
-    throw new Error('Enter at least one yahrzeit for this member.');
+  if (!Array.isArray(value.observances) || value.observances.length > YAHRZEIT_MAX_OBSERVANCES) {
+    throw new Error(`Enter up to ${YAHRZEIT_MAX_OBSERVANCES} yahrzeits per member.`);
   }
   const parents = new Set();
   const observances = value.observances.map(entry => {
@@ -36,9 +37,11 @@ export function yahrzeitMember(value) {
     if (yahrzeitVariableMonth(month, day) && !['previous', 'next', 'both'].includes(shortMonth)) {
       throw new Error('Choose what to use in years without the 30th.');
     }
-    return { kind, relationship, deceasedName, month, day, adar, shortMonth };
+    const id = typeof entry.id === 'string' && /^(?:[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}|legacy-\d{1,2})$/.test(entry.id) ? entry.id : '';
+    return { ...(id ? { id } : {}), kind, relationship, deceasedName, month, day, adar, shortMonth };
   });
-  return { name, observances };
+  const address = yahrzeitText(value.address, 'Keep the address to 240 characters or less.', 240);
+  return { name, address, observances };
 }
 
 // Work from Rosh Hashana and the current year's actual month lengths. The
@@ -54,6 +57,19 @@ function yahrzeitMonthStart(month, year, leap) {
       : current === 9 ? (yearType === 3 ? 29 : 30) : yahrzeitMonthLimit(current);
   }
   return start;
+}
+
+export function yahrzeitCalendarMonths(year) {
+  const leap = (year * 7 + 1) % 19 < 7;
+  return YAHRZEIT_MONTHS.filter(month => leap ? month !== 12 : month < 13);
+}
+
+export function yahrzeitHebrewDateSerial(day, month, year) {
+  if (!Number.isInteger(year) || !yahrzeitCalendarMonths(year).includes(month)
+    || !Number.isInteger(day) || day < 1 || day > yahrzeitMonthLimit(month)) return null;
+  const leap = (year * 7 + 1) % 19 < 7;
+  const serial = yahrzeitMonthStart(month, year, leap) + day - 1;
+  return hebrewDateExtended(serial).month === month ? serial : null;
 }
 
 export function yahrzeitDates(entry, year) {
