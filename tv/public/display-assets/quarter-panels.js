@@ -33,10 +33,9 @@ export class QuarterPanel {
     this.host = host;
     this.kind = kind;
     this.departing = new Set();
-    host.innerHTML = `<header class="quarter-panel-head"><h2 lang="he" dir="rtl">${kind === 'zmanim' ? 'זמני היום' : 'זמני תפילה'}</h2></header><div class="quarter-viewport"><div class="quarter-flow"></div></div><div class="quarter-more"></div>` + (kind === 'prayers' ? '<div class="quarter-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim · ** Simcha hall</span></div>' : '');
+    host.innerHTML = `<header class="quarter-panel-head"><h2 lang="he" dir="rtl">${kind === 'zmanim' ? 'זמני היום' : 'זמני תפילה'}</h2></header><div class="quarter-viewport"><div class="quarter-flow"></div></div>` + (kind === 'prayers' ? '<div class="quarter-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim · ** Simcha hall</span></div>' : '');
     this.viewport = host.querySelector('.quarter-viewport');
     this.flow = host.querySelector('.quarter-flow');
-    this.more = host.querySelector('.quarter-more');
   }
   invalidate() { this.key = null; }
   descriptors(data) {
@@ -178,7 +177,6 @@ export class QuarterPanel {
       if (!node.hidden) visibleDays.add(node.dataset.day);
     }
     for (const heading of this.flow.querySelectorAll('.quarter-day-heading')) if (!visibleDays.has(heading.dataset.day)) heading.hidden = true;
-    this.more.textContent = hidden ? 'Later times appear as space opens' : '';
     this.host.dataset.visibleTimes = String(total-hidden);
     this.host.dataset.laterTimes = String(hidden);
     this.host.dataset.visibleDays = String(visibleDays.size);
