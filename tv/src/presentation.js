@@ -4,7 +4,7 @@ import { announcedCell } from '../../js/announced.js';
 import { specialMinyanim } from '../../js/posters/day.js';
 /** Presentation only: never used to calculate the next minyan. */
 import { agendaDayKind } from '../../js/ui/weekly-agenda.js';
-import { hebrewDateExtended, excelWeekday, hasRoshChodesh, hasBehab, hasTaanis, hasParsha, dateFromHebrew } from '../../js/hebrew-calendar.js';
+import { hebrewDateExtended, excelWeekday, hasRoshChodesh, hasBehab, hasTaanis, hasParsha, dateFromHebrew, jewishDateString } from '../../js/hebrew-calendar.js';
 import { dateFromSerial } from '../../js/zmanim/solar.js';
 import { weekIndex, rowFor, weekdayChartFor } from '../../js/sheets/rows.js';
 import { buildSukkosPoster, SK_TEXT } from '../../js/posters/sukkos.js';
@@ -34,6 +34,25 @@ export function hebrewPanelDay(s,settings) {
  if(!next.holy || next.holy==='Shabbos' || next.chol)return base;
  const erev=next.holy.includes('Rosh Hashana')?'ערב ראש השנה':next.holy.includes('Yom Kippur')?'ערב יום כיפור':'ערב יום טוב';
  return weekday>=6?base+' · '+erev:erev;
+}
+/** Sacred prayer headings are display metadata, separate from the civil source day.
+ * The client changes headings at the evening service without moving its events. */
+export function prayerPanelHeadings(s,settings) {
+ const here=agendaDayKind(s,settings),next=agendaDayKind(s+1,settings);
+ const dayHeading=(serial,kind)=>{
+  const date=civil(serial);
+  return {key:'day:'+date,date,
+   title:kind.holy?hebrewDay(serial,settings).replace(/^שבת קודש(?= · |$)/,'שבת'):hebrewPanelDay(serial,settings),
+   hebrewDate:jewishDateString(serial,false)};
+ };
+ const day=dayHeading(s,here);
+ // A consecutive holy day starts at Maariv, before any Motzaei label applies.
+ if(next.holy)return {day,evening:dayHeading(s+1,next)};
+ if(!here.holy)return {day,evening:null};
+ const shabbos=excelWeekday(s)===7;
+ const occasion=here.holy.includes('Yom Kippur')?'יום כיפור':here.chol||here.holy==='Shabbos'?'':'יום טוב';
+ const title='מוצאי '+(shabbos&&occasion?'שבת ו'+occasion:shabbos?'שבת':occasion);
+ return {day,evening:{...day,key:'motzai:'+day.date,title}};
 }
 const cleanText=value=>String(value??'').replace(/<u\b[^>]*>/gi,'\uE000').replace(/<\/u>/gi,'\uE001').replace(/<br\s*\/?>|<\/(div|p)>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 const publicTime=t=>({text:cleanText(t.text),underlined:!!t.underlined,mark:t.mark||'',name:t.name||''});

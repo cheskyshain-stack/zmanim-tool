@@ -1,6 +1,7 @@
 import { addDays, localStamp } from './time.js';
 import { MINYAN_HOLD_MS } from './minyan-timing.js';
 import { printedPrayerGroups } from './quarter-display-rows.js';
+import { prayerSections } from './quarter-prayer-sections.js';
 
 export const PRAYER_HOLD_MS = MINYAN_HOLD_MS;
 export const ZMAN_HOLD_MS = 30 * 60000;
@@ -65,7 +66,7 @@ function prayerDay(day,currentDate,now) {
   const groups=allGroups.map(group=>({...group,events:group.events.filter(event=>!event.expired)})).filter(group=>group.events.length || group.printed&&!group.rowExpired&&(group.note||group.untimed));
   const eventCount=allGroups.reduce((count,group)=>count+group.events.length,0);
   const remainingCount=groups.reduce((count,group)=>count+group.events.length,0);
-  return {...dayMetadata(day,currentDate),groups,allGroups,eventCount,remainingCount,expiredCount:eventCount-remainingCount,
+  return {...dayMetadata(day,currentDate),prayerHeadings:day.prayerHeadings,groups,allGroups,eventCount,remainingCount,expiredCount:eventCount-remainingCount,
     state:groups.length?'upcoming':eventCount?'finished':'unavailable'};
 }
 
@@ -101,5 +102,5 @@ export function quarterSchedule(schedule, instant) {
   const primaryPrayer=allPrayerDays.find(day=>day.date===today.date) || prayerDay(today,currentDate,now);
   const primaryZman=allZmanDays.find(day=>day.date===today.date) || zmanDay({...today,zmanim:schedule.zmanim || []},currentDate,now);
   return {...primaryPrayer,zmanim:primaryZman.zmanim,allZmanim:primaryZman.allZmanim,zmanimState:primaryZman.state,
-    prayerDays,zmanDays,allPrayerDays,allZmanDays};
+    prayerDays,prayerSections:prayerSections(prayerDays),zmanDays,allPrayerDays,allZmanDays};
 }

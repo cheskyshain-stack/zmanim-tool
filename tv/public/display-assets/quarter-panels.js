@@ -41,19 +41,20 @@ export class QuarterPanel {
   }
   invalidate() { this.key = null; }
   descriptors(data) {
-    const days = this.kind === 'zmanim' ? data.zmanDays || [] : data.prayerDays || [];
+    const days = this.kind === 'zmanim' ? data.zmanDays || [] : data.prayerSections || data.prayerDays || [];
     const rows = [];
     for (const day of days) {
       const entries = this.kind === 'zmanim' ? day.zmanim : day.groups?.filter(group => !isShemaDeadline(group));
       if (!entries?.length && !day.note) continue;
+      const section = day.key || 'day:'+day.date,sourceDate = day.sourceDate || day.date;
       const heading = day.relativeLabel === 'אתמול' ? day.relativeLabel : day.displayTitle || day.title;
       const fullDate = [day.relativeLabel,day.title,day.hebrewDate].filter(Boolean).join(' · ');
-      rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
-      if (!entries?.length) rows.push({key:`note:${day.date}`,day:day.date,type:'note',html:esc(day.note)});
-      else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
+      rows.push({key:section,section,day:sourceDate,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
+      if (!entries?.length) rows.push({key:`note:${section}`,section,day:sourceDate,type:'note',html:esc(day.note)});
+      else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,section,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
       else for (const group of entries) {
         const label = /^מנחה\s+ערב\s+שבת$/.test(group.label) ? 'מנחה' : group.label;
-        rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),
+        rows.push({key:`p:${group.key}`,section,day:group.sourceDate || day.date,type:'prayer',printed:Boolean(group.printed),
           columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),
           long:String(label).length>13||!group.printed&&group.events.length!==1&&String(label).trim().split(/\s+/).length>1,
           html:`<h4 lang="he" dir="rtl">${esc(label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
@@ -63,10 +64,10 @@ export class QuarterPanel {
   }
   update(data, instant, {deferFit = false} = {}) {
     const rows = this.descriptors(data), key = JSON.stringify(rows);
-    const headings = rows.filter(row => row.type === 'heading');
+    const entries = rows.filter(row => row.type !== 'heading');
     // Include overnight carryover above today. When today is finished, reserve
     // the first upcoming source date instead of only yesterday's last group.
-    this.requiredDay = headings.find(row => row.day >= data.date)?.day || headings[0]?.day || null;
+    this.requiredDay = entries.find(row => row.day >= data.date)?.day || entries[0]?.day || null;
     const stamp = Date.parse(instant), previousInstant = this.instant;
     this.instant = stamp;
     if (key === this.key) return false;
@@ -92,6 +93,7 @@ export class QuarterPanel {
       if(row.printed||row.type==='prayer'&&row.columns===1)node.dataset.timeColumns=String(row.columns);else delete node.dataset.timeColumns;
       node.dataset.motion = row.key;
       node.dataset.day = row.day;
+      node.dataset.section = row.section;
       node.dataset.rowType = row.type;
       if (row.type === 'zman') node.dataset.time = row.at || '';
       node.hidden = false;
@@ -161,19 +163,20 @@ export class QuarterPanel {
   fitRows() {
     const bottom = this.viewport.clientHeight;
     let ended = false,total = 0,hidden = 0;
-    const visibleDays = new Set();
+    const visibleDays = new Set(),visibleSections = new Set();
+    const showSection = node => {visibleDays.add(node.dataset.day);visibleSections.add(node.dataset.section);};
     for (const node of this.flow.children) {
       if (node.dataset.rowType === 'heading') { node.hidden = ended; continue; }
       const times = node.matches('[data-time]') ? [node] : [...node.querySelectorAll('[data-time]')];
       if(node.classList.contains('quarter-printed-row')) {
         node.hidden=ended || layoutBottom(node,this.viewport)>bottom+.5;
         total+=times.length;
-        if(node.hidden){ended=true;hidden+=times.length;}else visibleDays.add(node.dataset.day);
+        if(node.hidden){ended=true;hidden+=times.length;}else showSection(node);
         continue;
       }
       if (!times.length) {
         node.hidden = ended || layoutBottom(node, this.viewport) > bottom + .5;
-        if (!node.hidden && node.dataset.day) visibleDays.add(node.dataset.day);
+        if (!node.hidden && node.dataset.day) showSection(node);
         else ended = true;
         continue;
       }
@@ -190,9 +193,9 @@ export class QuarterPanel {
         }
       }
       node.hidden = times.every(time=>time.hidden);
-      if (!node.hidden) visibleDays.add(node.dataset.day);
+      if (!node.hidden) showSection(node);
     }
-    for (const heading of this.flow.querySelectorAll('.quarter-day-heading')) if (!visibleDays.has(heading.dataset.day)) heading.hidden = true;
+    for (const heading of this.flow.querySelectorAll('.quarter-day-heading')) if (!visibleSections.has(heading.dataset.section)) heading.hidden = true;
     this.host.dataset.visibleTimes = String(total-hidden);
     this.host.dataset.laterTimes = String(hidden);
     this.host.dataset.visibleDays = String(visibleDays.size);
