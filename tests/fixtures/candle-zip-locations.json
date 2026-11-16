@@ -1,0 +1,11 @@
+{
+  "08701": {"title":"Lakewood, NJ 08701","latitude":40.072114,"longitude":-74.204978,"tzid":"America/New_York","geo":"zip","zip":"08701"},
+  "10001": {"title":"New York, NY 10001","latitude":40.7508,"longitude":-73.996122,"tzid":"America/New_York","geo":"zip","zip":"10001"},
+  "90210": {"title":"Beverly Hills, CA 90210","latitude":34.103131,"longitude":-118.416253,"tzid":"America/Los_Angeles","geo":"zip","zip":"90210"},
+  "85001": {"title":"Phoenix, AZ 85001","latitude":33.4486,"longitude":-112.0733,"tzid":"America/Phoenix","geo":"zip","zip":"85001"},
+  "60601": {"title":"Chicago, IL 60601","latitude":41.88502,"longitude":-87.622387,"tzid":"America/Chicago","geo":"zip","zip":"60601"},
+  "99501": {"title":"Anchorage, AK 99501","latitude":61.222463,"longitude":-149.867694,"tzid":"America/Anchorage","geo":"zip","zip":"99501"},
+  "96813": {"title":"Honolulu, HI 96813","latitude":21.328602,"longitude":-157.828594,"tzid":"Pacific/Honolulu","geo":"zip","zip":"96813"},
+  "00901": {"title":"San Juan, PR 00901","latitude":18.4654,"longitude":-66.104373,"tzid":"America/Puerto_Rico","geo":"zip","zip":"00901"},
+  "99723": {"title":"Barrow, AK 99723","latitude":71.268363,"longitude":-156.744728,"tzid":"America/Anchorage","geo":"zip","zip":"99723"}
+}

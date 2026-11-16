@@ -18,7 +18,9 @@ const server=http.createServer((req,res)=>{
   const page=await context.newPage(),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(origin+'/week/?count=off');
   await page.locator('.weekly-reader').waitFor();
-  for(const date of ['2027-01-09','2026-09-19']) {
+  // A regular spring Shabbos exercises all three early Mincha pairs. Rosh Hashanah
+  // on September 19 has its own poster, so it cannot supply a Shabbos chart card.
+  for(const date of ['2027-01-09','2027-03-20']) {
    await page.setViewportSize({width:1400,height:1200});
    const result=await page.evaluate(async(date)=>{
     const {renderWeek}=await import('/js/ui/week-view.js');
@@ -36,8 +38,14 @@ const server=http.createServer((req,res)=>{
    },date);
    if(result.overflow)throw Error('Print overflow '+date);
    if(result.height!==1056)throw Error('Page height '+result.height);
-   assert(!/202[67]|January|September/.test(result.title));
-   assert.equal(result.rows.length,date==='2027-01-09'?9:17);
+   assert(!/202[67]|January|March/.test(result.title));
+   assert.equal(result.rows.length,date==='2027-01-09'?9:15);
+   if(date==='2027-03-20') {
+    const pairs=await page.locator('.is-shabbos-print .week-mincha-plag').allInnerTexts();
+    assert.equal(pairs.length,3,'All three early Mincha and Plag pairs remain');
+    assert.equal(pairs.filter(pair=>pair.includes('*')).length,1,'Weekly print keeps the Ezras Nashim room mark');
+    assert.equal(await page.locator('.is-shabbos-print .week-mincha-plag u').count(),1,'Weekly print keeps the downstairs underline');
+   }
    await page.emulateMedia({media:'print'});
    await page.evaluate(()=>window.scrollTo(0,0));
    const printed=await page.locator('.is-shabbos-print').evaluate(card=>{
@@ -52,7 +60,6 @@ const server=http.createServer((req,res)=>{
   }
  }finally{await browser.close();server.close();}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});
-
 
 
 

@@ -225,7 +225,7 @@ export function schedulePresentation({serial,state,settings,tables,day,instant,s
     const entry=weekIndex(state).get(sat),chart=weekdayChartFor(entry?.sheet,sat,state),week=chart?.weeks.find(w=>w.serial===sat);
     if(week){const built=mergeRow(buildWeekdayRow(week,settings),chart,sat);
       for(const col of WEEKDAY_COLUMNS.filter(c=>['B','C'].includes(c.key)&&built.overriddenKeys.has(c.key))){
-        const name=col.key==='B'?'מעריב':'מנחה';const sourceText=cleanText(announcedCell(built.row[col.key],col.key,s));
+        const name=col.key==='B'?'מעריב':'מנחה';const sourceText=cleanText(announcedCell(built.row[col.key],col.key,s,settings));
         let attached=false;events=events.map(e=>{if(e.name!==name||attached)return e;attached=true;return {...e,sourceText};});
         if(!attached&&sourceText)events=[...events,{name,mins:col.key==='B'?1200:800,time:'',place:'',sourceText}];
       }

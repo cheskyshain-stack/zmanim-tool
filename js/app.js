@@ -1,3 +1,5 @@
+import { renderCalendar } from './ui/calendar-view.js';
+import { resolveSettings } from './settings.js';
 import { buildAutomaticCharts } from './publish.js';
 import { loadState, saveState } from './storage.js';
 import { loadTables, showDataError } from './data-loader.js';
@@ -8,18 +10,26 @@ import { renderSheet } from './ui/sheet-view.js';
 import { renderGuide } from './ui/guide-view.js';
 import { renderProgram } from './ui/program-view.js';
 import { renderPosters, posterRoute, setPosterRoute } from './ui/posters-view.js';
-import { renderCalculations } from './ui/calculations-view.js';
 import { renderWeek } from './ui/week-view.js';
 import { renderChartBrowser } from './ui/chart-view.js';
 import { renderTraffic } from './ui/traffic-view.js';
 import { renderStatus } from './ui/status-view.js';
+import { renderWebsitePreview } from './ui/website-preview-view.js';
+import { renderAdminHome, ADMIN_NAV_SECTIONS, ADMIN_TAB_LABELS } from './ui/admin-home.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { isOpen, renderLock } from './ui/lock.js';
+import { installTimeExplanations } from './ui/time-explanations.js';
+import { installZmanimReferences } from './ui/zmanim-references.js';
+import { keepPosition } from './ui/keep-position.js';
+import { setPrintPage } from './ui/print-page.js';
 
 const state = loadState();
 let tables = null;
-let currentTab = 'charts';
+let currentTab = 'home';
+let adminStarted = false;
 let currentSheetId = null;
+let disposeWebsitePreview = null;
+let disposeCalendar = null;
 // Which week the This week screen is showing. Null follows whichever Shabbos is next;
 // the prev/next buttons pin it to one.
 let weekSerial = null;
@@ -51,14 +61,11 @@ document.addEventListener(
 
 const main = document.getElementById('main');
 const nav = document.getElementById('nav');
-// Making a chart first, then the week you are on, then the sheets you already have, then
-// the things you set once. Rules is no longer among them - it is the first panel inside
-// Settings, being something configured rather than a place you go. Generate leading also
-// matches where the app opens.
-const tabs = ['week', 'charts', 'generate', 'saved', 'posters', 'status', 'settings', 'traffic', 'calc', 'program', 'guide'];
-// "Saved sheets" in sentence case, matching the heading on the page it opens - the nav
-// said "Saved Sheets" and the page said "Saved sheets".
-const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings: 'Settings', saved: 'Saved Copies', traffic: 'Visitor Statistics', calc: 'How Times Are Calculated', program: 'Get the Program', guide: 'Help & Instructions', week: 'Weekly Schedule', posters: 'Special Schedules', status: 'What the Congregation Sees' };
+installTimeExplanations(main, document.querySelector('.sidebar-foot'));
+installZmanimReferences(main, document.querySelector('.sidebar-foot'));
+// Keep existing hashes so saved links and the chart workflows continue to work.
+const tabs = ['home', 'week', 'charts', 'generate', 'saved', 'posters', 'preview', 'calendar', 'status', 'settings', 'traffic', 'program', 'guide'];
+const tabLabels = ADMIN_TAB_LABELS;
 
 /* --- The screen you are on, in the address ------------------------------------------
    Without this the tab was a variable that started at Generate and was never written
@@ -75,12 +82,14 @@ const tabLabels = { charts: 'Season Charts', generate: 'Print Layout', settings:
 const routeTabs = new Set(tabs);
 
 function routeParts() {
-  return location.hash.replace(/^#/, '').split('/').filter(Boolean);
+  return location.hash.replace(/^#/, '').split('/').filter(Boolean).map(part => {
+    try { return decodeURIComponent(part); } catch { return part; }
+  });
 }
 
 /** What the address should say for what is on screen now. */
 function currentRoute() {
-  return ['', currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].join('/').replace('/', '#');
+  return '#' + [currentTab, ...(currentTab === 'posters' ? posterRoute() : [])].map(encodeURIComponent).join('/');
 }
 
 /** Put it there. Assigning location.hash, so this leaves a history entry and back works. */
@@ -92,7 +101,10 @@ function writeRoute() {
 /** Take it from there, on load and on back or forward. Returns whether anything moved, so
  *  the caller can decide whether a redraw is needed. */
 function readRoute() {
-  const [tab, ...rest] = routeParts();
+  const [requestedTab, ...rest] = routeParts();
+  // Old bookmarks open the charts, where Explain times supplies the calculation details.
+  const tab = requestedTab === 'calc' ? 'charts' : requestedTab || 'home';
+  if (requestedTab === 'calc') location.replace('#charts');
   if (!routeTabs.has(tab)) return false;
   const same = tab === currentTab && !currentSheetId
     && (tab !== 'posters' || rest.join('/') === posterRoute().join('/'));
@@ -105,19 +117,21 @@ function readRoute() {
 
 // Back and forward. Our own writes come back through here too and are recognised as
 // already applied, so they do not cause a second render.
-window.addEventListener('hashchange', () => { if (readRoute()) render(); });
+window.addEventListener('hashchange', () => { if (adminStarted && tables && readRoute()) render(); });
 
 // Inline stroke icons, sized in em and drawn in currentColor so they follow the nav's
 // own colour and size. Inline rather than a font or sprite file so the offline/USB build
 // stays a single self-contained folder with no extra assets to load.
 const tabIcons = {
+  calendar: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3M6.5 12h1M10 12h1M13.5 12h1M6.5 15h1M10 15h1"/>',
+  home: '<path d="M3 9.5 10 3.5l7 6"/><path d="M4.8 8.2v8.3h10.4V8.2M8.2 16.5v-5h3.6v5"/>',
+  screen: '<rect x="2" y="3.5" width="16" height="11" rx="1.5"/><path d="M10 14.5v3M6.5 17.5h7"/>',
   generate: '<path d="M4 3h9l4 4v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z"/><path d="M13 3v4h4"/><path d="M10 10v6M7 13h6"/>',
   settings: '<circle cx="10" cy="10" r="3"/><path d="M10 1v2m0 14v2M3.6 3.6l1.4 1.4m10 10 1.4 1.4M1 10h2m14 0h2M3.6 16.4 5 15m10-10 1.4-1.4"/>',
   saved: '<path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h4L9 6h7.5A1.5 1.5 0 0 1 18 7.5v8A1.5 1.5 0 0 1 16.5 17h-13A1.5 1.5 0 0 1 2 15.5z"/>',
   week: '<rect x="3" y="4.5" width="14" height="13" rx="1.5"/><path d="M3 8.5h14M7 3v3M13 3v3"/><circle cx="10" cy="12.5" r="1.4"/>',
   guide: '<circle cx="10" cy="10" r="7.5"/><path d="M7.9 7.7a2.1 2.1 0 1 1 2.6 2.5c-.4.15-.5.4-.5.8v.5"/><path d="M10 14.4v.1"/>',
   program: '<path d="M10 3v9"/><path d="M6.5 8.5 10 12l3.5-3.5"/><path d="M3.5 13v2.5A1.5 1.5 0 0 0 5 17h10a1.5 1.5 0 0 0 1.5-1.5V13"/>',
-  calc: '<rect x="4" y="2.5" width="12" height="15" rx="1.5"/><path d="M7 6h6"/><path d="M7 9.5h2M11 9.5h2M7 13h2M11 13h2"/>',
   // A line climbing over two low bars: what the screen itself draws.
   traffic: '<path d="M3 16.5h14"/><rect x="4.5" y="11" width="3" height="5.5" rx="0.6"/><rect x="9" y="8" width="3" height="8.5" rx="0.6"/><rect x="13.5" y="4.5" width="3" height="12" rx="0.6"/>',
   // A speech bubble with two lines in it: the message, rather than the sheet it is read off.
@@ -152,31 +166,52 @@ function persist() {
 }
 
 function openTab(tab) {
+  if (tab === currentTab && !currentSheetId) return;
   currentTab = tab;
   currentSheetId = null;
   writeRoute();
   render();
+  window.scrollTo(0, 0);
+  const heading = main.querySelector('h2');
+  if (heading) { heading.tabIndex = -1; heading.focus({ preventScroll: true }); }
 }
 
 function renderNav() {
   const active = currentSheetId || ['generate', 'saved'].includes(currentTab) ? 'charts'
     : currentTab === 'program' ? 'guide' : currentTab;
-  const button = t => `<button class="nav-btn ${active === t ? 'active' : ''}" ${active === t ? 'aria-current="page"' : ''} data-tab="${t}">${icon(t === 'charts' ? 'generate' : t)}<span>${tabLabels[t]}</span></button>`;
-  const group = (label, content) => `<section class="admin-nav-group" aria-label="${label}"><h2 class="admin-nav-label">${label}</h2>${content}</section>`;
-  nav.innerHTML = group('Schedules', ['week', 'charts', 'posters', 'status'].map(button).join('')
-      + `<a class="nav-btn" href="/texts/">${icon('texts')}<span>Messages</span></a>`)
-    + group('Management', ['traffic', 'settings'].map(button).join('')
-      + `<a class="nav-btn" href="/admin/display/">${icon('site')}<span>Manage TV Display</span></a>`)
-    + group('Help', ['calc', 'guide'].map(button).join(''))
-    + `<a class="nav-btn admin-site-link" href="/">${icon('site')}<span>View Website</span></a>`;
-  nav.querySelectorAll('button[data-tab]').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.tab)));
+  const link = item => `<a class="nav-btn ${active === item.tab ? 'active' : ''}" href="${item.tab ? `#${item.tab}` : item.href}" ${active === item.tab ? 'aria-current="page"' : ''}${item.tab ? ` data-tab="${item.tab}"` : ''}>${icon(item.icon || item.tab)}<span>${item.tab ? tabLabels[item.tab] : item.label}</span></a>`;
+  nav.classList.remove('is-expanded');
+  nav.setAttribute('aria-label', 'Admin navigation');
+  nav.innerHTML = `<button type="button" class="admin-nav-toggle" aria-expanded="false" aria-controls="admin-navigation"><span><small>Menu</small>${tabLabels[currentTab]}</span><span class="admin-nav-chevron" aria-hidden="true">⌄</span></button>
+    <div class="admin-nav-sections" id="admin-navigation">
+      ${link({ tab: 'home' })}
+      ${ADMIN_NAV_SECTIONS.map(section => `<section class="admin-nav-group" aria-label="${section.title}"><h2 class="admin-nav-label">${section.title}</h2>${section.items.map(link).join('')}</section>`).join('')}
+      <div class="admin-nav-public-links">
+        <a class="nav-btn" href="/tv/">${icon('screen')}<span>Open Shul View</span></a>
+        <a class="nav-btn" href="/">${icon('site')}<span>Open website</span></a>
+      </div>
+    </div>`;
+  const toggle = nav.querySelector('.admin-nav-toggle');
+  toggle.addEventListener('click', () => {
+    const expanded = nav.classList.toggle('is-expanded');
+    toggle.setAttribute('aria-expanded', String(expanded));
+  });
+  nav.onkeydown = event => {
+    if (event.key === 'Escape' && nav.classList.contains('is-expanded')) {
+      nav.classList.remove('is-expanded'); toggle.setAttribute('aria-expanded', 'false'); toggle.focus();
+    }
+  };
+  nav.querySelectorAll('[data-tab]').forEach(link => link.addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault(); openTab(link.dataset.tab);
+  }));
 }
 
 function addSectionTabs(items) {
   const bar = document.createElement('div');
   bar.className = 'pane-switch no-print admin-section-tabs';
   bar.setAttribute('aria-label', 'Section navigation');
-  bar.innerHTML = items.map(t => `<button type="button" class="pane-btn ${currentTab === t ? 'is-on' : ''}" ${currentTab === t ? 'aria-current="page"' : ''} data-section="${t}">${t === 'charts' ? 'View Charts' : tabLabels[t]}</button>`).join('');
+  bar.innerHTML = items.map(t => `<button type="button" class="pane-btn ${currentTab === t ? 'is-on' : ''}" ${currentTab === t ? 'aria-current="page"' : ''} data-section="${t}">${t === 'charts' ? 'View charts' : tabLabels[t]}</button>`).join('');
   bar.querySelectorAll('button').forEach(btn => btn.addEventListener('click', () => openTab(btn.dataset.section)));
   main.prepend(bar);
 }
@@ -185,7 +220,7 @@ function addSectionTabs(items) {
  *  the two is chosen. The same pair the congregation's site puts on its menu, so the two
  *  screens hold the same things in the same order. */
 function renderWeekTab(showPublish) {
-  main.innerHTML = '<h2 class="no-print">Weekly Schedule</h2><div id="week-pane"></div>';
+  main.innerHTML = '<h2 class="no-print">Weekly schedules</h2><div id="week-pane"></div>';
   renderWeek(main.querySelector('#week-pane'), buildAutomaticCharts(state, tables),
     serial => { weekSerial = serial; render(); }, weekSerial, { heading: false });
   main.querySelector('#publish-panel')?.remove();
@@ -210,23 +245,29 @@ let painted = { tab: null, sheet: null };
 
 function render() {
   const held = painted.tab === currentTab && painted.sheet === currentSheetId && !openPublish;
-  const y = window.scrollY;
   painted = { tab: currentTab, sheet: currentSheetId };
-  paint();
-  if (held) window.scrollTo(0, y);
+  if (held) keepPosition(main, paint);
+  else paint();
 }
 
 function paint() {
+  document.body.classList.toggle('is-calendar-admin', currentTab === 'calendar' && !currentSheetId);
+  disposeCalendar?.();
+  disposeCalendar = null;
+  disposeWebsitePreview?.();
+  disposeWebsitePreview = null;
+  setPrintPage('letter landscape');
   renderNav();
   // A sheet needs the full width (a page is a fixed 11in); every other screen is held to
-  // a column next to the sidebar. Saved sheets gets a wider one: it's a six-column table,
+  // a column next to the sidebar. Saved sheets gets a wider one: it's a seven-column table,
   // and at the standard width every cell in it wrapped. See app.css.
   main.classList.toggle('is-sheet-view', Boolean(currentSheetId));
-  main.classList.toggle('is-wide', !currentSheetId && currentTab === 'saved');
+  main.classList.toggle('is-wide', !currentSheetId && ['saved', 'calendar'].includes(currentTab));
+  if (currentTab !== 'posters' || currentSheetId) main.classList.remove('is-special-schedules', 'is-half-letter-print', 'is-half-paired-print');
   // The nav used to be hidden while a sheet was open (it sat in a top bar that competed
   // with the sheet's own toolbar). In the sidebar it just stays put - a persistent
   // sidebar with its links blanked out reads as broken. Clicking one does exactly what
-  // the sheet's Back button does, and a pending cell edit still commits on blur first.
+  // the sheet's Back button does.
   if (currentSheetId) {
     const sheet = state.sheets.find((s) => s.id === currentSheetId);
     renderSheet(main, state, sheet, (evt) => {
@@ -235,7 +276,7 @@ function paint() {
         render();
       } else if (evt.save) {
         persist();
-        render(); // re-render so the ✎ overridden-cell flag appears immediately
+        render(); // print settings and layout changes redraw the chart
       } else if (evt.openSheetId) {
         currentSheetId = evt.openSheetId; // e.g. the Weekday chart <-> Shabbos sheet companion link
         render();
@@ -243,10 +284,17 @@ function paint() {
     });
     return;
   }
-  if (currentTab === 'settings') {
+  if (currentTab === 'home') {
+    renderAdminHome(main, openTab);
+  } else if (currentTab === 'preview') {
+    disposeWebsitePreview = renderWebsitePreview(main);
+  } else if (currentTab === 'calendar') {
+    disposeCalendar = renderCalendar(main, resolveSettings(state.settings), tables);
+  } else if (currentTab === 'settings') {
     renderSettings(
       main,
       state,
+      tables,
       (next) => {
         state.settings = next;
         persist();
@@ -265,7 +313,7 @@ function paint() {
       () => persist()
     );
   } else if (currentTab === 'charts') {
-    main.innerHTML = '<h2 class="no-print">Season Charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print Layout for your own page splits, or Saved Copies to reopen a local chart.</p><div id="season-chart-view"></div>';
+    main.innerHTML = '<h2 class="no-print">Seasonal charts</h2><p class="hint no-print">Automatic seasonal schedules. Use Print layouts for your own page splits, or Saved copies to reopen a chart saved on this device.</p><div id="season-chart-view"></div>';
     renderChartBrowser(main.querySelector('#season-chart-view'), buildAutomaticCharts(state, tables), { confine: false });
   } else if (currentTab === 'generate') {
     renderGenerate(
@@ -278,7 +326,7 @@ function paint() {
         currentSheetId = sheet.id;
         render();
         const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id);
-        toast(weekday ? 'Saved in Season Charts → Saved Copies, with its weekday chart.' : 'Saved in Season Charts → Saved Copies.');
+        toast(weekday ? 'Saved in Seasonal charts → Saved copies, with its weekday chart.' : 'Saved in Seasonal charts → Saved copies.');
       },
       (tab) => {
         currentTab = tab;
@@ -292,15 +340,6 @@ function paint() {
     // whichever half was last open, that trip wants this one.
     if (showPublish) weekPane = 'week';
     renderWeekTab(showPublish);
-  } else if (currentTab === 'calc') {
-    /* The automatic sheets, not the raw state. The saved-sheet list is empty now that the
-       charts are computed rather than generated, and this page reads one real week off it to
-       work every column through: handed state it found nothing and quietly printed "blank
-       that week" in every cell, which is the shape of failure this page is written to avoid.
-       Same call the week card and the chart browser make, so all three show one week. */
-    renderCalculations(main, buildAutomaticCharts(state, tables), (tab) => {
-      openTab(tab);
-    });
   } else if (currentTab === 'traffic') {
     renderTraffic(main);
   } else if (currentTab === 'posters') {
@@ -346,14 +385,14 @@ function paint() {
     addSectionTabs(['charts', 'generate', 'saved']);
     if (currentTab === 'saved') {
       const heading = main.querySelector('h2');
-      if (heading) heading.textContent = 'Saved Copies';
+      if (heading) heading.textContent = tabLabels.saved;
       main.querySelectorAll('button').forEach(btn => {
         if (btn.textContent.trim().startsWith('Publishing')) btn.remove();
       });
     }
   }
   if (['guide', 'program'].includes(currentTab)) addSectionTabs(['guide', 'program']);
-  if (['posters', 'traffic', 'calc'].includes(currentTab)) {
+  if (['posters', 'traffic', 'status', 'settings', 'guide', 'program', 'generate'].includes(currentTab)) {
     const heading = main.querySelector('h2');
     if (heading) heading.textContent = tabLabels[currentTab];
   }
@@ -368,6 +407,8 @@ wireSecretDoor(document.querySelector('.sidebar-brand'), '/');
 
 
 function start() {
+  window.dispatchEvent(new Event('zmanim-admin-open'));
+  adminStarted = true;
   loadTables()
     .then((t) => {
       tables = t;
@@ -391,5 +432,3 @@ function start() {
    What this is and is not worth is written at the top of ui/lock.js. */
 if (isOpen()) start();
 else renderLock(main, start);
-
-

@@ -37,11 +37,21 @@ test('real Gedalya week collects the entire fast below the weekday services', ()
 });
 
 test('Rosh Chodesh and fast days with only a morning change stay with their prayer', () => {
-  for (const date of ['2028-04-26','2026-12-20','2027-03-22','2027-07-22']) {
+  for (const date of ['2028-04-26','2027-03-22']) {
     const source = snapshot(date).presentation.weekly.services;
     const result = groupWeekdayPresentation(source);
     assert.deepEqual(result.services, source, date);
     assert.deepEqual(result.daySections, [], date);
+  }
+});
+
+test('fast days with a full congregation schedule have their own day section', () => {
+  for (const date of ['2026-12-20', '2027-07-22']) {
+    const source = snapshot(date).presentation.weekly.services;
+    const result = groupWeekdayPresentation(source);
+    const day = result.daySections.find(section => section.days.some(day => day.date === date));
+    assert.ok(day, date);
+    assert.deepEqual(day.services.map(service => service.name), names);
   }
 });
 

@@ -97,13 +97,51 @@ export function flattenNonEmpty(parts) {
   return flat.filter((x) => x !== '' && x != null);
 }
 
-/** Splits a list of time options across two printed lines, first line getting the
- *  smaller half when the count is odd (4 -> 2+2, 5 -> 2+3, 6 -> 3+3, ...). */
-export function splitLinesInHalf(items, delim = SLASH) {
-  const cut = Math.floor(items.length / 2);
-  const line1 = items.slice(0, cut).join(delim);
-  const line2 = items.slice(cut).join(delim);
+/** Splits a list of time options across two printed lines. The bottom line gets the
+ *  larger (or equal) half by default, floor(n/2) on top and ceil(n/2) below, which is
+ *  what every one of these columns has always done and reads as one consistent pattern
+ *  down the page.
+ *
+ *  That default is only overridden when it would read clearly lopsided by width - not
+ *  plain item count, since 10:00 is a whole item wider than 7:00 and a board full of one
+ *  but not the other (later evening times run longer than earlier afternoon ones) can
+ *  split lopsided even at an even item count. A בראשית מעריב line of
+ *  7:30/8:00/8:30/8:45/9:00 against 9:30/10:00/10:30/11:00/11:30/12:00 read as five short
+ *  items over six longer ones, the bottom line fifteen characters wider than the top
+ *  (measured) - moving the cut over one item narrows that to five, and only a gap that
+ *  much worse than the alternative (here, more than double it) is worth giving up the
+ *  bottom-heavier default for. A smaller gap stays bottom-heavy even if the other cut
+ *  would have measured a few characters closer, since the consistent pattern is worth
+ *  more than a handful of characters.
+ *
+ *  Only the two candidates nearest the middle are ever weighed (floor(n/2) and
+ *  ceil(n/2)), never a lopsided count-wise split in the name of a closer width. Character
+ *  count is the width proxy rather than a measured pixel width: this runs while the sheet
+ *  is being built, before there is a rendered cell to measure at all.
+ *
+ *  `cut` overrides the choice outright, for a caller with its own reason to want a
+ *  specific split regardless of what balances best - see the Weekday chart's "NEW" tag
+ *  (sheets/weekday.js), which is not plain text and so is not honestly weighed by
+ *  counting its characters. */
+export function splitLinesInHalf(items, delim = SLASH, cut = null) {
+  const resolvedCut = cut ?? bestSplitCut(items, delim);
+  const line1 = items.slice(0, resolvedCut).join(delim);
+  const line2 = items.slice(resolvedCut).join(delim);
   return [line1, line2].filter(Boolean).join('\n');
+}
+
+/** Bottom-heavier by default (see splitLinesInHalf), moved to top-heavier only when
+ *  staying bottom-heavy would leave a gap more than double the alternative's. */
+function bestSplitCut(items, delim) {
+  const lo = Math.floor(items.length / 2); // bottom gets the larger half
+  const hi = Math.ceil(items.length / 2); // top gets the larger half
+  if (lo === hi) return lo;
+  const widthDiff = (cut) => Math.abs(
+    items.slice(0, cut).join(delim).length - items.slice(cut).join(delim).length
+  );
+  const bottomHeavyGap = widthDiff(lo);
+  const topHeavyGap = widthDiff(hi);
+  return bottomHeavyGap > topHeavyGap * 2 ? hi : lo;
 }
 
 /** HTML escaping, in the two shapes this codebase actually uses.
@@ -128,6 +166,19 @@ export function escAttr(str) {
 }
 export function escText(str) {
   return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** Match the straight double quote in the chart's ס"ז קר"ש heading. Only visible
+ *  text changes; attributes, room keys and calculation data keep their original values. */
+export function useStraightHebrewQuotes(root) {
+  if (!root) return;
+  const walker = root.ownerDocument.createTreeWalker(root, 4); // NodeFilter.SHOW_TEXT
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.parentElement?.closest('script, style, textarea')) continue;
+    const text = node.data.replace(/״/g, '"').replace(/([\u0590-\u05ff])[“”](?=[\u0590-\u05ff])/g, '$1"');
+    if (text !== node.data) node.data = text;
+  }
 }
 
 /** Whether two שחרית schedules say different things, whatever separators they were typed with.

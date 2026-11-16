@@ -1,0 +1,45 @@
+export const SEATS_PRINT_VIEW = { x: 12, y: 50, width: 1176, height: 916 };
+export const SEATS_CHART_PRINT_TITLE = 'שבת 7:30 מנין';
+
+export function seatsPrintGeometry(paper, footer = 0) {
+  const tabloid = paper === 'tabloid', width = tabloid ? 17 : paper === 'legal' ? 14 : 11, height = tabloid ? 11 : 8.5;
+  const margin = tabloid ? 0.5 : 0.35, header = 0.35, contentWidth = width - margin * 2, contentHeight = height - margin * 2;
+  const viewTop = SEATS_PRINT_VIEW.y, viewHeight = SEATS_PRINT_VIEW.height;
+  const xScale = viewHeight * contentWidth / (contentHeight - header - footer) / SEATS_PRINT_VIEW.width;
+  return { auto: paper === 'auto', width, height, margin, header, footer, contentWidth, contentHeight, xScale, viewTop,
+    viewBox: [SEATS_PRINT_VIEW.x * xScale, viewTop, SEATS_PRINT_VIEW.width * xScale, viewHeight].join(' ') };
+}
+
+// Spread the room across the sheet while preserving the proportions of the lettering.
+export function seatsPreparePrint(svg, geometry) {
+  if (!svg) return;
+  // Native paper changes happen during pagination. CSS container sizing adjusts
+  // the diagram, while these wrappers preserve lettering and square fixture proportions.
+  const adaptive = geometry.auto && CSS.supports('container-type', 'size') && CSS.supports('transform', 'scaleX(calc(1px / 1px))');
+  if (adaptive) {
+    svg.classList.add('adaptive-print');
+    svg.setAttribute('preserveAspectRatio', 'none');
+  }
+  const inverse = 1 / geometry.xScale;
+  for (const text of svg.querySelectorAll('text')) {
+    let vertical = false;
+    for (let node = text; node && node !== svg; node = node.parentElement) {
+      if (/rotate\(\s*-?90(?:\s|,|\))/.test(node.getAttribute('transform') || '')) vertical = !vertical;
+    }
+    if (!text.hasAttribute('data-original-transform')) text.setAttribute('data-original-transform', text.getAttribute('transform') || '');
+    const original = text.getAttribute('data-original-transform');
+    const anchor = Number(text.getAttribute('x') ?? text.querySelector('tspan')?.getAttribute('x') ?? 0);
+    const correction = vertical ? 'scale(1 ' + inverse + ')'
+      : 'translate(' + anchor + ' 0) scale(' + inverse + ' 1) translate(' + -anchor + ' 0)';
+    text.setAttribute('transform', (original + ' ' + correction).trim());
+    if (adaptive && !text.parentElement.classList.contains('print-lettering')) {
+      const wrapper = document.createElementNS(svg.namespaceURI, 'g');
+      wrapper.setAttribute('class', 'print-lettering' + (vertical ? ' vertical-lettering' : ''));
+      if (text.classList.contains('assigned-seat-name')) {
+        wrapper.classList.add('seat-name-lettering');
+        wrapper.style.setProperty('--seat-name-growth-limit', text.dataset.nameGrowthLimit || '1');
+      }
+      text.replaceWith(wrapper); wrapper.append(text);
+    }
+  }
+}

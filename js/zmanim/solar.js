@@ -13,19 +13,9 @@ export function excelSerial(date) {
   return (Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - EXCEL_EPOCH_UTC) / 86400000;
 }
 
-/** Inverse of excelSerial: turns a serial day number back into a UTC-midnight Date.
- *  Uses Math.floor (not round): every whole-day serial in this app (shabbos/friday
- *  Excel-style day numbers) is already an integer, so floor vs. round makes no
- *  difference there - but the two DST-lookup call sites in this file and zmanim.js
- *  pass a *fractional* serial (a whole day plus a UTC-time-of-day fraction, e.g. an
- *  evening sunset's serial + eventUTC ≈ serial + 0.91). Excel's own calcDST_LOCAL/
- *  calcTIMEZONE formulas extract the calendar day from such a value via YEAR()/DATE()
- *  arithmetic, which truncates (floors) to the day the moment falls in - rounding
- *  instead pushes any evening event (fraction > 0.5) into the *next* calendar day for
- *  DST-lookup purposes. That's harmless almost all year (DST status rarely differs
- *  between adjacent days) but silently breaks the one week each fall where that
- *  rounded-up day crosses the real DST cutover a week early (e.g. an Oct 31 sunset
- *  got misread as Nov 1 - already standard time - undercounting by an hour). */
+/** Calendar-day inverse of excelSerial, always at UTC midnight. Floor rather than
+ *  round so a late time never becomes tomorrow. For calcTIMEZONE, preserve the
+ *  fractional day in an instant instead: its 2am boundaries depend on the time. */
 export function dateFromSerial(serial) {
   return new Date(EXCEL_EPOCH_UTC + Math.floor(serial) * 86400000);
 }
@@ -148,27 +138,35 @@ function sunriseSet(rise, jDay, latitude, longitude, zenithDeg) {
   return sunriseSetUTC(rise, jDay + passOne, latitude, longitude, zenithDeg);
 }
 
-/** US-style DST rule used throughout the workbook: 2nd Sunday in March (2am) through
- *  1st Sunday in November (2am), local time. Returns true if `date` (UTC-midnight,
- *  representing a local calendar day) falls within DST for that rule. */
-function usDstActive(date) {
+/** The workbook uses 2am boundaries for both clock changes. Its calcTIMEZONE subtracts
+ *  the zone's standard UTC offset for both boundaries; calcDST_LOCAL uses wall time. */
+function usDstActive(date, standardOffsetHours = 0) {
   const year = date.getUTCFullYear();
   const nthSunday = (y, month, nth) => {
     const first = new Date(Date.UTC(y, month, 1));
     const firstSunday = 1 + ((7 - first.getUTCDay()) % 7);
     return new Date(Date.UTC(y, month, firstSunday + (nth - 1) * 7));
   };
-  const start = nthSunday(year, 2, 2); // March, 2nd Sunday
-  const end = nthSunday(year, 10, 1); // November, 1st Sunday
-  return date.getTime() >= start.getTime() && date.getTime() < end.getTime();
+  const boundaryOffset = (2 - standardOffsetHours) * 3600000;
+  const start = nthSunday(year, 2, 2).getTime() + boundaryOffset;
+  const end = nthSunday(year, 10, 1).getTime() + boundaryOffset;
+  return date.getTime() >= start && date.getTime() < end;
 }
 
 /** calcTIMEZONE / calcDST_LOCAL, simplified to the two DST rule types the workbook
  *  itself implements: 'us' (2nd Sun Mar - 1st Sun Nov) and 'none'.
- *  Returns { offsetHours, isDst } for the given calendar date and a timezone def
+ *  Returns { offsetHours, isDst } for local wall time represented in UTC Date fields,
+ *  as calcDST_LOCAL does, and a timezone def
  *  { utcOffset, dstOffset, rule } as found in settings.TIMEZONES. */
 export function timezoneOffset(date, tz) {
   const isDst = tz.rule === 'us' && usDstActive(date);
+  return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
+}
+
+/** calcTIMEZONE receives a UTC instant. Retain its time of day: a late-night zman
+ *  can land on the next UTC date before that date's clock change has happened. */
+export function timezoneOffsetUTC(instant, tz) {
+  const isDst = tz.rule === 'us' && usDstActive(instant, tz.utcOffset);
   return { offsetHours: tz.utcOffset + (isDst ? tz.dstOffset : 0), isDst };
 }
 
@@ -193,7 +191,7 @@ export function sunEvent(rise, date, horizonDeg, settings, useElevation) {
   const z = zenith(horizonDeg) + elevAdjust(elevM);
   const serial = excelSerial(date);
   const eventUTC = sunriseSet(rise, calcJD(serial), lat, lon, z);
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial + eventUTC), settings.timezone);
+  const { offsetHours } = timezoneOffsetUTC(new Date(EXCEL_EPOCH_UTC + (serial + eventUTC) * 86400000), settings.timezone);
   return eventUTC + offsetHours / 24;
 }
 
@@ -212,16 +210,13 @@ export function sunEvent(rise, date, horizonDeg, settings, useElevation) {
  *  shifted by however far it has travelled.
  *
  *  Off the platform's own timezone database, by name, and not off the workbook's DST rule
- *  the charts use. That rule answers whether a calendar day is on daylight saving, which is
- *  all a zman ever needs, since no זמן falls in the hour the clocks move. Turning an instant
- *  into a wall clock is a different question and the whole-day answer is wrong on the two
- *  days a year it changes: measured against the tz database, this read 02:30 for 01:30 EST
- *  on 8 March 2026 and 00:30 for 01:30 EDT on 1 November, an hour out from midnight until
- *  the switch at 2am each time.
+ *  the charts use. The source's fall boundary uses the standard UTC offset, while the
+ *  platform knows the actual instant when the clocks move. The old whole-day fallback
+ *  was an hour out from midnight until the switch at 2am on both transition dates.
  *
  *  The arithmetic below is kept as a fallback for a browser with no Intl timezone support
- *  or a settings entry with no name to look up, where being an hour out for two hours a
- *  year is better than not knowing the time at all. */
+ *  or a settings entry with no name to look up. It follows the workbook's precise
+ *  calcTIMEZONE boundaries, including its standard-offset fall boundary. */
 export function shulNow(now, settings) {
   const zone = settings.timezone?.id;
   if (zone) {
@@ -244,20 +239,8 @@ export function shulNow(now, settings) {
       // No Intl timezone support: fall through to the arithmetic.
     }
   }
-  const utcMinutes = now.getTime() / 60000;
-  // The offset is looked up for the day the moment falls on, which needs the day, which
-  // needs the offset. Standard time first, then again on the day that lands on: an hour
-  // either way can only change the answer within an hour of midnight, and the second pass
-  // is on the right side of the DST change by then.
-  let serial = Math.floor((utcMinutes + settings.timezone.utcOffset * 60) / 1440) + 25569;
-  for (let pass = 0; pass < 2; pass++) {
-    const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-    const local = utcMinutes + offsetHours * 60;
-    const next = Math.floor(local / 1440) + 25569;
-    if (next === serial) return { serial, mins: local - Math.floor(local / 1440) * 1440 };
-    serial = next;
-  }
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial), settings.timezone);
-  const local = utcMinutes + offsetHours * 60;
-  return { serial, mins: local - Math.floor(local / 1440) * 1440 };
+  const { offsetHours } = timezoneOffsetUTC(now, settings.timezone);
+  const local = now.getTime() / 60000 + offsetHours * 60;
+  const day = Math.floor(local / 1440);
+  return { serial: day + 25569, mins: local - day * 1440 };
 }

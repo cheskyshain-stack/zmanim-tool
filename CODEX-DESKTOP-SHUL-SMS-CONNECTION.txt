@@ -1,0 +1,73 @@
+Activate Shul SMS for the existing calendar Announcements feed
+
+The user authorized every new SMS from the sender configured in Shul SMS to
+become an announcement, with its exact original wording and no AI filtering.
+Tasker already works. Keep its receiving URL and phone credentials unchanged.
+
+Source branch: codex/shul-sms-announcements
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Calendar: https://baismedrashoflakewoodcommons.org/admin/calendar/
+Private service: https://zmanim-calendar.cheskyshain.workers.dev
+Shul SMS: https://shul-signs-inbox.cheskyshain.chatgpt.site
+
+The cloud workspace is not authenticated to Cloudflare. The existing calendar
+GitHub deployment also failed because CLOUDFLARE_API_TOKEN is not configured.
+Use the computer already authorized for the shul Cloudflare account. Never use
+a temporary preview account or request credentials in chat.
+
+1. Fetch the feature branch. Use an isolated worktree if the checkout has other
+   work. Read CLAUDE.md and worker/calendar/README.md. Keep the existing CALENDAR
+   binding, CommunityCalendar class, lakewood-commons object name, v1 migration,
+   accounts, announcements, read markers, minyan settings and email connection.
+
+2. From the feature checkout, use Node 24 and the existing Cloudflare login:
+
+   npm ci --prefix worker/calendar --no-audit --no-fund
+   worker/calendar/node_modules/.bin/wrangler whoami
+   worker/calendar/node_modules/.bin/wrangler deploy --config worker/calendar/wrangler.jsonc
+
+   If the CLI is not authenticated, sign in normally on this computer first.
+   The existing configuration pins the authorized account and Worker name.
+   Deploy only this calendar service. Do not reset or bootstrap the owner.
+
+3. Verify /api/info with Origin https://baismedrashoflakewoodcommons.org and
+   confirm ready:true, private:true, smsImport:true and the existing capabilities.
+   Verify POST /api/sms-import/receive with {check:true}, no Origin and no key
+   returns 401. GET /api/sms-import without a session must also return 401 with
+   the allowed Origin. Do not create production accounts or test announcements.
+
+4. After service verification, publish the feature PR to main through the
+   repository's normal flow. Its GitHub Pages workflow builds the website.
+   Verify that the live calendar exposes Calendar access > Shul SMS connection
+   to the actual owner. Editors, viewers and View as previews cannot configure it.
+
+5. The real owner signs in normally and chooses Create connection key. Copy the
+   private key into Shul SMS > Announcements > Connect announcements. Do not put
+   the key or a calendar session in Git, logs, screenshots or chat. This check
+   writes no announcement. A connection key grants only SMS ingestion.
+
+6. Wait for a real SMS from the allowed sender. It should appear in the existing
+   private Announcements feed with author Shul and original text. The Shul SMS
+   inbox should show Posted to calendar announcements. Do not use synthetic
+   production posts to test. Existing setup SMS and browser tests are not backfilled.
+
+Key rotation and disconnection retain source receipts. Retrying a previously
+accepted SMS cannot duplicate, overwrite an edited announcement, restore a deleted
+announcement or mark anyone as having read it. Phone numbers and private connection
+metadata stay out of the calendar feed. Messages up to 16,000 characters are kept
+whole. Normal manually composed announcements retain their 4,000-character limit.
+If posting fails, Shul SMS retains the original, returns HTTP 503 and shows a
+pending delivery. Retry pending or retry the same captured Tasker payload.
+There is no scheduled retry while Shul SMS is closed in this version.
+
+Local verification already passed with synthetic accounts and messages:
+
+   node --test tests/calendar-model.mjs tests/calendar-announcements.mjs tests/calendar-email-import.mjs
+   python build-offline.py
+   node scripts/build-schedule-api.mjs
+   node tests/calendar-sms-import.cjs
+   node tests/calendar-email-import.cjs
+
+The SMS browser check verifies 320px, 393px and desktop layout, safe key handling,
+owner-only setup, long Hebrew text, independent unread counts, retry deduplication,
+key rotation and preservation of edits/deletions. No production content was created.

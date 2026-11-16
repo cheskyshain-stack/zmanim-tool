@@ -25,8 +25,9 @@
 import { dateFromHebrew, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { formatTime, roundToMinute, floorToMinute, ceilToMinute } from '../format.js';
+import { roundToMinute, floorToMinute, ceilToMinute } from '../format.js';
 import { parseTimes } from './slichos.js';
+import { zman } from '../zmanim/trace.js';
 
 /** The months, as the Hebrew date counts them: Nisan is 1, the way rules count them too.
  *  Both Adars are offered; a plain year has neither and takes אדר. */
@@ -50,7 +51,7 @@ export const OWN_ZMANIM = [
   { key: 'shmaGra', label: 'סוף זמן ק"ש גר"א', at: (d, s) => Z.sofZmanShmaGRA(d, s) },
   { key: 'tfilaGra', label: 'סוף זמן תפילה גר"א', at: (d, s) => Z.sofZmanTfilaGRA(d, s) },
   { key: 'chatzos', label: 'חצות', at: (d, s) => Z.solarNoon(d, s) },
-  { key: 'minchaGedola', label: 'מנחה גדולה', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
+  { key: 'minchaGedola', label: 'מנחה גדולה לחומרא', at: (d, s) => Z.minchaGedolaLechumra(d, s) },
   { key: 'minchaKetana', label: 'מנחה קטנה', at: (d, s) => Z.minchaKetana(d, s) },
   { key: 'plag', label: 'פלג המנחה', at: (d, s) => Z.plagHamincha(d, s) },
   { key: 'shkia', label: 'שקיעה', at: (d, s) => Z.sunsetElev(d, s) },
@@ -71,6 +72,13 @@ export const OWN_ROUNDING = [
   { key: 'down5', label: 'Down to the last 5 minutes', apply: (t) => Math.floor(t * 288) / 288 },
   { key: 'up5', label: 'Up to the next 5 minutes', apply: (t) => Math.ceil(t * 288) / 288 },
 ];
+
+/** Mincha Gedola rows round later, including rows saved with an older rounding choice. */
+export function ownRoundingFor(row) {
+  const selected = OWN_ROUNDING.find(round => round.key === row.round) || OWN_ROUNDING[0];
+  if (row.mode !== 'zman' || row.zman !== 'minchaGedola') return selected;
+  return OWN_ROUNDING.find(round => round.key === (selected.key.endsWith('5') ? 'up5' : 'up'));
+}
 
 /** The names a row is likely to want, so a sheet is picked rather than spelled. Anything not
  *  here is typed instead: the list is a shortcut, not a fence. Off the shul's own sheets. */
@@ -114,11 +122,24 @@ export function ownBlockSerial(block, year) {
 export function ownRowTimes(row, serial, settings) {
   if (!row) return [];
   if (row.mode !== 'zman') return parseTimes(row.text);
-  const zman = OWN_ZMANIM.find((z) => z.key === row.zman);
-  if (!zman) return [];
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
-  const at = zman.at(dateFromSerial(serial), settings) + (Number(row.offset) || 0) / 1440;
-  return [{ text: formatTime(round.apply(at)), underlined: Boolean(row.underlined), mark: row.mark || '' }];
+  const selectedZman = OWN_ZMANIM.find((z) => z.key === row.zman);
+  if (!selectedZman) return [];
+  const round = ownRoundingFor(row);
+  const day = dateFromSerial(serial);
+  let traced = row.zman === 'candles'
+    ? zman('שקיעה', Z.sunsetElev(day, settings)).minus(settings.candleLightingMinutes ?? 18, 'the candle-lighting setting')
+    : zman(selectedZman.label, selectedZman.at(day, settings));
+  if (row.zman === 'tzais50' || row.zman === 'tzais72') {
+    traced = zman('שקיעה', Z.sunsetElev(day, settings)).plus(row.zman === 'tzais50' ? 50 : 72);
+  } else if (row.zman === 'alos72') {
+    traced = zman('נץ', Z.sunriseElev(day, settings)).minus(72);
+  }
+  if (Number(row.offset)) traced = traced.plus(Number(row.offset), 'the offset selected for this custom row');
+  const rounding = { near: 'round', down: 'floor', up: 'ceil', down5: 'floorToStep', up5: 'ceilToStep' };
+  traced = ['down5', 'up5'].includes(round.key) ? traced[rounding[round.key]](5) : traced[rounding[round.key]]();
+  if (row.underlined) traced = traced.underline();
+  if (row.mark) traced = traced.mark(row.mark);
+  return [{ text: traced.plain(), underlined: Boolean(row.underlined), mark: row.mark || '', trace: traced }];
 }
 
 /** What a row off a זמן says it is, in words, for the editor and for the Calculations page:
@@ -128,7 +149,7 @@ export function ownRuleText(row) {
   if (!zman) return '';
   const mins = Number(row.offset) || 0;
   const when = mins === 0 ? 'at' : `${Math.abs(mins)} minutes ${mins < 0 ? 'before' : 'after'}`;
-  const round = OWN_ROUNDING.find((r) => r.key === row.round) || OWN_ROUNDING[0];
+  const round = ownRoundingFor(row);
   return `${when} ${zman.label}, ${round.label.toLowerCase()}`;
 }
 

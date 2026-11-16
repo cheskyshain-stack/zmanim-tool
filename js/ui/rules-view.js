@@ -1,4 +1,5 @@
 import { newId } from '../storage.js';
+import { keepPosition } from './keep-position.js';
 import { KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { CHOREF_COLUMNS } from '../sheets/choref.js';
 import { escText, escAttr } from '../util.js';
@@ -7,6 +8,10 @@ import { escText, escAttr } from '../util.js';
  *  Null (the default) shows just the list - most visits here are to glance at the
  *  rules, not write one, and the creation form used to sit open below them permanently. */
 export function renderRules(container, state, onChange, editingRuleId = null) {
+  return keepPosition(container, () => drawRules(container, state, onChange, editingRuleId));
+}
+
+function drawRules(container, state, onChange, editingRuleId) {
   // Editing loads the rule's values into the same form used for adding; submitting
   // then updates that rule in place (keeping its id and enabled state) instead of
   // appending a new one.
@@ -54,7 +59,6 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
   container.querySelector('#rule-edit-cancel').addEventListener('click', () => renderRules(container, state, onChange));
   container.querySelector('#rule-add').addEventListener('click', () => {
     renderRules(container, state, onChange, 'new');
-    container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   });
 
   const list = container.querySelector('#rules-list');
@@ -80,6 +84,10 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
         .join('')
     : '<p class="hint">No rules yet.</p>';
 
+  // Edit beside the selected rule instead of scrolling away to a form under the list.
+  const row = prefill && [...list.querySelectorAll('.rule-row')].find(el => el.dataset.id === prefill.id);
+  if (row) row.after(container.querySelector('#rule-form-title'), container.querySelector('#rule-form'));
+
   list.querySelectorAll('.rule-enabled').forEach((cb) => {
     cb.addEventListener('change', (e) => {
       const id = e.target.closest('.rule-row').dataset.id;
@@ -90,13 +98,11 @@ export function renderRules(container, state, onChange, editingRuleId = null) {
   list.querySelectorAll('.rule-edit').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       renderRules(container, state, onChange, e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
   });
   list.querySelectorAll('.rule-clone').forEach((btn) => {
     btn.addEventListener('click', (e) => {
       renderRules(container, state, onChange, 'clone:' + e.target.closest('.rule-row').dataset.id);
-      container.querySelector('#rule-form-title').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
   });
   list.querySelectorAll('.rule-delete').forEach((btn) => {

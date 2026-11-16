@@ -1,4 +1,6 @@
+import { websiteNow } from '../website-clock.js';
 import { safeHeaderImage } from '../security.js';
+import { keepPosition } from './keep-position.js';
 // Posters: the sheets the shul hangs that are not the zmanim board.
 //
 // Two so far, שבת שובה and סליחות, and the tab is shaped for the others to follow rather
@@ -24,19 +26,30 @@ import { buildRoshHashanaPoster, RH_TEXT } from '../posters/roshhashana.js';
 import { erevRoshHashanaText } from '../erev-yomtov-text.js';
 import { buildYomKippurPoster, buildAfterYomKippurPoster, YK_TEXT } from '../posters/yomkippur.js';
 import { buildTzomGedaliaPoster, TZG_TEXT } from '../posters/tzomgedalia.js';
+import { buildAsaraBTevesPoster, ASARA_TEXT } from '../posters/asarabteves.js';
+import { buildShivaAsarTammuzPoster, TAMMUZ_TEXT } from '../posters/shiva-asar-tammuz.js';
+import { buildAsaraShacharisPoster, buildBehabShacharisPoster, BEHAB_SHACHARIS_TEXT, shacharisRoomRows, shacharisDayGroups,
+  buildRoshChodeshShacharisPoster, ROSH_CHODESH_SHACHARIS_MONTHS, roshChodeshShacharisTitle } from '../posters/shacharis.js';
 import { buildPairPoster, buildSlichosTzomPoster } from '../posters/pair.js';
 import { buildSukkosPoster, buildSukkosShuavaPoster, SK_TEXT, SK_SHUAVA } from '../posters/sukkos.js';
 import { buildPesachPoster, PS_TEXT } from '../posters/pesach.js';
 import { buildVasikinPoster, VS_TEXT } from '../posters/vasikin.js';
+import { buildChanukahPoster, CH_TEXT, toCell } from '../posters/chanukah.js';
 import { buildOwnPoster } from '../posters/own.js';
-import { renderOwnEditor, newOwnSheet } from './own-view.js';
+import { renderOwnEditor } from './own-view.js';
 import { saveState } from '../storage.js';
-import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday } from '../hebrew-calendar.js';
-import { excelSerial, dateFromSerial } from '../zmanim/solar.js';
+import { hebrewDateExtended, hebrewYear, roshHashana, jewishDateString, excelWeekday, dateFromHebrew, hasParsha } from '../hebrew-calendar.js';
+import { excelSerial, dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { fontStackFor } from './sheet-view.js';
-import { hebrewLang, DAY_NAMES, SLASH, escAttr } from '../util.js';
+import { hebrewLang, DAY_NAMES, SLASH, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { switchHtml, wireSwitch } from './switch.js';
+import { posterTimeExplanationHtml, timeExplanationAttrs } from './time-explanations.js';
+import { attachZmanimReference } from './zmanim-references.js';
+import { posterReferenceDates } from '../zmanim/references.js';
+import { specialScheduleControls, occasionOptions, orderedOccasionChoices, specialOccasionChoices, SPECIAL_COLLECTIONS, specialCollectionEntries } from './special-schedule-controls.js';
+import { normalizeHalfPagePairs } from './half-page-pairs.js';
+import { newPrintPage, normalizePrintPages, specialPrintPlan } from './special-print-job.js';
 
 /** Times New Roman, the face the Word posters the shul already hangs were set in. Fixed
  *  rather than taken from the sheet style: a poster is its own document and does not
@@ -51,9 +64,13 @@ const POSTER_FONT = 'Times New Roman';
  *  The year number turns over at ר"ה, so "this year" stops being the useful answer the
  *  moment יו"כ is past: in אלול 5786 the calendar still says 5786, but the סליחות a week
  *  away are for ר"ה 5787. This asks the question the poster asks, which yomim noraim are
- *  still ahead, and rolls over the day after יו"כ. */
-export function nextYomimNoraim(today = new Date()) {
-  const serial = excelSerial(today);
+ *  still ahead, and rolls over the day after יו"כ.
+ *
+ *  `now` reads through shulNow rather than excelSerial's own UTC day, so a visitor (or this
+ *  admin's own browser) checking between roughly 7pm and midnight Eastern still gets the
+ *  shul's own today, not tomorrow's UTC date. */
+export function nextYomimNoraim(settings, now = websiteNow()) {
+  const serial = shulNow(now, settings).serial;
   const year = hebrewDateExtended(serial).year;
   const yomKippur = (y) => roshHashana(y - 3761) + 9; // 10 תשרי
   return serial > yomKippur(year) ? year + 1 : year;
@@ -76,7 +93,7 @@ const YEARS_AHEAD = 7;
  *  The one coming up with a few either side of it, plus any year a generated chart covers the
  *  שבת שובה of, which is not the year written on that chart (see shuvaSheetsFor). */
 function posterYears(state) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), resolveSettings(state.settings)).serial).year;
   const years = new Set();
   for (let y = next - YEARS_BACK; y <= next + YEARS_AHEAD; y++) years.add(y);
   for (const sheet of state.sheets) {
@@ -126,6 +143,31 @@ function yearLabel(y) {
  *  can be built from, and how to draw it. A source is one option in the picker, carrying
  *  its own build() so this table is the only place that knows what a given poster needs. */
 const POSTERS = [
+  ...[
+    { key: 'asarashacharis', label: 'עשרה בטבת · שחרית', build: buildAsaraShacharisPoster },
+    { key: 'behabcheshvan', label: BEHAB_SHACHARIS_TEXT.afterSukkos, build: (y, s) => buildBehabShacharisPoster(y, 8, s, posterTables) },
+    { key: 'behabiyar', label: BEHAB_SHACHARIS_TEXT.afterPesach, build: (y, s) => buildBehabShacharisPoster(y, 2, s, posterTables) },
+    ...ROSH_CHODESH_SHACHARIS_MONTHS.map(month => ({
+      key: `roshchodesh${month}`, label: roshChodeshShacharisTitle(month), group: 'ראש חודש',
+      dated: true,
+      build: (y, s) => buildRoshChodeshShacharisPoster(y, month, s),
+    })),
+  ].map(({ key, label, group = label, dated, build }) => ({
+    key, label, group, dated,
+    // Supplementary morning handouts are picked separately from the complete schedules.
+    handout: true,
+    covers: y => `${label} ${hebrewYear(y)}`,
+    when: built => when(built.span.from, built.span.to),
+    starts: (y, settings) => build(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map(y => ({
+        id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
+        build: () => ({ poster: build(y, settings) }),
+      }));
+    },
+    render: renderShacharisHandout,
+  })),
   {
     key: 'slichos',
     label: 'סליחות',
@@ -233,6 +275,55 @@ const POSTERS = [
     render: renderTzomGedaliaPoster,
   },
   {
+    key: 'chanukah',
+    label: 'חנוכה',
+    group: 'חנוכה',
+    covers: (y) => `${CH_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildChanukahPoster(y, settings, posterTables)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y),
+        year: y,
+        label: yearLabel(y),
+        preferred: y === preferred,
+        build: () => ({ poster: buildChanukahPoster(y, settings, posterTables) }),
+      }));
+    },
+    render: renderChanukahPoster,
+  },
+  {
+    key: 'asarabteves',
+    label: ASARA_TEXT.title,
+    group: ASARA_TEXT.title,
+    covers: (y) => `${ASARA_TEXT.title} ${hebrewYear(y)}`,
+    when: (built) => when(built.span.from, built.span.to),
+    starts: (y, settings) => buildAsaraBTevesPoster(y, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map((y) => ({
+        id: String(y), year: y, label: yearLabel(y), preferred: y === preferred,
+        build: () => ({ poster: buildAsaraBTevesPoster(y, settings) }),
+      }));
+    },
+    render: renderAsaraBTevesPoster,
+  },
+  {
+    key: 'shivaasartammuz',
+    label: TAMMUZ_TEXT.title,
+    group: TAMMUZ_TEXT.title,
+    covers: y => `${TAMMUZ_TEXT.title} ${hebrewYear(y)}`,
+    when: built => when(built.span.from, built.span.to),
+    starts: (year, settings) => buildShivaAsarTammuzPoster(year, settings)?.span.from ?? null,
+    sources: (state, settings) => {
+      const { years, preferred } = posterYears(state);
+      return years.map(year => ({ id: String(year), year, label: yearLabel(year), preferred: year === preferred,
+        build: () => ({ poster: buildShivaAsarTammuzPoster(year, settings) }) }));
+    },
+    render: renderAsaraBTevesPoster,
+  },
+  {
     key: 'shuva',
     label: 'שבת שובה דרשה',
     covers: (y) => `שבת שובה ${hebrewYear(y)}`,
@@ -306,6 +397,16 @@ const POSTERS = [
     covers: (y) => `${YK_TEXT.afterHeading} ${hebrewYear(y)}`,
     when: (built) => when(built.span.from, built.span.to),
     starts: (y, settings) => buildAfterYomKippurPoster(y, settings)?.span.from ?? null,
+    /* Printed as its own section at the foot of the ראש השנה יום כיפור sheet (see
+       ONEPAGE_SECTIONS.afteryk) so whoever kept that sheet on the wall still has a schedule to
+       read the week after יו"כ, without it the sheet would have a morning and nothing after it
+       - but that stretch is not why the sheet stays up on the congregation's own site. It is
+       the same days the Weekday chart already prints (afterYomKippurRow in sheets/weekday.js),
+       and the shul asked for the site to stop counting it: a page reading "Special Schedules"
+       through ערב סוכות when the actual special schedule ended at יו"כ is the wrong answer,
+       since the ordinary weekly page already has that week. See buildEveryPoster's own span,
+       which skips an `extra` poster's dates rather than folding them into the occasion's. */
+    extra: true,
     sources: (state, settings) => {
       const { years, preferred } = posterYears(state);
       return years.map((y) => ({
@@ -422,9 +523,9 @@ const POSTERS = [
       ? (built.sheets
         ? `<div class="poster-all">${built.sheets.map((b) => `<div class="poster-all-item">
             <p class="poster-all-name no-print"${hebrewLang(b.title)}>${escAttr(b.title)}</p>
-            ${renderOnePagePoster(b, settings)}
+            ${renderOnePagePoster(b, settings, opts)}
           </div>`).join('')}</div>`
-        : renderOnePagePoster(built, settings))
+        : renderOnePagePoster(built, settings, opts))
       : renderAllPosters(built, settings, opts)),
   },
 ];
@@ -485,7 +586,8 @@ function postersByDate(year, settings, state) {
     try { from = p.last ? null : p.starts?.(year, settings) ?? null; } catch { from = null; }
     at.set(p, { from, i, last: Boolean(p.last) });
   });
-  const sorted = [...all].sort((a, b) => {
+  // Omit months absent in this year and occasions that fall entirely on Shabbos.
+  const sorted = all.filter(p => !p.dated || at.get(p).from != null).sort((a, b) => {
     const x = at.get(a);
     const y2 = at.get(b);
     if (x.last !== y2.last) return x.last ? 1 : -1;
@@ -509,8 +611,8 @@ function postersByDate(year, settings, state) {
  *
  *  Adding sheets to one of them is the whole of filling it in: a poster carries
  *  `group: 'סוכות'`, its name here already has the place, and the posters under it sort by
- *  date like everything else. A poster whose group is not in this table still shows, after
- *  these, so a name typed one way in a poster and another way here cannot lose the sheet. */
+ *  date like everything else. Additional groups join the picker by their own dates,
+ *  so adding a sheet cannot put it after holidays that happen later in the year. */
 const POSTER_OCCASIONS = [
   'ראש השנה יום כיפור',
   'סוכות',
@@ -526,6 +628,18 @@ const POSTER_OCCASIONS = [
 /** Which heading a poster sits under when it does not name one. Every sheet so far belongs
  *  to the first occasion, so that is the default and no entry above has to say it. */
 const POSTER_GROUP_DEFAULT = POSTER_OCCASIONS[0];
+
+/** Undrawn occasions still have a calendar date, so they stay in order in the picker. */
+function posterOccasionStart(name, year) {
+  // Purim is sixteen days before Rosh Chodesh Nisan in both common and leap years.
+  if (name === 'פורים') return dateFromHebrew(1, 1, year) - 16;
+  const dates = {
+    'ראש השנה יום כיפור': [1, 7], 'סוכות': [15, 7], 'חנוכה': [25, 9],
+    'עשרה בטבת': [10, 10], 'פסח': [15, 1],
+    'שבועות': [6, 3], 'שבעה עשר בתמוז': [17, 4], 'תשעה באב': [9, 5],
+  };
+  return dates[name] ? dateFromHebrew(...dates[name], year) : null;
+}
 
 /** The posters cut into those headings, both in date order.
  *
@@ -549,8 +663,12 @@ function posterGroups(year, settings, state) {
     const days = items.map((p) => sorted.starts.get(p)?.from).filter((d) => d != null);
     return days.length ? Math.max(...days) : null;
   };
+  const firstStart = (items) => {
+    const days = items.map((p) => sorted.starts.get(p)?.from).filter((d) => d != null);
+    return days.length ? Math.min(...days) : null;
+  };
   return [
-    ...[...byName].map(([name, items]) => ({ name, items, lastStart: lastStart(items) })),
+    ...[...byName].map(([name, items]) => ({ name, items, firstStart: firstStart(items), lastStart: lastStart(items) })),
     ...loose.map((p) => ({ name: null, items: [p], lastStart: null })),
   ];
 }
@@ -572,6 +690,7 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
   const left = [];
   for (const p of postersByDate(year, settings, state)) {
     if (p.last) continue;
+    if (p.handout && !group) continue;
     /* Only the occasion showing in the picker. "All of them" used to mean every sheet of the
        year whichever yom tov was chosen, so picking סוכות and asking for a sheet each handed
        over סליחות, ראש השנה and the rest as well. The picker says which yom tov and the switch
@@ -594,12 +713,21 @@ function buildEveryPoster(state, settings, year, { combined = true, group = null
         // Whether this one reads the Page picker, which is what decides if it has to be
         // turned on its side to sit in the run.
         orientations: Boolean(p.orientations),
+        // A section printed on the combined sheet for its own sake (afteryk, so far) rather
+        // than a date this occasion is actually about. Kept in `items` so it still prints; left
+        // out of the span below so it cannot keep the occasion "needed" on the congregation's
+        // site past its own last real day. See the note on afteryk above.
+        extra: Boolean(p.extra),
       });
     }
     else missing.push(p.label);
   }
   if (!items.length) return { missing: 'Nothing to build for this year.' };
-  const spans = items.map((i) => i.poster.span).filter(Boolean);
+  const real = items.filter((i) => !i.extra).map((i) => i.poster.span).filter(Boolean);
+  // An occasion built only from extra sections (should not happen; every occasion so far has a
+  // real sheet of its own) still needs a span, so the extra ones answer rather than leave the
+  // occasion with no window to speak of at all.
+  const spans = real.length ? real : items.map((i) => i.poster.span).filter(Boolean);
   return {
     poster: {
       hebrewYear: year,
@@ -630,6 +758,7 @@ function buildEveryOnePage(state, settings, year) {
   const sheets = [];
   for (const g of posterGroups(year, settings, state)) {
     if (!g.name || !g.items.length) continue;
+    if (g.items.every(p => p.handout)) continue;
     const one = buildEveryPoster(state, settings, year, { combined: false, group: g.name });
     if (one.poster) sheets.push(one.poster);
   }
@@ -705,12 +834,20 @@ function renderAllPosters(built, settings, { landscape = false } = {}) {
  *  halves of each are already on it under their own names, and a sheet holding them twice is
  *  the same schedule said twice.
  *
- *  Only two years are looked at. Every sheet's dates sit within a month of ר"ה, and
- *  nextYomimNoraim rolls over the day after יו"כ, so the year it names covers everything still
- *  ahead and the year before it covers the sheets that run past יו"כ, which from סוכות onwards
- *  is most of them. A year nowhere near today is not built at all: this is asked on the page
- *  every visitor lands on, and building a season to find out that none of it is up cost 120ms
- *  on a slow phone. The dates come from the calendar, which costs nothing.
+ *  Only two years are looked at: the Hebrew year today is in, and the one before it - between
+ *  the two, every occasion from ר"ה through the following אלול is covered once, since a date
+ *  either side of a Rosh Hashana falls in whichever of the pair that Rosh Hashana belongs to.
+ *  A year nowhere near today is not built at all: this is asked on the page every visitor
+ *  lands on, and building a season to find out that none of it is up cost 120ms on a slow
+ *  phone. The dates come from the calendar, which costs nothing.
+ *
+ *  This used to skip a year unless `on` fell within about a month of its own Rosh Hashana -
+ *  true of ר"ה, יו"כ and סוכות, which is all POSTER_OCCASIONS held when this was written, but
+ *  not of חנוכה, three months later, or anything after it: the live page could never show
+ *  them, whatever the admin's own Posters tab could build on demand. Caught the same way the
+ *  gap in ONEPAGE_SECTIONS was: asked to make the one-page sheet work for חנוכה and it did not,
+ *  anywhere a visitor could actually reach it. The window is the whole Hebrew year now, not a
+ *  month of it.
  *
  *  No calendar tables are passed in, so שבת שובה comes off the published chart or not at all.
  *  That is the right way round here rather than a shortcut: the chart is what the board says,
@@ -732,7 +869,7 @@ export const ONEPAGE_LEAD_DAYS = 10;
  *  questions are different: they read the identical `buildEveryPoster` and the identical
  *  ותיקין call, so the two cannot describe two different calendars. */
 export function onePageOccasionSpans(state, settings) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     for (const name of POSTER_OCCASIONS) {
@@ -766,12 +903,16 @@ export function onePageOccasionSpans(state, settings) {
   return out.sort((a, b) => a.span.from - b.span.from || a.span.to - b.span.to);
 }
 
-export function currentOnePageSheets(state, settings, { on = excelSerial(new Date()), lead = ONEPAGE_LEAD_DAYS } = {}) {
-  const next = hebrewDateExtended(excelSerial(new Date())).year;
+export function currentOnePageSheets(state, settings, { on = shulNow(websiteNow(), settings).serial, lead = ONEPAGE_LEAD_DAYS, tables = null } = {}) {
+  if (tables) posterTables = tables;
+  const next = hebrewDateExtended(shulNow(websiteNow(), settings).serial).year;
   const out = [];
   for (const year of [next - 1, next]) {
     const rh = roshHashana(year - 3761);
-    if (on < rh - 45 || on > rh + 35) continue;
+    const rhAfter = roshHashana(year - 3761 + 1);
+    // lead rather than a fixed number: a sheet can go up this many days before its own first
+    // date, and that is as early as this year has anything worth building for.
+    if (on < rh - lead || on >= rhAfter) continue;
     for (const name of POSTER_OCCASIONS) {
       let built = null;
       try {
@@ -782,13 +923,15 @@ export function currentOnePageSheets(state, settings, { on = excelSerial(new Dat
       if (!built?.span) continue;
       const { from, to } = built.span;
       if (on < from - lead || on > to) continue;
+      const handout = Boolean(posterTables && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key));
       out.push({
         key: `onepage-${year}-${name}`,
         year,
         label: name,
         span: built.span,
         when: when(from, to),
-        html: renderOnePagePoster(built, settings),
+        handout,
+        html: handout ? `<div class="poster-half-sheet">${renderHalfSchedulePoster(built.items[0].poster, built.items[0].key, settings, { standalone: true })}</div>` : renderOnePagePoster(built, settings),
       });
     }
     let vasikin = null;
@@ -804,7 +947,7 @@ export function currentOnePageSheets(state, settings, { on = excelSerial(new Dat
         label: VS_TEXT.who,
         span: vasikin.span,
         when: when(vasikin.span.from, vasikin.span.to),
-        html: renderVasikinPoster(vasikin, settings),
+        html: renderModernVasikinPoster(vasikin, settings),
       });
     }
   }
@@ -857,7 +1000,10 @@ function buildShuvaFor(state, settings, hebrewYearNum) {
  *  somebody holding a poster and a board is reading one system. */
 function timeHtml(t) {
   const body = t.underlined ? `<u>${escAttr(t.text)}</u>` : escAttr(t.text);
-  return `${body}${escAttr(t.mark || '')}`;
+  const time = posterTimeExplanationHtml(`${body}${escAttr(t.mark || '')}`, t);
+  return t.timeNote
+    ? `<span class="poster-annotated-time">${time}<bdi class="poster-time-note" dir="rtl" lang="he">(${escAttr(t.timeNote)})</bdi></span>`
+    : time;
 }
 
 /** A זמן given both ways, set as two little columns: the name of each reckoning over its own
@@ -883,12 +1029,12 @@ const isReckoned = (times) => times.length > 1 && times.every((t) => t.name);
  *
  *  Shared so the two posters cannot drift apart on the parts that are the shul rather than
  *  the occasion. */
-function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, both = false } = {}) {
+function posterShell(settings, body, legend = [], { dense = false, pair = false, landscape = false, chartHead = false, onepage = false, sukkos = false, vasikin = false, modernVasikin = false, both = false, chanukah = false, halfpage = false, shacharis = false, asaraDetailed = false } = {}) {
   const rabbi = String(settings.headerRabbiLine || '').split('\n').filter(Boolean);
   const cls = `poster${dense ? ' is-dense' : ''}${pair ? ' is-pair' : ''}`
     + `${landscape ? ' is-landscape' : ''}${chartHead ? ' is-chart-head' : ''}`
     + `${onepage ? ' is-onepage' : ''}${sukkos ? ' is-sukkos' : ''}${vasikin ? ' is-vasikin' : ''}`
-    + `${both ? ' is-both' : ''}`;
+    + `${modernVasikin ? ' is-modern-vasikin' : ''}${both ? ' is-both' : ''}${chanukah ? ' is-chanukah' : ''}${halfpage ? ' is-halfpage' : ''}${shacharis ? ' is-shacharis' : ''}${asaraDetailed ? ' is-asara-detailed' : ''}`;
   const wordmark = `<img class="poster-wordmark" src="/assets/logo-text.png"
          alt="${escAttr(settings.shulName)}"${hebrewLang(settings.shulName)} width="1776" height="237">
     <div class="poster-subtitle"${hebrewLang(settings.headerSubtitle)}>${escAttr(settings.headerSubtitle)}</div>`;
@@ -909,7 +1055,7 @@ function posterShell(settings, body, legend = [], { dense = false, pair = false,
      Out of Settings, so a shul that has cropped its own photo in has it here as well, and
      alt="" because the name beside it already says what it is. */
   const icon = onepage
-    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage))}" alt="">`
+    ? `<img class="header-icon" src="${escAttr(safeHeaderImage(settings.headerIconImage, true))}" alt="">`
     : '';
   const head = chartHead
     /* The wall chart's header, copied: the same markup and the same classes, so the two are
@@ -945,7 +1091,7 @@ function renderShuvaPoster(poster, settings) {
   const body = `
     <h2 class="poster-title" lang="he">${escAttr(SHUVA_TEXT.title)}</h2>
     ${SHUVA_TEXT.lines.map((l) => `<p class="poster-line" lang="he">${escAttr(l)}</p>`).join('')}
-    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${escAttr(poster.drasha)}</bdi></p>` : ''}
+    ${poster.drasha ? `<p class="poster-at" lang="he">${escAttr(SHUVA_TEXT.at)} <bdi>${timeHtml({ text: poster.drasha, trace: poster.drashaTrace, explanation: poster.explanation })}</bdi></p>` : ''}
     <p class="poster-mincha" lang="he"><span class="poster-row-label">${escAttr(SHUVA_TEXT.minchaLabel)}</span>
       <bdi>${poster.mincha.map(timeHtml).join(', ')}</bdi></p>`;
   return posterShell(settings, body, poster.legend);
@@ -972,7 +1118,7 @@ function slichosBody(poster) {
     // with Hebrew now inside the run, the first strong character is the note's and auto would
     // turn the whole list around. Measured after the change, not assumed.
     const parts = r.times.map(timeHtml);
-    const note = r.note ? `<bdi class="poster-row-note">${escAttr(r.note)}</bdi>` : '';
+    const note = r.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace) || [], note: r.note })}>${escAttr(r.note)}</bdi>` : '';
     // On the left of the first time, which is the side it has always been on: it says that
     // מנין runs five minutes earlier on the days it names, so it belongs against that time
     // and not against the row's last one.
@@ -1053,14 +1199,28 @@ function renderRoshHashanaPoster(poster, settings) {
   return posterShell(settings, rhBody(poster), poster.legend || [], { dense: true });
 }
 
-/** A מנין ותיקין sheet: the occasion and the year, the two lines that say whose minyan it is,
- *  and then five lines a day.
- *
- *  Nothing of its own. The title is the title every sheet on this tab carries, the two lines
- *  under it are .poster-line, which is what the שבת שובה sheet says its own lines with, the day
- *  headings are .poster-day, and the rows are the ראש השנה sheet's rows. It was drawn with a
- *  header block of its own for a while and that was a page layout nobody had asked for: a new
- *  sheet should be the pieces already here, arranged, so it reads like the rest of the wall. */
+/** The approved Netz layout, using the existing day's lines and explanation traces.
+ *  Sunrise keeps its seconds, with no generic whole-minute rounding note. */
+function renderModernVasikinPoster(poster, settings) {
+  const rows = day => `<div class="netz-rows">${day.lines.map(line => `<div class="netz-row">
+    <span lang="he">${escAttr(line.label)}</span><strong dir="ltr">${timeHtml({ text: line.text, trace: line.trace })}</strong>
+  </div>`).join('')}</div>`;
+  const sections = poster.sections.map((section, index) => `<section class="netz-block${index ? ' netz-kippur' : ''}">
+    <h3 class="onepage-sec-head" lang="he">${escAttr(section.heading)}</h3>
+    ${section.days.length > 1 ? `<div class="netz-days">${section.days.map(day => `<section class="netz-day">
+      <h3 lang="he">${escAttr(day.heading)}</h3>${rows(day)}</section>`).join('')}</div>` : rows(section.days[0])}
+  </section>`).join('');
+  const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
+  const body = `<div class="netz-intro">
+    <p class="netz-motto" lang="he">${escAttr(VS_TEXT.motto)}</p>
+    <h2 class="netz-title" lang="he">${escAttr(VS_TEXT.who)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>
+    <p class="netz-location" lang="he">${escAttr(VS_TEXT.where)} · <bdi dir="ltr">${escAttr(VS_TEXT.address)}</bdi></p>
+  </div>${sections}
+  ${address ? `<footer class="netz-footer" dir="ltr">${address.split('\n').map(line => `<p>${escAttr(line)}</p>`).join('')}</footer>` : ''}`;
+  return posterShell(settings, body, [], { onepage: true, chartHead: true, modernVasikin: true });
+}
+
+/** The original framed layout remains available under Old design. */
 function renderVasikinPoster(poster, settings) {
   /* The day's heading stands above its rows box rather than inside it, which the other sheets
      do not need and this one does: the rule between יום א' and יום ב' is drawn down the side of
@@ -1074,7 +1234,7 @@ function renderVasikinPoster(poster, settings) {
   const day = (d) => `${d.heading ? `<h3 class="poster-day" lang="he">${escAttr(d.heading)}</h3>` : ''}
     <div class="poster-rows is-dense">
       <div class="poster-times">
-        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '' }])).join('')}
+        ${d.lines.map((ln) => rhRow(ln.label, [{ text: ln.text, underlined: false, mark: '', trace: ln.trace }])).join('')}
       </div>
     </div>`;
   /* Two days side by side, one day down the middle. That is how the Word sheets are built:
@@ -1187,10 +1347,29 @@ function balanceRuns(container) {
      keeps the break between the two: see .poster-run and the box in app.css. */
   const wrapped = (times) => times.length > 1 && times[times.length - 1].offsetTop > times[0].offsetTop;
   const cuts = [];
-  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run')) {
-    const times = [...run.querySelectorAll(':scope > .poster-t')];
+  for (const run of container.querySelectorAll('.poster-box-row .poster-row-times, .poster-run, .poster-chanukah-run')) {
+    // .poster-chanukah-run's own times sit one level deeper now, inside their own dir="ltr"
+    // bdi (see chanukahRunLine) rather than as this run's own direct children, so :scope >
+    // would find only its label (if any) and miss every time. A plain descendant search
+    // still finds exactly one .poster-t per time on the other two, flat, shapes too.
+    const times = [...run.querySelectorAll('.poster-t')];
     if (!wrapped(times)) continue;
-    const cut = Math.floor(times.length / 2);
+    /* A run carrying a נץ note cuts right after it rather than at the halfway mark, asked
+       for directly on the חנוכה sheet's own merged שחרית row: the note is about the one
+       time in front of it (the ותיקין time, or the first מנין a sukkosRow note is paired
+       with), and a plain half-and-half cut can leave an ordinary time or two sitting on the
+       note's own line for no reason other than where the midpoint happened to fall, while
+       the rest of an unrelated run wraps below it. Only applies where something besides the
+       note's own paired time actually precedes the note (a row's label, here, is itself a
+       .poster-t) - a sukkosRow note has nothing of its own in front of it, so the first
+       .poster-t after it is the very time it is paired with, and an index of 0 there is not
+       a cut at all; that case falls back to the even split exactly as before, which is what
+       already keeps that note beside its own time. */
+    const note = run.querySelector('.poster-row-note');
+    const afterNote = note
+      ? times.findIndex((t) => note.compareDocumentPosition(t) & Node.DOCUMENT_POSITION_FOLLOWING)
+      : -1;
+    const cut = afterNote > 0 ? afterNote : Math.floor(times.length / 2);
     if (cut) cuts.push({ run, rest: times.slice(cut) });
   }
   for (const { run, rest } of cuts) {
@@ -1290,7 +1469,7 @@ function sukkosRow(ln) {
 
      Joined to the first time by a non-breaking space, so the נץ and the מנין it is the נץ for
      can never be split across two lines. See onePageRows for where that showed. */
-  const note = ln.note ? `<bdi class="poster-row-note">${escAttr(ln.note)}</bdi>\u00A0` : '';
+  const note = ln.note ? `<bdi class="poster-row-note"${timeExplanationAttrs({ header: ln.label, printed: ln.note, times: ln.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: ln.note })}>${escAttr(ln.note)}</bdi>\u00A0` : '';
   const times = !ln.times.length
     ? note
     : isReckoned(ln.times)
@@ -1357,14 +1536,14 @@ function renderSukkosShuavaPoster(poster, settings) {
   const body = `
     <div class="poster-shuava">
       <h2 class="poster-shuava-head" lang="he">${escAttr(t.title)}</h2>
-      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi>${escAttr(t.at)}</bdi></p>
+      <p class="poster-shuava-line" lang="he">${escAttr(t.when)} <bdi${timeExplanationAttrs({ header: t.title, printed: t.at, fixed: true })}>${escAttr(t.at)}</bdi></p>
       <p class="poster-shuava-line" dir="ltr">${escAttr(t.where)}</p>
       <hr class="poster-shuava-rule">
       <!-- Where it is, spelled out. This sheet has no key on it and nothing on it is marked,
            so the words are the only thing that can say it; the schedule says it with a star
            instead and prints the name alone. -->
       <h2 class="poster-shuava-head" lang="he">${escAttr(`${t.mishna} ${t.mishnaWhere}`)}</h2>
-      <p class="poster-shuava-line" dir="ltr">${escAttr(t.mishnaAt)}</p>
+      <p class="poster-shuava-line" dir="ltr"${timeExplanationAttrs({ header: t.mishna, printed: t.mishnaAt, fixed: true })}>${escAttr(t.mishnaAt)}</p>
       <p class="poster-shuava-line" lang="he">${escAttr(t.mishnaMaariv)}</p>
     </div>`;
   return posterShell(settings, body, poster.legend || []);
@@ -1406,24 +1585,259 @@ function renderAfterYomKippurPoster(poster, settings) {
  *
  *  One block is a note rather than a תפילה: the שקיעה, which stands between מנחה and מעריב
  *  with no heading of its own. */
-function tzomGedaliaBody(poster) {
+function fastDayBody(poster, title) {
   const timeLine = (times) =>
-    `<p class="poster-set-line" lang="he"><bdi>${times.map(timeHtml).join(', ')}</bdi></p>`;
+    `<p class="poster-set-line" lang="he"><bdi dir="ltr">${times.map(timeHtml).join(', ')}</bdi></p>`;
   const section = (s) => (s.note
     ? `<div class="poster-set"><p class="poster-set-note" lang="he">${escAttr(s.note.label)}
-        <bdi>${escAttr(s.note.text)}</bdi></p></div>`
+        <bdi>${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></p></div>`
     : `
     <div class="poster-set">
       <h3 class="poster-set-head" lang="he">${escAttr(s.head)}</h3>
       ${s.lines.map(timeLine).join('')}
     </div>`);
   return `
-    <h2 class="poster-title" lang="he">${escAttr(TZG_TEXT.title)}</h2>
+    <h2 class="poster-title" lang="he">${escAttr(title)}</h2>
     <div class="poster-sets">${poster.sets.map(section).join('')}</div>`;
+}
+
+function tzomGedaliaBody(poster) {
+  return fastDayBody(poster, TZG_TEXT.title);
 }
 
 function renderTzomGedaliaPoster(poster, settings) {
   return posterShell(settings, tzomGedaliaBody(poster), poster.legend || []);
+}
+
+function renderAsaraBTevesPoster(poster, settings) {
+  return posterShell(settings, fastDayBody(poster, poster.title), poster.legend || []);
+}
+
+/** One line of times, as a run `balanceRuns` can measure and cut evenly in two if it does
+ *  not fit on one - the same mechanism the יום כיפור after-box uses, with the comma this
+ *  sheet's own lists want rather than that box's own room-per-line shape. See app.css's
+ *  .poster-chanukah-run rule and balanceRuns's own selector.
+ *
+ *  `label`, where a row has one, is the run's own first item too rather than text set in
+ *  front of it, so a label long enough to need it (Rosh Chodesh's own) is part of what
+ *  balanceRuns measures and can be cut evenly along with the times after it, not a fixed
+ *  width the run's own share of the line has to fit around.
+ *
+ *  `timesInnerHtml` sits in a second, nested `dir="ltr"` bdi of its own, the same way every
+ *  other poster's own list of times already does (rhRow, the יום כיפור after-box) - this one
+ *  needed it more than they do and did not have it. A label sharing the *same* bidi run as
+ *  the times gives that run a strong Hebrew character of its own, so the browser's own
+ *  auto-direction read the whole run right to left and printed the times backwards: last
+ *  time nearest the label, first time run off the far end. A line with no label never
+ *  showed it - digits alone default to ltr with nothing to override - which is why שחרית's
+ *  own two labelled rows read backwards while מנחה and מעריב beneath them, labelless,
+ *  already read correctly. Measured directly before this: ראש חודש's own line read 8:40,
+ *  8:20*, 8:05 … down to the label, the reverse of the order a reader wants. */
+function chanukahLineHtml(label, timesInnerHtml, lineClass) {
+  return `<p class="poster-set-line${lineClass ? ` ${lineClass}` : ''}" lang="he">`
+    + `<bdi class="poster-chanukah-run">`
+    + (label ? `<span class="poster-t"><strong>${escAttr(label)}</strong></span>` : '')
+    + `<bdi class="poster-row-times" dir="ltr">`
+    + timesInnerHtml
+    + `</bdi>`
+    + `</bdi></p>`;
+}
+
+/** A plain list of cells, no in-between time and no נץ note - every line on this sheet
+ *  that is not שחרית (מנחה, מעריב, the ערב שבת menu) still just prints its cells. */
+const chanukahRunLine = (cells, label) => chanukahLineHtml(label,
+  cells.map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join(''));
+
+/** Every שחרית row's own times, the group's own in-between ותיקין time first (see
+ *  combineShacharisRows's own `vasikin`, chanukahVasikinBetween), then the row's ordinary,
+ *  fixed times - the ותיקין time's own `.poster-t` sits right next to the first ordinary
+ *  one's, so the sheet's own `.poster-t + .poster-t::before` rule draws the comma between
+ *  them the same as it draws every other comma on this sheet, on every row alike now that
+ *  the נץ note (see netzLineHtml) is its own line below rather than sharing this one. */
+function vasikinLine(row) {
+  const { time } = row.vasikin;
+  const rest = row.cells.slice(1).map((c) => `<span class="poster-t">${timeHtml(c)}</span>`).join('');
+  return `<span class="poster-t">${timeHtml({ text: time, trace: row.vasikin.trace })}</span>${rest}`;
+}
+
+/** One group's own list of נץ times, each carrying its own "יום X" above it, asked for
+ *  directly the first time this was built: a group's own label ("יום א' ב' ג' ד'") already
+ *  says which days share the row, and a reader working out which נץ belongs to which day
+ *  had to count slashes against it rather than read the day off the time itself. "יום"
+ *  repeats before every time rather than once over the whole list, asked for directly after
+ *  a bare letter - the row's own label already says "יום" once over several letters, and a
+ *  reader short of that context seeing a bare "א'" over a time had no word telling them it
+ *  was a day at all. The letter is its own `<bdi>`, the same isolation every mark on this
+ *  sheet near a digit already gets - a bare Hebrew character sitting loose beside a time is
+ *  exactly the shape that has turned a run backwards elsewhere on this sheet, so it is
+ *  never trusted plain beside a digit here either, small as it is.
+ *
+ *  No slash between one entry and the next, asked for directly once every entry carried its
+ *  own "יום X": the slash was there to tell entries apart, and a label over every time does
+ *  that job better than a mark between them does. The gap it leaves is `.poster-netz-day +
+ *  .poster-netz-day` in app.css rather than a joined string, so the day and its time stay
+ *  one span - a space joined into the string here would sit between the two bdi and could
+ *  be read as part of either one. */
+function netzDaysHtml(netzDays) {
+  return netzDays.map(({ time, letters, trace }) => {
+    const label = `יום ${letters.map((l) => `${l}'`).join('/')}`;
+    return `<span class="poster-netz-day"><bdi class="poster-netz-day-label">${escAttr(label)}</bdi><bdi dir="ltr">${timeHtml({ text: time, trace })}</bdi></span>`;
+  }).join('');
+}
+
+/** One שחרית row, label over times: the label (combineShacharisRows's own `row.label`,
+ *  "ראש חודש יום ג' ד'" or "יום א' ב' ג' ד'") on its own line, the row's own times under it
+ *  (vasikinLine). The row's own נץ note, if it has one, is not here - it moved into
+ *  שחרית's own box as its own lines, see netzBlockLines, asked for directly once the two
+ *  had to be found one under the other; this is back to the label-and-times shape the row
+ *  had before that note existed at all. */
+function shacharisRunLines(row) {
+  return chanukahLineHtml(row.label, '') + chanukahLineHtml(null, vasikinLine(row));
+}
+
+/** The שחרית block's own נץ lines, one per row that needed נץ to explain its own ותיקין
+ *  time, in the same order as the rows themselves. Part of שחרית's own box, asked for
+ *  directly - not a section of its own the way מנחה and מעריב are, so it opens with a
+ *  label line the same weight as a row's own ("ראש חודש...") rather than a full underlined
+ *  poster-set-head, and sits inside שחרית's own div rather than closing it and opening
+ *  another.
+ *
+ *  Both the label and the lines under it carry `poster-netz-line` (see its own rule in
+ *  app.css), smaller than the rest of the block and centered like every other line here -
+ *  asked for directly, after flush left: these read as a reference under the row's own
+ *  times, not a second times line the same weight as the first. */
+function netzBlockLines(poster) {
+  const rows = poster.shacharisRows.filter((row) => row.vasikin.netzDays);
+  if (!rows.length) return '';
+  return chanukahLineHtml(CH_TEXT.netz, '', 'poster-netz-line')
+    + rows.map((row) => chanukahLineHtml(null, netzDaysHtml(row.vasikin.netzDays), 'poster-netz-line')).join('');
+}
+
+/** The חנוכה sheet: one row per combined morning (see `combineShacharisRows`), then the
+ *  standing weekday מנחה and מעריב, then the one ערב שבת block (see `combineErevShabbos`)
+ *  the eight days work out to, whether that is one Friday or two. */
+function chanukahBody(poster) {
+  const timeLine = (times) => chanukahRunLine(times.map(toCell));
+  const section = (head, inner) => `
+    <div class="poster-set">
+      <h3 class="poster-set-head" lang="he">${escAttr(head)}</h3>
+      ${inner}
+    </div>`;
+  const sections = [
+    section(CH_TEXT.shacharis, poster.shacharisRows.map(shacharisRunLines).join('') + netzBlockLines(poster)),
+    section(CH_TEXT.mincha, timeLine(poster.weekdayMincha)
+      + poster.sundayMinchaRows.map(row => chanukahRunLine(row.times, row.label)).join('')),
+    poster.erevShabbos ? section(poster.erevShabbos.title, chanukahRunLine(poster.erevShabbos.cells)) : '',
+    section(CH_TEXT.maariv, timeLine(poster.maariv)),
+  ].filter(Boolean);
+  return `
+    <h2 class="poster-title" lang="he">${escAttr(CH_TEXT.title)}</h2>
+    <div class="poster-sets">${sections.join('')}</div>`;
+}
+
+function renderChanukahPoster(poster, settings) {
+  return posterShell(settings, chanukahBody(poster), poster.legend || [], { chanukah: true });
+}
+
+const HALF_PAGE_POSTERS = new Set(['chanukah', 'asarabteves', 'shivaasartammuz', 'slichos', 'tzomgedalia', 'afteryk']);
+const halfPageSection = (title, rows, { dayHeading = false } = {}) => `<section class="onepage-sec">
+  <h3 class="onepage-sec-head${dayHeading ? ' is-day-heading' : ''}" lang="he">${escAttr(title)}</h3>${rows}</section>`;
+
+function halfPageShell(poster, settings, title, sections, { asara = false, chanukah = false, shacharis = false, small = false, dates = '', standalone = false, asaraShacharis = 'compact' } = {}) {
+  const heading = `<h2 class="onepage-title" lang="he">${escAttr(title)} ${escAttr(hebrewYear(poster.hebrewYear))}</h2>`;
+  const schedule = `${dates}<div class="halfpage-body${asara ? ' is-asara' : ''}${chanukah ? ' is-chanukah' : ''}${shacharis ? ' is-shacharis' : ''}${small ? ' is-small-schedule' : ''}">${sections}</div>`;
+  const body = `<div class="halfpage-content">${heading}${schedule}</div>`;
+  // Put the shul's name and street address on separate lines on the morning handouts.
+  const address = String(settings.footerAddress || '').trim().replace(/\s+(?=\d)/, '\n');
+  const legend = shacharis ? (address ? [{ dir: 'ltr', text: address }] : [])
+    : [...(poster.legend || []), { dir: 'ltr', text: ONEPAGE_TEXT.rounded }];
+  const html = posterShell(settings, body, legend, { onepage: true, chartHead: true, halfpage: true, shacharis, asaraDetailed: asara && asaraShacharis === 'locations' });
+  if (standalone) return html;
+  return `<div class="poster-half-sheet${chosenCopiesPerPage === 2 ? ' is-two-copies' : ''}">${html.repeat(chosenCopiesPerPage)}</div>`;
+}
+
+/** A handout on half a Letter sheet. Keep the morning groups together and put their
+ *  sunrise references in one strip, rather than spending a table row on each day. */
+function renderHalfChanukahPoster(poster, settings, options = {}) {
+  const sections = ONEPAGE_SECTIONS.chanukah(poster);
+  const morning = sections[0];
+  const netz = poster.shacharisRows.flatMap((row) => row.vasikin.netzDays || []);
+  const sectionsHtml = halfPageSection(morning.title, morning.rows.filter((row) => !row.label.startsWith(CH_TEXT.netz)).map(onePageRows).join('')
+        + (netz.length ? `<div class="halfpage-netz"><strong lang="he">${escAttr(CH_TEXT.netz)}</strong>
+          <bdi dir="ltr">${netzDaysHtml(netz)}</bdi></div>` : ''))
+    + sections.slice(1).map((s) => halfPageSection(s.title, s.rows.map((row) => onePageRows({ ...row,
+      label: row.label === s.title ? '' : row.label })).join(''))).join('');
+  return halfPageShell(poster, settings, CH_TEXT.title, sectionsHtml, { chanukah: true, ...options });
+}
+
+function renderHalfAsaraBTevesPoster(poster, settings, options = {}) {
+  const detailed = options.asaraShacharis === 'locations';
+  const sections = [];
+  let notes = [];
+  for (const s of poster.sets) {
+    if (s.note) {
+      notes.push(`<div class="halfpage-zman" lang="he"><span>${escAttr(s.note.label)}</span>
+        <bdi dir="ltr">${timeHtml({ text: s.note.text, trace: s.note.trace })}</bdi></div>`);
+    } else {
+      const section = halfPageSection(s.head, detailed && s.calc === 'shacharis'
+        ? shacharisRowsHtml(shacharisRoomRows(s.lines.flat()))
+        : s.lines.map(times => onePageRows({ label: '', times })).join(''));
+      // Keep sunset beside Maariv rather than distributing it as an isolated block.
+      sections.push(notes.length ? `<div class="asara-block">${notes.join('')}${section}</div>` : section);
+      notes = [];
+    }
+  }
+  // On Friday, candle lighting and sunset stay together below Mincha.
+  if (notes.length) sections.push(`<div class="asara-block">${notes.join('')}</div>`);
+  const later = poster.sets.filter(set => set.calc !== 'shacharis').flatMap(set => set.lines?.flat() || []);
+  const stars = ['*', '**'].filter(mark => later.some(time => time.mark === mark));
+  const legend = detailed ? [
+    ...poster.legend.filter(line => line.dir !== 'rtl'),
+    ...(stars.length ? [{ dir: 'rtl', text: stars.map(mark => mark === '*' ? '*בעזרת נשים' : '**באולם השמחות').join(' ') }] : []),
+  ] : poster.legend;
+  const content = detailed ? `<div class="asara-detailed-sections">${sections.join('')}</div>` : sections.join('');
+  return halfPageShell({ ...poster, legend }, settings, poster.title, content, {
+    asara: true, dates: shacharisDaysHtml([poster.span.from], settings), ...options,
+  });
+}
+
+function renderHalfSchedulePoster(poster, key, settings, options = {}) {
+  if (key === 'chanukah') return renderHalfChanukahPoster(poster, settings, options);
+  if (key === 'asarabteves' || key === 'shivaasartammuz') return renderHalfAsaraBTevesPoster(poster, settings, options);
+  if (key === 'tzomgedalia') return renderHalfAsaraBTevesPoster({ ...poster, title: TZG_TEXT.title }, settings, options);
+  const sections = key === 'slichos'
+    ? poster.rows.map(row => oneSection(row.label, [{ ...row, label: '' }]))
+    : ['shacharis', 'mincha', 'maariv'].map(tefillah => oneSection(YK_TEXT.afterBig[tefillah], [{ label: '', times: poster.after[tefillah] }]));
+  return halfPageShell(poster, settings, key === 'slichos' ? SLICHOS_TEXT.title : YK_TEXT.afterHeading,
+    sections.map(section => halfPageSection(section.title, section.rows.map(onePageRows).join(''), { dayHeading: key === 'slichos' })).join(''), { small: true, ...options });
+}
+
+function shacharisRowsHtml(rows) {
+  return rows.map(row => `<div class="onepage-row shacharis-handout-row">
+    <div class="shacharis-handout-run">
+      <div class="shacharis-handout-location" dir="rtl">
+        <bdi class="shacharis-handout-room" lang="he">${escAttr(row.room)}</bdi>
+        ${row.timeNote ? `<span class="shacharis-handout-separator" aria-hidden="true">&middot;</span><bdi class="shacharis-handout-note" lang="he">${escAttr(row.timeNote)}</bdi>` : ''}
+      </div>
+      <bdi class="shacharis-handout-time" dir="ltr">${timeHtml({ ...row, mark: '', underlined: false, timeNote: null })}</bdi>
+    </div>
+  </div>`).join('');
+}
+
+function shacharisDaysHtml(days, settings) {
+  const groups = shacharisDayGroups(days, settings, posterTables);
+  const label = groups.map(group => group.label).join(' · ו');
+  return `<div class="shacharis-handout-dates" dir="rtl">
+    <div class="shacharis-handout-date" data-dates="${days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)).join(' ')}"><div lang="he">${escAttr(label)}</div></div>
+  </div>`;
+}
+
+/** The same compact half-sheet as the complete schedules, with rooms beside each time. */
+function renderShacharisHandout(poster, settings, options = {}) {
+  const rows = shacharisRowsHtml(poster.rows);
+  const days = poster.dayLabel && !poster.showDates ? `<div class="shacharis-handout-days" lang="he">${escAttr(poster.dayLabel)}</div>` : '';
+  const dates = poster.showDates ? shacharisDaysHtml(poster.days, settings) : '';
+  return halfPageShell(poster, settings, poster.title, halfPageSection(poster.subtitle, days + rows), { shacharis: true, dates, ...options });
 }
 
 /** סליחות and צום גדליה on one sheet, the same two columns under the same header as the
@@ -1605,7 +2019,7 @@ const namedDay = (heading, yomtov, days, sep) => {
   const parts = String(heading).split(sep);
   return days.includes(parts[0]) ? [`${parts[0]} ${yomtov}`, ...parts.slice(1)].join(sep) : heading;
 };
-const onePlain = (text) => [{ text, underlined: false, mark: '' }];
+const onePlain = (text, trace = null, explanation = '') => [{ text, underlined: false, mark: '', trace, explanation }];
 
 /** One poster's schedule, cut into the blocks this sheet stacks. Keyed by the poster's own
  *  key, so adding a poster to the run and adding it here are the same word twice and a
@@ -1632,13 +2046,17 @@ const ONEPAGE_SECTIONS = {
     // The שקיעה, which stands between מנחה and מעריב with no מנין of its own. On the sheet
     // of its own it is a line without a heading; here every line has a label already, so it
     // is a row like the rest.
-    ? { label: s.note.label, times: onePlain(s.note.text) }
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
     : { label: s.head, times: s.lines.flat() })))],
+  asarabteves: (p) => [oneSection(p.title, p.sets.map(s => s.note
+    ? { label: s.note.label, times: onePlain(s.note.text, s.note.trace) }
+    : { label: s.head, times: s.lines.flat() }))],
+  shivaasartammuz: (p) => ONEPAGE_SECTIONS.asarabteves(p),
   shuva: (p) => [oneSection(SHUVA_TEXT.heading, [
     // The announcement itself is not on this sheet. Given a page of its own it is three lines
     // of 24pt down the middle of the sheet; as a row it was a sentence lying across a
     // timetable, and it says nothing the heading over it and the word דרשה do not.
-    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha) : [] },
+    { label: SHUVA_TEXT.drashaLabel, times: p.drasha ? onePlain(p.drasha, p.drashaTrace, p.explanation) : [] },
     { label: SHUVA_TEXT.minchaLabel, times: p.mincha },
   ])],
   yomkippur: (p) => [
@@ -1648,6 +2066,10 @@ const ONEPAGE_SECTIONS = {
     // the row inside says only which תפילה it is.
     oneSection(p.nextMorning.label, [{ label: YK_TEXT.shacharis.label, times: p.nextMorning.times }]),
   ],
+  // Paired posters use these same compact rows under New design. Keep the paired
+  // Selichos sheet complete, since the rest of the occasion is not on this page.
+  pair: (p) => [...ONEPAGE_SECTIONS.roshhashana(p.rh), ...ONEPAGE_SECTIONS.yomkippur(p.yk), ...ONEPAGE_SECTIONS.afteryk(p.yk)],
+  slichostzom: (p) => [oneSection(SLICHOS_TEXT.title, p.slichos.rows), ...ONEPAGE_SECTIONS.tzomgedalia(p.tzom)],
   /* Every block on this sheet is its own name, on both occasions. They used to carry the yom
      tov in front of them, "ראש השנה - יום א'", because one sheet holds two of them and "יום א'"
      alone does not say which; but the blocks run in date order and each yom tov opens with its
@@ -1668,6 +2090,39 @@ const ONEPAGE_SECTIONS = {
     { label: YK_TEXT.afterBig.mincha, times: p.after.mincha },
     { label: YK_TEXT.afterBig.maariv, times: p.after.maariv },
   ])],
+  /* The same sections chanukahBody draws on the sheet of its own (see posters/chanukah.js):
+     one or two combined mornings with their own נץ note where a day needed it, the standing
+     weekday מנחה, מעריב, and the one ערב שבת block the eight days work out to (sometimes two
+     Fridays merged into one). Missing before this, not merely unlisted: a poster with no
+     entry here is left off the sheet silently (see the table's own note above), and חנוכה had
+     none, so "All on one" for חנוכה printed a header and a footer with nothing between them.
+     Nothing here works out a time, same as every other entry: these are the poster's own
+     rows, cut to this sheet's shape.
+     Each שחרית row's own ותיקין time (vasikin) stands in for its first, merged cell exactly the
+     way the full sheet's own vasikinLine draws it: that one position is never the group's own
+     agreed time the way every other position is, so it cannot be read off row.cells[0] along
+     with the rest. */
+  chanukah: (p) => {
+    const shacharisRow = (row) => ({
+      label: row.label,
+      times: [{ text: row.vasikin.time, underlined: false, mark: '', trace: row.vasikin.trace }, ...row.cells.slice(1)],
+    });
+    // One row per day the row's own ותיקין time needed נץ to explain it (netzBlockLines'
+    // own rows, on the full sheet), each day labelled rather than run together the way the
+    // full sheet's own netzDaysHtml sets them under one heading - this sheet's own row
+    // shape has no room for a label over every time, only one label a row.
+    const netzRows = (row) => (row.vasikin.netzDays || []).map(({ time, letters, trace }) => ({
+      label: `${CH_TEXT.netz} יום ${letters.map((l) => `${l}'`).join('/')}`,
+      times: [{ text: time, underlined: false, mark: '', trace }],
+    }));
+    const oneLine = (label, times) => oneSection(label, [{ label, times }]);
+    const sections = [
+      oneSection(CH_TEXT.shacharis, p.shacharisRows.flatMap((row) => [shacharisRow(row), ...netzRows(row)])),
+      oneSection(CH_TEXT.mincha, p.minchaRows),
+      oneLine(CH_TEXT.maariv, p.maariv.map(toCell)),
+    ];
+    return sections;
+  },
 };
 
 /** Public rows for the Shul View copy of the original special-schedule page.
@@ -1741,7 +2196,7 @@ function onePageRows(r) {
      space. They are two boxes with a space between them, and a column an inch and a half wide
      broke at that space: the הושענא רבה row came out with "(נץ 6:54)" alone on one line and the
      6:18 it is the נץ for on the next, which reads as a line about nothing. */
-  const note = r.note ? `<bdi class="onepage-note">${escAttr(r.note)}</bdi>\u00A0` : '';
+  const note = r.note ? `<bdi class="onepage-note"${timeExplanationAttrs({ header: r.label, printed: r.note, times: r.noteTimes?.map(t => t.trace).filter(Boolean) || [], note: r.note })}>${escAttr(r.note)}</bdi>\u00A0` : '';
   // dir="ltr" said out loud, not left to a bdi's dir="auto": times are digits, which are not
   // strong characters, so a note's Hebrew would otherwise turn the whole run around.
   //
@@ -1765,7 +2220,14 @@ function onePageRows(r) {
     + (r.extra ? onePageRows({ label: r.extra.label, times: r.extra.times }) : '');
 }
 
-/** Every public block on the original whole-season sheet, in its source order. */
+/** The whole season on one sheet.
+ *
+ *  Two columns by CSS rather than by handing blocks out between two boxes here. The browser
+ *  balances them, which means a year that runs long or short does not need this file to know
+ *  about it, and the blocks stay in one list in date order however they fall. Columns run
+ *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
+ *
+ *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
 function onePageSections(built) {
   /* עשי"ת as a block of its own, after the last of the two days it runs between.
    *
@@ -1825,18 +2287,14 @@ function onePageSections(built) {
   return sections;
 }
 
-/** The whole season on one sheet.
- *
- *  Two columns by CSS rather than by handing blocks out between two boxes here. The browser
- *  balances them, which means a year that runs long or short does not need this file to know
- *  about it, and the blocks stay in one list in date order however they fall. Columns run
- *  right to left, so the first block is at the top right, which is where a Hebrew page starts.
- *
- *  Nothing is dropped to make it fit: see fitOnePage, which sets the type instead. */
-export function renderOnePagePoster(built, settings) {
+export function renderOnePagePoster(built, settings, { halfLetter = false, asaraShacharis = 'compact' } = {}) {
+  if (halfLetter && built.items?.length === 1 && HALF_PAGE_POSTERS.has(built.items[0].key)) {
+    const item = built.items[0];
+    return renderHalfSchedulePoster(item.poster, item.key, settings, { asaraShacharis });
+  }
+  const sections = onePageSections(built);
   const own = built.own === true && Array.isArray(built.sections);
   const items = own ? [] : built.items;
-  const sections = onePageSections(built);
   /* One key at the foot for the whole sheet, gathered off the sheets it is made of.
      Not simply the distinct lines: a poster naming both marks writes "*בעזרת נשים
      **באולם השמחות" and one using only the first writes "*בעזרת נשים", which are two
@@ -2007,7 +2465,7 @@ function splitColumns(cols, groups, atDayOnly = false) {
  *  where a webfont did not arrive. Fitted to the last pixel here, some of those come out one
  *  line over there, and one line over is a block off the sheet. */
 const OP_ROOM = 11;
-function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, paddingInches = chosenMargin, fitWidth = false, dayBreakOnly = false, columnCount = 2, columnBreakAt = null } = {}) {
+function fitOnePage(container) {
   for (const sheet of container.querySelectorAll('.poster.is-onepage')) {
     const cols = sheet.querySelector('.onepage-cols');
     const col = cols?.querySelectorAll(':scope > .onepage-col');
@@ -2018,7 +2476,7 @@ function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, p
        the search below fits the type to that room. Set on the sheet rather than in the CSS so
        the bar can move it; the CSS still carries 0.35in as the fallback, which is what the
        week's own sheet and a sheet drawn outside this tab get. */
-    sheet.style.setProperty('--op-pad', `${paddingInches}in`);
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
     // Colour only, so it cannot move the fit; set here with the padding so the two cannot get
     // out of step, and so a sheet redrawn on a turned phone comes back the way it was left.
     sheet.classList.toggle('is-mono', chosenInk === 'mono');
@@ -2035,48 +2493,15 @@ function fitOnePage(container, { minimumScale = OP_MIN, maximumScale = OP_MAX, p
       rows: [...box.querySelectorAll(':scope > .onepage-row')],
       carried: null,
     })));
-    const layout = () => {
-      // A screen can keep a connected holiday intact in the first column and
-      // its attached Shabbos intact in the second. The print view does not set
-      // this option and retains its normal measured column balancing.
-      if (columnCount !== 1 && Number.isInteger(columnBreakAt) && columnBreakAt > 0 && columnBreakAt < groups.length) {
-        groups.forEach((g, index) => {
-          for (const r of g.rows) if (r.parentElement !== g.box) g.box.appendChild(r);
-          if (g.carried) { g.carried.remove(); g.carried = null; }
-          const target = col[index < columnBreakAt ? 0 : 1];
-          if (g.box.parentElement !== target) target.appendChild(g.box);
-        });
-        return Math.max(...[...col].map(c => {
-          const sections = [...c.querySelectorAll(':scope > .onepage-sec')];
-          return sections.at(-1).offsetTop + sections.at(-1).offsetHeight - sections[0].offsetTop;
-        }));
-      }
-      if (columnCount !== 1) return splitColumns(col, groups, dayBreakOnly || chosenBreak === 'day');
-      // A screen adapter can keep the entire schedule in one continuous column.
-      // Restore the original groups first, including rows carried by an earlier
-      // two-column fit, so resizing never loses or duplicates schedule content.
-      for (const g of groups) {
-        for (const r of g.rows) if (r.parentElement !== g.box) g.box.appendChild(r);
-        if (g.carried) { g.carried.remove(); g.carried = null; }
-        if (g.box.parentElement !== col[0]) col[0].appendChild(g.box);
-      }
-      const first = groups[0].box, last = groups[groups.length - 1].box;
-      return last.offsetTop + last.offsetHeight - first.offsetTop;
-    };
-    const fits = () => {
-      if (layout() > cols.clientHeight - OP_ROOM) return false;
-      // The boxed screen view can be narrower than a printed page. Its optional
-      // width check keeps every long time/note inside the same original columns.
-      // Printed pages retain their established fitting behavior.
-      return !fitWidth || [...cols.querySelectorAll('.onepage-row')].every((r) => r.scrollWidth <= r.clientWidth + 1);
-    };
+    const layout = () => splitColumns(col, groups, chosenBreak === 'day');
+    const fits = () => layout() <= cols.clientHeight - OP_ROOM;
     // Cleared before the search, not after it: this runs again when a phone is turned, and a
     // gap left over from the last pass would be part of what the type is fitted against.
     sheet.style.setProperty('--op-gap-1', '0px');
     sheet.style.setProperty('--op-gap-2', '0px');
-    let best = minimumScale;
+    let best = OP_MIN;
     for (const step of [0.05, OP_STEP]) {
-      for (let v = best; v <= maximumScale + 1e-9; v = Math.round((v + step) * 100) / 100) {
+      for (let v = best; v <= OP_MAX + 1e-9; v = Math.round((v + step) * 100) / 100) {
         set(v);
         if (!fits()) break;
         best = v;
@@ -2191,13 +2616,17 @@ function fitSukkos(container) {
 // has been picked, which is how a fresh load and a change of occasion both land on the first
 // sheet of the list without this having to know what that is.
 let chosen = null;
-/* How much is on screen and on how much paper: 'one' is a single sheet, 'each' is every sheet
-   one to a page, 'all' is every one of them on a single sheet.
-   One control rather than two, because there were only ever three answers. It was a pair of
-   switches, which is four boxes, and the fourth was dead: a single sheet has no layout to
-   choose and the second switch went away whenever the first said one. Three points on one
-   axis is what it always was. */
+// Preserve the original layout values in saved preferences. The workflow distinguishes
+// a single compact poster from a print set using combined posters.
 let chosenSheets = 'one';
+let chosenWorkflow = 'single';
+let chosenSetSelection = {};
+let chosenHalfPagePairs = null;
+let chosenDesign = 'new';
+let chosenPrintPages = null;
+let chosenCollection = null;
+let pendingAddition = null;
+let printSettingsOpen = false;
 // Which yom tov. One so far, and the picker has one answer, but the posters have been grouped
 // by it from the start and the next set drawn will land in the next group.
 let chosenGroup = null;
@@ -2208,9 +2637,8 @@ let chosenYear = null;
 // rather than passed through every redraw, since redrawInPlace calls back in on its own.
 let onRoute = null;
 // The Hebrew-calendar tables, handed in by app.js once it has loaded them and held here the
-// way onRoute is, since redrawInPlace calls back in without them. Only the שבת שובה poster
-// needs them, and only in a year with no chart saved: it has to know that Shabbos's parsha,
-// because a rule can be keyed on one.
+// way onRoute is, since redrawInPlace calls back in without them. The שבת שובה calculation
+// uses the parsha when no chart is saved, and the BHB date row names each week's parsha.
 let posterTables = null;
 
 /** Which poster is on screen and, if it is one that can be set either way up, which way.
@@ -2220,45 +2648,37 @@ let posterTables = null;
  *  the right answer on a fresh load; carrying a year in the address would mean a link that
  *  goes stale. */
 export function posterRoute() {
-  // The whole set keeps the key the run entry has always had, so a link written before it
-  // became a switch still lands on it.
-  const key = chosenSheets === 'one' ? chosen : POSTERS.find((p) => p.last)?.key;
+  if (chosenCollection) return ['category', chosenCollection];
+  const key = chosenPrintPages?.[0]?.left || chosenPrintPages?.[0]?.right || chosen;
   if (!key) return [];
-  const poster = POSTERS.find((p) => p.key === key);
-  return poster?.orientations ? [key, chosenOrientation] : [key];
+  if (key.startsWith('occasion:')) return ['occasion', key.slice(9)];
+  return POSTERS.find(p => p.key === key)?.orientations ? [key, chosenOrientation] : [key];
 }
 
-/** The other way: set the pickers from the address. Anything unrecognised is left alone,
- *  so an old or hand-typed link falls back to the defaults rather than to nothing. */
 export function setPosterRoute(parts = []) {
-  // What was remembered first, then the address over the top of it: a link says which sheet
-  // and which way up, and everything it does not say is left as it was left.
   recallBar();
   const [key, orient] = parts;
-  // A sheet of your own is not in the table, so it is recognised by its key. Which occasion
-  // it sits under is not in the address either, and is whatever was remembered.
-  if (String(key).startsWith('own:')) {
-    chosenSheets = 'one';
-    chosen = key;
-    conflictPick = 0;
-    rememberBar();
-    return;
+  if (key === 'category' && SPECIAL_COLLECTIONS.some(collection => collection.kind === orient)) {
+    chosenCollection = orient; chosenPrintPages = []; chosen = null;
+    chosenGroup = orient === 'roshchodesh' ? 'ראש חודש' : POSTER_GROUP_DEFAULT;
+  } else if (key === 'all' || key === 'halfpages') {
+    if (!chosenPrintPages) chosenWorkflow = key === 'halfpages' ? 'halves'
+      : POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup)) ? 'single' : 'set';
+  } else {
+    const selection = key === 'occasion' ? `occasion:${orient}` : key;
+    const poster = POSTERS.find(p => p.key === selection || selection === 'asaralocations' && p.key === 'asarabteves');
+    if (poster || String(selection).startsWith('own:') || key === 'occasion') {
+      if (chosenCollection) chosenPrintPages = [];
+      chosenCollection = null;
+      chosen = selection;
+      chosenGroup = key === 'occasion' ? orient : poster?.key === 'asarashacharis' || selection === 'asaralocations'
+        ? 'עשרה בטבת' : poster?.group || POSTER_GROUP_DEFAULT;
+      if (chosenPrintPages?.length) chosenPrintPages[0].left = selection;
+      chosenWorkflow = 'single';
+    }
+    if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
   }
-  const poster = POSTERS.find((p) => p.key === key);
-  if (poster?.last) {
-    // A link to the whole set says only that, not which of the two ways of laying it out, so
-    // whichever was left standing is kept.
-    if (chosenSheets === 'one') chosenSheets = 'each';
-  } else if (poster) {
-    chosenSheets = 'one';
-    chosen = key;
-    // The occasion goes with the sheet, so a link to one of another yom tov's brings its own
-    // heading up with it rather than landing on a list the sheet is not in.
-    chosenGroup = poster.group || POSTER_GROUP_DEFAULT;
-  }
-  if (orient === 'portrait' || orient === 'landscape') chosenOrientation = orient;
-  // The year is not in the address and is not cleared by a change of one: it is the year
-  // being worked in rather than part of what a link points at. See recallBar.
+  pendingAddition = null;
   conflictPick = 0;
   rememberBar();
 }
@@ -2298,7 +2718,10 @@ function recallBar() {
     // is checked again by the render, which falls back to the first sheet of the occasion
     // and to the year coming up, so a stale or hand edited value costs nothing.
     if (Number.isFinite(saved.year)) chosenYear = saved.year;
-    if (typeof saved.group === 'string') chosenGroup = saved.group;
+    if (typeof saved.group === 'string') chosenGroup = ({
+      'בה"ב חשון · שחרית': BEHAB_SHACHARIS_TEXT.afterSukkos,
+      'בה"ב אייר · שחרית': BEHAB_SHACHARIS_TEXT.afterPesach,
+    })[saved.group] || saved.group;
     if (typeof saved.sheet === 'string') chosen = saved.sheet;
     if (['one', 'each', 'all'].includes(saved.sheets)) chosenSheets = saved.sheets;
     // What the two switches this replaced were remembered as, carried forward so somebody
@@ -2309,8 +2732,24 @@ function recallBar() {
     // Snapped to a step and held inside the ends, so a hand-edited value cannot put the
     // select on an option that is not in it or the sheet on a margin the stepper cannot undo.
     if (saved.ink === 'colour' || saved.ink === 'mono') chosenInk = saved.ink;
+    if (saved.copiesPerPage === 1 || saved.copiesPerPage === 2) chosenCopiesPerPage = saved.copiesPerPage;
+    if (saved.asaraShacharis === 'locations') chosenAsaraShacharis = 'locations';
+    if (saved.design === 'old' || saved.design === 'new') chosenDesign = saved.design;
+    if (SPECIAL_COLLECTIONS.some(collection => collection.kind === saved.collection)) chosenCollection = saved.collection;
+    if (Array.isArray(saved.printPages)) chosenPrintPages = saved.printPages;
     if (saved.scope === 'one' || saved.scope === 'all') chosenScope = saved.scope;
-    if (Number.isFinite(saved.margin)) {
+    if (['single', 'set', 'halves'].includes(saved.workflow)) chosenWorkflow = saved.workflow;
+    else chosenWorkflow = chosenSheets === 'each' || chosenSheets === 'all' && chosenScope === 'all' ? 'set' : 'single';
+    // Old handout links used Compact and Whole year even though they printed one morning.
+    if (!saved.workflow && POSTERS.some(p => p.handout && (p.key === chosen || p.group === chosenGroup))) chosenWorkflow = 'single';
+    if (saved.setSelection && typeof saved.setSelection === 'object' && !Array.isArray(saved.setSelection)) {
+      chosenSetSelection = Object.fromEntries(Object.entries(saved.setSelection).filter(([key, value]) => typeof value === 'boolean' && key.length < 200));
+    }
+    chosenHalfPagePairs = normalizeHalfPagePairs(saved.halfPagePairs,
+      POSTERS.filter(poster => poster.handout || HALF_PAGE_POSTERS.has(poster.key)).map(poster => poster.key));
+    if (typeof saved.advanced === 'boolean') printSettingsOpen = saved.advanced;
+    // Adopt the requested narrower default once, then retain later custom margins.
+    if (saved.marginDefault === OP_PAD && Number.isFinite(saved.margin)) {
       const v = Math.round(saved.margin / OP_PAD_STEP) * OP_PAD_STEP;
       chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
     }
@@ -2327,7 +2766,10 @@ function rememberBar() {
     localStorage.setItem(POSTER_BAR_KEY, JSON.stringify({
       year: chosenYear, group: chosenGroup, sheet: chosen, sheets: chosenSheets,
       combined: chosenCombined, orientation: chosenOrientation, brk: chosenBreak,
-      margin: chosenMargin, ink: chosenInk, scope: chosenScope,
+      margin: chosenMargin, marginDefault: OP_PAD, ink: chosenInk, scope: chosenScope, copiesPerPage: chosenCopiesPerPage,
+      workflow: chosenWorkflow, setSelection: chosenSetSelection, halfPagePairs: chosenHalfPagePairs, advanced: printSettingsOpen,
+      asaraShacharis: chosenAsaraShacharis,
+      design: chosenDesign, printPages: chosenPrintPages, collection: chosenCollection,
     }));
   } catch {
     // The choice still holds for this page, it just will not be there next time.
@@ -2340,6 +2782,7 @@ function rememberBar() {
    in the address: the orientation is there because it decides what paper comes out, and this
    only decides how many sheets. */
 let chosenCombined = false;
+let chosenAsaraShacharis = 'compact';
 /* Where the one-page sheet's second column is allowed to start.
    'even' cuts wherever the two columns come closest to level, which can fall inside a day: the
    rest of that day carries over to the head of the second column with no heading on it, since
@@ -2351,21 +2794,13 @@ let chosenBreak = 'even';
 /* The white the one-page sheet leaves round itself, in inches, and what the stepper in the
    bar walks through.
  *
- * 0.35 is the shipped answer and the one "Original" goes back to. It was 0.5in, and the sheet
- * came off the printer looking as though it had an inch round it: measured on the print file,
- * the 0.5in was 0.55in top and foot and 0.50in each side, exactly what was set, and what is
- * added after that is the printer's own unprintable border, 0.16in to 0.25in on most machines
- * and out of reach from here.
- *
- * Which is the whole reason this is a control rather than a number. How much of that border a
- * machine takes is a fact about the machine, so the person standing at it is the one who can
- * see the answer. The floor is 0.15in, which is inside most printers' border and will be
- * clipped on them: that is the point of being able to try it. The ceiling is where it started
- * out from before any of this.
+ * 0.15in on all four sides is the requested default and what "Original" restores.
+ * Existing saved print setups adopt it once through marginDefault. The control
+ * still allows wider margins, which remain remembered after that migration.
  *
  * Remembered with the rest of the bar, so a shul that has found its number keeps it. Only the
  * poster's one-page sheet reads it; the week's own sheet keeps the CSS default. */
-const OP_PAD = 0.35;
+const OP_PAD = 0.15;
 const OP_PAD_MIN = 0.15;
 const OP_PAD_MAX = 0.75;
 const OP_PAD_STEP = 0.05;
@@ -2388,6 +2823,9 @@ let chosenMargin = OP_PAD;
  *
  * Remembered with the rest of the bar, so a shul that prints in black and white stays there. */
 let chosenInk = 'colour';
+// A Chanukah handout can leave the other half blank or use it for an identical copy.
+// Remember the choice with the bar; full-size posters do not read it.
+let chosenCopiesPerPage = 1;
 /* Whether the run is one yom tov or the whole year of them.
  *
  * Asked for: ראש השנה, יום כיפור and סוכות printed in one go rather than three trips to the
@@ -2429,13 +2867,14 @@ let fitHandler = null;
  *  The two cuts come before the fit and can: every time on a line scales by the same factor,
  *  so where a run should be cut does not change when the type does, and the heights they
  *  settle are what the fit then measures. */
-export function layoutPosters(container, options) {
+export function layoutPosters(container) {
+  useStraightHebrewQuotes(container);
   balanceRuns(container);
   balanceOnePageTimes(container);
-  fitPoster(container, options);
+  fitPoster(container);
 }
 
-export function fitPoster(container, options) {
+export function fitPoster(container) {
   // All of them at once is a run of sheets rather than one, and they are not all the same
   // width: the two that can be set landscape are 11in where the rest are 8.5in. Each is
   // measured and scaled on its own, so a portrait sheet is not shrunk to fit a landscape
@@ -2443,7 +2882,8 @@ export function fitPoster(container, options) {
   // A sheet turned on its side is scaled by its wrapper rather than by itself: rotation
   // leaves the sheet's own box 11in wide whatever it looks like, and it is the wrapper, the
   // portrait page it is sitting on, that has to fit the screen.
-  const all = [...container.querySelectorAll('.poster')].map((el) => el.closest('.is-sideways') || el);
+  const all = [...new Set([...container.querySelectorAll('.poster')]
+    .map((el) => el.closest('.is-sideways, .poster-half-sheet') || el))];
   if (!all.length) return;
   const decide = () => {
     for (const el of all) {
@@ -2452,23 +2892,135 @@ export function fitPoster(container, options) {
       const cs = getComputedStyle(box);
       const avail = box.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
       const wide = el.getBoundingClientRect().width;
-      if (avail > 0 && wide > avail) el.style.zoom = Math.max(0.15, avail / wide);
+      if (avail > 0 && (wide > avail || box.matches('.luach-sheet-page.is-handout'))) el.style.zoom = Math.max(0.15, avail / wide);
     }
     // The one-page sheet's type is set against the zoom just chosen, so the two are decided
     // together and a resize cannot leave one of them behind. See fitOnePage for why it has
     // to be this way round. The סוכות sheet's type is set here for the same reason.
-    fitOnePage(container, options);
+    fitOnePage(container);
     fitSukkos(container);
+    fitChanukah(container);
+    fitModernVasikin(container);
+    fitHalfPage(container);
   };
   decide();
-  // Embedded views observe their actual box instead of the whole window. Avoid
-  // replacing the print page's global resize listener when fitting one of them.
-  if (options?.observeResize === false) return;
+  if (document.fonts.status !== 'loaded' && container.querySelector('.poster.is-halfpage,.poster.is-chanukah,.poster.is-modern-vasikin')) {
+    document.fonts.ready.then(() => {
+      if (document.body.contains(all[0])) keepPosition(container, decide);
+    });
+  }
   // Rotating a phone changes what fits. One listener, replaced each render so it always
   // points at the posters currently on screen.
   if (fitHandler) window.removeEventListener('resize', fitHandler);
   fitHandler = () => { if (document.body.contains(all[0])) decide(); };
   window.addEventListener('resize', fitHandler);
+}
+
+/** Retain the full-page poster's type while tightening section gaps only when the
+ *  Sunday addition would otherwise push its location notes beyond the print margin. */
+function fitChanukah(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-chanukah')) {
+    const zoom = sheet.style.zoom;
+    sheet.style.zoom = '1';
+    for (let gap = 0.3; gap >= 0.059; gap -= 0.02) {
+      sheet.style.setProperty('--chanukah-set-gap', `${gap}in`);
+      const limit = sheet.getBoundingClientRect().bottom - parseFloat(getComputedStyle(sheet).paddingBottom);
+      if (sheet.querySelector('.poster-legend').getBoundingClientRect().bottom <= limit - 1) break;
+    }
+    sheet.style.zoom = zoom;
+  }
+}
+
+// Fit at the preview's actual zoom so phone row rounding cannot crowd the footer.
+function fitModernVasikin(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-modern-vasikin')) {
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    sheet.classList.toggle('is-mono', chosenInk === 'mono');
+    const fits = () => {
+      const rect = sheet.getBoundingClientRect(), css = getComputedStyle(sheet);
+      const zoom = rect.width / sheet.offsetWidth;
+      const bottom = rect.bottom - parseFloat(css.paddingBottom) * zoom;
+      const footer = sheet.querySelector('.netz-footer');
+      const last = sheet.querySelector('.netz-block:last-of-type');
+      return sheet.scrollHeight <= sheet.clientHeight && sheet.scrollWidth <= sheet.clientWidth
+        && last.getBoundingClientRect().bottom <= (footer ? footer.getBoundingClientRect().top - 8 * zoom : bottom) + 0.5 * zoom
+        && [...sheet.querySelectorAll('.netz-row,.netz-title,.netz-location')].every(el => {
+          const box = el.getBoundingClientRect();
+          return el.scrollWidth <= el.clientWidth + 1 && box.right <= rect.right - parseFloat(css.paddingRight) * zoom + 0.5
+            && box.left >= rect.left + parseFloat(css.paddingLeft) * zoom - 0.5;
+        });
+    };
+    for (let scale = 1; scale >= 0.7; scale = Math.round((scale - 0.025) * 1000) / 1000) {
+      sheet.style.setProperty('--netz-scale', scale);
+      if (fits()) break;
+    }
+  }
+}
+
+function fitHalfPage(container) {
+  for (const sheet of container.querySelectorAll('.poster.is-halfpage')) {
+    const wrapper = sheet.closest('.poster-half-sheet') || sheet.parentElement;
+    const zoom = wrapper.style.zoom;
+    wrapper.style.zoom = '1';
+    sheet.style.setProperty('--op-pad', `${chosenMargin}in`);
+    sheet.classList.toggle('is-mono', chosenInk === 'mono');
+    const legend = sheet.querySelector('.poster-legend');
+    for (const property of ['--halfpage-row-pad', '--halfpage-line-gap', '--halfpage-section-gap', '--asara-row-pad', '--asara-morning-pad', '--asara-section-gap']) {
+      sheet.style.removeProperty(property);
+    }
+    const fits = () => {
+      const cs = getComputedStyle(sheet);
+      const rect = sheet.getBoundingClientRect();
+      const limit = rect.bottom - parseFloat(cs.paddingBottom);
+      const body = sheet.querySelector('.halfpage-body');
+      const content = body.querySelector('.asara-detailed-sections') || body;
+      const heading = sheet.querySelector('.onepage-title');
+      const inside = [...sheet.querySelectorAll('.shacharis-handout-run')].every(row => {
+        const r = row.getBoundingClientRect();
+        return r.left >= rect.left + parseFloat(cs.paddingLeft) - 0.5
+          && r.right <= rect.right - parseFloat(cs.paddingRight) + 0.5;
+      });
+      return (!legend || legend.getBoundingClientRect().bottom <= limit + 0.5)
+        && heading.offsetTop >= sheet.querySelector('.page-header').offsetTop + sheet.querySelector('.page-header').offsetHeight - 0.5
+        && content.getBoundingClientRect().top >= body.getBoundingClientRect().top - 0.5
+        && content.getBoundingClientRect().bottom <= (legend ? legend.getBoundingClientRect().top - 6 : limit + 0.5)
+        && inside && sheet.scrollWidth <= sheet.clientWidth && sheet.scrollHeight <= sheet.clientHeight;
+    };
+    for (let size = 1.5; size >= 1; size = Math.round((size - 0.025) * 1000) / 1000) {
+      sheet.style.setProperty('--op-scale', size);
+      if (fits()) break;
+    }
+    if (sheet.classList.contains('is-asara-detailed') && !fits()) {
+      for (const padding of [0.09, 0.075, 0.065, 0.05]) {
+        sheet.style.setProperty('--asara-row-pad', `${padding}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const padding of [0.035, 0.025, 0.015]) {
+        sheet.style.setProperty('--asara-morning-pad', `${padding}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const gap of [0.14, 0.12, 0.1, 0.08]) {
+        sheet.style.setProperty('--asara-section-gap', `${gap}in`);
+        if (fits()) break;
+      }
+    }
+    // Large print margins can need less row padding even at the minimum type size.
+    if (sheet.querySelector('.halfpage-body.is-chanukah,.halfpage-body.is-small-schedule') && !fits()) {
+      for (const padding of [0.055, 0.045, 0.035, 0.025, 0.015, 0.01]) {
+        sheet.style.setProperty('--halfpage-row-pad', `${padding}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const gap of [0.03, 0.02, 0.01]) {
+        sheet.style.setProperty('--halfpage-line-gap', `${gap}in`);
+        if (fits()) break;
+      }
+      if (!fits()) for (const gap of [0.12, 0.1, 0.08, 0.06, 0.04]) {
+        sheet.style.setProperty('--halfpage-section-gap', `${gap}in`);
+        if (fits()) break;
+      }
+    }
+    wrapper.style.zoom = zoom;
+  }
 }
 
 /** Redraw after a picker changed, without throwing the reader back to the top.
@@ -2483,22 +3035,193 @@ export function fitPoster(container, options) {
  *  and changes the page's height. Focus goes back to the select that was just used, so the
  *  next arrow key still moves it, and preventScroll keeps that from undoing the restore. */
 function redrawInPlace(container, state) {
-  const y = window.scrollY;
-  const focused = document.activeElement?.id || '';
-  renderPosters(container, state);
-  const same = focused ? container.querySelector(`#${focused}`) : null;
-  /* A button that has just disabled itself under the finger cannot take the focus back, and
-     without the second half of this it goes to the body, which puts a keyboard back at the
-     top of the page. The year stepper is where it happens: Today disables itself every time
-     it is pressed, and each of the two steps does at its end of the list. So the focus goes
-     to whatever is still pressable in the same box and the next key is still working the
-     year. Measured before this: pressing + up to the last year left document.activeElement
-     as BODY. */
-  const to = same && !same.disabled
-    ? same
-    : same?.closest('.poster-year-step')?.querySelector('button:not(:disabled)');
-  to?.focus({ preventScroll: true });
-  window.scrollTo(0, y);
+  keepPosition(container, () => renderPosters(container, state));
+}
+
+let additionScrollController = null;
+
+/** Adding schedules deliberately reveals the picker or preview after the redraw. */
+function revealPrintAddition(container, id, picker = false) {
+  const target = container.querySelector(picker ? `#add-form-${CSS.escape(id)}`
+    : `.special-job-page[data-job-id="${CSS.escape(id)}"]`);
+  if (!target) return;
+  additionScrollController?.abort();
+  additionScrollController = null;
+  const focus = target.querySelector(picker ? 'select' : '.special-job-heading h4');
+  focus?.focus({ preventScroll: true });
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const destination = Math.max(0, Math.min(document.scrollingElement.scrollHeight - window.innerHeight,
+    window.scrollY + target.getBoundingClientRect().top - (parseFloat(getComputedStyle(target).scrollMarginTop) || 0)));
+  if (!reducedMotion && Math.abs(window.scrollY - destination) > 1) {
+    const controller = new AbortController();
+    additionScrollController = controller;
+    const finish = () => {
+      controller.abort();
+      if (additionScrollController === controller) additionScrollController = null;
+    };
+    const interrupt = () => {
+      finish();
+      window.scrollTo({ left: window.scrollX, top: window.scrollY, behavior: 'instant' });
+    };
+    for (const event of ['wheel', 'touchmove', 'pointerdown', 'keydown']) {
+      window.addEventListener(event, interrupt, { capture: true, passive: true, signal: controller.signal });
+    }
+    // An earlier position restore can queue scrollend before this animation starts.
+    window.addEventListener('scrollend', () => {
+      if (Math.abs(window.scrollY - destination) < 2) finish();
+    }, { signal: controller.signal });
+  }
+  target.scrollIntoView({ block: 'start', inline: 'nearest',
+    behavior: reducedMotion ? 'instant' : 'smooth' });
+}
+
+function currentSchedule(groups, state, settings, year, today, { includeExtra = false } = {}) {
+  const candidates = [];
+  for (const group of groups) for (const poster of group.items) {
+    if (poster.extra && !includeExtra || poster.combined) continue;
+    const from = poster.starts?.(year, settings);
+    if (!Number.isFinite(from)) continue;
+    if (from < today) {
+      const value = poster.sources(state, settings).find(s => s.year === year)?.build().poster;
+      if (!value?.span || value.span.to < today) continue;
+    }
+    candidates.push({ name: group.name, key: poster.key, from: Math.max(from, today) });
+  }
+  return candidates.sort((a, b) => a.from - b.from)[0] || null;
+}
+
+function selectedScheduleRun(groups, state, settings, year, compact) {
+  const entries = [];
+  for (const group of groups) {
+    const originals = group.items.filter(p => !p.handout);
+    if (compact && originals.length) {
+      const result = buildEveryPoster(state, settings, year, { combined: false, group: group.name });
+      entries.push({ id: `combined:${group.name}`, group: group.name, label: group.name, compact: true,
+        half: originals.length === 1 && HALF_PAGE_POSTERS.has(originals[0].key),
+        value: result.poster, missing: result.missing,
+        render: (value, st) => renderOnePagePoster(value, st, { halfLetter: true }),
+      });
+    }
+    for (const poster of group.items) {
+      // Combined schedules replace originals. Vasikin has its own announcement.
+      if (compact && originals.length && !poster.handout && poster.key !== 'vasikinboth') continue;
+      // The full Asara schedule's morning handout is a separate, explicit choice.
+      if (poster.handout && originals.length) continue;
+      const result = poster.sources(state, settings).find(s => s.year === year)?.build() || {};
+      entries.push({ id: `poster:${poster.key}`, group: group.name, label: poster.label, poster,
+        paired: Boolean(poster.combined), handout: Boolean(poster.handout),
+        value: result.poster, missing: result.missing || (!result.poster ? 'Not available for this year' : null),
+        render: poster.render,
+      });
+    }
+  }
+  for (const entry of entries) entry.selected = !entry.missing && (chosenSetSelection[entry.id] ?? (!entry.paired || chosenCombined));
+  const pages = entries.filter(e => e.selected);
+  const spans = pages.map(p => p.value?.span).filter(Boolean);
+  return { entries, result: pages.length ? { poster: { pages, hebrewYear: year,
+    span: spans.length ? { from: Math.min(...spans.map(s => s.from)), to: Math.max(...spans.map(s => s.to)) } : null,
+  } } : { missing: 'Select at least one available schedule to print.' } };
+}
+
+function specialPageCatalog(groups, state, settings, year) {
+  const catalog = [];
+  const add = (poster, group) => {
+    const result = poster.sources(state, settings).find(source => source.year === year)?.build() || {};
+    const value = result.poster && !result.poster.span && result.poster.week?.date
+      ? { ...result.poster, span: { from: excelSerial(new Date(result.poster.week.date)), to: excelSerial(new Date(result.poster.week.date)) } } : result.poster;
+    catalog.push({ key: poster.key, label: poster.label, group, poster, value, missing: result.missing, conflict: result.conflict });
+  };
+  for (const group of groups) {
+    for (const poster of group.items) add(poster, group.name);
+    const originals = group.items.filter(poster => !poster.handout && !poster.combined && !poster.own);
+    if (originals.length > 1) {
+      const result = buildEveryPoster(state, settings, year, { combined: false, group: group.name });
+      catalog.push({ key: `occasion:${group.name}`, label: 'Whole occasion on one page', group: group.name,
+        value: result.poster, whole: true, missing: result.missing });
+    }
+  }
+  // Keep a selected handout visible if its dates are unavailable in the next year.
+  for (const poster of POSTERS.filter(poster => poster.handout && !catalog.some(entry => entry.key === poster.key))) {
+    add(poster, poster.key === 'asarashacharis' ? 'עשרה בטבת' : poster.group);
+  }
+  const full = catalog.find(entry => entry.key === 'asarabteves');
+  if (full) catalog.push({ ...full, key: 'asaralocations', label: 'עשרה בטבת · שחרית עם מקומות, מנחה ומעריב', locations: true });
+  return catalog;
+}
+
+function resolveSpecialPage(entry, settings, year) {
+  if (!entry) return null;
+  const original = entry.poster;
+  const half = Boolean(original?.handout || entry.locations || chosenDesign === 'new' && HALF_PAGE_POSTERS.has(original?.key));
+  const modern = entry.whole || original?.own || original?.handout || entry.locations
+    || chosenDesign === 'new' && (half || original?.key === 'vasikinboth' || original?.key !== 'shuva' && Boolean(ONEPAGE_SECTIONS[original?.key]));
+  const render = () => {
+    if (modern && original?.key === 'vasikinboth') return renderModernVasikinPoster(entry.value, settings);
+    if (original?.handout) return renderShacharisHandout(entry.value, settings, { standalone: true });
+    if (half) return renderHalfSchedulePoster(entry.value, original.key, settings, { standalone: true, asaraShacharis: entry.locations ? 'locations' : 'compact' });
+    if (modern && original?.key === 'slichos') return renderOnePagePoster({
+      own: true, hebrewYear: year, title: entry.label, span: entry.value.span,
+      sections: [oneSection(SLICHOS_TEXT.title, entry.value.rows)], legend: entry.value.legend,
+    }, settings);
+    if (modern && original?.key === 'yomkippur') return renderOnePagePoster({
+      own: true, hebrewYear: year, title: entry.label, span: entry.value.span,
+      sections: [...ONEPAGE_SECTIONS.yomkippur(entry.value), ...ONEPAGE_SECTIONS.afteryk(entry.value)], legend: entry.value.legend,
+    }, settings);
+    if (modern) return renderOnePagePoster(entry.whole || original?.own ? entry.value : {
+      hebrewYear: year, title: entry.label, span: entry.value.span,
+      items: [{ key: original.key, label: original.label, poster: entry.value }], notBuilt: [], leftOut: [],
+    }, settings);
+    return original.render(entry.value, settings, { landscape: chosenOrientation === 'landscape' });
+  };
+  return { ...entry, half, modern, render, turned: !modern && original?.orientations && chosenOrientation === 'landscape' };
+}
+
+function printAdditionHtml(page, groups, catalog, resolve) {
+  if (pendingAddition?.after !== page.id) return '';
+  const half = pendingAddition.side !== 'page';
+  const available = catalog.filter(entry => entry.value && (!half || resolve(entry.key)?.half));
+  const occasions = specialOccasionChoices(groups, available, { selectedKey: pendingAddition.key, availableOnly: true });
+  const occasion = (pendingAddition.key && occasions.find(choice => choice.key === pendingAddition.key))
+    || occasions.find(choice => !choice.key && choice.group === pendingAddition.group) || occasions[0];
+  const group = groups.find(group => group.name === occasion?.group);
+  const choices = available.filter(entry => entry.group === group?.name);
+  const selected = choices.find(entry => entry.key === pendingAddition.key) || choices[0];
+  pendingAddition.group = group?.name;
+  pendingAddition.key = selected?.key;
+  return `<form class="special-add-page no-print" id="add-form-${escAttr(page.id)}" data-add-after="${escAttr(page.id)}">
+    <h4>${half ? 'Add a schedule on the other half' : 'Add another page'}</h4>
+    <label>Occasion<select id="add-occasion-${escAttr(page.id)}" data-add-group>${occasionOptions(occasions, occasion?.value)}</select></label>
+    <label>Page<select id="add-choice-${escAttr(page.id)}" data-add-choice>${choices.map(entry => `<option value="${escAttr(entry.key)}" ${entry.key === selected?.key ? 'selected' : ''}>${escAttr(entry.label)}</option>`).join('')}</select></label>
+    <div class="actions"><button type="submit" class="btn-primary" ${selected ? '' : 'disabled'}>Add ${half ? 'to other half' : 'page'}</button><button type="button" data-job-action="cancel" data-job-id="${escAttr(page.id)}">Cancel</button></div>
+    ${half ? '' : `<div class="special-add-all"><button type="button" data-job-action="all-halves" data-job-id="${escAttr(page.id)}">Add all half-page schedules</button><button type="button" data-job-action="all" data-job-id="${escAttr(page.id)}">Add all available pages</button></div>`}
+  </form>`;
+}
+
+function renderSpecialPrintJob(pages, plan, groups, catalog, resolve, year) {
+  const slot = entry => `<div class="poster-half-slot${entry?.value ? '' : ' is-blank'}"${entry ? ` data-half-key="${escAttr(entry.key)}"` : ''}>${entry?.value ? entry.render() : '<span class="no-print">Blank half</span>'}</div>`;
+  return `<div class="poster-all special-print-job">${pages.map((page, index) => {
+    const frames = plan.frames.filter(frame => frame.page.id === page.id);
+    const first = resolve(page.left || page.right);
+    const span = frames.flatMap(frame => [frame.left, frame.right]).filter(entry => entry?.value?.span).map(entry => entry.value.span);
+    const dates = span.length ? when(Math.min(...span.map(s => s.from)), Math.max(...span.map(s => s.to))) : null;
+    const canPair = first?.half && !(page.left && page.right);
+    return `<section class="special-job-page" data-job-id="${escAttr(page.id)}">
+      <div class="special-job-heading no-print"><h4 tabindex="-1">Page ${index + 1}${first ? `: <bdi dir="auto">${escAttr(first.label)}</bdi>` : ''}</h4><div>
+        ${pages.length > 1 ? `<button type="button" data-job-action="up" data-job-id="${escAttr(page.id)}" aria-label="Move page ${index + 1} up" ${index === 0 ? 'disabled' : ''}>↑</button><button type="button" data-job-action="down" data-job-id="${escAttr(page.id)}" aria-label="Move page ${index + 1} down" ${index === pages.length - 1 ? 'disabled' : ''}>↓</button><button type="button" data-job-action="remove" data-job-id="${escAttr(page.id)}">Remove page</button>` : ''}
+        ${page.left && page.right ? `<button type="button" data-job-action="unpair" data-job-id="${escAttr(page.id)}">Separate pages</button><button type="button" data-job-action="swap" data-job-id="${escAttr(page.id)}">Swap halves</button><button type="button" data-job-action="remove-right" data-job-id="${escAttr(page.id)}">Remove second schedule</button>` : ''}
+      </div></div>
+      ${dates ? `<div class="poster-when no-print"><div class="poster-when-what" dir="auto">${escAttr(first?.label || '')} ${escAttr(hebrewYear(year))}</div><div class="poster-when-he" lang="he" dir="rtl">${escAttr(dates.he)}</div><div class="poster-when-en">${escAttr(dates.en)}</div></div>` : ''}
+      ${frames.length > 1 ? '<p class="hint no-print">These schedules use two sheets with the selected design.</p>' : ''}
+      ${plan.issues.filter(issue => issue.id === page.id).map(issue => `<p class="error no-print">${escAttr(issue.label)} is not available for this year. Choose another page or remove it before printing.</p>`).join('')}
+      ${frames.map(frame => `<div class="poster-all-item${frame.turned || frame.left?.turned || frame.right?.turned ? ' is-sideways' : ''}${frame === plan.frames.at(-1) ? ' is-last-print-frame' : ''}" data-job-frame="${escAttr(frame.id)}">
+        ${frame.half ? `<div class="special-job-half${plan.landscape ? '' : ' special-job-half-mixed'}"><div class="poster-half-sheet is-paired">${slot(frame.left)}${slot(frame.right)}</div></div>` : (frame.left || frame.right).render()}
+      </div>`).join('')}
+      <div class="special-job-actions no-print">
+        ${canPair ? `<button type="button" id="add-half-${escAttr(page.id)}" data-job-action="half" data-job-id="${escAttr(page.id)}">+ Add on the other half</button>` : ''}
+        <button type="button" id="add-page-${escAttr(page.id)}" data-job-action="page" data-job-id="${escAttr(page.id)}">+ Add another page</button>
+      </div>${printAdditionHtml(page, groups, catalog, resolve)}
+    </section>`;
+  }).join('')}</div>`;
 }
 
 export function renderPosters(container, state, routeChanged, tables) {
@@ -2506,411 +3229,247 @@ export function renderPosters(container, state, routeChanged, tables) {
   if (routeChanged !== undefined) onRoute = routeChanged;
   if (tables) posterTables = tables;
   const settings = resolveSettings(state.settings);
-  // Ordered by date, so the picker and the run both read down the season. Which year's dates
-  // is settled here rather than below, because the order has to be known before the poster is
-  // picked out of it. Every poster's sources are the same list of years and a source id is
-  // that year, so this is the Year picker's answer without having to build anything first.
-  // Current means the actual Hebrew year, including after Yom Kippur.
-  // Future years remain available through the year stepper.
-  const { years, preferred } = posterYears(state);
-  const year = years.includes(chosenYear) ? chosenYear : preferred;
-  const at = years.indexOf(year);
-
-  /* Which occasion, and then which sheet of it. The whole year is offered whether or not its
-     sheets exist yet, so the list reads as the shul's year rather than as a report on what
-     has been drawn (see POSTER_OCCASIONS). Only the first of them has sheets so far.
-     The nameless group is dropped: it holds the run, which is now the other side of the
-     "one at a time or all of them" switch rather than an entry in the list. */
-  /* Each occasion keeps the day its last sheet opens on as well as its sheets. The list is
-     rebuilt here in the picker's own order rather than the year's, and dropping that day was
-     what left the Current button with nothing to go back to. */
-  const drawn = new Map(posterGroups(year, settings, state).filter((g) => g.name).map((g) => [g.name, g]));
-  const groups = [
-    ...POSTER_OCCASIONS.map((name) => ({
-      name, items: drawn.get(name)?.items || [], lastStart: drawn.get(name)?.lastStart ?? null,
-    })),
-    ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name))
-      .map(([name, g]) => ({ name, items: g.items, lastStart: g.lastStart })),
-  ];
-  /* The occasion that is on, which the Current button goes back to.
-     The first one of the year still ahead of today, by the last day any of its sheets opens
-     on: in אלול that is the ימים נוראים, whose יום כיפור sheet is still to come, and once
-     יו"כ is past it is סוכות. Past the whole year it stays on the last occasion that has
-     sheets rather than falling back to the first, since that is the one whose paper is still
-     on the wall. The year picker has rolled to the next year by then anyway (see
-     posterYears), which puts everything ahead again.
-     Off the days postersByDate already worked out, so nothing is built for it. */
-  const withSheets = groups.filter((g) => g.items.length && g.lastStart != null);
-  const nowSerial = excelSerial(new Date());
-  const current = withSheets.find((g) => g.lastStart >= nowSerial)
-    || withSheets[withSheets.length - 1] || null;
-
-  const group = groups.find((g) => g.name === chosenGroup) || groups[0];
-  // Where the occasion showing sits in that list, which is what the two steppers move along
-  // and what disables one of them at either end.
-  const gAt = groups.indexOf(group);
-  /* Written back, so the occasion the picker is showing and the occasion the run is built from
-     are one name. Nothing has been picked on a fresh load and chosenGroup is null, which the
-     line above resolves to the first occasion for the picker's sake; the run read the null and
-     built every sheet of the year under it. */
-  if (group) chosenGroup = group.name;
-  /* The whole year of them, or the one showing. Everything below reads `items`, so the
-     switches, the Print button and the "nothing here yet" message all answer for what is
-     actually in the run rather than for the occasion the picker happens to be on. */
-  const scopeAll = chosenSheets !== 'one' && chosenScope === 'all';
-  const items = scopeAll ? groups.flatMap((g) => g.items) : (group ? group.items : []);
-  // An occasion nobody has given times for yet. Everything past the picker is left off: a
-  // Sheets switch over nothing, or a Print button that would hand over a blank page, is a
-  // control that lies about what is there.
-  const empty = items.length === 0;
-  const runPoster = POSTERS.find((p) => p.last);
-  const one = items.find((p) => p.key === chosen) || items[0] || null;
-  // 'each' and 'all' are both the whole set; they differ only in how it is laid out.
-  const showAll = chosenSheets !== 'one';
-  const onePage = chosenSheets === 'all';
-  const poster = empty ? null : showAll ? runPoster : one;
-
-  /* Which of the further switches this sheet actually reads, and whether the occasion showing
-     has anything for them to decide. Both belong to the run rather than to a single sheet.
-     A switch over nothing is a control that lies about what is there: סוכות has no sheet that
-     carries two schedules and none that can be turned, so it was being offered the choice of
-     leaving out sheets it does not have and of paper it cannot use. Asked of the occasion's own
-     sheets rather than written down, so an occasion drawn later gets the right answer by
-     carrying the right flags. */
-  const hasCombined = items.some((p) => p.combined);
-  const canTurn = !onePage && (showAll
-    // In a run, the way up only means something when a sheet that can be turned is in it, which
-    // is what the two-in-one switch decides for the ones that are both.
-    ? items.some((p) => p.orientations && (chosenCombined || !p.combined))
-    : Boolean(poster?.orientations));
-
-  const sources = poster ? poster.sources(state, settings) : [];
-  const source = sources.find((s) => s.year === year)
-    || sources.find((s) => s.preferred) || sources[0] || null;
-  const result = poster && source ? source.build() : { missing: 'No year to build from.' };
-  const built = result.poster || null;
-
-  container.className = 'is-sheet-view';
-  container.innerHTML = `
-    <h2 class="no-print">Posters</h2>
-    <p class="hint no-print">The sheets the shul hangs that are not the zmanim board. What changes with the year is worked out rather than typed, so a poster is right the year it is printed and every year after.</p>
-    <div class="poster-bar no-print">
-      <div class="poster-year">
-        <span class="poster-year-label" id="poster-year-label">Year</span>
-        <div class="poster-year-step" role="group" aria-labelledby="poster-year-label">
-          <button type="button" id="poster-year-back" aria-label="The year before"
-            ${at <= 0 ? 'disabled' : ''}>&minus;</button>
-          <!-- data-year is the number behind the label, which is written as תשפ״ז and a
-               Gregorian date. aria-live, so a screen reader is told the year changed rather
-               than the page silently becoming a different one. -->
-          <span class="poster-year-now" data-year="${year}" aria-live="polite">${escAttr(yearLabel(year))}</span>
-          <button type="button" id="poster-year-next" aria-label="The year after"
-            ${at >= years.length - 1 ? 'disabled' : ''}>+</button>
-          <!-- Back to the year a fresh load opens on, after stepping off it to look at
-               another one. Called Today because that is what the same button is called on
-               This week and on the wall chart, and because the year it lands on is the one
-               that is current for printing rather than the calendar's own: in אלול it is
-               next year's sheets that are wanted. Disabled where it is already there, the
-               way the two steppers are at the ends of the list, so it keeps its place in
-               the box rather than the bar changing shape as the year moves. -->
-          <button type="button" id="poster-year-today" class="poster-year-reset"
-            aria-label="The current Hebrew year" ${year === preferred ? 'disabled' : ''}>Current</button>
-        </div>
-      </div>
-      <!-- The occasion, in the same box as the year: a step either side of a control that is
-           still the whole list. The two are one question asked twice, "which sheet am I
-           printing", and the year already answers it this way. A dropdown alone made you open
-           a menu of nine and read it to move one occasion, and there are only ever a few
-           between the one showing and the one wanted. -->
-      ${scopeAll ? '' : `<div class="poster-year">
-        <span class="poster-year-label" id="poster-group-label">Yom tov</span>
-        <div class="poster-year-step">
-          <button type="button" id="poster-group-back" aria-label="The yom tov before"
-            ${gAt <= 0 ? 'disabled' : ''}>&minus;</button>
-          <select id="poster-group" aria-labelledby="poster-group-label">
-            ${groups.map((g) => `<option value="${escAttr(g.name)}" ${group && g.name === group.name ? 'selected' : ''}>${escAttr(g.name)}</option>`).join('')}
-          </select>
-          <button type="button" id="poster-group-next" aria-label="The yom tov after"
-            ${gAt >= groups.length - 1 ? 'disabled' : ''}>+</button>
-          <!-- Back to the occasion that is on, the same way the year's button goes back to
-               the year coming up. Left off entirely where there is no occasion to go back
-               to, rather than sat there dead: the year's is always answerable and this one
-               is not. -->
-          ${current ? `<button type="button" id="poster-group-now" class="poster-year-reset"
-            aria-label="The yom tov on now"
-            ${group && current.name === group.name ? 'disabled' : ''}>Current</button>` : ''}
-        </div>
-      </div>`}
-      <!-- One yom tov or the whole year of them. Only over a run: on a single sheet there is
-           nothing for it to decide, and it is the picker above that says which sheet. -->
-      ${chosenSheets !== 'one' ? `<div class="poster-bar-switch">${switchHtml('poster-scope', 'Yom tovim', [
-        { value: 'one', label: 'Just this one', on: !scopeAll },
-        { value: 'all', label: 'All of them', on: scopeAll },
-      ])}</div>` : ''}
-      ${empty ? '' : `<div class="poster-bar-switch">${switchHtml('poster-sheets', 'Sheets', [
-        { value: 'one', label: 'Just one', on: chosenSheets === 'one' },
-        { value: 'each', label: 'A sheet each', on: chosenSheets === 'each' },
-        // The one beside it says sheet, so this reads as all on one sheet without having to
-        // say it, which it has no room to: three sides of a switch get 86px of text each on
-        // a phone and "All on one sheet" is 105px of it.
-        { value: 'all', label: 'All on one', on: chosenSheets === 'all' },
-      ])}</div>`}
-      ${!empty && !showAll ? `<label>Which sheet
-        <select id="poster-pick">
-          ${items.map((p) => `<option value="${escAttr(p.key)}" ${one && p.key === one.key ? 'selected' : ''}>${escAttr(p.label)}</option>`).join('')}
-        </select>
-      </label>` : ''}
-      <!-- The margin, built like the year and the yom tov beside it: a step either side of a
-           control that is still the whole list, and a reset at the end. Only on the one-page
-           sheet, which is the only one that reads it.
-
-           A stepper because the number nobody can work out from here is how much of the paper
-           the printer refuses to mark. Whoever is standing at the machine can see that in one
-           print, so they get to walk it in a step at a time rather than ask for a number. -->
-      ${!empty && onePage ? `<div class="poster-year">
-        <span class="poster-year-label" id="poster-margin-label">Margin</span>
-        <div class="poster-year-step">
-          <button type="button" id="poster-margin-back" aria-label="A narrower margin"
-            ${chosenMargin <= OP_PAD_MIN + 1e-9 ? 'disabled' : ''}>&minus;</button>
-          <select id="poster-margin" aria-labelledby="poster-margin-label">
-            ${padSteps().map((v) => `<option value="${v}" ${Math.abs(v - chosenMargin) < 1e-9 ? 'selected' : ''}>${padLabel(v)}</option>`).join('')}
-          </select>
-          <button type="button" id="poster-margin-next" aria-label="A wider margin"
-            ${chosenMargin >= OP_PAD_MAX - 1e-9 ? 'disabled' : ''}>+</button>
-          <button type="button" id="poster-margin-reset" class="poster-year-reset"
-            aria-label="Back to the margin the sheet ships with"
-            ${Math.abs(chosenMargin - OP_PAD) < 1e-9 ? 'disabled' : ''}>Original</button>
-        </div>
-      </div>` : ''}
-      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-ink', 'Ink', [
-        { value: 'colour', label: 'Colour', on: chosenInk !== 'mono' },
-        // Two words, which is what a side of a switch holds on a phone. The photo keeps its
-        // colour either way and the switch does not try to say so: the sheet in front of you
-        // shows it.
-        { value: 'mono', label: 'Black and white', on: chosenInk === 'mono' },
-      ])}</div>` : ''}
-      ${!empty && onePage ? `<div class="poster-bar-switch">${switchHtml('poster-break', 'Second column', [
-        // Two words each: a switch gives a side 86px of text on a phone, and "Split evenly"
-        // and "Start at a day" both sit inside that where a sentence would not.
-        { value: 'even', label: 'Split evenly', on: chosenBreak === 'even' },
-        { value: 'day', label: 'Start at a day', on: chosenBreak === 'day' },
-      ])}</div>` : ''}
-      ${!empty && showAll && !onePage && hasCombined ? `<div class="poster-bar-switch">${switchHtml('poster-combined', 'The two-in-one sheets', [
-        { value: 'no', label: 'Leave out', on: !chosenCombined },
-        { value: 'yes', label: 'Include', on: chosenCombined },
-      ])}</div>` : ''}
-      ${canTurn ? `<div class="poster-bar-switch">${switchHtml('poster-orient', 'Paper', [
-        { value: 'portrait', label: 'Portrait', on: chosenOrientation === 'portrait' },
-        { value: 'landscape', label: 'Landscape', on: chosenOrientation === 'landscape' },
-      ])}</div>` : ''}
-      ${built ? printButtonHtml() : ''}
-      ${built && poster.erevText ? '<button type="button" class="copy-btn" id="poster-copy-btn">Copy text</button>' : ''}
-    </div>
-    ${built ? (() => { const w = poster.when(built); return `
-      <div class="poster-when no-print">
-        <div class="poster-when-what"${hebrewLang(poster.covers(year))}>${escAttr(poster.covers(year))}</div>
-        <div class="poster-when-he" lang="he" dir="rtl">${escAttr(w.he)}</div>
-        <div class="poster-when-en">${escAttr(w.en)}</div>
-      </div>`; })() : poster ? `<p class="hint no-print">${escAttr(poster.covers(year))}</p>` : ''}
-    ${result.conflict
-      ? `<p class="hint no-print">Two saved charts cover this שבת שובה and they do not say the same thing, so pick which one to read:
-           <select id="poster-conflict">
-             ${result.conflict.map((b, i) => `<option value="${i}" ${i === conflictPick ? 'selected' : ''}>${escAttr(chartLabel(b.sheet))}</option>`).join('')}
-           </select></p>`
-      : ''}
-    ${empty
-      ? `<p class="hint no-print">Nothing is drawn for <bdi${hebrewLang(group.name)}>${escAttr(group.name)}</bdi> yet. It is in the list so the whole year is in one place; the sheets follow once the shul's times for it are in, and then this fills in on its own the way <bdi${hebrewLang(POSTER_GROUP_DEFAULT)}>${escAttr(POSTER_GROUP_DEFAULT)}</bdi> does.</p>`
-      : ''}
-    <!-- The sheet in a box of its own, so typing in the editor under it can redraw the paper
-         without redrawing the panel the caret is in. -->
-    <div id="poster-sheet">${!empty && built
-      ? poster.render(built, settings, { landscape: chosenOrientation === 'landscape' })
-      : !empty ? `<p class="hint no-print">${escAttr(result.missing || '')}</p>` : ''}</div>
-    ${!showAll ? `<div class="poster-own-bar no-print">
-      ${poster?.own ? '' : `<button type="button" id="poster-own-new">+ Write a sheet of your own</button>`}
-      <span class="hint">A sheet of your own is typed here and prints on this same page. Its blocks are dated by the Hebrew date, so it comes back every year, and a line can hang off a זמן instead of being typed.</span>
-    </div>
-    <div id="poster-own"></div>` : ''}`;
-
+  const { years, preferred } = posterYears(state), year = years.includes(chosenYear) ? chosenYear : preferred;
+  const drawn = new Map(posterGroups(year, settings, state).filter(group => group.name).map(group => [group.name, group]));
+  const groups = [...POSTER_OCCASIONS.map(name => ({ name, items: drawn.get(name)?.items || [],
+    firstStart: drawn.get(name)?.firstStart ?? posterOccasionStart(name, year) })),
+    ...[...drawn].filter(([name]) => !POSTER_OCCASIONS.includes(name)).map(([name, group]) => ({ ...group, name }))]
+    .filter(group => group.name !== 'עשרה בטבת · שחרית').map(group => group.name === 'עשרה בטבת'
+      ? { ...group, items: [...group.items, ...(drawn.get('עשרה בטבת · שחרית')?.items || [])] } : group)
+    .sort((a, b) => (a.firstStart ?? Infinity) - (b.firstStart ?? Infinity));
+  const catalog = specialPageCatalog(groups, state, settings, year), byKey = new Map(catalog.map(entry => [entry.key, entry]));
+  const resolve = key => resolveSpecialPage(byKey.get(key), settings, year);
+  const current = currentSchedule(groups, state, settings, year, shulNow(websiteNow(), settings).serial);
+  chosenPrintPages = normalizePrintPages(chosenPrintPages, catalog.map(entry => entry.key));
+  const collectionEntries = chosenCollection ? specialCollectionEntries(catalog, chosenCollection) : [];
+  if (chosenCollection) {
+    chosenPrintPages = collectionEntries.map(entry => chosenPrintPages?.find(page => page.left === entry.key && !page.right)
+      || newPrintPage(entry.key));
+    chosen = chosenPrintPages[0]?.left || null;
+    chosenGroup = collectionEntries[0]?.group || (chosenCollection === 'roshchodesh' ? 'ראש חודש' : POSTER_GROUP_DEFAULT);
+  }
+  if (chosenPrintPages === null) {
+    if (chosenWorkflow === 'halves' && chosenHalfPagePairs?.length) chosenPrintPages = chosenHalfPagePairs.map(pair => ({ ...pair,
+      left: pair.leftShacharis === 'locations' && pair.left === 'asarabteves' ? 'asaralocations' : pair.left,
+      right: pair.rightShacharis === 'locations' && pair.right === 'asarabteves' ? 'asaralocations' : pair.right }));
+    else if (chosenWorkflow === 'set') {
+      const selected = selectedScheduleRun(chosenScope === 'all' ? groups : groups.filter(group => group.name === chosenGroup), state, settings, year, chosenSheets === 'all');
+      chosenPrintPages = selected.entries.filter(entry => entry.selected && entry.value).map(entry => {
+        const key = entry.poster?.key || (entry.half ? groups.find(group => group.name === entry.group)?.items.find(p => !p.handout)?.key : `occasion:${entry.group}`);
+        return newPrintPage(key, chosenCopiesPerPage === 2 && resolve(key)?.half ? key : '');
+      });
+    } else chosenPrintPages = [];
+  }
+  let selectedKey = chosenPrintPages[0]?.left || chosenPrintPages[0]?.right || (chosen === '__combined__' ? `occasion:${chosenGroup}`
+    : chosen === 'asarabteves' && chosenAsaraShacharis === 'locations' ? 'asaralocations' : chosen);
+  if (byKey.get(selectedKey)?.poster?.dated && !byKey.get(selectedKey).value && chosenPrintPages.length <= 1
+    && (!chosenPrintPages[0]?.left || !chosenPrintPages[0]?.right || chosenPrintPages[0].left === chosenPrintPages[0].right)) {
+    const replacement = catalog.find(entry => entry.group === byKey.get(selectedKey).group && entry.value);
+    if (replacement) {
+      for (const side of ['left', 'right']) if (chosenPrintPages[0]?.[side] === selectedKey) chosenPrintPages[0][side] = replacement.key;
+      selectedKey = replacement.key; chosen = selectedKey; rememberBar(); onRoute?.();
+    }
+  }
+  const selectedEntry = byKey.get(selectedKey);
+  const group = groups.find(group => group.name === selectedEntry?.group) || groups.find(group => group.name === chosenGroup)
+    || groups.find(group => group.name === current?.name) || groups[0];
+  const choices = catalog.filter(entry => entry.group === group?.name && !entry.locations && (!entry.poster?.dated || entry.value || entry.key === selectedKey));
+  const primary = selectedEntry || choices.find(entry => entry.value) || choices[0];
+  const pageChoices = choices.filter(entry => entry.value), pAt = pageChoices.findIndex(entry => entry.key === primary?.key);
+  const pageCurrent = group && currentSchedule([group], state, settings, year, shulNow(websiteNow(), settings).serial, { includeExtra: true })?.key
+    || pageChoices[0]?.key;
+  const occasions = specialOccasionChoices(groups, catalog, { selectedKey: primary?.key });
+  const occasion = (primary?.key && occasions.find(choice => choice.key === primary.key))
+    || occasions.find(choice => !choice.key && choice.group === group?.name);
+  const collections = SPECIAL_COLLECTIONS.filter(collection => collection.kind === 'yomtov').map(collection => ({ ...collection,
+    disabled: !specialCollectionEntries(catalog, collection.kind).length }));
+  const occasionValue = chosenCollection === 'yomtov' ? 'all:yomtov' : occasion?.value;
+  const occasionSteps = orderedOccasionChoices(occasions, collections).filter(choice => !choice.disabled);
+  const occasionAt = occasionSteps.findIndex(choice => choice.value === occasionValue);
+  const previousOccasion = occasionSteps[occasionAt - 1]?.value;
+  const nextOccasion = occasionSteps[occasionAt + 1]?.value;
+  chosenGroup = group?.name;
+  chosen = primary?.key || null;
+  if (!chosenPrintPages.length && primary && !chosenCollection) chosenPrintPages = [newPrintPage(primary.key, chosenCopiesPerPage === 2 && resolve(primary.key)?.half ? primary.key : '')];
+  const plan = specialPrintPlan(chosenPrintPages, resolve);
+  chosenWorkflow = 'single';
+  rememberBar();
+  const entries = plan.frames.flatMap(frame => [frame.left, frame.right]).filter(Boolean);
+  const own = primary?.poster?.own;
+  const unavailable = chosenCollection === 'yomtov' ? [...new Set(occasions.filter(choice => choice.category === 'Yom Tov').map(choice => choice.group))]
+    .filter(name => !collectionEntries.some(entry => entry.group === name)) : [];
+  container.className = `is-sheet-view is-special-schedules${plan.landscape ? ' is-half-letter-print is-half-paired-print' : ''}`;
+  container.innerHTML = specialScheduleControls({ year, years, at: years.indexOf(year), preferred, yearLabel: y => `${hebrewYear(y)} · ${y}`,
+    groups: occasions, group, occasionValue, previousOccasion, nextOccasion, current,
+    selected: primary?.key, choices: chosenCollection === 'yomtov' ? [] : choices, design: chosenDesign, collections, collection: chosenCollection, unavailable,
+    pAt: chosenCollection === 'roshchodesh' ? -1 : pAt, pCount: pageChoices.length, pageCurrent, allMonths: chosenCollection === 'roshchodesh',
+    asara: group?.name === 'עשרה בטבת', count: plan.frames.length, landscape: plan.landscape,
+    printable: Boolean(plan.frames.length && !plan.issues.length), advanced: printSettingsOpen,
+    margin: chosenMargin, padMin: OP_PAD_MIN, padMax: OP_PAD_MAX, padOriginal: OP_PAD, padSteps: padSteps(), padLabel,
+    ink: chosenInk, brk: chosenBreak, orientation: chosenOrientation,
+    canPad: entries.some(entry => entry.modern || entry.half),
+    canColumns: entries.some(entry => entry.modern && !entry.half && entry.poster?.key !== 'vasikinboth'), canTurn: entries.some(entry => !entry.modern && entry.poster?.orientations),
+    copyText: Boolean(!chosenCollection && primary?.value && primary.poster?.erevText),
+    conflict: primary?.conflict, conflictPick, chartLabel,
+  }) + `<div id="poster-sheet">${chosenPrintPages.length ? renderSpecialPrintJob(chosenPrintPages, plan, groups, catalog, resolve, year)
+    : '<p class="hint no-print">No schedules are available for this occasion yet.</p>'}</div></section></div>`;
   const again = () => redrawInPlace(container, state);
-  // A year either side, and no further: the buttons at the ends are disabled rather than
-  // wrapping round, so holding one down cannot walk off the list.
-  const step = (by) => {
-    const to = years[at + by];
-    if (to == null) return;
-    chosenYear = to;
-    conflictPick = 0;
-    rememberBar();
-    again();
+  const commit = () => { rememberBar(); onRoute?.(); again(); };
+  const selectCollection = kind => {
+    if (!SPECIAL_COLLECTIONS.some(collection => collection.kind === kind)) return;
+    chosenCollection = kind; chosenPrintPages = []; chosen = null;
+    chosenGroup = kind === 'roshchodesh' ? 'ראש חודש' : POSTER_GROUP_DEFAULT;
+    pendingAddition = null; conflictPick = 0; commit();
   };
-  container.querySelector('#poster-year-back')?.addEventListener('click', () => step(-1));
-  container.querySelector('#poster-year-next')?.addEventListener('click', () => step(1));
-  // Null rather than the year itself: null is what a fresh load holds and it means the year
-  // coming up, so this leaves the bar in the state it opens in rather than in a state that
-  // happens to name the same year today and the wrong one after ראש השנה.
-  container.querySelector('#poster-year-today')?.addEventListener('click', () => {
-    chosenYear = null;
-    conflictPick = 0;
-    rememberBar();
-    again();
-  });
-  /* The occasion, from the two steppers or from the list. Both end in the same place, so the
-     one that does the work takes a name and the three ways in hand it one.
-     No wrapping at the ends, like the year's: holding a button down cannot walk off the list. */
-  const toGroup = (name) => {
-    if (name == null) return;
-    chosenGroup = name;
-    // The sheet chosen belongs to the occasion that was showing, so it is let go of here
-    // rather than left pointing into a list it is not in any more.
-    chosen = null;
-    conflictPick = 0;
-    rememberBar();
-    onRoute?.();
-    again();
+  const selectPrimary = key => {
+    const entry = byKey.get(key); if (!entry) return;
+    if (chosenCollection) chosenPrintPages = [];
+    chosenCollection = null;
+    if (!chosenPrintPages.length) chosenPrintPages.push(newPrintPage(key));
+    else chosenPrintPages[0][chosenPrintPages[0].left ? 'left' : 'right'] = key;
+    chosen = key; chosenGroup = entry.group; pendingAddition = null; conflictPick = 0;
+    if (key === 'asarabteves' || key === 'asaralocations') chosenAsaraShacharis = key === 'asaralocations' ? 'locations' : 'compact';
+    commit();
   };
-  container.querySelector('#poster-group-now')?.addEventListener('click', () => toGroup(current?.name));
-  container.querySelector('#poster-group-back')?.addEventListener('click', () => toGroup(groups[gAt - 1]?.name));
-  container.querySelector('#poster-group-next')?.addEventListener('click', () => toGroup(groups[gAt + 1]?.name));
-  container.querySelector('#poster-group')?.addEventListener('change', (e) => {
-    chosenGroup = e.target.value;
-    // The sheet chosen belongs to the occasion that was showing, so it is let go of here
-    // rather than left pointing into a list it is not in any more.
-    chosen = null;
-    conflictPick = 0;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
-  wireSwitch(container, 'poster-sheets', (value) => {
-    chosenSheets = value;
-    conflictPick = 0;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
-  container.querySelector('#poster-pick')?.addEventListener('change', (e) => {
-    chosen = e.target.value;
-    conflictPick = 0;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
-  wireSwitch(container, 'poster-orient', (value) => {
-    chosenOrientation = value;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
-  wireSwitch(container, 'poster-scope', (value) => {
-    chosenScope = value === 'all' ? 'all' : 'one';
-    conflictPick = 0;
-    rememberBar();
-    again();
-  });
-  wireSwitch(container, 'poster-ink', (value) => {
-    chosenInk = value === 'mono' ? 'mono' : 'colour';
-    rememberBar();
-    again();
-  });
-  wireSwitch(container, 'poster-break', (value) => {
-    chosenBreak = value === 'day' ? 'day' : 'even';
-    rememberBar();
-    again();
-  });
-  /* The margin, from the two steppers, the list, or the reset. All four end in the same place,
-     so the one that does the work takes a number and the four ways in hand it one. Held inside
-     the ends rather than wrapped, the same as the year's and the yom tov's. */
-  const toMargin = (v) => {
-    if (!Number.isFinite(v)) return;
-    const next = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(v * 100) / 100));
-    if (Math.abs(next - chosenMargin) < 1e-9) return;
-    chosenMargin = next;
-    rememberBar();
-    again();
+  const toGroup = (name, key) => {
+    if (!name) return;
+    const entry = catalog.find(entry => entry.key === key && entry.group === name)
+      || catalog.find(entry => entry.group === name && entry.value && !entry.whole && !entry.locations)
+      || catalog.find(entry => entry.group === name);
+    if (entry) selectPrimary(entry.key);
+    else { chosenCollection = null; chosenGroup = name; chosen = null; chosenPrintPages = []; pendingAddition = null; commit(); }
   };
-  container.querySelector('#poster-margin-back')?.addEventListener('click', () => toMargin(chosenMargin - OP_PAD_STEP));
-  container.querySelector('#poster-margin-next')?.addEventListener('click', () => toMargin(chosenMargin + OP_PAD_STEP));
-  container.querySelector('#poster-margin-reset')?.addEventListener('click', () => toMargin(OP_PAD));
-  container.querySelector('#poster-margin')?.addEventListener('change', (e) => toMargin(Number(e.target.value)));
-  wireSwitch(container, 'poster-combined', (value) => {
-    chosenCombined = value === 'yes';
-    rememberBar();
-    again();
+  const toOccasion = value => {
+    const collection = SPECIAL_COLLECTIONS.find(collection => collection.value === value);
+    if (collection) { selectCollection(collection.kind); return; }
+    const choice = occasions.find(choice => choice.value === value);
+    if (choice?.group === 'ראש חודש') selectCollection('roshchodesh');
+    else if (choice) toGroup(choice.group, choice.key || choice.defaultKey);
+  };
+  container.querySelector('#poster-year').addEventListener('change', event => { chosenYear = Number(event.target.value); pendingAddition = null; commit(); });
+  for (const [id, offset] of [['poster-year-back', -1], ['poster-year-next', 1]]) container.querySelector('#' + id).addEventListener('click', () => {
+    const next = years[years.indexOf(year) + offset]; if (next != null) { chosenYear = next; pendingAddition = null; commit(); }
   });
-  container.querySelector('#poster-conflict')?.addEventListener('change', (e) => {
-    conflictPick = Number(e.target.value) || 0;
-    again();
+  container.querySelector('#poster-year-today').addEventListener('click', () => { chosenYear = null; pendingAddition = null; commit(); });
+  container.querySelector('#poster-group').addEventListener('change', event => toOccasion(event.target.value));
+  container.querySelector('#poster-group-back').addEventListener('click', () => toOccasion(previousOccasion));
+  container.querySelector('#poster-group-next').addEventListener('click', () => toOccasion(nextOccasion));
+  container.querySelector('#poster-group-now').addEventListener('click', () => toGroup(current?.name, current?.key));
+  container.querySelector('#poster-pick')?.addEventListener('change', event => event.target.value === 'all:roshchodesh'
+    ? selectCollection('roshchodesh') : selectPrimary(event.target.value));
+  container.querySelector('#poster-page-back')?.addEventListener('click', () => selectPrimary(pageChoices[pAt - 1]?.key));
+  container.querySelector('#poster-page-next')?.addEventListener('click', () => selectPrimary(pageChoices[chosenCollection === 'roshchodesh' ? 0 : pAt + 1]?.key));
+  container.querySelector('#poster-page-now')?.addEventListener('click', () => selectPrimary(pageCurrent));
+  container.querySelector('#poster-conflict')?.addEventListener('change', event => { conflictPick = Number(event.target.value) || 0; again(); });
+  wireSwitch(container, 'poster-design', value => { chosenDesign = value === 'old' ? 'old' : 'new'; pendingAddition = null; commit(); });
+  wireSwitch(container, 'poster-asara-option', value => selectPrimary(value === 'shacharis' ? 'asarashacharis' : value === 'locations' ? 'asaralocations' : 'asarabteves'));
+  container.querySelector('.special-print-settings')?.addEventListener('toggle', event => {
+    if (container.contains(event.target)) { printSettingsOpen = event.target.open; rememberBar(); }
   });
-  /* A sheet of your own: the button that starts one, and the panel that writes it.
-     The new sheet is put under the occasion the picker is on, which is the answer nine times
-     out of ten and is a select on the panel when it is not. */
-  container.querySelector('#poster-own-new')?.addEventListener('click', () => {
-    const sheet = newOwnSheet(group?.name || POSTER_GROUP_DEFAULT);
-    state.own = [...(state.own || []), sheet];
-    saveState(state);
-    chosenSheets = 'one';
-    chosen = `own:${sheet.id}`;
-    chosenGroup = sheet.group;
-    rememberBar();
-    onRoute?.();
-    again();
-  });
-  if (poster?.own && container.querySelector('#poster-own')) {
-    /* The paper on its own, without the panel around it. Typing a name or a time is a change
-       to the sheet and not to the tab: a full redraw would take the caret out of the box mid
-       word, which is exactly what the soft path is here to avoid. The two lines above the
-       sheet name it as well, so they are written again from the same call. */
-    const drawSheet = () => {
-      const holder = container.querySelector('#poster-sheet');
-      const src = poster.sources(state, settings).find((s) => s.year === year);
-      const now = src ? src.build().poster : null;
-      holder.innerHTML = now ? poster.render(now, settings) : '';
-      const what = container.querySelector('.poster-when-what');
-      if (what && now) {
-        what.textContent = poster.covers(year);
-        const w = poster.when(now);
-        container.querySelector('.poster-when-he').textContent = w.he;
-        container.querySelector('.poster-when-en').textContent = w.en;
+  wireSwitch(container, 'poster-ink', value => { chosenInk = value; commit(); });
+  wireSwitch(container, 'poster-break', value => { chosenBreak = value; commit(); });
+  wireSwitch(container, 'poster-orient', value => { chosenOrientation = value; commit(); });
+  const margin = value => { chosenMargin = Math.min(OP_PAD_MAX, Math.max(OP_PAD_MIN, Math.round(Number(value) * 100) / 100)); commit(); };
+  container.querySelector('#poster-margin')?.addEventListener('change', event => margin(event.target.value));
+  container.querySelector('#poster-margin-back')?.addEventListener('click', () => margin(chosenMargin - OP_PAD_STEP));
+  container.querySelector('#poster-margin-next')?.addEventListener('click', () => margin(chosenMargin + OP_PAD_STEP));
+  container.querySelector('#poster-margin-reset')?.addEventListener('click', () => margin(OP_PAD));
+  container.querySelectorAll('[data-job-action]').forEach(button => button.addEventListener('click', () => {
+    const index = chosenPrintPages.findIndex(page => page.id === button.dataset.jobId), page = chosenPrintPages[index];
+    const action = button.dataset.jobAction;
+    if (action === 'page' || action === 'half') {
+      pendingAddition = { after: page.id, side: action === 'page' ? 'page' : page.left ? 'right' : 'left', group: byKey.get(page.left || page.right)?.group, key: page.left || page.right };
+      again(); revealPrintAddition(container, page.id, true); return;
+    }
+    if (action === 'cancel') { pendingAddition = null; again(); return; }
+    chosenCollection = null;
+    let addedPageId = null;
+    if (action === 'remove') chosenPrintPages.splice(index, 1);
+    if (action === 'remove-right') page.right = '';
+    if (action === 'swap') [page.left, page.right] = [page.right, page.left];
+    if (action === 'unpair') { chosenPrintPages.splice(index + 1, 0, newPrintPage(page.right)); page.right = ''; }
+    if (action === 'up' || action === 'down') {
+      const next = index + (action === 'up' ? -1 : 1);
+      if (next >= 0 && next < chosenPrintPages.length) [chosenPrintPages[index], chosenPrintPages[next]] = [chosenPrintPages[next], chosenPrintPages[index]];
+    }
+    if (action === 'all' || action === 'all-halves') {
+      const canonical = key => key === 'asaralocations' ? 'asarabteves' : key;
+      const placed = new Set(chosenPrintPages.flatMap(page => [page.left, page.right]).map(canonical));
+      const available = catalog.filter(entry => entry.value && !placed.has(entry.key) && !entry.whole && !entry.locations && !entry.poster?.combined
+        && (action !== 'all-halves' || resolve(entry.key)?.half))
+        .sort((a, b) => (a.value.span?.from ?? Infinity) - (b.value.span?.from ?? Infinity));
+      if (action === 'all-halves') for (const existing of chosenPrintPages) {
+        if (!available.length) break;
+        if ([existing.left, existing.right].filter(Boolean).every(key => resolve(key)?.half) && !(existing.left && existing.right)) {
+          existing[existing.left ? 'right' : 'left'] = available.shift().key;
+          addedPageId ||= existing.id;
+        }
       }
-      layoutPosters(container);
-    };
-    renderOwnEditor(container.querySelector('#poster-own'), poster.own, POSTER_OCCASIONS, {
-      onChange: (hard) => {
-        saveState(state);
-        if (hard) again(); else drawSheet();
-      },
-      onDelete: () => {
-        state.own = (state.own || []).filter((s) => s.id !== poster.own.id);
-        saveState(state);
-        // Back to whatever the occasion's first sheet is, which is where the picker would
-        // have opened if this sheet had never been written.
-        chosen = null;
-        rememberBar();
-        onRoute?.();
-        again();
-      },
+      const additions = [];
+      for (const entry of available) {
+        const last = additions.at(-1);
+        if (action === 'all-halves' && last && !last.right) last.right = entry.key;
+        else additions.push(newPrintPage(entry.key));
+      }
+      chosenPrintPages.splice(index + 1, 0, ...additions);
+      addedPageId ||= additions[0]?.id;
+    }
+    pendingAddition = null; chosen = chosenPrintPages[0]?.left || chosenPrintPages[0]?.right || null; commit();
+    if (addedPageId) revealPrintAddition(container, addedPageId);
+  }));
+  const addition = container.querySelector('.special-add-page');
+  addition?.querySelector('[data-add-group]').addEventListener('change', event => {
+    const half = pendingAddition.side !== 'page';
+    const available = catalog.filter(entry => entry.value && (!half || resolve(entry.key)?.half));
+    const choice = specialOccasionChoices(groups, available, { selectedKey: pendingAddition.key, availableOnly: true })
+      .find(choice => choice.value === event.target.value);
+    if (choice) { pendingAddition.group = choice.group; pendingAddition.key = choice.key || choice.defaultKey || null; again(); }
+  });
+  addition?.querySelector('[data-add-choice]').addEventListener('change', event => { pendingAddition.key = event.target.value; again(); });
+  addition?.addEventListener('submit', event => {
+    event.preventDefault();
+    chosenCollection = null;
+    const index = chosenPrintPages.findIndex(page => page.id === pendingAddition.after);
+    let addedPageId;
+    if (pendingAddition.side === 'page') {
+      const page = newPrintPage(pendingAddition.key);
+      chosenPrintPages.splice(index + 1, 0, page); addedPageId = page.id;
+    } else {
+      chosenPrintPages[index][pendingAddition.side] = pendingAddition.key;
+      addedPageId = chosenPrintPages[index].id;
+    }
+    pendingAddition = null; commit();
+    revealPrintAddition(container, addedPageId);
+  });
+  for (const frame of plan.frames) {
+    const holder = container.querySelector(`[data-job-frame="${CSS.escape(frame.id)}"]`);
+    const selected = [frame.left, frame.right].filter(entry => entry?.value);
+    attachZmanimReference(holder, {
+      title: selected.map(entry => entry.label).join(' + '), days: selected.flatMap(entry => posterReferenceDates(entry.value)), settings,
+      groups: selected.every(entry => entry.poster?.handout) ? ['shacharis'] : undefined,
     });
   }
-  if (built) {
-    /* Every sheet on this tab prints on portrait paper, the landscape ones included: they
-       go on it turned a quarter turn, which is what the run has always done with them and
-       what a single one does now as well. See the .poster.is-landscape rule in print.css
-       for why it is not left to the paper to be landscape. */
-    setPrintPage('letter portrait');
-    wirePrintButton(container);
-
-    /* The erev message onto the clipboard, for the sheets that have one. See ui/copy.js:
-       both routes are tried, and where a browser lets the page do neither the text goes on
-       the screen to be copied by hand. */
-    if (poster.erevText) {
-      wireCopyButton(container.querySelector('#poster-copy-btn'), () => {
-        const text = poster.erevText(built);
-        if (!text) throw new Error('this sheet built no message');
-        return text;
-      });
-    }
-    // The runs cut in two, then the type fitted to what that leaves: see layoutPosters, which
-    // is what the congregation's page calls as well so the two cannot come to differ.
-    layoutPosters(container);
-  }
+  if (primary?.value && primary.poster?.erevText) wireCopyButton(container.querySelector('#poster-copy-btn'), () => primary.poster.erevText(primary.value));
+  if (own) renderOwnEditor(container.querySelector('#poster-own'), own, groups.map(group => group.name), {
+    onChange: hard => {
+      saveState(state);
+      if (hard) { again(); return; }
+      primary.value = buildOwnPoster(own, year, settings);
+      for (const frame of plan.frames) {
+        const entry = frame.left || frame.right;
+        if (entry?.poster?.own?.id !== own.id) continue;
+        entry.value = primary.value;
+        const holder = container.querySelector(`[data-job-frame="${CSS.escape(frame.id)}"]`);
+        holder.innerHTML = entry.render();
+        attachZmanimReference(holder, { title: own.name, days: posterReferenceDates(primary.value), settings });
+      }
+      const heading = container.querySelector('.poster-when-what');
+      if (heading) heading.textContent = `${own.name || 'Untitled sheet'} ${hebrewYear(year)}`;
+      layoutPosters(container);
+    },
+    onDelete: () => { state.own = (state.own || []).filter(sheet => sheet.id !== own.id); saveState(state); chosenPrintPages.shift(); chosen = null; commit(); },
+  });
+  setPrintPage(plan.landscape ? 'letter landscape' : 'letter portrait');
+  if (plan.frames.length && !plan.issues.length) wirePrintButton(container);
+  layoutPosters(container);
 }

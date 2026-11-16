@@ -1,0 +1,188 @@
+import { escAttr, escText } from '../util.js';
+import { seatsWriteName, seatsItems, seatsSeatBlocked } from './model.js';
+import { SEATS_RESERVATION_MS } from './reservation.js';
+
+export function seatsCreateEditor({ getPlan, commit, seatNode, onSelect, notify, canEdit = () => true, onActivity = () => {}, editStatus = () => '' }) {
+  const card = document.createElement('section');
+  card.className = 'seat-editor no-print'; card.hidden = true;
+  card.setAttribute('aria-label', 'Edit seat'); document.body.appendChild(card);
+  let active = null, copied = '', suggestions = [], highlight = -1, expiryTimer = null;
+  const expiredDrafts = new Map();
+  const draftKey = (tableId, index) => JSON.stringify([getPlan().id, tableId, index]);
+  const text = value => escText(value), attr = value => escAttr(value);
+  const personAt = (tableId, index) => {
+    const plan = getPlan(), table = seatsItems(plan).find(entry => entry.id === tableId);
+    return plan.people.find(person => person.id === table?.seats[index]);
+  };
+  function position() {
+    if (!active) return;
+    const node = seatNode(active.tableId, active.index);
+    if (!node) { close(); return; }
+    const box = node.getBoundingClientRect(), viewport = window.visualViewport;
+    const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+    const width = viewport?.width || innerWidth, height = viewport?.height || innerHeight;
+    card.style.left = Math.max(left + 8, Math.min(left + width - card.offsetWidth - 8, box.left)) + 'px';
+    const below = box.bottom + 9, above = box.top - card.offsetHeight - 9;
+    card.style.top = Math.max(top + 8, Math.min(top + height - card.offsetHeight - 8, below + card.offsetHeight < top + height ? below : above)) + 'px';
+  }
+  function close() {
+    clearTimeout(expiryTimer);
+    active = null; card.hidden = true;
+    onActivity(null);
+    document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
+  }
+  function expire() {
+    if (!active) return;
+    const name = card.querySelector('input').value;
+    if (name !== (JSON.parse(active.original)?.name || '')) expiredDrafts.set(active.draftKey, { name, original: active.original });
+    close();
+    notify('Seat selection released after 30 minutes. Saved names are unchanged. Any unfinished text is kept on this page; select the seat again to continue.');
+  }
+  function expired() {
+    if (!active || Date.now() < active.expiresAt) return false;
+    expire(); return true;
+  }
+  function save({ personId = null, duplicate = false, next = 0 } = {}) {
+    if (expired()) return false;
+    if (!active) return;
+    const unavailable = editStatus(active.tableId, active.index);
+    if (unavailable) { notify(unavailable); return false; }
+    const target = { ...active }, name = card.querySelector('input').value;
+    const now = personAt(target.tableId, target.index), original = JSON.stringify(now ? { id: now.id, name: now.name } : null);
+    if (original !== active.original && name.trim() !== (now?.name || '')) {
+      active.original = original;
+      let warning = card.querySelector('.seat-editor-conflict');
+      if (!warning) { warning = document.createElement('p'); warning.className = 'seat-editor-conflict'; warning.setAttribute('role', 'alert'); card.querySelector('form').appendChild(warning); }
+      warning.textContent = 'This seat changed while you were typing. Your text is kept here. Check the chart, then save again if you want to replace its name.';
+      return false;
+    }
+    const unchangedBlocked = seatsSeatBlocked(getPlan(), target.tableId, target.index) && name.trim() === (now?.name || '') && !personId && !duplicate;
+    const ok = unchangedBlocked || commit(() => seatsWriteName(getPlan(), target.tableId, target.index, name, { personId, duplicate }), 'Seat saved.');
+    if (!ok) return false;
+    close();
+    if (next) {
+      const seats = getPlan().tables.flatMap(table => table.seats.map((_, index) => ({ tableId: table.id, index })));
+      const index = seats.findIndex(seat => seat.tableId === target.tableId && seat.index === target.index);
+      let destination;
+      for (let step = 1; step <= seats.length; step++) {
+        const candidate = seats[(index + next * step + seats.length * step) % seats.length];
+        if (!seatsSeatBlocked(getPlan(), candidate.tableId, candidate.index)) { destination = candidate; break; }
+      }
+      if (destination) open(destination.tableId, destination.index);
+    } else seatNode(target.tableId, target.index)?.focus({ preventScroll: true });
+  }
+  function location(person) {
+    for (const table of seatsItems(getPlan())) {
+      const index = table.seats.indexOf(person.id);
+      if (index >= 0) return table.id === active?.tableId && index === active.index
+        ? 'This seat' : table.label + ' · Seat ' + (index + 1) + ' · copy here';
+    }
+    return 'Not seated';
+  }
+  function suggest() {
+    if (!active) return;
+    const input = card.querySelector('input'), query = input.value.trim().toLocaleLowerCase();
+    suggestions = query ? getPlan().people.filter(person => person.name.toLocaleLowerCase().includes(query)).slice(0, 6) : [];
+    highlight = -1;
+    card.querySelector('.seat-suggestions').innerHTML = suggestions.map((person, index) => `<button type="button" role="option" id="seat-suggestion-${index}" data-suggest="${attr(person.id)}" tabindex="-1" aria-selected="false"><bdi>${text(person.name)}</bdi><small>${text(location(person))}</small></button>`).join('');
+    input.setAttribute('aria-expanded', String(suggestions.length > 0)); input.removeAttribute('aria-activedescendant');
+    position();
+  }
+  function open(tableId, index, initial) {
+    expired();
+    const blocked = seatsSeatBlocked(getPlan(), tableId, index);
+    if (blocked && !personAt(tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
+    if (!canEdit(tableId, index)) return;
+    if (active && save() === false) return;
+    const table = seatsItems(getPlan()).find(entry => entry.id === tableId);
+    if (!table || index < 0 || index >= (table.count ?? 0)) return;
+    onSelect(tableId);
+    const person = personAt(tableId, index);
+    const key = draftKey(tableId, index), draft = expiredDrafts.get(key);
+    active = { tableId, index, draftKey: key, original: draft?.original ?? JSON.stringify(person ? { id: person.id, name: person.name } : null), expiresAt: Date.now() + SEATS_RESERVATION_MS };
+    expiredDrafts.delete(key);
+    expiryTimer = setTimeout(expire, SEATS_RESERVATION_MS);
+    onActivity({ tableId, index, expiresAt: active.expiresAt });
+    const name = blocked ? person.name : initial ?? draft?.name ?? person?.name ?? '';
+    card.innerHTML = `<form><div class="seat-editor-heading"><h2>${text(table.label)} · Seat ${index + 1}</h2><button type="button" data-editor="close" aria-label="Close seat editor">×</button></div><label for="seat-name-input">Name</label><input id="seat-name-input" maxlength="160" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="seat-suggestions" aria-expanded="false" value="${attr(name)}" placeholder="Start typing a name..."><div id="seat-suggestions" class="seat-suggestions" role="listbox" aria-label="Matching names"></div><p>Type a new name or choose a suggestion.<br>Enter saves. Tab saves and opens the next seat.</p><div class="seat-editor-actions"><button class="primary" type="submit">Save</button><button type="button" data-editor="clear">Clear</button><button type="button" data-editor="copy">Copy name</button><button type="button" data-editor="paste" ${copied ? '' : 'disabled'}>Paste name</button></div><small>Adding an existing name keeps its other seats.</small></form>`;
+    card.hidden = false; position();
+    const input = card.querySelector('input'); input.focus({ preventScroll: true });
+    if (blocked) {
+      input.readOnly = true;
+      card.querySelector('[type=submit]').disabled = true;
+      card.querySelector('[data-editor=paste]').disabled = true;
+      card.querySelector('p').textContent = 'This position is blocked by a pillar. Clear this name or drag it to another seat.';
+    }
+    if (initial === undefined) input.select();
+    else input.setSelectionRange(input.value.length, input.value.length);
+    if (!blocked) suggest(); sync();
+  }
+  function sync() {
+    expired();
+    document.querySelectorAll('.table-seat.is-active').forEach(node => node.classList.remove('is-active'));
+    if (!active) return;
+    const unavailable = editStatus(active.tableId, active.index), blocked = seatsSeatBlocked(getPlan(), active.tableId, active.index);
+    card.querySelector('input').readOnly = Boolean(unavailable || blocked);
+    card.querySelector('[type=submit]').disabled = Boolean(unavailable || blocked);
+    card.querySelector('[data-editor=clear]').disabled = Boolean(unavailable);
+    card.querySelector('[data-editor=paste]').disabled = Boolean(unavailable || blocked || !copied);
+    card.querySelectorAll('[data-suggest]').forEach(button => { button.disabled = Boolean(unavailable); });
+    let warning = card.querySelector('.seat-editor-reservation');
+    if (!warning) { warning = document.createElement('p'); warning.className = 'seat-editor-reservation'; warning.setAttribute('role', 'status'); card.querySelector('form').appendChild(warning); }
+    warning.textContent = unavailable; warning.hidden = !unavailable;
+    seatNode(active.tableId, active.index)?.classList.add('is-active'); position();
+  }
+  function copyName(tableId = active?.tableId, index = active?.index) {
+    if (expired()) return;
+    const name = active && active.tableId === tableId && active.index === index ? card.querySelector('input').value.trim() : personAt(tableId, index)?.name;
+    if (!name) { notify('This seat has no name to copy.'); return; }
+    copied = name;
+    sync();
+    notify('Name copied. Select another seat and use Paste name or Ctrl+V.');
+  }
+  function pasteName(tableId = active?.tableId, index = active?.index) {
+    if (expired()) return;
+    if (!copied || tableId === undefined) return;
+    if (seatsSeatBlocked(getPlan(), tableId, index)) { notify('This position is blocked by a pillar. Choose another seat.'); return; }
+    if (!canEdit(tableId, index)) return;
+    if (active && active.tableId === tableId && active.index === index) {
+      const unavailable = editStatus(tableId, index);
+      if (unavailable) { notify(unavailable); return; }
+    }
+    commit(() => seatsWriteName(getPlan(), tableId, index, copied, { duplicate: true }), 'Copied name to a separate seat.');
+    close();
+    seatNode(tableId, index)?.focus({ preventScroll: true });
+  }
+  card.addEventListener('input', event => { if (!expired() && event.target.matches('input')) suggest(); });
+  card.addEventListener('submit', event => { event.preventDefault(); save(); });
+  card.addEventListener('pointerdown', event => { if (event.target.closest('[data-suggest]')) event.preventDefault(); });
+  card.addEventListener('click', event => {
+    if (expired()) return;
+    const suggestion = event.target.closest('[data-suggest]');
+    if (suggestion) return save({ personId: suggestion.dataset.suggest });
+    const action = event.target.closest('[data-editor]')?.dataset.editor;
+    if (action === 'close') close();
+    if (action === 'clear') { card.querySelector('input').value = ''; save(); }
+    if (action === 'copy') copyName();
+    if (action === 'paste') pasteName();
+  });
+  card.addEventListener('keydown', event => {
+    if (expired() || !active) { event.preventDefault(); return; }
+    if (event.key === 'Escape') { event.preventDefault(); const target = active; close(); seatNode(target.tableId, target.index)?.focus({ preventScroll: true }); }
+    if (!event.target.matches('input')) return;
+    if (event.key === 'Tab') { event.preventDefault(); save({ next: event.shiftKey ? -1 : 1 }); }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      if (!suggestions.length) return;
+      event.preventDefault(); highlight = (highlight + (event.key === 'ArrowDown' ? 1 : -1) + suggestions.length) % suggestions.length;
+      card.querySelectorAll('[role=option]').forEach((node, index) => node.setAttribute('aria-selected', String(index === highlight)));
+      event.target.setAttribute('aria-activedescendant', 'seat-suggestion-' + highlight);
+    }
+    if (event.key === 'Enter' && highlight >= 0) { event.preventDefault(); save({ personId: suggestions[highlight].id }); }
+  });
+  window.addEventListener('scroll', position, { passive: true });
+  window.addEventListener('resize', position);
+  window.visualViewport?.addEventListener('resize', position);
+  window.addEventListener('focus', expired);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) expired(); });
+  return { open, close, sync, expire, flush: save, copy: copyName, paste: pasteName };
+}

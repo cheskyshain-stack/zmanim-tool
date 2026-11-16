@@ -15,14 +15,33 @@ export function roundToMinute(dayFraction) {
   return Math.round(dayFraction * 1440) / 1440;
 }
 
+/** The minute chosen for display, shared with the explanation of display rounding. */
+export function timeDisplayMinutes(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  return Math.round(frac * 1440);
+}
+
 /** TEXT(time,"h:mm") - 12-hour clock, no AM/PM, hour 0 displayed as 12. */
 export function formatTime(dayFraction) {
-  const frac = ((dayFraction % 1) + 1) % 1;
-  const totalMinutes = Math.round(frac * 1440) % 1440;
+  const totalMinutes = timeDisplayMinutes(dayFraction) % 1440;
   const h24 = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
   const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
   return `${h12}:${String(m).padStart(2, '0')}`;
+}
+
+/** The same clock, with the seconds kept rather than rounded away - asked for on the
+ *  Special Schedules חנוכה poster's own ראש חודש נץ note, where the point is showing the
+ *  two days' own נץ precisely enough to say why their vasikin times differ by a minute. No
+ *  caller needs this for a printed מנין time, which is why formatTime above still rounds. */
+export function formatTimeWithSeconds(dayFraction) {
+  const frac = ((dayFraction % 1) + 1) % 1;
+  const totalSeconds = Math.round(frac * 86400) % 86400;
+  const h24 = Math.floor(totalSeconds / 3600);
+  const m = Math.floor((totalSeconds % 3600) / 60);
+  const s = totalSeconds % 60;
+  const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
+  return `${h12}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
 // Sentinel markers wrapping "this should render underlined" spans (Private Use Area
@@ -39,6 +58,49 @@ export const UL_END = '';
 export function underlineTime(value) {
   const text = typeof value === 'number' ? formatTime(value) : value;
   return UL_START + ' ' + text + UL_END;
+}
+
+// Same PUA mechanism as UL_START/UL_END, for the Weekday chart's "NEW" tag on 11:30
+// מעריב (sheets/weekday.js, ui/sheet-view.js's nl2br). Three markers rather than two:
+// the tag wraps the whole time *and* carries a second, inner span around the literal
+// word "NEW" (see .new-minyan-tag/.tag-word in app.css), so nl2br needs a seam between
+// them as well as an open and a close.
+export const NEW_TAG_START = '';
+export const NEW_TAG_MID = '';
+export const NEW_TAG_END = '';
+
+/** Wraps an already-formatted cell value (which may itself carry underline sentinels -
+ *  the time can be both למטה and new at once) so it renders inside the "NEW" tag. */
+export function newMinyanTag(text) {
+  return NEW_TAG_START + text + NEW_TAG_MID + 'NEW' + NEW_TAG_END;
+}
+
+// Same mechanism again, for חנוכה's own extra/different weekday מנחה/מעריב times
+// (sheets/weekday.js, ui/sheet-view.js's nl2br): a week that touches חנוכה gets these
+// values right on its own row, tagged, rather than a row or a panel line of their own.
+// The word is Hebrew, unlike "NEW", so it carries no separate font-family in app.css -
+// it sets in the chart's own serif like the rest of the row.
+export const CHANUKAH_TAG_START = '';
+export const CHANUKAH_TAG_MID = '';
+export const CHANUKAH_TAG_END = '';
+
+/** Wraps a cell value with a small label, defaulting to "חנוכה". */
+export function chanukahTag(text, label = 'חנוכה') {
+  return CHANUKAH_TAG_START + text + CHANUKAH_TAG_MID + label + CHANUKAH_TAG_END;
+}
+
+// Same PUA mechanism again, for a span that should print smaller than the rest of its cell:
+// the stricter/alternate reading sitting beside the main one (sheets/kayitz.js's own פלג
+// under its מנחה, and the מ"א beside the גר"א in the ס"ז קר"ש column of both Shabbos charts),
+// the same way .head-room already sets a heading's bracketed room smaller than the מנין name
+// above it. Two markers, not three: there is no inner word to seam off, unlike NEW/חנוכה.
+export const SMALL_START = '';
+export const SMALL_END = '';
+
+/** Wraps an already-formatted value (which may itself carry underline sentinels) so it
+ *  renders smaller than the rest of its cell. */
+export function smallText(text) {
+  return SMALL_START + text + SMALL_END;
 }
 
 /** "1220" -> "12:20", "130" -> "1:30", "8" -> "8:00". Returns null for anything that

@@ -1,0 +1,170 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { resolveSettings } from '../js/settings.js';
+import { hebrewDateExtended, excelWeekday, hasBehab, hasRoshChodesh, roshHashana } from '../js/hebrew-calendar.js';
+import { dateFromSerial } from '../js/zmanim/solar.js';
+import { sunriseElev } from '../js/zmanim/zmanim.js';
+import { buildAsaraBTevesPoster } from '../js/posters/asarabteves.js';
+import { buildAsaraShacharisPoster, buildBehabShacharisPoster, buildRoshChodeshShacharisPoster,
+  ROSH_CHODESH_SHACHARIS_MONTHS, shacharisDayGroups } from '../js/posters/shacharis.js';
+import { buildChanukahPoster } from '../js/posters/chanukah.js';
+
+const readJSON = async name => JSON.parse(await readFile(new URL('../data/' + name, import.meta.url)));
+const [config, parshaChutz, parshaEY, parshaNames] = await Promise.all([
+  'published.json', 'parsha_chutz.json', 'parsha_ey.json', 'parsha_names.json',
+].map(readJSON));
+const settings = resolveSettings(config.settings), tables = { parshaChutz, parshaEY, parshaNames };
+const expected = [
+  ['6:40', 'בית מדרש'], ['7:00', 'בעזרת נשים'],
+  ['7:15', 'בית מדרש למטה'], ['7:35', 'באולם השמחות'],
+  ['8:00', 'בית מדרש'], ['8:20', 'בעזרת נשים'], ['8:40', 'בית מדרש למטה'],
+];
+const rows = poster => poster.rows.map(row => [row.text, row.room]);
+const expectedRoshChodesh = (poster, options = settings) => {
+  const floor = Math.ceil(Math.max(...poster.days.map(day => sunriseElev(dateFromSerial(day), options) * 1440)) - 25 - 1e-7);
+  const chanukah = poster.month === 10 ? buildChanukahPoster(poster.hebrewYear, options) : null;
+  const sharedAverage = chanukah?.days.every(day => day.netzBinding) ? Math.floor(chanukah.days.reduce((sum, day) =>
+    sum + Math.max(sunriseElev(dateFromSerial(day.serial), options) * 1440 - 25,
+      hasRoshChodesh(day.serial, options) ? 400 : 410), 0) / chanukah.days.length + 1e-7) : null;
+  return expected.map(([time, room], index) => {
+    const [hour, minute] = time.split(':').map(Number);
+    const start = index === 0 && sharedAverage !== null ? sharedAverage
+      : index < 2 ? Math.max(hour * 60 + minute, floor) : hour * 60 + minute;
+    return [`${Math.floor(start / 60)}:${String(start % 60).padStart(2, '0')}`, room];
+  });
+};
+
+test('Asara handouts retain the full poster morning times, rooms and conditional note', () => {
+  for (let year = 5784; year <= 5834; year++) {
+    const full = buildAsaraBTevesPoster(year, settings), morning = buildAsaraShacharisPoster(year, settings);
+    assert.deepEqual(rows(morning), expected);
+    assert.deepEqual(morning.span, full.span);
+    assert.deepEqual(morning.days, [full.span.from]);
+    assert.equal(morning.showDates, true);
+    assert.deepEqual(morning.rows.map(({ text, mark, underlined, timeNote }) => ({ text, mark, underlined, timeNote })),
+      full.sets.find(set => set.calc === 'shacharis').lines.flat().map(({ text, mark, underlined, timeNote }) => ({ text, mark, underlined, timeNote })));
+    assert.equal(morning.title, 'עשרה בטבת');
+    assert.equal(morning.sets, undefined, 'The handout does not contain other tefillos');
+  }
+  const earlySunrise = buildAsaraShacharisPoster(5786, { ...settings, latitude: 0 });
+  assert.equal(earlySunrise.rows.some(row => row.timeNote), false, 'The Selichos note is absent when sunrise is before 7:05');
+  assert.equal(buildAsaraShacharisPoster(null, settings), null);
+});
+
+test('both BHB rounds use the chart calendar and special Shacharis schedule every year', () => {
+  for (let year = 5784; year <= 5834; year++) for (const month of [8, 2]) {
+    const poster = buildBehabShacharisPoster(year, month, settings, tables);
+    assert.deepEqual(rows(poster), expected);
+    assert.equal(poster.title, month === 8 ? 'בה"ב אחר סוכות' : 'בה"ב אחר פסח');
+    assert.equal(poster.subtitle, 'שחרית');
+    assert.equal(poster.days.length, 3);
+    assert.deepEqual(poster.days.map(excelWeekday), [2, 5, 2]);
+    assert.deepEqual(poster.days.slice(1).map((serial, i) => serial - poster.days[i]), [3, 4]);
+    assert(poster.days.every(serial => {
+      const date = hebrewDateExtended(serial);
+      return date.year === year && date.month === month && hasBehab(serial, settings);
+    }));
+    assert.deepEqual(poster.span, { from: poster.days[0], to: poster.days[2] });
+    const needsSelichos = poster.days.some(serial => sunriseElev(dateFromSerial(serial), settings) * 1440 > 425);
+    assert.equal(Boolean(poster.rows[0].timeNote), needsSelichos, 'BHB uses actual sunrise for the 6:40 Selichos note');
+    assert.equal(poster.rows.slice(1).some(row => row.timeNote), false, 'The Selichos note belongs only to 6:40');
+  }
+  assert.deepEqual(buildBehabShacharisPoster(5787, 8, settings, tables).days.map(serial => dateFromSerial(serial).toISOString().slice(0, 10)),
+    ['2026-10-19', '2026-10-22', '2026-10-26']);
+  assert.equal(buildBehabShacharisPoster(5787, 9, settings), null);
+});
+
+test('BHB Selichos notes cover all, none, or the specific qualifying dates in a round', () => {
+  const note = (year, month, options = settings) => buildBehabShacharisPoster(year, month, options, tables).rows[0].timeNote;
+  assert.equal(note(5787, 8), 'סליחות קודם שחרית',
+    'When all three dates qualify, the common note has no weekday or parsha details');
+  assert.equal(note(5785, 8), undefined, 'After the clock change all three dates have earlier Netz');
+  assert.equal(note(5787, 2), undefined, 'After-Pesach sunrise is earlier than 7:05');
+  assert.equal(note(5786, 8), 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך)',
+    'A clock change before the third date must not apply the note to that date');
+  assert.equal(note(5793, 8), 'סליחות קודם שחרית (יום ה׳ לך לך, יום ב׳ וירא)',
+    'Only the later two dates cross the sunrise threshold');
+  assert.equal(note(5787, 2, { ...settings, longitude: -110 }), 'סליחות קודם שחרית',
+    'The same sunrise rule applies to the after-Pesach round when the calculation settings require it');
+  assert.equal(note(5787, 8, { ...settings, latitude: 0 }), undefined,
+    'An earlier sunrise from the configured location removes the note');
+  assert.equal(note(5786, 8, { ...settings, english: true }), 'סליחות קודם שחרית (יום ב׳ וה׳ לך לך)',
+    'The printed note stays Hebrew when the admin uses English');
+});
+
+test('Rosh Chodesh handouts cover weekdays and skip occasions entirely on Shabbos', () => {
+  let oneDay = false, twoDays = false, shabbosOnly = false, mixedShabbos = false, adarI = false, adarII = false;
+  for (let year = 5784; year <= 5834; year++) {
+    const months = new Map();
+    for (let serial = roshHashana(year - 3761); serial < roshHashana(year - 3760); serial++) {
+      if (!hasRoshChodesh(serial, settings)) continue;
+      const date = hebrewDateExtended(serial);
+      const month = date.dayOfMonth === 30 ? hebrewDateExtended(serial + 1).month : date.month;
+      if (!months.has(month)) months.set(month, []);
+      months.get(month).push(serial);
+    }
+    for (const month of ROSH_CHODESH_SHACHARIS_MONTHS) {
+      const calendarDays = months.get(month) || [];
+      const days = calendarDays.filter(serial => excelWeekday(serial) !== 7);
+      const poster = buildRoshChodeshShacharisPoster(year, month, settings);
+      if (!days.length) {
+        assert.equal(poster, null);
+        if (calendarDays.length) shabbosOnly = true;
+        continue;
+      }
+      if (days.length === 1) oneDay = true;
+      if (days.length === 2) twoDays = true;
+      if (days.length < calendarDays.length) mixedShabbos = true;
+      if (month === 13) adarI = true;
+      if (month === 14) adarII = true;
+      assert.deepEqual(poster.days, days);
+      assert.equal(poster.showDates, true);
+      assert.deepEqual(poster.span, { from: days[0], to: days.at(-1) });
+      assert.equal(poster.month, month);
+      assert(poster.title.startsWith('ראש חודש '));
+      assert.equal(poster.subtitle, 'שחרית');
+      assert.equal(poster.rows.some(row => row.timeNote), false, 'No Asara Selichos note on Rosh Chodesh');
+      if (month === 10) {
+        const chanukah = buildChanukahPoster(year, settings).shacharisRows.find(row => row.isRoshChodesh);
+        assert.equal(poster.rows[0].text, chanukah.vasikin.time);
+        assert.deepEqual(poster.rows.slice(1).map(row => row.text), chanukah.cells.slice(1).map(cell => cell.text));
+        assert.deepEqual(poster.rows.map(row => row.room), expected.map(row => row[1]));
+        assert(poster.title.endsWith(' · חנוכה'));
+      }
+      const expectedRows = expectedRoshChodesh(poster);
+      const printedChanukah = year === 5787 && month === 10;
+      if (printedChanukah) expectedRows[0][0] = '6:43';
+      assert.deepEqual(rows(poster), expectedRows, 'The weekday limits, shared Chanukah average and confirmed printed exception agree');
+      const sharedChanukah = month === 10 && buildChanukahPoster(year, settings).days.every(day => day.netzBinding);
+      for (const day of days) for (const row of poster.rows.slice(sharedChanukah || printedChanukah ? 1 : 0, 2)) {
+        assert(row.trace.value * 1440 >= sunriseElev(dateFromSerial(day), settings) * 1440 - 25 - 1e-7);
+      }
+    }
+    assert.equal(buildRoshChodeshShacharisPoster(year, 7, settings), null, 'Rosh Hashana has its own schedule');
+  }
+  assert(oneDay && twoDays && shabbosOnly && mixedShabbos && adarI && adarII, 'All calendar shapes were exercised');
+  assert.equal(buildRoshChodeshShacharisPoster(null, 8, settings), null);
+});
+
+test('Shevat is omitted when entirely on Shabbos and remains available on weekdays', () => {
+  for (const year of [5787, 5790]) assert.equal(buildRoshChodeshShacharisPoster(year, 11, settings), null);
+  for (const year of [5785, 5786]) {
+    const poster = buildRoshChodeshShacharisPoster(year, 11, settings);
+    assert.equal(poster.title, 'ראש חודש שבט');
+    assert(poster.days.every(serial => excelWeekday(serial) !== 7));
+    assert.deepEqual(rows(poster), expectedRoshChodesh(poster));
+  }
+});
+
+
+test('Weekday/parsha headers combine the same week and retain distinct weeks', () => {
+  const bhb = buildBehabShacharisPoster(5787, 8, settings, tables);
+  const groups = shacharisDayGroups(bhb.days, settings, tables);
+  assert.deepEqual(groups.map(group => group.label), ["יום ב' וה' לך לך", "יום ב' וירא"]);
+  assert.deepEqual(groups.flatMap(group => group.days), bhb.days);
+  const rc = buildRoshChodeshShacharisPoster(5787, 8, settings);
+  assert.deepEqual(shacharisDayGroups(rc.days, settings, tables).map(group => group.label), ["יום א' וב' נח"]);
+  const fast = buildAsaraShacharisPoster(5790, settings);
+  assert.deepEqual(shacharisDayGroups(fast.days, settings, tables).map(group => group.label), ["יום א' ויחי"]);
+});

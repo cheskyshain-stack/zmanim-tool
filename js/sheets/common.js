@@ -1,13 +1,32 @@
 // Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
 // "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, excelSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { hebrewDateExtended } from '../hebrew-calendar.js';
+import { hebrewDateExtended, excelWeekday, isAssurMelacha } from '../hebrew-calendar.js';
 import { formatTime, underlineTime, ceilToMinute } from '../format.js';
 import { flattenNonEmpty, splitLinesInHalf, isolate, NBSP, SLASH } from '../util.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
+
+/** Asara B'Teves: retain sunset's seconds until the requested final rounding. */
+export function asaraLastMinchaTrace(shkia, friday = false, title = "Asara B'Teves") {
+  const base = zman('שקיעה', shkia, `on ${title}, at the shul's elevation`);
+  return friday
+    ? base.minus(25, 'the Friday fast\'s last Mincha is twenty-five minutes before sunset')
+      .floor('remove the seconds, without rounding up')
+    : base.minus(40, 'the last weekday Mincha must be at least forty minutes before sunset')
+      .floorToStep(5, 'round down to the earlier five-minute mark');
+}
+
+/** The Friday chart and fast-day sheet must agree about the final Mincha. */
+export function fridayLateMinchaTrace(date, settings) {
+  const hebrew = hebrewDateExtended(excelSerial(date), settings.useGregorianBefore1582);
+  if (hebrew.month === 10 && hebrew.dayOfMonth === 10) {
+    return asaraLastMinchaTrace(Z.sunsetElev(date, settings), true);
+  }
+  return zman('שקיעה', Z.sunset(date, settings), 'on the Friday').minus(15).floor();
+}
 
 /** DST active AND month<6 - specifically the *spring* DST window (roughly the 2nd
  *  Sunday of March through Pesach), deliberately excluding the *fall* DST window
@@ -31,30 +50,70 @@ export function inPlagWindow(serial, settings) {
   return inSpringDstWindow(d, settings) || doy < 192;
 }
 
+/** מנחה גדולה לחומרא, the latest it reaches Sunday through Friday of the calendar week
+ *  `anchorSerial` falls in. Not assumed to be a Saturday itself: a Weekday chart's own
+ *  trailing-gap and Chol Hamoed rows (see sheets/weeks.js) are anchored on a stand-in date
+ *  instead of a real one, the same reason sheets/weekday.js's own sundayThroughThursday
+ *  walks back to the Sunday rather than just subtracting a fixed number of days.
+ *
+ *  **A day of the six that is itself full יום טוב is left out.** Nobody is davening this
+ *  board's ערב שבת or weekday afternoon on that day, so its own מנחה גדולה has no business
+ *  setting how early the *other* days of the week may print. שבת בראשית's own Sunday is
+ *  שמחת תורה, and counting it pushed the whole week's answer later for a מנין that was
+ *  never being decided by it. isAssurMelacha alone, with no special-days table: a full
+ *  יום טוב day is fixed by day-of-year regardless of the table, and the case this guards
+ *  is always a full יום טוב rather than חול המועד, which already gets its own row
+ *  elsewhere (afterSukkosRow, afterYomKippurRow, or a שבוע-של-חול-המועד block) rather than
+ *  reaching this function's Sun-Fri window at all.
+ *
+ *  Round up to the whole minute. A printed early Mincha must clear the exact
+ *  מנחה גדולה לחומרא, including its seconds, on every covered day.
+ *
+ *  One answer for the whole week, asked once and used by both charts' early מנחה slots -
+ *  sheets/weekday.js's own early מנחה and this file's Erev Shabbos one - so the two cannot
+ *  look at two different windows and land on two different answers about days that sit
+ *  right next to each other. */
+export function weekLatestMinchaGedola(anchorSerial, settings) {
+  const sunday = anchorSerial - (excelWeekday(anchorSerial) - 1);
+  const days = [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
+  const regular = days.filter((d) => !isAssurMelacha(d, settings));
+  const latest = Math.max(...(regular.length ? regular : days).map((d) => Z.minchaGedolaLechumra(dateFromSerial(d), settings)));
+  return ceilToMinute(latest);
+}
+
 /** The Erev Shabbos "main" Mincha menu (קיץ column L / חורף column I) - identical
  *  formula in both sheets. Printed across two lines, split as evenly as possible
  *  (more options on the second line when the count is odd).
  *
- *  While the clocks are forward, nothing is offered before 1:35. That is the shul's rule
- *  and it is a deliberate departure from the workbook, which does not have it.
+ *  12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
+ *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
+ *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
+ *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
+ *  before that Friday's מנחה גדולה לחומרא, rounded up to the next five minutes.
  *
- *  It matters for one stretch: חורף opens at Sukkos but the clocks do not go back until
- *  the start of November, so the first weeks of the winter schedule are still on DST.
- *  Through those weeks Mincha Gedola Lechumra sits just under 1:20 (measured across the
- *  5787 winter: 1:16, 1:15, 1:15, 1:15, 1:15 on the five Fridays from 2 October to 30
- *  October) and the early minyan below fired on its own, putting a 1:15 in front of the
- *  1:35 on a day nobody davens that early. From 6 November it is on standard time and the
- *  whole early set is right again, and by late March, when the clocks go forward at the
- *  other end of the season, Mincha Gedola has moved past 1:35 and the early minyan does not
- *  come up anyway. קיץ is on DST from end to end, and its Mincha Gedola is later still, so
- *  nothing there changes either way. */
-export function fridayMainMinchaParts(fridayDate, settings) {
+ *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
+ *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
+ *  to read the clock too, the same as 12:30 and 1:00, and that tied a fixed clock date to
+ *  a זמן that moves with the sun: the first weeks of חורף are still on daylight saving,
+ *  and through them מנחה גדולה sits just under 1:20 (measured across 5787's own five
+ *  Fridays from 2 October to 30 October: 1:16, 1:15, 1:15, 1:15, 1:15), so the old rule lit
+ *  a 1:15 in front of the 1:35 on a week nobody davens that early, and stayed dark once the
+ *  clocks went back even on a week מנחה גדולה would have allowed it. And 1:35 used to creep
+ *  with מנחה גדולה once past it, printing whatever odd minute that landed on and climbing
+ *  week to week through a season; the shul asked for two round numbers instead, the same
+ *  1:35/1:40 the weekday board already gives. */
+export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
   const mglVal = Z.minchaGedolaLechumra(fridayDate, settings);
   const onStandardTime = !Z.dstLocal(fridayDate, settings);
   const mgl = () => zman('מנחה גדולה לחומרא', mglVal,
-    'the later of מנחה גדולה, which is half a proportional hour after חצות, and חצות plus thirty clock minutes. Both move with חצות, so this walks through the season');
+    'on this Friday: the later of Gra Mincha Gedola and thirty regular minutes after חצות')
+    .ceilToStep(5, 'rounded up to the next five minutes, retaining the seconds until rounding');
   /* Short, because the מנחה גדולה it is weighed against now explains itself. */
   const notBefore = 'a מנחה is never offered before it';
+
+  const weekMgl = weekLatestMinchaGedola(shabbosSerial, settings);
+  const weekMglText = formatTime(weekMgl);
+  const sundayFriday = "somewhere in the week's own regular days";
 
   /* The printed list is these values asked for their text, in this order, rather than a
      second list built alongside them. A trace and the time it explains cannot then be paired
@@ -77,30 +136,37 @@ export function fridayMainMinchaParts(fridayDate, settings) {
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
     clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
-    clockTime(13, 15, 'the last of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline()
-      .onlyWhen(onStandardTime && mglVal < T(13, 20), `${clocksBack}, and then only where מנחה גדולה לחומרא is before 1:20`),
-    /* Written as a comparison rather than as a branch, so the page can say what this time
-       really is. Branched, the trace only ever saw the side that won and called a 1:35 a
-       fixed time, which is what the shul caught: it is a floor, and on the weeks מנחה
-       גדולה is past it, מנחה גדולה is what prints. Same answer either way: the fallback
-       used to be written as 1:35 in the morning, which formats identically. */
-    clockTime(13, 35, 'the earliest the main ערב שבת מנחה is ever offered').laterOf(mgl(), notBefore).underline(),
+    /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
+       neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
+       them: the same choice sheets/weekday.js makes for its own early מנחה, against the
+       same window. */
+    clockTime(13, 15, 'the earlier of the two early ערב שבת מנחה מנינים').underline()
+      .onlyWhen(weekMgl <= T(13, 15), `מנחה גדולה לחומרא reaching ${weekMglText} ${sundayFriday}, past 1:15`),
+    clockTime(13, 20, 'the later of the two early ערב שבת מנחה מנינים, offered instead of 1:15').underline()
+      .onlyWhen(weekMgl > T(13, 15) && weekMgl <= T(13, 20), `offered instead of 1:15, מנחה גדולה לחומרא reaching ${weekMglText} ${sundayFriday}`),
+    /* 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
+       Never anything else. */
+    clockTime(13, 35, 'the earlier of the two main ערב שבת מנחה מנינים').underline()
+      .onlyWhen(weekMgl <= T(13, 35), `מנחה גדולה לחומרא reaching ${weekMglText} ${sundayFriday}, past 1:35`),
+    clockTime(13, 40, 'the later of the two main ערב שבת מנחה מנינים, offered instead of 1:35').underline()
+      .onlyWhen(weekMgl > T(13, 35), `offered instead of 1:35, מנחה גדולה לחומרא reaching ${weekMglText} ${sundayFriday}`),
     fixedTime('1:50'),
     fixedTime('2:15'),
     fixedTime('3:00'),
   ];
 
+  const text = splitLinesInHalf(flattenNonEmpty(all.map((t) => t.text())));
   return {
-    text: splitLinesInHalf(flattenNonEmpty(all.map((t) => t.text()))),
+    text,
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
-    note: onStandardTime
-      ? 'The clocks are back this week, so the earlier מנינים are offered in front of the 1:35.'
-      : 'The clocks are forward this week, so nothing is offered before 1:35. That is the shul\'s own rule and the workbook does not have it.',
+    note: !onStandardTime
+      ? 'The clocks are forward this week, so 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
+      : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest.',
   };
 }
-export function fridayMainMinchaMenu(fridayDate, settings) {
-  return fridayMainMinchaParts(fridayDate, settings).text;
+export function fridayMainMinchaMenu(fridayDate, settings, shabbosSerial) {
+  return fridayMainMinchaParts(fridayDate, settings, shabbosSerial).text;
 }
 
 /** Shabbos-day Mincha menu (קיץ column C / חורף column C) - identical formula.
@@ -183,8 +249,17 @@ export function shabbosMinchaParts(shabbosDate, settings, specialParsha = '') {
       .onlyWhen(T(gh, gm) <= sunsetVal - 1 / 24, 'printed once שקיעה is at least an hour after it'));
 
   const times = [early, ...standing.filter((t) => t.held), main, late];
+  const flat = flattenNonEmpty(times.map((t) => t.text()));
+  /* Three times (no standing מנין held, the ordinary shape most of the year) forced onto
+     one top and two bottom rather than left to splitLinesInHalf's own width balancing,
+     asked for directly: the balancer chose two-top-one-bottom on some weeks, which put the
+     later of the two bottom times (late, שקיעה less 30) on a line of its own while early and
+     main, the two further from שקיעה, shared the one above it. The bottom line is always
+     meant to carry more, not whichever split happens to balance the two lines' width that
+     week. Four and up are untouched - splitLinesInHalf already splits those evenly or
+     bottom-heavy on its own. */
   return {
-    text: splitLinesInHalf(flattenNonEmpty(times.map((t) => t.text()))),
+    text: splitLinesInHalf(flat, SLASH, flat.length === 3 ? 1 : null),
     times,
     dropped: standing.filter((t) => !t.held),
   };

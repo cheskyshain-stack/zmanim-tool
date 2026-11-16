@@ -1,10 +1,15 @@
 import { computeSeasonWeeks, computeWeekdayWeeks, splitChorefAtSpringCutover, defaultSeasonAndYear, nextAvailableYearFor } from '../sheets/weeks.js';
 import { resolveSettings } from '../settings.js';
-import { validatePageSizes, defaultPageSizes, alignPageSizesTo } from '../pagination.js';
+import { validatePageSizes, defaultSeasonPageCount, defaultSeasonPageSizes, alignPageSizesTo } from '../pagination.js';
 import { newId } from '../storage.js';
 import { escText } from '../util.js';
+import { keepPosition } from './keep-position.js';
 
 export function renderGenerate(container, state, tables, onGenerate, onOpenTab) {
+  return keepPosition(container, () => drawGenerate(container, state, tables, onGenerate, onOpenTab));
+}
+
+function drawGenerate(container, state, tables, onGenerate, onOpenTab) {
   const settings = resolveSettings(state.settings);
   const { season: defaultSeason, hebrewYear: defaultYear } = defaultSeasonAndYear(settings);
   // Generate is where the app opens, so it's where someone who has never seen it lands.
@@ -16,7 +21,7 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
   container.innerHTML = `
     <div class="gen-column">
     <h2>Print a season chart</h2>
-    <p class="hint">The site generates charts automatically with three pages per season. Use this screen to adjust rows per page for a local print copy.</p>
+    <p class="hint">Seasons are split into two parts, or three for winter in a Hebrew leap year. Use this screen to adjust rows per page for a local print copy.</p>
     ${firstRun ? '<p class="guide-nudge">First time here? <button type="button" id="open-guide" class="linkish">Read the guide</button>. What this site does, and how to print a board.</p>' : ''}
     ${stepsBar(1)}
     <div id="step-one"></div>
@@ -83,26 +88,28 @@ export function renderGenerate(container, state, tables, onGenerate, onOpenTab) 
 
   container.querySelector('#gen-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const fd = new FormData(e.target);
-    const season = fd.get('season');
-    const hebrewYear = Number(fd.get('hebrewYear'));
-    const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
+    keepPosition(container, () => {
+      const fd = new FormData(e.target);
+      const season = fd.get('season');
+      const hebrewYear = Number(fd.get('hebrewYear'));
+      const { weeks } = computeSeasonWeeks(season, hebrewYear, settings, tables);
 
-    // Step one folds into a one-line summary once it's answered, so step two isn't
-    // competing with a form you've already finished - the page used to just keep
-    // growing downward with everything still on screen at once.
-    container.querySelector('#gen-form').hidden = true;
-    container.querySelector('#step-one').innerHTML = `
-      <div class="step-summary">
-        <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
-        <button type="button" id="change-sheet">Change</button>
-      </div>`;
-    container.querySelector('#gen-steps').outerHTML = stepsBar(2);
-    container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate));
+      // Step one folds into a one-line summary once it's answered, so step two isn't
+      // competing with a form you've already finished - the page used to just keep
+      // growing downward with everything still on screen at once.
+      container.querySelector('#gen-form').hidden = true;
+      container.querySelector('#step-one').innerHTML = `
+        <div class="step-summary">
+          <span dir="ltr"><bdi><strong>${seasonLabel(season)}</strong></bdi> · ${hebrewYear} · ${weeks.length} weeks</span>
+          <button type="button" id="change-sheet">Change</button>
+        </div>`;
+      container.querySelector('#gen-steps').outerHTML = stepsBar(2);
+      container.querySelector('#change-sheet').addEventListener('click', () => renderGenerate(container, state, tables, onGenerate, onOpenTab));
 
-    // No scrolling into view: collapsing step one keeps step two roughly where step one
-    // was, and scrolling to it pushed the step indicator off the top of the screen.
-    renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+      // No scrolling into view: collapsing step one keeps step two roughly where step one
+      // was, and scrolling to it pushed the step indicator off the top of the screen.
+      renderPreview(container.querySelector('#gen-preview'), season, hebrewYear, weeks, settings, state, tables, onGenerate);
+    });
   });
 }
 
@@ -145,7 +152,8 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   // is on the summer schedule from the clock change through Pesach. You choose the page
   // split yourself below (covering all the weeks, as usual); at render time, any page
   // that ends up containing at least one of these weeks prints as a real קיץ chart -
-  // the other, earlier weeks on that same page just show blank Plag columns.
+  // the other, earlier weeks on that same page show blank Plag columns unless the admin
+  // print layout gives them their own winter header.
   const springSplitIndex = season === 'choref' ? splitChorefAtSpringCutover(weeks, settings) : weeks.length;
   const kayitzWeekCount = weeks.length - springSplitIndex;
 
@@ -157,17 +165,17 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   el.innerHTML = `
     <details class="panel">
       <summary>Show all ${weeks.length} weeks (${fmtDate(weeks[0].date)} – ${fmtDate(weeks[weeks.length - 1].date)})</summary>
-      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: any page from here on prints as שבת קיץ</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
+      <ol class="week-list">${weeks.map((w, i) => `${i === springSplitIndex ? '<li class="week-marker"><strong>Spring DST cutover: summer columns start here</strong></li>' : ''}<li>${w.date.toISOString().slice(0, 10)}: ${escText(w.parsha)}${w.specialParsha ? ' (' + escText(w.specialParsha) + ')' : ''}</li>`).join('')}</ol>
     </details>
     ${
       kayitzWeekCount > 0
-        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout. Keep that in mind when you split into pages below: whichever page ends up holding the first of them will print as a full שבת קיץ chart.</p>`
+        ? `<p class="hint"><strong>${kayitzWeekCount} of these ${weeks.length} weeks</strong> (from ${fmtDate(weeks[springSplitIndex].date)} onward) are past the spring DST cutover and need the שבת קיץ layout. ${state.settings.sheetStyle.splitSpringDst ? 'Your print layout gives earlier weeks on the same page their own winter header.' : 'A page holding any of them uses summer columns. You can choose separate winter and summer headers after opening the charts.'}</p>`
         : ''
     }
     <form id="page-form" class="form-grid">
       <fieldset>
         <legend>How many printable pages?</legend>
-        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', 3, { min: 1, max: 8 })}</label>
+        <label for="step-numPages" style="max-width:160px">Number of pages${stepper('numPages', defaultSeasonPageCount(season, hebrewYear), { min: 1, max: 8 })}</label>
       </fieldset>
       <fieldset>
         <legend>Weeks per page (must add up to ${weeks.length})</legend>
@@ -194,7 +202,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
   const inputsEl = el.querySelector('#page-size-inputs');
   const numPagesInput = el.querySelector('input[name=numPages]');
   function renderSizeInputs(numPages) {
-    const defaults = defaultPageSizes(weeks.length, numPages);
+    const defaults = defaultSeasonPageSizes(weeks, season, hebrewYear, numPages);
     inputsEl.innerHTML = defaults.map((size, i) => `<label for="step-pageSize${i}">Page ${i + 1} weeks${stepper(`pageSize${i}`, size, { min: 0, className: 'page-size' })}</label>`).join('');
     wireSteppers(inputsEl);
   }
@@ -226,7 +234,7 @@ function renderPreview(el, season, hebrewYear, weeks, settings, state, tables, o
         : `All ${total} weeks placed.`;
   }
 
-  renderSizeInputs(3);
+  renderSizeInputs(Number(numPagesInput.value));
   renderAlloc();
   numPagesInput.addEventListener('change', () => {
     const n = Math.max(1, Math.min(8, Number(numPagesInput.value) || 1));

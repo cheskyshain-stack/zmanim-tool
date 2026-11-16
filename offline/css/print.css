@@ -14,7 +14,7 @@
   .no-print { display: none !important; }
   /* Pages unticked in the page picker are left out of the print/PDF run. */
   .page-excluded { display: none !important; }
-  html, body { background: white; }
+  html, body, body.is-luach { background: white; }
   /* The sidebar is .no-print, so the shell has nothing left to lay out beside main -
      collapse the flex row so main can't inherit a stray flex width. */
   .app-shell { display: block; min-height: 0; }
@@ -22,6 +22,8 @@
      congregation pages kept their screen padding here and the last card spilled 68px
      onto a blank third sheet. Named explicitly so both mains flatten for paper. */
   main,
+  main:not(.is-sheet-view),
+  main.is-wide,
   body.is-luach main { padding: 0; max-width: none; margin: 0; }
   /* !important because Fit to screen sets these inline - they are a way of reading the
      sheet on a small screen and must never reach the paper. zoom is what the sheet view
@@ -29,13 +31,16 @@
      scale too, see fitChartToWindow), holding .pages at its natural width and sizing the
      wrapper to what the transform covers. All four have to come off for print, or a phone
      would put a third-size chart on the paper inside a clipped box. */
-  .pages { margin: 0; zoom: 1 !important; transform: none !important; width: auto !important; }
+  .pages { margin: 0; zoom: 1 !important; transform: none !important; width: auto !important; overflow: visible !important; }
   .pages-fit { height: auto !important; overflow: visible !important; }
   /* Full size and one per sheet of paper, even if side-by-side is on screen. Pages are
      already interleaved in the DOM (שבת, its Weekday, שבת, …), which is the print order. */
   #sheet-stack.is-side-by-side > .pages { display: block; }
   #sheet-stack.is-side-by-side > .pages > .page { zoom: 1; }
   .page {
+    --ink: #000;
+    --muted: #000;
+    color: #000;
     width: 11in;
     height: 8.5in;
     min-height: 0;
@@ -46,7 +51,10 @@
     break-after: page;
   }
   .page:last-child { page-break-after: auto; }
+  .page.is-combined-chart { width: 17in; height: 11in; min-height: 0; zoom: 1 !important; }
+  .page.is-combined-chart.is-combined-letter { width: 11in; height: 8.5in; }
   .cell { outline: none; }
+  .page .footer-text { color: #000; }
 }
 
 /* --- When the browser will not give us the 11in the page is built for ----------------
@@ -92,13 +100,26 @@
   }
 }
 
+.combined-chart-print-run { display: none; }
+@media print {
+  /* SVG scales the original HTML to the actual paper width. CSS zoom based on
+     print queries was shrinking it again when Android also resized the page. */
+  body.has-combined-chart-print > :not(.combined-chart-print-run) { display: none !important; }
+  html:has(body.has-combined-chart-print), body.has-combined-chart-print { height: 100%; }
+  .combined-chart-print-run { display: block; width: 100%; height: 100%; margin: 0; }
+  .combined-chart-print-frame { width: 100%; height: 100%; max-width: 17in; max-height: 11in; margin: 0 auto; break-after: page; break-inside: avoid; }
+  .combined-chart-print-frame:last-child { break-after: auto; }
+  .combined-chart-print-frame > svg { display: block; width: 100%; height: 100%; }
+  .combined-chart-print-run .page { zoom: 1 !important; break-after: auto; page-break-after: auto; }
+}
+
 @media print {
   /* Browsers drop background colours when printing unless told otherwise, which would
      wipe the dark header row, the tinted parsha column and the striped body rows - the
      things that make the printed board readable at a glance. */
   .page, .page * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* Retain the original soft panel shadow when printing. */
-  .shacharis-panel { box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13); }
+  .shacharis-panel { box-shadow: 0 1px 4px rgba(0, 0, 0, 0.13); }
 }
 
 /* --- The week cards on paper -------------------------------------------------------
@@ -208,9 +229,9 @@
      Both runs are excluded by name rather than by cascade order. A pin to one sheet clips
      everything after the first, and a rule that stopped applying because another one below
      happened to be more specific is not something to be relying on for that. */
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)),
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) .app-shell,
-  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)) main {
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)),
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)) .app-shell,
+  body:has(.poster):not(:has(.poster-all)):not(:has(.luach-sheet + .luach-sheet)):not(:has(.is-half-letter-print)) main {
     width: 8.5in; height: 11in;
     margin: 0; padding: 0;
     overflow: hidden;
@@ -276,6 +297,15 @@
   .luach-sheets { gap: 0; }
   .luach-sheet { break-after: page; break-inside: avoid; }
   .luach-sheet:last-child { break-after: auto; }
+  .luach-sheets { max-width: none; margin: 0; }
+  .luach-sheet { margin: 0; }
+  .luach-sheet-page { display: block; overflow: visible; }
+  body:has(.luach-sheets.is-half-letter-print),
+  body:has(.luach-sheets.is-half-letter-print) .app-shell,
+  body:has(.luach-sheets.is-half-letter-print) main { height: auto; overflow: visible; }
+  .luach-sheets.is-half-letter-print .luach-sheet-page { width: 11in; }
+  .luach-sheets.has-mixed-handouts .is-handout .poster-half-sheet { position: relative; width: 8.5in; height: 11in; }
+  .luach-sheets.has-mixed-handouts .is-handout .poster.is-halfpage { position: absolute; top: 0; left: 0; transform-origin: 0 0; transform: translateY(5.5in) rotate(-90deg); }
   /* The wrapper keeps a turned sheet's shadow off paper.
 
      zoom: 1 for the same reason .poster carries it, and it has to be said here as well as
@@ -286,6 +316,39 @@
      printed at the 0.42 the screen had them at, a small sheet adrift on a letter page.
      A desktop never showed it, having no zoom to reset. */
   .poster-all-item.is-sideways { box-shadow: none; zoom: 1 !important; }
+
+  /* One or two half-size handouts on one landscape Letter sheet.
+     Explicit dimensions keep a phone's preview zoom and the portrait poster pin out
+     of this print job. The 5.5in cut edge is never part of the printer's outer margin. */
+  body:has(.is-half-letter-print),
+  body:has(.is-half-letter-print) .app-shell,
+  body:has(.is-half-letter-print) main {
+    width: 11in; height: 8.5in;
+    margin: 0; padding: 0; overflow: hidden;
+  }
+  .poster-half-sheet { margin: 0; box-shadow: none; zoom: 1 !important; }
+  body:has(.is-half-letter-print) .poster-half-sheet { width: 11in; height: 8.5in; }
+  .poster.is-halfpage { margin: 0; zoom: 1 !important; }
+  /* Paired handouts share landscape paper across the complete print run. */
+  body:has(.is-half-paired-print),
+  body:has(.is-half-paired-print) .app-shell,
+  body:has(.is-half-paired-print) main { height: auto; overflow: visible; }
+  .poster-paired-page { break-after: page; break-inside: avoid; }
+  .poster-paired-page:last-child { break-after: auto; }
+  .poster-paired-page + .poster-paired-page { margin-top: 0; }
+  /* Mixed runs retain portrait paper. Turn this small handout onto the top half of
+     that sheet, still at its actual size, rather than changing every other poster. */
+  body:not(:has(.is-half-letter-print)) .poster-all .poster-half-sheet {
+    position: relative; width: 8.5in; height: 11in;
+  }
+  body:not(:has(.is-half-letter-print)) .poster-all .poster.is-halfpage {
+    position: absolute; top: 0; left: 0;
+    transform-origin: 0 0;
+    transform: translateY(5.5in) rotate(-90deg);
+  }
+  body:not(:has(.is-half-letter-print)) .poster-all .poster.is-halfpage + .poster.is-halfpage {
+    transform: translateY(11in) rotate(-90deg);
+  }
 }
 
 /* --- The same thing again, for the boxes that are portrait ---------------------------
@@ -330,4 +393,20 @@
      drops it by is a fixed distance that a zoom does not scale with it, so scaling the
      sheet would slide it off its own paper rather than fit it. */
   .poster.is-landscape { zoom: 1 !important; }
+  .poster.is-halfpage { zoom: 1 !important; }
+}
+
+@media print {
+  .special-print-job { display: block; }
+  .special-print-job .special-job-page { display: block; margin: 0; padding: 0; }
+  .special-print-job .poster-all-item { break-after: page; break-inside: avoid; }
+  .special-print-job .poster-all-item.is-last-print-frame { break-after: auto; }
+  .special-job-half-mixed { position: relative; width: 8.5in; height: 11in; }
+  body:not(:has(.is-half-letter-print)) .special-job-half-mixed .poster-half-sheet {
+    position: absolute; width: 11in; height: 8.5in; top: 0; left: 0;
+    transform-origin: 0 0; transform: translateY(11in) rotate(-90deg);
+  }
+  body:not(:has(.is-half-letter-print)) .special-job-half-mixed .poster.is-halfpage {
+    position: static; transform: none;
+  }
 }

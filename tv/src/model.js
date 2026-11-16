@@ -1,6 +1,6 @@
 import { ApiError } from "./auth.js";
 import { localToISO, visible, phase } from "../public/display-assets/time.js";
-import { dateInfo, source } from "./schedules.js";
+import { scheduleCalendar } from "./schedules.js";
 export const text = (v, n = 200) => {
   if (typeof v !== "string") return "";
   if (v.length > n) throw new ApiError(422, `Text exceeds ${n} characters.`);
@@ -11,7 +11,7 @@ const choice = (v, values, fallback) => {
   if (!values.includes(v)) throw new ApiError(422, "Choose a valid option.");
   return v;
 };
-export function validate(raw) {
+export function validate(raw, { dateInfo, source } = scheduleCalendar()) {
   if (!raw || typeof raw!=="object" || Array.isArray(raw)) throw new ApiError(422,"Enter a valid display item.");
   const kind = choice(raw.kind, ["announcement", "dedication", "schedule"]), status = choice(raw.status, ["draft", "published", "hidden", "archived"], "draft");
   const d = raw.data || {}, data = {};

@@ -1,0 +1,128 @@
+.yahrzeit-page.seats-app { --cal-site-header-height:calc(61px + env(safe-area-inset-top)); background:#faf7f0; font-family:system-ui,sans-serif; }
+.yahrzeit-page .seats-header { flex:none; height:var(--cal-site-header-height); padding-top:calc(7px + env(safe-area-inset-top)); }
+@media (max-width:700px) {
+  .yahrzeit-page.seats-app { --cal-site-header-height:calc(54px + env(safe-area-inset-top)); }
+  .yahrzeit-page .seats-header { padding-left:max(12px,env(safe-area-inset-left)); padding-right:max(12px,env(safe-area-inset-right)); }
+}
+#yahrzeit-app { box-sizing:border-box; width:100%; max-width:78rem; margin:0 auto; }
+#yahrzeit-app.is-cal-congregation {
+  --yr-row-preferred:clamp(72px,19.286vw,128px);
+  --cal-reader-cell:min(var(--yr-row-preferred),calc((var(--cal-reader-space) - 178px) / var(--cal-weeks)));
+}
+.yr-card .cal-reader-heading h1 { margin:0; text-align:center; color:#142b46; font:700 clamp(27px,7vw,36px)/1.15 Georgia,serif; letter-spacing:-.025em; }
+.yr-card [hidden] { display:none !important; }
+.yr-view-switch { display:grid; align-self:stretch; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px; padding:3px; border:1px solid #dfddd3; border-radius:12px; background:#fff; }
+:is(.yr-card .yr-view-switch,.yr-dialog .yr-date-mode) > button { min-height:44px; border:0; border-radius:8px; padding:.35rem .3rem; background:transparent; box-shadow:none; }
+:is(.yr-card .yr-view-switch,.yr-dialog .yr-date-mode) > button[aria-pressed="true"] { background:#142b46; color:#fff; }
+.yr-card .cal-content { max-height:calc(20px + var(--cal-weeks) * var(--yr-row-preferred)); border-top:0; }
+.yr-card .cal-grid-wrap { overflow:hidden; }
+.yr-card .cal-month-title { display:flex; align-items:center; justify-content:center; gap:.25rem; white-space:normal; }
+.yr-card :is([data-yr-jump],[data-yr-hebrew-month]) { -webkit-user-select:none; user-select:none; }
+.yr-card .cal-month-title .yr-english-month { color:#142b46; font:700 clamp(15px,4.7vw,23px)/1.15 Georgia,serif; }
+.yr-card .cal-month-nav > div { min-width:0; }
+.yr-card .cal-toolbar button[data-yr-step] { border-color:#dfddd3; }
+.yr-card .cal-grid .cal-day { padding:3px 4px 14px; }
+.yr-card .cal-grid .cal-day:focus-visible { outline-offset:-3px; }
+.yr-card .cal-date-numbers { display:flex; justify-content:flex-start; }
+.yr-card .cal-hebrew-day { top:auto; bottom:3px; right:4px; color:#6b716f; font:400 clamp(9px,calc(var(--cal-reader-cell) * .14),13px)/1 Arial,sans-serif; }
+.yr-card .cal-english-day, .yr-card .is-today .cal-english-day { font-size:clamp(12px,calc(var(--cal-reader-cell) * .19),18px); }
+.yr-day-count { flex:none; color:#263e5a; font:700 clamp(8px,2.35vw,12px)/1.15 system-ui,sans-serif; text-align:center; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.yr-day-count::after { display:block; height:3px; margin:1px 2px 0; border-radius:2px; background:#24736c; content:""; }
+.yr-card .cal-reader-status { color:#263e5a; }
+.yr-option-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; }
+.yr-agenda { display:flex; flex:1; flex-direction:column; min-height:0; }
+.yr-list-filters { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:.45rem .6rem; align-items:center; max-width:48rem; padding:0 1rem .55rem; width:100%; box-sizing:border-box; margin:auto; }
+.yr-list-filters label { font-weight:600; }
+.yr-card .yr-list-filters [data-yr-list-jump] { background:#f6f1e5; border-color:#ded6bf; }
+.yr-list-filters :is(input,select) { box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:.45rem .55rem; border-color:#dfddd3; border-radius:9px; color:#142b46; }
+.yr-custom-dates { grid-column:1/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)) auto; gap:.5rem; align-items:end; margin:0; padding:0; border:0; min-inline-size:0; }
+.yr-custom-dates label { display:grid; gap:.25rem; min-width:0; font-size:.8rem; }
+.yr-list-tools { grid-column:1/-1; display:flex; gap:.6rem; justify-content:space-between; align-items:center; }
+.yr-range-note { margin:0; color:#5b6871; font-size:.8rem; }
+.yr-card .yr-list-tools button { flex:none; padding-inline:.65rem; }
+.yr-list-scroll { flex:1; min-height:0; overflow:auto; overflow-anchor:none; overscroll-behavior:contain; padding:0 1rem 1rem; border-top:1px solid #ebe5d7; }
+.yr-list-scroll:focus-visible { outline-offset:-3px; }
+.yr-list-scroll > [data-yr-list-history], .yr-list-upcoming { max-width:46rem; margin:auto; }
+.yr-list-upcoming { display:flow-root; min-height:var(--yr-list-min-upcoming,0); }
+.yr-today-marker { margin:0; padding:.55rem 0 .4rem; border-bottom:1px solid #cbb681; color:#263e5a; font-weight:700; }
+.yr-list-empty { text-align:center; color:#5b6871; margin:1.3rem 0; }
+.yr-list-year { margin:.95rem 0 .5rem; padding:.15rem 0; border-bottom:1px solid #d7c69d; color:#263e5a; font:700 1rem/1.4 system-ui,sans-serif; }
+.yr-list-date { overflow:hidden; border:1px solid #e0ddd3; border-radius:12px; background:#fff; margin:.7rem 0; }
+.yr-list-date h2 { margin:0; }
+.yr-card .yr-list-date h2 button { display:flex; align-items:center; justify-content:space-between; gap:.5rem; width:100%; padding:.55rem .75rem; text-align:start; background:#f6f1e5; border:0; border-radius:0; }
+.yr-card .yr-list-date h2 button:focus-visible { outline-offset:-3px; }
+.yr-list-date h2 time { display:block; font:700 1.05rem/1.25 Georgia,serif; }
+.yr-list-date h2 [lang=he] { display:inline-block; font:400 .78rem/1.25 Arial,sans-serif; color:#4f626f; }
+.yr-list-date ul { list-style:none; padding:0 .75rem; margin:0; }
+.yr-list-date li { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:baseline; gap:.5rem; padding:.6rem 0; overflow-wrap:anywhere; }
+.yr-list-date li + li { border-top:1px solid #f0ede4; }
+.yr-list-date li span { font-size:.85rem; color:#4f626f; }
+.yr-list-scroll :is([data-yr-list-more],[data-yr-list-earlier]) { display:block; margin:.75rem auto; }
+@media (max-width:480px) {
+  .yr-custom-dates { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .yr-custom-dates button { grid-column:1/-1; justify-self:end; }
+}
+@media (max-height:460px) {
+  .yr-card .cal-reader-heading h1 { flex:1; font-size:clamp(19px,4.5vw,24px); text-align:left; }
+  .yr-card .yr-view-switch button { font-size:12px; padding-inline:.3rem; min-height:44px; height:auto; }
+  .yr-card .cal-grid .cal-day { padding:2px 3px; }
+  .yr-card .cal-hebrew-day { top:4px; bottom:auto; }
+}
+@media (max-width:350px) {
+  .yr-card .cal-reader-heading button { padding-inline:6px; }
+  .yr-card .cal-month-title .yr-english-month { font-size:14px; }
+  .yr-day-count span { display:none; }
+}
+
+.yr-dialog .cal-dialog-header { position:sticky; top:-1.4rem; background:#faf7f0; z-index:1; padding:.45rem 0; }
+.yr-date-mode { margin-bottom:.75rem; }
+.yr-dialog label { display:grid; align-content:start; gap:.25rem; font-weight:600; min-width:0; }
+.yr-dialog input, .yr-dialog select { box-sizing:border-box; font-size:1rem; min-height:44px; }
+.yr-date-fields { display:grid; grid-template-columns:minmax(4.1rem, .55fr) minmax(0, 1.45fr); gap:.65rem; }
+.yr-entries { display:grid; gap:.7rem; margin:1rem 0 .7rem; }
+.yr-entries:empty { margin:.7rem 0 0; }
+.yr-entry { min-inline-size:0; margin:0; padding:.6rem; border:1px solid #dedccf; border-radius:9px; }
+.yr-entry legend { padding:0 .3rem; font-weight:700; }
+.yr-entry-fields { display:grid; gap:.55rem; }
+.yr-entry button { justify-self:start; }
+.yr-entry-relationship { border:0; margin:0; padding:0; min-inline-size:0; }
+.yr-entry-relationship legend { padding:0; margin-bottom:.25rem; font-weight:600; }
+.yr-relationship-options { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.yr-dialog .yr-relationship-options button { justify-self:stretch; padding:.4rem .25rem; border-color:transparent; border-radius:8px; }
+.yr-dialog .yr-relationship-options button[aria-pressed="true"] { background:#142b46; color:#fff; }
+.yr-list { list-style:none; display:grid; gap:.55rem; padding:0; margin:.85rem 0 0; }
+.yr-list li { display:flex; justify-content:space-between; align-items:center; gap:.6rem; padding:.65rem .75rem; background:#fff; border:1px solid #dedfd9; border-radius:9px; overflow-wrap:anywhere; }
+.yr-list li button { flex:none; }
+.yr-list li p { margin:.2rem 0 0; }
+.yr-dialog-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:.45rem; margin:.7rem 0 0; }
+.yr-remove-member { margin-inline-end:auto; }
+.yr-member-actions { margin:0 0 .8rem; justify-content:flex-start; }
+.yr-entry-info { color:#4f626f; margin-top:.35rem; font-size:.84rem; }
+.yr-entry-info summary { cursor:pointer; }
+.yr-entry-info p { margin:.25rem 0 0; }
+.yr-import-controls { display:grid; gap:.75rem; }
+.yr-import-controls [role=status], .yr-import-steps { margin:0; }
+.yr-import-steps { padding-inline-start:1.25rem; }
+.yr-import-steps li + li { margin-top:.35rem; }
+.yr-dialog form label + label { margin-top:.5rem; }
+.yr-dialog .yr-date-fields label + label { margin-top:0; }
+#yr-date-hebrew .yr-date-fields { grid-template-columns:minmax(6rem, .95fr) minmax(0, 1.55fr); align-items:end; }
+.yr-import-controls [role=status]:empty { display:none; }
+.yr-import-controls input { width:100%; }
+.yr-help { color:#4f626f; margin:.25rem 0; }
+.yr-status { color:#883626; margin:.6rem 0 0; }
+.yr-status:empty { display:none; }
+.yr-report-dates { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.65rem; }
+.yr-dialog .yr-report-dates label { margin:0; }
+.yr-report-member-export { padding-top:.7rem; border-top:1px solid #e3dfd3; }
+.yr-print-sheet { display:none; }
+@media print {
+  .yahrzeit-page.cal-reader-page { display:block; overflow:visible; }
+  #yahrzeit-app { width:auto; max-width:none; padding:0; }
+  .yr-print-sheet { display:block; font:11pt/1.35 system-ui,sans-serif; }
+  .yr-print-sheet h1 { font:700 20pt Georgia,serif; }
+  .yr-print-sheet table { width:100%; table-layout:fixed; border-collapse:collapse; }
+  .yr-print-sheet thead { display:table-header-group; }
+  .yr-print-sheet tr { break-inside:avoid; }
+  .yr-print-sheet th, .yr-print-sheet td { border-bottom:1px solid #aaa; text-align:start; padding:5pt 4pt; overflow-wrap:anywhere; vertical-align:top; }
+}

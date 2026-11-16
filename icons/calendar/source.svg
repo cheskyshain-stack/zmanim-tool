@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>LC Shul Calendar</title>
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop stop-color="#ffc433"/>
+      <stop offset="1" stop-color="#ffa31e"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="#071433"/>
+  <g id="artwork">
+    <g id="mark" fill="none" stroke="#f7ecdd" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="142" y="104" width="228" height="202" rx="22"/>
+      <path d="M142 160H370" stroke="#ffaf26"/>
+      <path d="M198 82V122M314 82V122"/>
+      <g fill="#f7ecdd" stroke="none">
+        <rect x="184" y="190" width="28" height="28" rx="5"/>
+        <rect x="242" y="190" width="28" height="28" rx="5"/>
+        <rect x="300" y="190" width="28" height="28" rx="5"/>
+        <rect x="184" y="246" width="28" height="28" rx="5"/>
+        <rect x="242" y="246" width="28" height="28" rx="5"/>
+        <rect x="300" y="246" width="28" height="28" rx="5" fill="url(#gold)"/>
+      </g>
+    </g>
+    <g id="wordmark" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="600">
+      <text x="256" y="386" font-size="68" fill="#f7ecdd">LC Shul</text>
+      <text x="256" y="454" font-size="70" fill="url(#gold)">Calendar</text>
+    </g>
+  </g>
+</svg>

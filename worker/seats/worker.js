@@ -1,0 +1,495 @@
+import { seatsSharedApply, seatsSharedPlan } from '../../js/seats/shared-model.js';
+import { seatsDescribeChanges, seatsRecordMetadata } from '../../js/seats/activity.js';
+import { seatsNormalizeNameFile } from '../../js/seats/name-files.js';
+import { seatsTrashAvailable, seatsTrashExpiry } from '../../js/seats/trash.js';
+import { SEATS_RESERVATION_MS } from '../../js/seats/reservation.js';
+import { shulSessionExpiration } from '../../js/session-expiration.js';
+import { YAHRZEIT_MAX_MEMBERS, yahrzeitMember } from '../../js/yahrzeits/model.js';
+import { yahrzeitPlanImport } from '../../js/yahrzeits/import.js';
+
+const SEATS_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const SEATS_SHARED_LIMIT = 2 * 1024 * 1024;
+const seatsWorkerHash = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value)))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+const seatsWorkerJson = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
+const seatsPrivatePin = env => /^[0-9]{6,8}$/.test(env.SEATS_PRIVATE_PIN || '') ? env.SEATS_PRIVATE_PIN : '';
+const yahrzeitEntryId = (entry, index) => entry.id || 'legacy-' + index;
+const yahrzeitRecordWithEntryIds = member => ({
+  ...member, observances: member.observances.map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) })),
+});
+
+const YAHRZEIT_ACTIVITY_KEY = 'yahrzeit-activity';
+const YAHRZEIT_ACTIVITY_LIMIT = 50;
+
+function yahrzeitActivityItem(action, member, entry, by, at) {
+  return { action, member, by, at, kind: entry.kind, relationship: entry.relationship,
+    deceasedName: entry.deceasedName, month: entry.month, day: entry.day };
+}
+
+function yahrzeitEntryChanges(entries, earlier, member, name, addedAt) {
+  const previous = (earlier?.observances || []).map((entry, index) => ({ ...entry, id: yahrzeitEntryId(entry, index) }));
+  const used = new Set(), activity = [];
+  const observances = entries.map(entry => {
+    const existing = previous.find(candidate => !used.has(candidate.id) && candidate.kind === entry.kind
+      && (entry.id ? candidate.id === entry.id : candidate.kind !== 'custom'
+        || candidate.relationship === entry.relationship && candidate.day === entry.day && candidate.month === entry.month));
+    if (existing) used.add(existing.id);
+    const id = existing && !existing.id.startsWith('legacy-') ? existing.id : crypto.randomUUID();
+    if (existing) return { ...entry, id, ...(existing.addedAt ? { addedAt: existing.addedAt, addedBy: existing.addedBy } : {}) };
+    activity.push(yahrzeitActivityItem('added', member, entry, name, addedAt));
+    return { ...entry, id, addedAt, addedBy: name };
+  });
+  for (const entry of previous) {
+    if (!used.has(entry.id)) activity.push(yahrzeitActivityItem('deleted', member, entry, name, addedAt));
+  }
+  return { observances, activity };
+}
+
+async function recordYahrzeitActivity(txn, activity) {
+  if (!activity.length) return;
+  const recent = await txn.get(YAHRZEIT_ACTIVITY_KEY) || [];
+  await txn.put(YAHRZEIT_ACTIVITY_KEY, activity.concat(recent).slice(0, YAHRZEIT_ACTIVITY_LIMIT));
+}
+
+async function readYahrzeitActivity(txn, prefix) {
+  const recent = await txn.get(YAHRZEIT_ACTIVITY_KEY) || [];
+  if (recent.length >= YAHRZEIT_ACTIVITY_LIMIT) return recent;
+  const earliest = recent.at(-1)?.at;
+  const members = await txn.list({ prefix });
+  const earlier = [];
+  for (const member of members.values()) {
+    for (const entry of member.observances) {
+      if (entry.addedAt && entry.addedBy && (!earliest || entry.addedAt < earliest)) {
+        earlier.push(yahrzeitActivityItem('added', member.name, entry, entry.addedBy, entry.addedAt));
+      }
+    }
+  }
+  earlier.sort((a, b) => b.at.localeCompare(a.at));
+  return recent.concat(earlier).slice(0, YAHRZEIT_ACTIVITY_LIMIT);
+}
+
+const seatsWorkerId = value => typeof value === 'string' && /^[A-Za-z0-9_-]{8,100}$/.test(value);
+const seatsHistoryKey = (id, revision) => 'history:' + id + ':' + String(revision).padStart(12, '0');
+const seatsLegacyHistory = record => ({ revision: record.revision, at: record.updatedAt, by: record.updatedBy, details: ['Last saved change before change history was enabled. Earlier changes were not recorded.'] });
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('Origin'), allowed = env.ALLOWED_ORIGIN || 'https://baismedrashoflakewoodcommons.org';
+    if (origin !== allowed) return seatsWorkerJson({ error: 'Open shared plans from the Seats website.' }, 403);
+    const cors = { 'Access-Control-Allow-Origin': allowed, 'Access-Control-Allow-Methods': 'GET,POST,DELETE,OPTIONS', 'Access-Control-Allow-Headers': 'Authorization,Content-Type', 'Vary': 'Origin' };
+    if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+    try {
+      const response = await env.SEATS_WORKSPACE.get(env.SEATS_WORKSPACE.idFromName('lakewood-commons')).fetch(request);
+      if (response.status === 101) return response;
+      const headers = new Headers(response.headers);
+      for (const [name, value] of Object.entries(cors)) headers.set(name, value);
+      headers.set('X-Content-Type-Options', 'nosniff');
+      return new Response(response.body, { status: response.status, headers });
+    } catch {
+      return new Response(JSON.stringify({ error: 'Shared plans are temporarily unavailable. Your local copy is kept.' }), { status: 503, headers: { ...cors, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
+    }
+  },
+};
+
+export class SeatsWorkspace {
+  constructor(ctx, env) { this.ctx = ctx; this.env = env; this.authTimers = new Map(); }
+  async body(request) {
+    if (!request.headers.get('Content-Type')?.startsWith('application/json')) throw new Error('Use a JSON request.');
+    const reader = request.body?.getReader();
+    if (!reader) throw new Error('Enter a shared update.');
+    const chunks = []; let length = 0;
+    while (true) {
+      const { value, done } = await reader.read(); if (done) break;
+      length += value.byteLength;
+      if (length > SEATS_SHARED_LIMIT) { await reader.cancel(); throw new Error('This plan is too large to share.'); }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(length); let offset = 0;
+    for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+    return JSON.parse(new TextDecoder().decode(bytes));
+  }
+  async session(token, scope = 'seats') {
+    if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return null;
+    const session = await this.ctx.storage.get('session:' + await seatsWorkerHash(token));
+    return session?.expires > Date.now() && (session.scope || 'seats') === scope ? session : null;
+  }
+  async fetch(request) {
+    const url = new URL(request.url);
+    const privatePin = seatsPrivatePin(this.env);
+    if (url.pathname === '/api/live' && request.headers.get('Upgrade')?.toLowerCase() === 'websocket') {
+      const pair = new WebSocketPair();
+      this.ctx.acceptWebSocket(pair[1]); pair[1].serializeAttachment({ authenticated: false, connected: Date.now() });
+      this.authTimers.set(pair[1], setTimeout(() => { this.authTimers.delete(pair[1]); if (!pair[1].deserializeAttachment()?.authenticated) pair[1].close(1008, 'Sign in to shared plans.'); }, 10000));
+      return new Response(null, { status: 101, webSocket: pair[0] });
+    }
+    if (url.pathname === '/api/session' && request.method === 'POST') {
+      try {
+        const body = await this.body(request), ip = request.headers.get('CF-Connecting-IP') || 'local';
+        const scope = body.scope ?? 'seats';
+        if (scope !== 'seats' && scope !== 'yahrzeits') return seatsWorkerJson({ error: 'Choose a sign-in page.' }, 400);
+        if (scope === 'yahrzeits' && !privatePin) return seatsWorkerJson({ error: 'Yahrzeit sign-in has not been set up yet.' }, 503);
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'attempt:' + await seatsWorkerHash(ip), now = Date.now();
+          const saved = await this.ctx.storage.get(key), attempts = saved?.until > now ? saved : { count: 0, until: now + 15 * 60 * 1000 };
+          if (attempts.count >= 10) return seatsWorkerJson({ error: 'Too many PIN attempts. Try again in 15 minutes.' }, 429);
+          const privateAccess = Boolean(privatePin && body.pin === privatePin);
+          const valid = privateAccess || scope === 'seats' && typeof body.pin === 'string' && /^\d{4}$/.test(body.pin)
+            && await seatsWorkerHash(body.pin + 'lakewood-commons/seats/v1') === 'c5eebef6b017a917b05502fb6016a9dadfd75f31b2e48aa445175a5827a6cc55';
+          if (!valid) { attempts.count++; await this.ctx.storage.put(key, attempts); return seatsWorkerJson({ error: 'That PIN did not match.' }, 401); }
+          const name = String(body.name || 'Organizer').trim().slice(0, 60) || 'Organizer';
+          const token = [...crypto.getRandomValues(new Uint8Array(32))].map(byte => byte.toString(16).padStart(2, '0')).join('');
+          const session = { name, expires: shulSessionExpiration(now) };
+          const privateProof = scope === 'yahrzeits' ? await seatsWorkerHash(privatePin + ':' + token) : '';
+          await this.ctx.storage.put('session:' + await seatsWorkerHash(token), { ...session, scope, privateProof });
+          if (!privatePin || privateAccess) await this.ctx.storage.delete(key);
+          await this.ctx.storage.setAlarm(now + SEATS_CLEANUP_INTERVAL_MS);
+          return seatsWorkerJson({ ...session, token });
+        });
+      } catch { return seatsWorkerJson({ error: 'Enter your name and the Seats PIN.' }, 400); }
+    }
+    const token = request.headers.get('Authorization')?.replace(/^Bearer /, '');
+    if (url.pathname === '/api/yahrzeits' || url.pathname.startsWith('/api/yahrzeits/')) {
+      const session = await this.session(token, 'yahrzeits');
+      if (!session) return seatsWorkerJson({ error: 'Sign in to the Yahrzeit Calendar.' }, 401);
+      if (!privatePin) return seatsWorkerJson({ error: 'Yahrzeit sign-in has not been set up yet.' }, 503);
+      if (session.privateProof !== await seatsWorkerHash(privatePin + ':' + token)) {
+        return seatsWorkerJson({ error: 'Sign in with the current private organizer PIN to open the Yahrzeit Calendar.', code: 'yahrzeit-sign-in' }, 403);
+      }
+      return this.yahrzeits(request, url.pathname, session.name);
+    }
+    const session = await this.session(token);
+    if (!session) return seatsWorkerJson({ error: 'Enter the Seats PIN to open shared plans.' }, 401);
+    if (url.pathname === '/api/info' && request.method === 'GET') return seatsWorkerJson({ chartDates: true, changeHistory: true, sharedNameFiles: true, deleteFiles: true, editNameFiles: true, trash60Days: true, printNotes: true, seatReservationMinutes: 30, yahrzeits: Boolean(privatePin), yahrzeitMemberImport: true, yahrzeitActivity: true });
+    if (url.pathname === '/api/trash' && request.method === 'GET') {
+      const files = [];
+      for (const [prefix, type] of [['plan:', 'chart'], ['names:', 'names']]) {
+        const records = await this.ctx.storage.list({ prefix });
+        for (const record of records.values()) if (seatsTrashAvailable(record)) files.push({ type, id: type === 'chart' ? record.plan.id : record.id,
+          name: type === 'chart' ? record.plan.name : record.name, deletedAt: record.deletedAt, deletedBy: record.deletedBy, expiresAt: seatsTrashExpiry(record) });
+      }
+      return seatsWorkerJson({ files: files.sort((a, b) => b.deletedAt.localeCompare(a.deletedAt)) });
+    }
+    const restore = /^\/api\/(plans|name-lists)\/([A-Za-z0-9_-]{8,100})\/restore$/.exec(url.pathname);
+    if (restore && request.method === 'POST') {
+      try {
+        const body = await this.body(request);
+        if (typeof body.deletedAt !== 'string' || !Number.isFinite(Date.parse(body.deletedAt))) throw new Error('Reopen Trash before restoring this file.');
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const chart = restore[1] === 'plans', prefix = chart ? 'plan:' : 'names:', key = prefix + restore[2], record = await this.ctx.storage.get(key);
+          if (!record) return seatsWorkerJson({ error: 'That file was not found in Trash.' }, 404);
+          if (!record.deletedAt) return record.lastRestoredDeletion === body.deletedAt ? seatsWorkerJson(record) : seatsWorkerJson({ error: 'That file is already available. Refresh the saved list.' }, 409);
+          if (record.deletedAt !== body.deletedAt) return seatsWorkerJson({ error: 'This file was deleted again. Refresh Trash before restoring it.' }, 409);
+          if (!seatsTrashAvailable(record)) return seatsWorkerJson({ error: 'The 60-day recovery period for this file has ended.' }, 410);
+          const records = await this.ctx.storage.list({ prefix }), limit = chart ? 30 : 50;
+          if ([...records.values()].filter(value => !value.deletedAt).length >= limit) return seatsWorkerJson({ error: 'The saved folder is full. Move another file to Trash before restoring this one.' }, 409);
+          const now = new Date().toISOString(), next = { ...record, revision: (record.revision || 1) + 1, updatedAt: now, updatedBy: session.name, lastRestoredDeletion: record.deletedAt };
+          delete next.deletedAt; delete next.deletedBy;
+          if (chart) {
+            next.historyFromRevision ||= record.revision;
+            await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(restore[2], record.revision)]: seatsLegacyHistory(record) } : {}),
+              [seatsHistoryKey(restore[2], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Restored chart from Trash'] } });
+          } else await this.ctx.storage.put(key, next);
+          this.broadcast({ type: chart ? 'plans-changed' : 'name-lists-changed' });
+          return seatsWorkerJson(next);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
+    if (url.pathname === '/api/name-lists' && request.method === 'GET') {
+      const records = await this.ctx.storage.list({ prefix: 'names:' });
+      return seatsWorkerJson({ files: [...records.values()].filter(record => !record.deletedAt).map(record => ({ id: record.id, name: record.name, count: record.names.length, createdAt: record.createdAt, createdBy: record.createdBy,
+        revision: record.revision || 1, updatedAt: record.updatedAt || record.createdAt, updatedBy: record.updatedBy || record.createdBy })).sort((a, b) => b.createdAt.localeCompare(a.createdAt)) });
+    }
+    if (url.pathname === '/api/name-lists' && request.method === 'POST') {
+      try {
+        const body = await this.body(request); if (!seatsWorkerId(body.id)) throw new Error('Invalid file ID.');
+        const contents = seatsNormalizeNameFile(body);
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'names:' + body.id, existing = await this.ctx.storage.get(key);
+          if (existing) return existing.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(existing);
+          const records = await this.ctx.storage.list({ prefix: 'names:' });
+          if ([...records.values()].filter(record => !record.deletedAt).length >= 50) return seatsWorkerJson({ error: 'There are already 50 name files. Delete an older file before uploading another.' }, 409);
+          const now = new Date().toISOString();
+          const record = { id: body.id, ...contents, revision: 1, createdAt: now, createdBy: session.name, updatedAt: now, updatedBy: session.name };
+          await this.ctx.storage.put(key, record); this.broadcast({ type: 'name-lists-changed' });
+          return seatsWorkerJson(record, 201);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
+    const nameFile = /^\/api\/name-lists\/([A-Za-z0-9_-]{8,100})$/.exec(url.pathname);
+    if (nameFile && request.method === 'POST') {
+      try {
+        const body = await this.body(request), contents = seatsNormalizeNameFile(body);
+        if (!Number.isSafeInteger(body.revision) || body.revision < 1 || !seatsWorkerId(body.operationId)) throw new Error('Reopen the name file before saving.');
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
+          if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
+          if (record.deletedAt) return seatsWorkerJson({ error: 'That name file was deleted. Your draft is kept on this device.' }, 410);
+          if (record.operationId === body.operationId) return seatsWorkerJson(record);
+          if ((record.revision || 1) !== body.revision) return seatsWorkerJson({ error: 'Someone saved a newer version. Your draft is kept. Load the latest version before making further changes.' }, 409);
+          const updated = { ...record, ...contents, revision: (record.revision || 1) + 1, operationId: body.operationId, updatedAt: new Date().toISOString(), updatedBy: session.name };
+          await this.ctx.storage.put(key, updated); this.broadcast({ type: 'name-lists-changed' });
+          return seatsWorkerJson(updated);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
+    if (nameFile && ['GET', 'DELETE'].includes(request.method)) {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const key = 'names:' + nameFile[1], record = await this.ctx.storage.get(key);
+        if (!record) return seatsWorkerJson({ error: 'That name file was not found.' }, 404);
+        if (request.method === 'GET') return record.deletedAt ? seatsWorkerJson({ error: 'That name file was deleted.' }, 410) : seatsWorkerJson(record);
+        if (!record.deletedAt) { await this.ctx.storage.put(key, { ...record, deletedAt: new Date().toISOString(), deletedBy: session.name }); await this.ctx.storage.setAlarm(Date.now() + SEATS_CLEANUP_INTERVAL_MS); this.broadcast({ type: 'name-lists-changed' }); }
+        return seatsWorkerJson({ deleted: true });
+      });
+    }
+    if (url.pathname === '/api/plans' && request.method === 'GET') {
+      const records = await this.ctx.storage.list({ prefix: 'plan:' });
+      return seatsWorkerJson({ plans: [...records.values()].filter(record => !record.deletedAt).map(record => ({ id: record.plan.id, name: record.plan.name, revision: record.revision, ...seatsRecordMetadata(record) })).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) });
+    }
+    if (url.pathname === '/api/plans' && request.method === 'POST') {
+      try {
+        const body = await this.body(request);
+        if (!seatsWorkerId(body.id)) throw new Error('Invalid plan ID.');
+        const plan = seatsSharedPlan({ ...body.plan, id: body.id });
+        return await this.ctx.blockConcurrencyWhile(async () => {
+          const key = 'plan:' + plan.id, existing = await this.ctx.storage.get(key);
+          if (existing) return existing.deletedAt ? seatsWorkerJson({ error: 'That chart was deleted.' }, 410) : seatsWorkerJson(existing);
+          const plans = await this.ctx.storage.list({ prefix: 'plan:' });
+          if ([...plans.values()].filter(record => !record.deletedAt).length >= 30) return seatsWorkerJson({ error: 'There are already 30 shared charts. Delete an older chart before saving another.' }, 409);
+          const now = new Date().toISOString();
+          const record = { plan, revision: 1, createdAt: now, createdBy: session.name, updatedAt: now, updatedBy: session.name, operations: [], historyFromRevision: 1 };
+          await this.ctx.storage.put({ [key]: record, [seatsHistoryKey(plan.id, 1)]: { revision: 1, at: now, by: session.name, details: ['Saved chart to the site'] } });
+          this.broadcast({ type: 'plans-changed' });
+          return seatsWorkerJson(record, 201);
+        });
+      } catch (error) { return seatsWorkerJson({ error: error.message }, 400); }
+    }
+    const history = /^\/api\/plans\/([A-Za-z0-9_-]{8,100})\/history$/.exec(url.pathname);
+    if (history && request.method === 'GET') {
+      const record = await this.ctx.storage.get('plan:' + history[1]);
+      if (!record || record.deletedAt) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+      const rawBefore = url.searchParams.get('before'), before = rawBefore === null ? null : Number(rawBefore);
+      if (before !== null && (!Number.isSafeInteger(before) || before < 1)) return seatsWorkerJson({ error: 'Invalid history page.' }, 400);
+      const prefix = 'history:' + history[1] + ':';
+      const rows = await this.ctx.storage.list({ prefix, reverse: true, limit: 51, ...(before === null ? {} : { end: seatsHistoryKey(history[1], before) }) });
+      const entries = [...rows.values()];
+      if (!record.historyFromRevision && !entries.length && (before === null || record.revision < before)) entries.push(seatsLegacyHistory(record));
+      return seatsWorkerJson({ entries: entries.slice(0, 50), nextBefore: entries.length > 50 ? entries[49].revision : null, ...seatsRecordMetadata(record) });
+    }
+    const match = /^\/api\/plans\/([A-Za-z0-9_-]{8,100})$/.exec(url.pathname);
+    if (match && request.method === 'GET') {
+      const record = await this.ctx.storage.get('plan:' + match[1]);
+      if (!record) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+      return record.deletedAt ? seatsWorkerJson({ error: 'That shared chart was deleted.' }, 410) : seatsWorkerJson({ ...record, ...seatsRecordMetadata(record) });
+    }
+    if (match && request.method === 'DELETE') {
+      return this.ctx.blockConcurrencyWhile(async () => {
+        const key = 'plan:' + match[1], record = await this.ctx.storage.get(key);
+        if (!record) return seatsWorkerJson({ error: 'That shared chart was not found.' }, 404);
+        if (!record.deletedAt) {
+          const now = new Date().toISOString(), next = { ...record, ...seatsRecordMetadata(record), deletedAt: now, deletedBy: session.name, revision: record.revision + 1, updatedAt: now, updatedBy: session.name, historyFromRevision: record.historyFromRevision || record.revision };
+          await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(match[1], record.revision)]: seatsLegacyHistory(record) } : {}), [seatsHistoryKey(match[1], next.revision)]: { revision: next.revision, at: now, by: session.name, details: ['Deleted chart from the website'] } });
+          await this.ctx.storage.setAlarm(Date.now() + SEATS_CLEANUP_INTERVAL_MS);
+          this.broadcast({ type: 'plan-deleted', id: match[1] }); this.broadcast({ type: 'plans-changed' });
+        }
+        return seatsWorkerJson({ deleted: true });
+      });
+    }
+    return seatsWorkerJson({ error: 'Not found.' }, 404);
+  }
+  send(socket, message) { try { socket.send(JSON.stringify(message)); } catch { /* A disconnected organizer will reconnect. */ } }
+  peers() {
+    return this.ctx.getWebSockets().map(socket => ({ socket, ...socket.deserializeAttachment() })).filter(peer => peer.socket.readyState === WebSocket.OPEN && peer.authenticated && peer.expires > Date.now())
+      .map(peer => ({ ...peer, seat: peer.seatExpiresAt > Date.now() ? peer.seat : null }));
+  }
+  broadcast(message) { for (const peer of this.peers()) this.send(peer.socket, message); }
+  presence() { this.broadcast({ type: 'presence', at: Date.now(), peers: this.peers().map(({ clientId, name, planId, seat, seatExpiresAt }) => ({ clientId, name, planId, seat, seatExpiresAt })) }); }
+  expireReservations() {
+    let expired = false;
+    for (const { socket } of this.peers()) {
+      const meta = socket.deserializeAttachment();
+      if (!meta.seat || meta.seatExpired || meta.seatExpiresAt > Date.now()) continue;
+      // Retain the expired selection so old clients cannot reclaim it automatically.
+      socket.serializeAttachment({ ...meta, seatExpired: true });
+      this.send(socket, { type: 'reservation-expired', planId: meta.planId, seat: meta.seat });
+      expired = true;
+    }
+    if (expired) this.presence();
+  }
+  async yahrzeits(request, path, name) {
+    const prefix = 'yahrzeit:', storage = this.ctx.storage;
+    if (path === '/api/yahrzeits' && request.method === 'GET') {
+      return seatsWorkerJson({ members: [...(await storage.list({ prefix })).values()].map(yahrzeitRecordWithEntryIds), activityAvailable: true });
+    }
+    if (path === '/api/yahrzeits/activity' && request.method === 'GET') {
+      return seatsWorkerJson({ activity: await storage.transaction(txn => readYahrzeitActivity(txn, prefix)) });
+    }
+    if (path === '/api/yahrzeits/import' && request.method === 'POST') return this.importYahrzeitMembers(request, prefix, name);
+    const id = path.slice('/api/yahrzeits/'.length);
+    if (!seatsWorkerId(id) || !['POST', 'DELETE'].includes(request.method)) return seatsWorkerJson({ error: 'Unknown yahrzeit request.' }, 404);
+    let body, contents;
+    try {
+      body = await this.body(request);
+      if (!Number.isSafeInteger(body?.revision) || body.revision < (request.method === 'DELETE' ? 1 : 0)) throw new Error('The saved version is missing.');
+      if (request.method === 'POST') contents = yahrzeitMember(body);
+    } catch (error) {
+      return seatsWorkerJson({ error: error instanceof SyntaxError ? 'Enter a valid yahrzeit record.' : error.message }, 400);
+    }
+    const key = prefix + id;
+    return storage.transaction(async txn => {
+      const current = await txn.get(key);
+      if (body.revision !== (current?.revision || 0)) {
+        return seatsWorkerJson({ error: 'Someone else changed this record. Close it and reload before trying again.' }, 409);
+      }
+      const now = new Date().toISOString();
+      if (request.method === 'DELETE') {
+        const { activity } = yahrzeitEntryChanges([], current, current.name, name, now);
+        await recordYahrzeitActivity(txn, activity);
+        await txn.delete(key);
+        return seatsWorkerJson({ deleted: true });
+      }
+      if (!current && (await txn.list({ prefix, limit: YAHRZEIT_MAX_MEMBERS })).size >= YAHRZEIT_MAX_MEMBERS) {
+        return seatsWorkerJson({ error: 'The yahrzeit register is full.' }, 409);
+      }
+      const { observances, activity } = yahrzeitEntryChanges(contents.observances, current, contents.name, name, now);
+      await recordYahrzeitActivity(txn, activity);
+      const added = current ? (current.addedAt ? { addedAt: current.addedAt, addedBy: current.addedBy } : {}) : { addedAt: now, addedBy: name };
+      const record = { id, ...contents, ...added, observances, revision: body.revision + 1 };
+      await txn.put(key, record);
+      return seatsWorkerJson(record, current ? 200 : 201);
+    });
+  }
+
+  async importYahrzeitMembers(request, prefix, name) {
+    let rows;
+    try {
+      const body = await this.body(request);
+      if (!Array.isArray(body?.members) || !body.members.length || body.members.length > YAHRZEIT_MAX_MEMBERS) {
+        throw new Error('Choose a spreadsheet with 1 to 2,000 member rows.');
+      }
+      rows = body.members.map(yahrzeitMember);
+    } catch (error) {
+      return seatsWorkerJson({ error: error instanceof SyntaxError ? 'Enter a valid member list.' : error.message }, 400);
+    }
+    return this.ctx.storage.transaction(async txn => {
+      const records = await txn.list({ prefix });
+      let plan;
+      try { plan = yahrzeitPlanImport([...records.values()].map(yahrzeitRecordWithEntryIds), rows); }
+      catch (error) { return seatsWorkerJson({ error: error.message }, 409); }
+      if (records.size + plan.added.length > YAHRZEIT_MAX_MEMBERS) {
+        return seatsWorkerJson({ error: 'This import would exceed the 2,000-member limit.' }, 409);
+      }
+      const addedAt = new Date().toISOString();
+      const activity = [];
+      const withEntryInfo = (member, previous) => {
+        const result = yahrzeitEntryChanges(member.observances, previous, member.name, name, addedAt);
+        activity.push(...result.activity);
+        return { ...member, observances: result.observances };
+      };
+      const newRecords = plan.added.map(member => withEntryInfo({ ...member, id: crypto.randomUUID(), revision: 1, addedAt, addedBy: name }));
+      const updated = plan.updated.map(member => withEntryInfo(member, records.get(prefix + member.id)));
+      await recordYahrzeitActivity(txn, activity);
+      const writes = [...newRecords, ...updated];
+      for (let i = 0; i < writes.length; i += 100) {
+        const batch = writes.slice(i, i + 100).map(member => [prefix + member.id, member]);
+        await txn.put(Object.fromEntries(batch));
+        for (const [key, member] of batch) records.set(key, member);
+      }
+      return seatsWorkerJson({ added: newRecords.length, updated: plan.updated.length, unchanged: plan.unchanged, members: [...records.values()].map(yahrzeitRecordWithEntryIds) });
+    });
+  }
+
+  async webSocketMessage(socket, raw) {
+    try {
+      if (typeof raw !== 'string' || new TextEncoder().encode(raw).byteLength > SEATS_SHARED_LIMIT) throw new Error('This shared update is too large.');
+      const message = JSON.parse(raw), meta = socket.deserializeAttachment();
+      if (message.type === 'auth') {
+        const session = await this.session(message.token);
+        if (!session || !seatsWorkerId(message.clientId)) { socket.close(1008, 'Sign in again.'); return; }
+        clearTimeout(this.authTimers.get(socket)); this.authTimers.delete(socket);
+        socket.serializeAttachment({ ...session, authenticated: true, clientId: message.clientId, planId: null, seat: null });
+        this.send(socket, { type: 'ready' }); this.expireReservations(); this.presence(); return;
+      }
+      if (!meta?.authenticated || meta.expires <= Date.now()) { socket.close(1008, 'Sign in again.'); return; }
+      this.expireReservations();
+      if (message.type === 'ping') { this.send(socket, { type: 'pong' }); return; }
+      if (message.type === 'watch') {
+        if (!Array.isArray(message.ids) || message.ids.length > 30) throw new Error('Invalid plan list.');
+        for (const id of message.ids) {
+          if (!seatsWorkerId(id)) continue;
+          const record = await this.ctx.storage.get('plan:' + id);
+          if (record?.deletedAt) this.send(socket, { type: 'plan-deleted', id });
+          else if (record) this.send(socket, { type: 'snapshot', ...record });
+        }
+        return;
+      }
+      if (message.type === 'presence') {
+        const planId = seatsWorkerId(message.planId) ? message.planId : null;
+        const seat = typeof message.seat === 'string' && message.seat.length <= 120 ? message.seat : null;
+        const sameSelection = planId && seat && meta.planId === planId && meta.seat === seat;
+        if (sameSelection && !(meta.seatExpiresAt > Date.now())) {
+          this.send(socket, { type: 'reservation-expired', planId, seat }); return;
+        }
+        const busy = planId && seat && this.peers().find(peer => peer.socket !== socket && peer.planId === planId && peer.seat === seat);
+        socket.serializeAttachment({ ...meta, planId: planId && seat ? planId : null, seat: planId && !busy ? seat : null,
+          seatExpiresAt: planId && seat && !busy ? sameSelection ? meta.seatExpiresAt : Date.now() + SEATS_RESERVATION_MS : null, seatExpired: false });
+        if (busy) this.send(socket, { type: 'busy', seat, name: busy.name });
+        this.presence(); return;
+      }
+      if (message.type !== 'patch' || !seatsWorkerId(message.planId) || !seatsWorkerId(message.operationId)) throw new Error('Invalid shared update.');
+      await this.ctx.blockConcurrencyWhile(async () => {
+        const key = 'plan:' + message.planId, record = await this.ctx.storage.get(key);
+        if (!record) throw new Error('That shared plan was not found.');
+        if (record.deletedAt) { this.send(socket, { type: 'plan-deleted', id: message.planId }); return; }
+        if (record.operations.includes(message.operationId)) { this.send(socket, { type: 'snapshot', ...record, operationId: message.operationId, clientId: meta.clientId }); return; }
+        try {
+          for (const change of message.changes || []) {
+            if (change.group === 'people') {
+              const seated = [...record.plan.tables, ...record.plan.objects.filter(object => object.type === 'rav')].find(table => table.seats.includes(change.id));
+              const busy = seated && this.peers().find(peer => peer.socket !== socket && peer.planId === message.planId && peer.seat === seated.id + ':' + seated.seats.indexOf(change.id));
+              if (busy) throw new Error(busy.name + ' is editing that seat.');
+            }
+            if (!['tables', 'objects'].includes(change.group) || !['seats', 'count', undefined].includes(change.key)) continue;
+            const busy = this.peers().find(peer => peer.socket !== socket && peer.planId === message.planId && peer.seat && (change.index === undefined ? peer.seat.startsWith(change.id + ':') : peer.seat === change.id + ':' + change.index));
+            if (busy) throw new Error(busy.name + ' is editing that seat.');
+          }
+          const plan = seatsSharedApply(record.plan, message.changes);
+          if (JSON.stringify(plan) === JSON.stringify(record.plan)) { this.send(socket, { type: 'snapshot', ...record, operationId: message.operationId, clientId: meta.clientId }); return; }
+          const now = new Date().toISOString();
+          const next = { ...record, ...seatsRecordMetadata(record), plan, revision: record.revision + 1, updatedAt: now, updatedBy: meta.name, operations: [...record.operations, message.operationId].slice(-200), historyFromRevision: record.historyFromRevision || record.revision };
+          await this.ctx.storage.put({ [key]: next, ...(!record.historyFromRevision ? { [seatsHistoryKey(plan.id, record.revision)]: seatsLegacyHistory(record) } : {}),
+            [seatsHistoryKey(plan.id, next.revision)]: { revision: next.revision, at: now, by: meta.name, details: seatsDescribeChanges(record.plan, plan, message.changes) } });
+          this.broadcast({ type: 'snapshot', ...next, operationId: message.operationId, clientId: meta.clientId });
+        } catch (error) {
+          this.send(socket, { type: 'conflict', ...record, operationId: message.operationId, error: error.message });
+        }
+      });
+    } catch (error) { this.send(socket, { type: 'error', error: error.message }); }
+  }
+  webSocketClose(socket) { clearTimeout(this.authTimers.get(socket)); this.authTimers.delete(socket); try { socket.close(); } catch { /* Already closed. */ } this.presence(); }
+  webSocketError(socket) { try { socket.close(1011, 'Reconnect to shared plans.'); } catch { /* Already closed. */ } this.presence(); }
+  async alarm() {
+    return this.ctx.blockConcurrencyWhile(async () => {
+    const now = Date.now();
+    for (const prefix of ['session:', 'attempt:']) {
+      const records = await this.ctx.storage.list({ prefix });
+      const expired = [...records].filter(([, value]) => (value.expires || value.until) <= now).map(([key]) => key);
+      for (let index = 0; index < expired.length; index += 100) await this.ctx.storage.delete(expired.slice(index, index + 100));
+    }
+    let pendingTrash = false;
+    for (const prefix of ['plan:', 'names:']) {
+      const records = await this.ctx.storage.list({ prefix });
+      for (const [key, record] of records) {
+        if (!record.deletedAt || record.purgedAt) continue;
+        const expiry = seatsTrashExpiry(record);
+        if (!expiry || Date.parse(expiry) > now) { pendingTrash = true; continue; }
+        // Keep the deletion marker so an old offline upload cannot recreate an expired file.
+        await this.ctx.storage.put(key, { deletedAt: record.deletedAt, deletedBy: record.deletedBy, purgedAt: new Date(now).toISOString() });
+        if (prefix === 'plan:') {
+          const history = await this.ctx.storage.list({ prefix: 'history:' + key.slice(prefix.length) + ':' }), keys = [...history.keys()];
+          for (let index = 0; index < keys.length; index += 100) await this.ctx.storage.delete(keys.slice(index, index + 100));
+        }
+      }
+    }
+    if (pendingTrash || (await this.ctx.storage.list({ prefix: 'session:', limit: 1 })).size) await this.ctx.storage.setAlarm(now + SEATS_CLEANUP_INTERVAL_MS);
+    });
+  }
+}

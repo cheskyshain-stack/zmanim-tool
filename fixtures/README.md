@@ -1,5 +1,31 @@
 # Golden fixture
 
+The authoritative calculation reference is the user's **Lakewood Commons Zmanim tables.xlsx**,
+using FUNCTIONS, workbook defined names, SETTINGS, time zones and calendar tables.
+The two chart templates supply schedule/layout examples. Later user instructions determine
+minyan menus and rounding; the live configured location determines where times are calculated.
+
+`workbook-zmanim.json` stores 58 original named definitions used by the engine, their
+FUNCTIONS cell locations, original settings and the 508-row time-zone table. It does not
+contain the two chart templates or cached Excel display results. The original workbook is
+kept at `../Lakewood Commons Zmanim tables.xlsx`; its SHA256 is recorded in the fixture.
+
+Regenerate and verify that independent reference with:
+
+```bash
+python scripts/extract-workbook-zmanim.py '../Lakewood Commons Zmanim tables.xlsx'
+node --test tests/workbook-zmanim.mjs
+```
+
+The test interpreter reads the saved Excel formulas directly, including LET, LAMBDA,
+omitted arguments, the elevation rules and timezone-table lookups. It contains no copy
+of the site's solar or named-zman arithmetic. Comparisons retain seconds before any
+schedule rounding. The upload's coordinates are 40.067, -74.202; the live configured
+coordinates are 40.068, -74.205. Both are checked with the same calculation system.
+
+The fixture below is the site's output used for checking its desktop port. It is not
+an independent reference for the workbook itself.
+
 `golden.json` is the reference output of this app's calculation engine. It exists so that a
 **port of this app to another language can prove it is correct**, rather than being eyeballed
 against a printed chart.

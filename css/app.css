@@ -1,4 +1,4 @@
-/* Two Hebrew serifs shipped with the app rather than assumed to be installed. Phones
+/* Hebrew serifs shipped with the app rather than assumed to be installed. Phones
    have none of David / Frank Ruehl / Times New Roman, so Hebrew on the printed chart
    fell back to the system UI font and looked nothing like it does on the desktop.
    Which one stands in for which choice is decided in sheet-view.js (HEBREW_STAND_IN) -
@@ -28,6 +28,15 @@
   font-weight: 400 700;
   font-display: swap;
   src: url('../assets/fonts/frank-ruhl-libre.woff2') format('woff2');
+}
+/* David CLM's upright Medium face gives the homepage subtitle a separated ק.
+   Its original font, copyright notices, and license are in assets/fonts/david-clm-source. */
+@font-face {
+  font-family: 'David CLM';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('../assets/fonts/david-clm-medium.woff2') format('woff2');
 }
 
 :root {
@@ -174,6 +183,69 @@ h3 { font-size: 1.05rem; margin: 1.75rem 0 0.75rem; color: var(--accent-dark); }
 .nav-btn:not(.active):hover { background: rgba(255,255,255,0.09); color: #fff; }
 
 .sidebar-foot { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+.time-explain-bar { display:flex; flex-direction:column; gap:.35rem; direction:ltr; }
+.time-explain-bar button { margin:0; min-height:44px; color:#fff; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.3); font-size:.86rem; }
+.time-explain-bar button[aria-pressed="true"] { background:#f0dfb3; color:#15283f; border-color:#f0dfb3; }
+.time-explain-bar span { color:#d4dce5; font-size:.72rem; line-height:1.45; }
+.time-explain-kind { font-weight:700; color:#17344d; margin:.6rem 0; }
+.zmanim-reference-bar button:disabled { opacity: .5; }
+.zmanim-reference-panel {
+  box-sizing: border-box; width: min(100%, 68rem); margin: 0 0 1.25rem;
+  padding: 1rem; border: 1px solid #d9dee5; border-top: 3px solid #ab914f;
+  border-radius: 12px; background: #fff; color: #17344d; direction: ltr;
+  box-shadow: 0 4px 18px rgba(20, 40, 60, .07);
+}
+.zmanim-reference-panel[hidden] { display: none; }
+.zmanim-reference-panel button, .zmanim-reference-panel select {
+  box-sizing: border-box; padding: .5rem .65rem; min-height: 38px;
+  font: inherit; color: #17344d; background: #fff; border: 1px solid #cfd7df; border-radius: 7px;
+}
+.zmanim-reference-panel button { cursor: pointer; }
+.zmanim-reference-panel button:disabled { cursor: default; color: #a6afb8; background: #f5f6f8; }
+.zmanim-reference-panel :is(button, select):focus-visible { outline: 2px solid #ab914f; outline-offset: 2px; }
+.zmanim-reference-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.zmanim-reference-heading h3 { margin: 0; font-size: 1.1rem; }
+.zmanim-reference-heading button { margin: 0; }
+.zmanim-reference-schedule { margin: .5rem 0; font-size: .88rem; }
+.zmanim-reference-context { display: block; margin-top: .65rem; font-size: .8rem; }
+.zmanim-reference-context select { display: block; width: 100%; min-width: 0; margin-top: .2rem; }
+.zmanim-reference-date-control { display: flex; align-items: end; gap: .5rem; margin-top: .65rem; }
+.zmanim-reference-date-control label { flex: 1; min-width: 0; font-size: .8rem; }
+.zmanim-reference-date-control select { display: block; box-sizing: border-box; width: 100%; min-width: 0; margin-top: .2rem; }
+.zmanim-reference-date-control button { flex: none; margin: 0; min-height: 42px; width: 42px; }
+.zmanim-reference-hebrew { margin-top: .35rem; text-align: center; font: 400 1.05rem/1.4 "David Libre", serif; }
+.zmanim-reference-groups { display: flex; flex-wrap: wrap; gap: .35rem; margin: .7rem 0; }
+.zmanim-reference-groups button { flex: 1; margin: 0; padding: .45rem .65rem; white-space: nowrap; font-size: .85rem; }
+.zmanim-reference-groups button[aria-pressed="true"] { color: #fff; background: #17344d; border-color: #17344d; }
+.zmanim-reference-groups > button:only-child { flex: 0 1 auto; min-width: 7rem; }
+.zmanim-reference-values { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .6rem; margin: 0; }
+.zmanim-reference-values > div { min-width: 0; padding: .65rem; background: #f6f7f9; border-radius: 7px; }
+.zmanim-reference-values dt { font: 700 1rem/1.4 "David Libre", serif; text-align: left; }
+.zmanim-reference-values dd { margin: .2rem 0 0; font-size: 1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.zmanim-reference-values small { display: block; margin-top: .25rem; font-size: .7rem; line-height: 1.4; color: #63707c; }
+.zmanim-reference-note { margin: .65rem 0 0; font-size: .75rem; line-height: 1.4; color: #63707c; }
+.zmanim-reference-more { margin-top: .6rem; }
+.zmanim-reference-more summary { width: fit-content; cursor: pointer; font-size: .8rem; padding: .25rem 0; }
+.zmanim-reference-more[open] summary { margin-bottom: .35rem; }
+@media screen and (min-width: 901px) {
+  .zmanim-reference-panel { position: sticky; top: .5rem; z-index: 4; max-height: calc(100vh - 1rem); overflow-y: auto; }
+}
+@media screen and (max-width: 900px) {
+  .sidebar-foot:has(.zmanim-reference-bar) { flex-direction: column; align-items: stretch; }
+  .zmanim-reference-values { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .zmanim-reference-values dd { font-size: .86rem; }
+}
+@media screen {
+  .time-explain-target { cursor:help !important; }
+  .time-explain-target:hover { outline:1px dotted #a68a44; outline-offset:2px; }
+  .time-explain-target:focus-visible { outline:2px solid #a68a44; outline-offset:2px; }
+}
+@media screen and (max-width:900px) {
+  .sidebar-foot:has(.time-explain-bar) { width:100%; margin-left:0; }
+  .time-explain-bar { flex-direction:row; align-items:center; gap:.7rem; width:100%; }
+  .time-explain-bar button { flex:none; }
+  .time-explain-bar span { min-width:0; }
+}
 .sidebar-site { font-size: var(--fs-xs); color: rgba(255,255,255,0.45); text-align: center; }
 
 /* Backup section in Settings (moved out of the sidebar). The Import "button" is really
@@ -382,6 +454,12 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
    double it up in Settings, where the sections are panels inside the form. */
 .form-grid > .panel { margin-bottom: 0; }
 /* Backup sits in its own form; keep it clear of the Save button above it. */
+/* Restoring a panel after a redraw must not replay the height animation and clamp
+   the page to a shorter intermediate height. Normal disclosure clicks still animate. */
+.is-restoring-position details::details-content,
+.is-restoring-position::details-content { transition: none !important; }
+.is-restoring-position .panel-body { transition: none !important; }
+
 #settings-backup { margin-top: 1rem; }
 .panel-section { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
 /* The Rules screen is rendered whole inside a Settings panel, and it brings its own
@@ -590,6 +668,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .form-grid .secondary-btn { background: var(--accent-soft); color: var(--accent-dark); border: 1px solid var(--border); margin-left: 0.5rem; }
 .form-grid .secondary-btn:hover { background: var(--border); }
 
+.saved-tables { container: saved-copies / inline-size; }
 .saved-list { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow-sm); }
 /* nowrap because a wrapped row is unreadable here: the buttons broke onto a second line,
    "Hebrew year" split across two, and a timestamp wrapped mid-date. The Sheet column is
@@ -600,6 +679,10 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .saved-list tr:last-child td { border-bottom: none; }
 .saved-list tbody tr:hover td { background: var(--accent-soft); }
 .saved-list button { margin-right: 0.4rem; }
+.saved-page-splits { display: grid; gap: 0.2rem; min-width: 0; }
+.saved-page-split { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; font-variant-numeric: tabular-nums; }
+.saved-page-split [dir=ltr] { white-space: normal; }
+.saved-split-label { flex: none; color: var(--muted); font-size: var(--fs-xs); }
 
 .sheet-toolbar {
   display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.75rem; flex-wrap: wrap;
@@ -607,6 +690,32 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   padding: 0.7rem 1rem; box-shadow: var(--shadow-sm);
 }
 .sheet-toolbar .hint { flex-basis: 100%; margin: 0.15rem 0 0; }
+.website-preview-view { min-width: 0; }
+.website-preview-controls { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; padding: 1rem; margin: 1.2rem 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+.website-preview-controls label { display: grid; gap: 0.4rem; min-width: 0; font-size: var(--fs-sm); color: var(--muted); }
+.website-preview-controls :is(input,select) { min-width: 0; width: 100%; min-height: 44px; box-sizing: border-box; padding: 0.55rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; }
+.website-preview-actions { grid-column: 1 / -1; display: flex; align-items: center; flex-wrap: wrap; gap: 0.7rem; }
+.website-preview-actions :is(button,a) { min-height: 44px; display: inline-flex; align-items: center; padding: 0.5rem 0.8rem; }
+.website-preview-date-nav { display: flex; justify-content: center; align-items: center; gap: 0.75rem; margin: 0 0 0.65rem; }
+.website-preview-date-nav button { flex: 0 0 44px; min-height: 44px; padding: 0.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink); font: inherit; font-size: 1.25rem; font-weight: 600; line-height: 1; cursor: pointer; }
+.website-preview-date-nav button:disabled { opacity: 0.45; cursor: default; }
+#website-preview-day { width: 13rem; max-width: calc(100% - 112px); text-align: center; font-size: var(--fs-sm); font-weight: 600; }
+#website-preview-note { margin: 0 0 0.65rem; }
+.website-preview-canvas { width: 100%; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: #e9e9e9; box-sizing: border-box; }
+.website-preview-device { position: relative; margin: 0 auto; background: white; }
+#website-preview-frame { display: block; border: 0; transform-origin: top left; }
+@media (min-width:1100px) { .website-preview-controls { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media screen {
+  .website-preview-banner { position: fixed; z-index: 1000; inset: auto 0 0; display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 0.3rem 1rem; box-sizing: border-box; padding: 0.6rem 1rem calc(0.6rem + env(safe-area-inset-bottom, 0px)); border-top: 2px solid #b39754; background: #f3ead0; color: #142b46; font: 600 13px/1.5 Arial,sans-serif; }
+  .website-preview-banner a { color: inherit; padding: 0.25rem; text-underline-offset: 3px; }
+  body.is-website-preview #main { padding-bottom: calc(var(--website-preview-banner-height, 65px) + 28px); }
+}
+.chart-settings-help { flex-basis: 100%; min-width: 0; }
+.chart-settings-help > summary {
+  color: var(--muted); font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; min-height: 2.75rem; padding: 0.5rem 0; box-sizing: border-box;
+}
+.chart-settings-help > .hint { margin: 0.5rem 0 0; }
 .sheet-toolbar button { background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong); }
 .sheet-toolbar button:hover { background: var(--accent-soft); }
 .sheet-toolbar #print-btn { background: var(--ui-accent); color: white; border: none; }
@@ -648,6 +757,9 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
   .style-toolbar { flex-direction: column; align-items: stretch; gap: 0.75rem; }
   .style-toolbar label { justify-content: space-between; }
   .style-toolbar button { margin-left: 0; }
+}
+
+@container saved-copies (max-width: 70rem) {
   .saved-list, .saved-list thead, .saved-list tbody { display: block; width: 100%; }
   .saved-list tr { display: block; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--border); }
   .saved-list thead { display: none; }
@@ -707,6 +819,7 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 
 /* Everything on a printed page is bold by default (matches the shul's house style). */
 .page { font-weight: 700; }
+.page.is-mono { --ruled: #f3f3f3; }
 
 .page-header { display: flex; flex-direction: column; align-items: center; margin-bottom: 0.1in; }
 /* The name on the middle of the sheet, and not on the middle of what is left over.
@@ -742,6 +855,28 @@ button.btn-danger:hover { background: color-mix(in srgb, var(--danger) 10%, whit
 .header-rabbi { font-size: var(--sheet-font-size); text-align: right; white-space: pre-line; flex-shrink: 0; line-height: 1.3; }
 
 table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size); flex: 1; table-layout: auto; }
+/* Two headers on one winter print page, with row heights shared across both tables. */
+.chart-sections { display: flex; flex-direction: column; flex: 1; gap: 0.12in; }
+.chart-sections > table { flex: none; }
+.chart-print-layout { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; font: 400 14px Arial,sans-serif; }
+.chart-print-layout select { width: auto; max-width: 100%; font: inherit; }
+.week-nav-print-one { flex-wrap: wrap; }
+.week-nav-print-one .chart-print-layout { flex-basis: 100%; justify-content: center; }
+.week-nav-print-one .chart-print-paper-hint { flex-basis: 100%; margin: 0; text-align: center; font: 400 12px Arial,sans-serif; }
+.page.is-combined-chart { width: 17in; min-height: 11in; }
+.page.is-combined-chart.is-combined-letter { width: 11in; min-height: 8.5in; }
+.is-combined-letter th, .is-combined-letter td { padding-inline: 0.02in; }
+.combined-chart-body { display: flex; flex-direction: column; gap: 0.12in; position: relative; flex: none; }
+.combined-chart-body > table { flex: none; table-layout: fixed; }
+.is-combined-chart .combined-group-head th { font-size: calc(var(--sheet-font-size) + 4pt); line-height: 1.15; }
+.is-combined-chart .combined-service-head th { font-size: calc(var(--sheet-font-size) + 2pt); }
+.is-combined-chart .combined-weekday-cell[data-combined-col="B"],
+.is-combined-chart .combined-weekday-head:nth-last-child(3),
+.is-combined-chart .combined-group-head th:nth-child(2) { border-left: 2px solid #aaa; }
+.is-combined-chart .combined-parsha { min-width: 0; border-left: 2px solid #aaa; }
+.is-combined-chart .parsha-note.is-molad { white-space: normal; }
+.combined-chart-body .combined-morning-panel { right: auto; padding: 0.12in 0.035in; font-size: var(--sheet-font-size); }
+.combined-morning-panel .shacharis-panel-in { max-width: 100%; }
 /* The grid is heavier on a phone than on a desktop and this is not the place it can be
    fixed. Shrinking the page to fit does not thin these rules: a border is never painted
    thinner than one pixel however small the zoom, so at 0.34 the 1px rule still lands on
@@ -751,6 +886,53 @@ table { width: 100%; border-collapse: collapse; font-size: var(--sheet-font-size
    dark one. The width is a property of zoom, and only moving the fit to transform would
    change it. */
 th, td { border: 1px solid #9aa7b3; padding: 0.035in 0.05in; vertical-align: middle; text-align: center; }
+/* The chart's own border only, not every table's - "How Times Are Calculated", Visitor
+   Statistics and What the Congregation Sees' own status table all still want the plain
+   grid above, so this is scoped to .page rather than widening the bare rule itself.
+   Asked for directly: no line between one row and the next any more - the zebra shading
+   already carries that, and a board read from a few feet away does not need both. The
+   columns keep a line between them, since nothing else marks where one time column ends
+   and the next begins the way shading marks a row. #d2d2d2 is the שחרית panel's own light
+   grey (see .shacharis-panel), reused here as this project's one answer for "a border
+   that reads as a hint rather than a rule" - the outer frame used to keep the bare rule's
+   own darker #9aa7b3 instead, which read as a different weight around the same table; asked
+   for directly to match the column lines, so the whole frame is one grey throughout.
+   No top edge either, asked for the same day: the header row is a solid block of
+   --sheet-accent reaching the very top of the table, and that fill is already the
+   boundary against the page behind it - a grey line drawn right on top of a solid dark
+   block added nothing a sighted reader could use. The bottom edge keeps its line: the
+   zebra shading under it is at most a 40% tint of the accent colour (see tbody
+   tr:nth-child(even) below), never the header's own full strength, so there is no fill
+   there crisp enough to stand in for a border on its own. */
+.page table { border: 1px solid #d2d2d2; border-top: none; }
+.page th, .page td { border-top: none; border-bottom: none; border-left: 1px solid #d2d2d2; border-right: 1px solid #d2d2d2; }
+/* Crowded print jobs trade a little row padding for larger text. */
+.page.is-flexible-chart th, .page.is-flexible-chart td { padding-top: 0.03in; padding-bottom: 0.03in; }
+.page.is-flexible-chart .shacharis-through { padding: 0; }
+/* Keep a physical padding floor even when a full season needs smaller type. */
+.page.is-full-season { --full-season-cell-padding: 0.04in; }
+.page.is-full-season th,
+.page.is-full-season td { padding: 0.02in var(--full-season-cell-padding); }
+.page.is-full-season .weekday-table tbody tr { height: auto; }
+.page.is-full-season .cell { line-height: 1.2; white-space: nowrap; }
+.page.is-full-season .parsha-cell { font-size: calc(var(--sheet-font-size) + 1pt); }
+.page.is-full-season th {
+  font-size: calc(var(--sheet-font-size) + 1pt); line-height: 1.1;
+  padding-top: 0.03in; padding-bottom: 0.03in; white-space: pre;
+}
+.page.is-full-season .shacharis-through { padding: 0; }
+.page.is-full-season .parsha-cell { min-width: 0; }
+.page.is-full-season .shacharis-panel {
+  left: calc(var(--full-season-column-space, 0px) / 2);
+  right: calc(var(--full-season-column-space, 0px) / 2);
+  padding: 0.1in var(--full-season-cell-padding);
+}
+/* Intrinsic column measurement happens at paper size on every font fitting pass. */
+.page.is-full-season table.is-measuring-columns { width: max-content !important; table-layout: auto !important; }
+.page.is-full-season .is-measuring-columns col { width: auto !important; }
+.page.is-full-season .is-measuring-columns .shacharis-panel {
+  position: static; width: max-content; height: auto !important;
+}
 th {
   background: var(--sheet-accent, var(--accent));
   /* Follows the page colour rather than being fixed white, so a light one is readable.
@@ -776,6 +958,67 @@ th {
    the table. The names still lead the row without it, being 2pt larger than everything
    else. */
 .parsha-cell { text-align: center; font-size: calc(var(--sheet-font-size) + 2pt); line-height: 1.15; }
+/* ערב חנוכה, on its own line under the parsha rather than at the parsha's own size: it
+   names the week ahead, not this one, so it reads as a note rather than a second title. */
+.parsha-note { font-size: 0.7em; font-weight: normal; }
+/* The molad note is longer than any other note this cell carries, long enough to wrap
+   to a second line at the ordinary note size on a content-squeezed page - see the
+   comment in sheet-view.js on why that can never be let happen. Shrinking the font
+   alone chases its own tail under table-layout:auto: the parsha column's own width is
+   drawn from how much room its cells' content actually needs, so a smaller note just
+   taught the algorithm the column could be narrower still, and it was measured doing
+   exactly that - the column kept shrinking in step with the note, wrap and all, no
+   matter how small the font went. nowrap is what breaks the loop: with it, a cell's own
+   minimum width is the note's own whole width rather than its longest wrappable word,
+   so the column is sized to actually hold it. The smaller size stays alongside it,
+   since the note would otherwise be read at the parsha's own full size.
+
+   display: inline-block is load-bearing, not decorative, for the Yiddish molad's own
+   second line (moladLabelYiddish's <br>, hebrew-calendar.js): asked to compact the gap
+   between the two lines, line-height alone measured zero effect on a plain inline span -
+   Chromium floors an inline element's own line box at the font's glyph metrics regardless
+   of what line-height asks for, confirmed directly by setting it to 1 and measuring the
+   exact same rendered height as the unset default. Once the note is its own inline-block,
+   line-height governs its line box normally, the same as any block-level element's does -
+   measured span height dropping from 28.39px to 17.59px for the same two lines, nothing
+   else about the span's own content changing. getClientRects() stops being useful for
+   counting this element's own lines once it is inline-block (it always returns one rect
+   for the whole box rather than one per wrapped line); a Range around the text before and
+   after the <br> is what actually confirmed the two lines are still two lines, 8.8px
+   apart, not collapsed into one. */
+.parsha-note.is-molad { font-size: 0.55em; white-space: nowrap; display: inline-block; line-height: 1; }
+/* The digits in a molad note (the time, and in Yiddish format the minute/chalakim counts)
+   ink taller than the Hebrew letters around them at the same font-size: measured with
+   Canvas actualBoundingBoxAscent/Descent in the real font stack, Hebrew body letters are
+   about 59-60px of ink against digits at 66-68px, both at a 100px font-size. Every digit
+   run in a molad note is already its own <bdi dir="ltr"> for bidi ordering (see
+   moladLabelCompact/moladLabelYiddish in hebrew-calendar.js), so that element is what gets
+   scaled down, to 0.88em, which measured level with the letters around it. */
+.parsha-note.is-molad bdi { font-size: 0.88em; }
+/* Keeps the parsha name at the row's own vertical centre on a week carrying a compact
+   Hebrew molad note, rather than letting vertical-align: middle on the <td> centre the
+   name and the note as one two-line block, which pulled the name up off the line every
+   other week's name sits on. vertical-align: top hands this cell's own vertical layout
+   over entirely to centerMoladNotes in sheet-view.js, which measures the row's real
+   height and writes an explicit margin-top on .parsha-cell-name (centring it in the full
+   cell) and on .parsha-cell-sub (centring the molad note, and on the rare week that also
+   carries one, the ערב חנוכה note, in whatever room is left below the name) - a
+   flex-column attempt at the same thing, with height: 100% on a wrapper and an empty
+   ::before as a spacer, measured as not reaching the cell's real height at all in a real
+   browser, the sub region coming out 0px. See sheet-view.js for why the Yiddish molad
+   does not get this: it is two lines of its own and the room below the name is not asked
+   to stretch to fit it. */
+.parsha-cell.parsha-cell-centered { vertical-align: top; }
+.page.is-flexible-chart .parsha-cell-centered { vertical-align: middle; }
+.parsha-cell-name, .parsha-cell-sub { margin-top: 0; }
+/* Without this, .parsha-cell-sub's own line box inherits .parsha-cell's line-height: 1.15
+   at the parsha name's own (larger) font-size, and that invisible "strut" measured as
+   taller than the molad note itself (18.4px against the note's own 8.8px) even though the
+   note is the only thing in the box - which fed a wrong height into centerMoladNotes'
+   own measurement. line-height: 0 here collapses the strut; the molad note keeps its own
+   line-height (.parsha-note.is-molad sets it directly, not inherited past that point), so
+   this only changes what the empty space around it measures as. */
+.parsha-cell-sub { line-height: 0; }
 /* A floor on the parsha column so it can't be crushed. With table-layout:auto the
    browser shares out surplus width in proportion to how much content a column has, and
    the time columns hold far more of it - so on a קיץ page (12 columns rather than
@@ -800,11 +1043,14 @@ tbody tr:nth-child(even) td { background: color-mix(in srgb, var(--sheet-accent,
    [contenteditable] elements by default, which breaks lines anywhere (even at a
    non-breaking space) once content doesn't fit - defeating the NBSP protection above
    that keeps a time pair like "7:30 / 8:15" on one line. */
-.cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.2; direction: ltr; overflow-wrap: normal; word-break: normal; }
-.cell:focus { background: #fffbe6; }
+/* line-height 1.35 rather than a plain 1.2: a two-line cell read tight, and this is the
+   most room a line can get without the tallest cell on the boards (the דרשה row's own
+   three lines, on שבת שובה / הגדול) pushing its row past what an 8-row page's even split
+   allows. Measured across every season and Weekday chart from 5784 through 5792, 108
+   pages in all: 1.35 leaves every page exactly at its unchanged height, 1.38 already
+   overflows twenty of them. */
+.cell { min-height: 1.1em; outline: none; white-space: pre-line; text-align: center; line-height: 1.35; direction: ltr; overflow-wrap: normal; word-break: normal; }
 td.ruled .cell { background: var(--ruled); }
-/* Manually-edited cells no longer get a persistent background tint - only the brief
-   yellow flash while actively focused (above) shows anything changed. */
 /* .ul is no longer emitted (see nl2br in sheet-view.js) but stays styled here so cells
    whose overrides were saved back when it was still in use keep their underlines. */
 /* text-decoration-skip-ink: none, and it is not a preference. An underline here means the
@@ -816,6 +1062,12 @@ td.ruled .cell { background: var(--ruled); }
    Serif for Times New Roman, whose ע does not reach the line, so it has to be checked in the
    font that actually ships (see HEBREW_STAND_IN in sheet-view.js). */
 .ul, u { text-decoration: underline; text-underline-offset: 2px; text-decoration-skip-ink: none; }
+.page .ul, .page u { text-underline-offset: 0.1em; }
+/* smallText() (format.js): the stricter/alternate reading set smaller than the one a cell
+   leads with - פלג under its מנחה in the early קיץ columns, מ"א beside גר"א in ס"ז קר"ש.
+   Same idea as .head-room on a heading, a size of its own rather than borrowed from there,
+   since a cell and a heading are not read at the same size to begin with. */
+.cell-small { font-size: 0.8em; }
 /* Weekday chart's שחרית column: one shul-wide schedule for the whole page (see
    sheet-view.js) rather than a per-week editable cell - not contenteditable, so style it
    as plainly distinct from the surrounding editable cells. direction:ltr for the same
@@ -867,8 +1119,8 @@ td.ruled .cell { background: var(--ruled); }
   top: calc((0.35 - var(--above, 0)) * 100% + (0.35 - var(--above, 0)) * 1px);
   height: calc((var(--rows, 3) - 0.7) * 100% + (var(--rows, 3) - 0.7) * 1px);
   left: 18%; right: 18%;
-  background: #fff; border: 1px solid #ccd3da; border-radius: 2px;
-  box-shadow: 0 1px 4px rgba(38, 50, 62, 0.13);
+  background: #fff; border: 1px solid #d2d2d2; border-radius: 2px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.13);
   display: grid; place-content: center;
   padding: 0.14in 0.1in; box-sizing: border-box;
   white-space: pre-line; line-height: 1.3; direction: ltr;
@@ -895,9 +1147,12 @@ td.ruled .cell { background: var(--ruled); }
      rather than guessed: the ink of 7:00, 7:35, 8:20 and 6:40 is 1.833em in the boards' serif at
      both sizes, the figures being tabular, and a hundredth of an em is left over so nothing sits
      on the edge of its column. An asterisk is 0.5em of ink and two are 1.0em, measured the same
-     way, and each column carries its mark's lead-in on top of that. The slash column is
-     deliberately narrow. */
-  --sh-t: 1.84em; --sh-star: 0.5em; --sh-star2: 1em; --sh-slash: 0.34em; --sh-space: 0.5em;
+     way, and each column carries its mark's lead-in on top of that (0.06em, added below in
+     --sh-star and --sh-star2 themselves so .sh-mark's own padding-left has a column wide enough
+     to sit inside; see .sh-mark). Kept small on purpose: asked for, the mark still sits right
+     against its time, this is only the minimum that keeps it off the 0 rather than a real space.
+     The slash column is deliberately narrow. */
+  --sh-t: 1.84em; --sh-star: 0.56em; --sh-star2: 1.06em; --sh-slash: 0.34em; --sh-space: 0.5em;
 }
 .sh-row.is-times {
   display: grid; column-gap: 0; align-items: baseline;
@@ -919,8 +1174,20 @@ td.ruled .cell { background: var(--ruled); }
 .sh-time { text-align: right; white-space: nowrap; }
 /* The mark is set from the left of its column with a lead-in in front of it, so an asterisk has
    air between it and the digits rather than standing against the 0 of 8:20, which is what the
-   shul saw. The column is cut to hold the lead-in and the mark and nothing else. */
+   shul saw. The column is cut to hold the lead-in and the mark and nothing else.
+   The lead-in itself is this padding: --sh-star/--sh-star2 above carry the same 0.06em so the
+   column grows to hold it without moving the slash after it, which is what "nothing else"
+   means - the star's own ink still ends where it always did, the column just starts 0.06em
+   earlier to leave room in front of it. Small on purpose, the same reasoning as --sh-star
+   above: asked to keep the mark against its time rather than give it real air, only enough to
+   clear the 0 it used to stand on. Comments here described a lead-in and the rule that adds it
+   had gone missing; the columns measured flush against the time until it was added back. */
 .sh-mark { text-align: left; }
+/* Only where there is a mark to pad: an empty one is a position no row in this block ever
+   stars, held at 0px so a schedule whose stars all fall in one place pays for one column and
+   not four (see shacharis-grid.js). Padding it unconditionally reopened exactly that column on
+   every row, dead width nothing was ever going to sit in. */
+.sh-mark:not(:empty) { padding-left: 0.06em; }
 /* The asterisk column is exactly the mark's own ink, so the mark sits against its time the way it
    would in a line of typing. A position no row marks gets no column at all (see
    shacharis-grid.js), which is what keeps a schedule whose stars all fall in the same place from
@@ -937,8 +1204,28 @@ td.ruled .cell { background: var(--ruled); }
 .sh-slash { text-align: center; }
 /* The ר"ח ובה"ב heading, and a last line carrying one time where the rows above carry two. */
 .sh-wide { text-align: center; }
+/* The חנוכה panel's own נץ note (see chanukahPanelBlocks in chanukah.js), the one line on this
+   chart set smaller than the rest of it: a reference under the schedule, not a third standing
+   line the weight of the times above it, and muted for the same reason the poster's own נץ
+   line is - naming which day a time is for rather than being a time itself. */
+.sh-wide.is-small { font-size: 0.7em; color: var(--muted); }
 /* The blank line between the two blocks, which a flex column would otherwise close up. */
 .sh-gap { height: 0.5em; }
+/* חנוכה's headings and schedules share a light neutral fill. The old 2% gray was nearly
+   white on some printers; the requested 4% gray keeps the box light.
+   A decorative SVG behind the text also paints this fill as foreground artwork, so
+   disabling CSS background printing does not remove it. Isolation keeps that layer
+   above the surrounding white panel and below the selectable schedule text. */
+.chanukah-highlight {
+  position: relative; isolation: isolate;
+  display: flex; flex-direction: column; align-items: center;
+  background: #f5f5f5;
+  border-radius: 4px; padding: 0.2em 0.5em; margin: 0.15em 0;
+}
+.chanukah-highlight-fill {
+  position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1;
+  fill: #f5f5f5; border-radius: inherit; pointer-events: none;
+}
 
 /* Settings' מנחה/מעריב option lists - one editable row per option (rich text, so an
    option can carry the underlining the printed board uses). */
@@ -978,6 +1265,35 @@ td.ruled .cell { background: var(--ruled); }
    syncHeaderRowHeight() in sheet-view.js - see there for why that can't be pure CSS. */
 .weekday-table tbody tr { height: calc(var(--sheet-font-size) * 2.6); }
 
+/* The "NEW" tag on the Weekday chart's 11:30 מעריב (sheets/weekday.js, on only while
+   ui/settings-view.js's admin switch is on). Filled with --sheet-accent/--sheet-head-ink,
+   the same two variables the chart's own header is painted in (see applyStyle in
+   sheet-view.js) rather than a colour picked for this alone, so the tag inherits whatever
+   contrast the header already has, and turns to grayscale exactly the way the header does
+   under the chart's own Ink: Black and white switch - it never depends on a colour a
+   photocopier would drop. Small enough that a stray extra pixel or two of row height (see
+   .weekday-table tbody tr above, a floor rather than a cap) stays sub-pixel in practice. */
+.new-minyan-tag {
+  display: inline-flex; align-items: baseline; gap: 0.3em;
+  background: var(--sheet-accent, var(--accent)); color: var(--sheet-head-ink, #fff);
+  border-radius: 3pt; padding: 0 0.35em; font-weight: 700;
+}
+.new-minyan-tag .tag-word {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  font-size: 0.62em; font-weight: 700; letter-spacing: 0.04em;
+}
+/* חנוכה's own tag on a touching week's own מנחה/מעריב row (sheets/weekday.js,
+   CHANUKAH_TAG_START/MID/END in format.js): the same shape as .new-minyan-tag above, down
+   to the two variables it is painted in, but with no font-family override on .tag-word -
+   "חנוכה" is Hebrew, not Latin like "NEW", so it sets in the chart's own serif along with
+   the time beside it rather than needing a system sans stand-in. */
+.chanukah-tag {
+  display: inline-flex; align-items: baseline; gap: 0.3em;
+  background: var(--sheet-accent, var(--accent)); color: var(--sheet-head-ink, #fff);
+  border-radius: 3pt; padding: 0 0.35em; font-weight: 700;
+}
+.chanukah-tag .tag-word { font-size: 0.72em; font-weight: 700; }
+
 .col-width-grid { display: flex; flex-wrap: wrap; gap: 0.75rem; padding: 0.5rem 0 0.9rem; align-items: flex-end; }
 .col-width-input { display: flex; flex-direction: column; font-size: var(--fs-xs); color: var(--muted); gap: 0.2rem; }
 .col-width-input input { width: 74px; padding: 0.25rem 0.4rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); font-family: inherit; }
@@ -990,8 +1306,12 @@ td.ruled .cell { background: var(--ruled); }
   align-items: center;
   gap: 0.12in;
 }
-.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #9aa7b3, transparent); }
-.footer-text { font-size: calc(var(--sheet-font-size) - 2.5pt); color: #444; text-align: center; white-space: pre-line; line-height: 1.3; }
+.footer-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #a5a5a5, transparent); }
+/* Pages share a footer region but can have different numbers of location notes. Keep the
+   address at its bottom so adding a key does not shift the double-sided footer alignment. */
+.footer-text { align-self: flex-end; font-size: calc(var(--sheet-font-size) - 2.5pt); color: #444; text-align: center; white-space: pre-line; line-height: 1.3; }
+.chart-location-legend { white-space: nowrap; }
+.chart-location-downstairs { unicode-bidi: isolate; }
 .footer-address { display: block; font-size: calc(var(--sheet-font-size) + 3pt); color: var(--ink); margin-top: 2pt; }
 
 .saved-list button:disabled { opacity: 0.4; cursor: not-allowed; }
@@ -1126,6 +1446,15 @@ td.ruled .cell { background: var(--ruled); }
    other, which is how "28 · 5787 · שבת חורף weeks" happened elsewhere in this app. */
 .week-nav-hebrew { display: block; direction: rtl; font-family: "Times New Roman", "Frank Ruhl Libre", serif; font-size: var(--fs-md); }
 .week-nav-row { display: flex; justify-content: center; gap: 0.5rem; }
+.chart-current-week-badge { align-self:center; margin:.1rem 0 .85rem; padding:.4rem 1.2rem; border:1px solid #b19a58; border-radius:999px; background:#f2e8cb; color:#142b46; font:600 14px/1.4 Arial,sans-serif; text-align:center; }
+.chart-current-week-badge[hidden] { display:none; }
+.chart-current-week-badge bdi[lang=he] { font-family:"Times New Roman","Frank Ruhl Libre",serif; font-size:1.1em; }
+@media screen {
+  .pages-fit.has-current-week-layer { position:relative; }
+  .chart-current-week-layer { position:absolute; inset:0; pointer-events:none; }
+  .chart-current-week-band { position:absolute; box-sizing:border-box; border:1px solid #b19a58; background:#d1ad5f26; }
+  .chart-current-week-arrow { position:absolute; background:#b19a58; clip-path:polygon(100% 0,0 50%,100% 100%); }
+}
 /* Equal widths, so the group does not shift sideways as the labels change length. */
 .week-nav-row > button { flex: 1 1 0; max-width: 11rem; }
 
@@ -1260,10 +1589,15 @@ body.is-luach .week-cards { align-items: center; }
 .week-line > .week-time { grid-column: 1; grid-row: 1; }
 .week-line > .week-label { grid-column: 2; grid-row: 1; }
 .week-label { direction: rtl; font-weight: 600; font-size: 13pt; text-align: right; }
-/* The bracketed room in a heading, on the chart and on the card alike. In em so it follows
-   whatever size the heading is set to, which on the chart is a slider. 0.86 rather than
-   anything smaller: it still has to be read across a room. */
+/* The bracketed room scales with its heading's selected font size. */
 .head-room { font-size: 0.86em; }
+/* The chart's parenthesized location line reads smaller than the Plag basis below it. */
+.page th .head-room { font-size: 0.7em; }
+/* Use each heading line's own font size, with enough separation to read clearly in print. */
+.chart-room-heading {
+  display: inline-flex; flex-direction: column; align-items: center;
+  line-height: 1.12; gap: 0.1em; vertical-align: middle;
+}
 /* Set to the left edge of its column, mirroring the name set to the right edge of its
    own. Centred, the times floated inward and left a gap on the left about twice the one
    on the right, so the row looked lopsided; flush, the two sides are inset by the same
@@ -1563,6 +1897,18 @@ kbd {
    printed boards and are deliberately untouched, on screen and on paper alike. */
 /* Sampled off the design rather than picked by eye: the navy, the parchment, the gold on
    the arc and the softer gold in the dividers are the colours that were in it. */
+/* Keep public content and native page controls light under dark device preferences. */
+html:has(body.is-luach) { color-scheme:only light; }
+.luach-system-area { display:none; }
+@media screen {
+  html.has-system-area { --luach-safe-top:env(safe-area-inset-top, 0px); scroll-padding-bottom:env(safe-area-inset-bottom, 0px); }
+  html.has-system-area body.is-luach { padding-bottom:env(safe-area-inset-bottom, 0px); }
+  html.has-system-area .luach-system-area {
+    display:block; position:fixed; left:0; bottom:0; width:100vw;
+    height:env(safe-area-inset-bottom, 0px); background:#142b46;
+    pointer-events:none; z-index:10000;
+  }
+}
 body.is-luach {
   --luach-navy: #162a43;
   --luach-navy-deep: #101f34;
@@ -1853,7 +2199,7 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    shrinks by default, and that quietly took 816px down to 736 and made the page a different
    size from the paper. It is scaled instead, by fitPoster, which keeps the proportions. */
 .luach-sheet-page > .poster { flex: 0 0 auto; }
-.luach-sheet-print { display: flex; justify-content: center; margin-bottom: 1.1rem; }
+.luach-sheet-print { display: flex; justify-content: center; gap: .75rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
 .luach-sheet-none { max-width: 30rem; margin: 1.5rem auto; text-align: center; color: var(--luach-ink); line-height: 1.6; }
 /* The one line on this page that is not the sheet: a note that the times can move. Small and
    grey, under the sheet rather than over it, because it is a caveat and not a heading, and
@@ -1879,11 +2225,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    should have the whole width. The 8rem basis is what decides where two stop fitting side
    by side, and it is set low on purpose: stacking them doubles what the card costs in
    height, and on a 360px phone that was 118px of the reason the page had started to scroll.
-   Measured at 8rem, two boxes sit together from 320px wide and every one of them comes out
-   118px tall with the heading on one line and the name on one line, nothing wrapped.
-
-   The menu is laid out to fill the screen with the address at its foot and it only just
-   does, so the box is kept to three short lines: heading, the thing itself, how far off. */
+   Keep paired times in matching rows so a longer countdown cannot move one time above
+   the other. The menu still follows directly below the cards. */
 .luach-next {
   display: flex; flex-wrap: wrap; gap: 0.6rem; margin-bottom: 0.9rem;
 }
@@ -1955,6 +2298,10 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 .luach-next-what {
   font-family: "Times New Roman", "Frank Ruhl Libre", serif;
   font-size: 1.5rem; font-weight: 700; line-height: 1.15; color: var(--luach-ink);
+}
+.luach-next-description {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: center;
+  column-gap: 0.5rem; direction: rtl; min-width: 0; max-width: 100%;
 }
 /* The same face as the name it sits beside, and for a second reason as well as matching:
    it is Hebrew, and the system stack this used to fall through has no Hebrew serif on
@@ -2067,6 +2414,55 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
 @container (max-width: 19rem) {
   .luach-next-what { font-size: 1.2rem; }
 }
+
+/* Paired cards share four rows: heading, description, time and countdown. The flexible
+   description row absorbs any extra room, leaving both times and countdowns aligned.
+   Hide the decorative marks here so complete hour-and-minute wording has the full width. */
+.luach-next.is-paired .luach-next-box {
+  display: grid; grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto auto; row-gap: 0.35rem;
+  padding-inline: 0.65rem;
+}
+.luach-next.is-paired .luach-next-head {
+  grid-row: 1; margin: 0; gap: 0.3rem;
+  font-size: clamp(0.6rem, 7.5cqi, 0.68rem); letter-spacing: 0.07em;
+}
+.luach-next.is-paired .luach-next-body,
+.luach-next.is-paired .luach-next-main { display: contents; }
+.luach-next.is-paired .luach-next-mark,
+.luach-next.is-paired .luach-next-wait { display: none; }
+.luach-next.is-paired .luach-next-time { grid-row: 3; border: 0; padding: 0; }
+.luach-next.is-paired .luach-next-description {
+  grid-row: 2; min-height: 2rem; align-content: center; align-items: baseline;
+}
+.luach-next.is-paired .luach-next-when {
+  grid-row: 4; margin: 0; min-height: 2.7em; font-size: 0.82rem; line-height: 1.35;
+}
+.luach-next-countdown { text-wrap: balance; }
+.luach-next-box[data-candle-date] { cursor: pointer; }
+.luach-next-box[data-candle-date]:focus-visible { outline: 2px solid #a88b43; outline-offset: -2px; border-radius: 10px; }
+.luach-candle-dialog { position: fixed; inset: var(--candle-view-y,16px) auto auto var(--candle-view-x,50%); transform: translateX(-50%); width: min(25rem,calc(var(--candle-view-width,100vw) - 32px)); max-width: calc(var(--candle-view-width,100vw) - 32px); max-height: calc(var(--candle-view-height,100dvh) - 32px); box-sizing: border-box; margin: 0; padding: 34px 24px 20px; overflow: auto; border: 1px solid #ded8c7; border-radius: 18px; background: #faf7f0; color: #142b46; text-align: left; box-shadow: 0 16px 48px #142b4638; font: 400 15px/1.5 Arial,sans-serif; }
+.luach-candle-dialog::backdrop { background: #142b4670; }
+.luach-candle-close { position: absolute; top: 4px; right: 4px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #64707c; font: 400 28px/1 Arial,sans-serif; cursor: pointer; }
+.luach-candle-dialog h2 { margin: 0; font: 700 28px/1.2 Georgia,serif; }
+.luach-candle-date { margin: 8px 0 22px; color: #64707c; font-size: 13px; }
+.luach-candle-form label { display: block; margin-bottom: 6px; font-weight: 600; }
+.luach-candle-fields { display: flex; gap: 10px; }
+.luach-candle-fields input { flex: 1; min-width: 0; width: 0; min-height: 44px; box-sizing: border-box; padding: 10px 12px; border: 1px solid #ccc7ba; border-radius: 10px; background: white; color: #142b46; font: 400 17px/1.3 Arial,sans-serif; }
+.luach-candle-fields button { min-height: 44px; padding: 10px 14px; border: 1px solid #142b46; border-radius: 10px; background: #142b46; color: white; font: 600 14px/1.3 Arial,sans-serif; cursor: pointer; }
+.luach-candle-fields button:disabled { opacity: .6; cursor: wait; }
+.luach-candle-device { display: block; width: 100%; min-height: 44px; margin-top: 12px; padding: 8px 12px; border: 1px solid #ccc7ba; border-radius: 10px; background: transparent; color: #142b46; font: 600 14px/1.3 Arial,sans-serif; cursor: pointer; }
+.luach-candle-device:disabled { opacity: .6; cursor: wait; }
+.luach-candle-dialog :is(input,button,a):focus-visible { outline: 2px solid #a88b43; outline-offset: 2px; }
+.luach-candle-status { margin: 14px 0 0; font-size: 13px; }
+.luach-candle-status:empty { display: none; }
+.luach-candle-status.is-result { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.luach-candle-result { margin-top: 20px; padding: 18px; border: 1px solid #ded8c7; border-radius: 12px; background: white; text-align: center; }
+.luach-candle-result p { margin: 0; }
+.luach-candle-location { font-weight: 600; }
+.luach-candle-result .luach-candle-clock { margin: 8px 0 4px; font: 700 40px/1.15 Georgia,serif; }
+.luach-candle-zone,.luach-candle-day { color: #64707c; font-size: 12px; }
+.luach-candle-result .luach-candle-countdown { margin-top: 12px; color: #7d652d; font-size: 14px; text-wrap: balance; }
 
 .luach-menu { display: flex; flex-direction: column; gap: 0.85rem; }
 .luach-item {
@@ -2204,6 +2600,8 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   display: flex; align-items: center; justify-content: center; flex: none;
 }
 .luach-give-mark-svg { width: 1.3rem; height: 1.3rem; }
+.luach-give-mark.is-image { border: 0; background: none; }
+.luach-give-mark-image { display: block; width: 100%; height: 100%; object-fit: contain; }
 /* A real logo is drawn to fill its own roundel, so at the size that suits a line drawing it
    sits in the middle looking shrunken. Zelle and The Donors' Fund get the same larger size
    as each other, which keeps the two brand marks a pair. */
@@ -2362,6 +2760,12 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   margin-top: 0.6rem; border-radius: 12px; overflow: hidden;
   border: 1px solid rgba(18,39,79,0.14); background: #ffffff;
 }
+/* Give the open form enough room for the provider's desktop tabs. On phones the
+   form reaches the card edges, instead of losing another two padding widths. */
+.luach-give-page:has(.luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width: 48rem; }
+@media (max-width: 34rem) {
+  .luach-give-frame { margin-inline: -0.95rem; border-inline: 0; border-radius: 0; }
+}
 .luach-frame-bar {
   display: flex; align-items: center; gap: 0.6rem;
   padding: 0.4rem 0.5rem 0.4rem 0.65rem; background: rgba(18,39,79,0.05);
@@ -2373,8 +2777,13 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
   white-space: nowrap;
 }
 .luach-frame-lock { width: 0.85rem; height: 0.85rem; flex: none; opacity: 0.75; }
-.luach-frame-out { margin-left: auto; color: var(--luach-ink); opacity: 0.72; text-decoration: none; }
+.luach-frame-out { margin-left: auto; color: var(--luach-ink); opacity: 0.72; text-decoration: none; white-space: nowrap; }
 .luach-frame-out:hover { opacity: 1; text-decoration: underline; }
+.luach-frame-website { font-weight: 700; }
+@media (max-width: 34rem) {
+  .luach-frame-bar:has(.luach-frame-website) { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+  .luach-frame-website { grid-column: 1 / -1; grid-row: 2; margin-left: 0; }
+}
 .luach-frame-shut {
   flex: none; width: 1.6rem; height: 1.6rem; padding: 0; border: 0; border-radius: 6px;
   background: transparent; color: var(--luach-ink); font-size: 1.1rem; line-height: 1;
@@ -2388,17 +2797,22 @@ main:has(.luach-next) .luach-masthead { margin-bottom: 1.3rem; }
    is the height left once a phone's own toolbars are counted, and the rem before it is what
    a browser that does not know dvh keeps. */
 .luach-frame {
-  display: block; width: 100%; border: 0; background: #ffffff;
+  position: absolute; inset: 0; display: block; border: 0; background: #ffffff;
+  width: calc(100% / var(--luach-frame-scale, 1));
+  height: calc(100% / var(--luach-frame-scale, 1));
+  transform: scale(var(--luach-frame-scale, 1)); transform-origin: top left;
+}
+/* The waiting state. The wrapper exists only to be the thing the cover is positioned
+   against. It holds the visible height while the form can be slightly scaled to fit
+   a narrow phone. The wider internal viewport keeps fixed-width fields and the
+   security checkbox in view, without stretching the page or losing vertical scrolling. */
+.luach-frame-wrap {
+  position: relative; overflow: hidden;
   height: 34rem; height: min(82dvh, 44rem);
 }
 @media (min-width: 34rem) {
-  .luach-frame { height: 42rem; height: min(80dvh, 48rem); }
+  .luach-frame-wrap { height: 42rem; height: min(80dvh, 48rem); }
 }
-/* The waiting state. The wrapper exists only to be the thing the cover is positioned
-   against, so it must not add a box of its own: the frame is the only thing in it and the
-   frame carries the height. display: flex rather than block, so the iframe's inline
-   baseline gap cannot creep in and make the wrapper a few pixels taller than the frame. */
-.luach-frame-wrap { position: relative; display: flex; }
 .luach-frame-load {
   position: absolute; inset: 0; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: 0.75rem;
@@ -3089,9 +3503,24 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 }
 .poster-set-line { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
 .poster-set-line u { text-underline-offset: 0.12em; }
+.poster-annotated-time { display: inline-block; position: relative; padding-bottom: 0.7em; }
+.poster-time-note {
+  position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+  font-size: 0.52em; font-weight: 400; line-height: 1.3; white-space: nowrap;
+}
 /* The שקיעה on the צום גדליה sheet, which stands between מנחה and מעריב with no heading:
    set at the size of a line of times, since it reads as one. */
 .poster-set-note { font-size: 23pt; font-weight: 700; line-height: 1.5; margin: 0; }
+/* חנוכה carries a line per weekday morning on top of the standing מנחה/ערב שבת/מעריב blocks
+   that every other poster.poster-set sheet has - nine lines and up where the size above was
+   set against four, so it is scaled down the same way is-dense already scales the ראש השנה
+   rows, rather than given a size of its own with no relation to the rest of the run. */
+.poster.is-chanukah .poster-set-head { font-size: 19pt; margin: 0 0 0.14in; }
+.poster.is-chanukah .poster-set-line { font-size: 16pt; line-height: 1.6; }
+.poster.is-chanukah .poster-set { margin-bottom: var(--chanukah-set-gap, 0.3in); }
+/* The legend supplies the space after Maariv. A second bottom margin pushes the
+   location notes into the frame in years with six sunrise references. */
+.poster.is-chanukah .poster-set:last-child { margin-bottom: 0; }
 /* --- All of them, one after another -------------------------------------------------
    A way of looking through the season's sheets rather than a poster of its own: every one
    for the chosen year, stacked, each drawn by its own renderer so what is in the run is
@@ -3438,6 +3867,13 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    around the break. Only between: the first time on a line has no sibling in front of it, so
    neither the head of the run nor the head of its second half picks one up. */
 .poster-box-row .poster-t + .poster-t::before { content: ", "; }
+/* The חנוכה sheet's own runs: the same drawn-rather-than-written comma, so balanceRuns can
+   cut one of these in two the same way it cuts the יום כיפור box's own runs. Not nowrap: the
+   Rosh Chodesh row's own label ("ראש חודש יום ה' (נץ 7:08) וו' (נץ 7:09)") is one item with
+   several words of its own, wider than balanceRuns's own even split can make room for by
+   moving whole items alone, so it has to be free to wrap inside itself the way a plain time
+   never needs to. */
+.poster-chanukah-run .poster-t + .poster-t::before { content: ", "; }
 /* The second half of a run that has been cut in two. A block, which is what puts it on a line
    of its own and leaves the label sitting against the first half. */
 .poster-run-more { display: block; }
@@ -3455,6 +3891,22 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
    cannot be carried off on its own when a narrow column wraps the row. Kept whole: split, the
    day it names ends on one line and the time on the next. */
 .poster-row-note { margin-inline-start: 0.06in; white-space: nowrap; }
+/* Each נץ time's own day letter, stacked above it rather than beside it: the row's own
+   label four words up ("יום א' ב' ג' ד'") already reads left to right across the days this
+   row shares, and a letter directly over its own time is the one placement that does not
+   need a reader to count slashes against that label to match the two up. Small on purpose
+   - a reference mark here, the same reasoning the molad note's own size is built on,
+   not a second row of equally-weighted text - and muted, since it names which day a time
+   is for rather than being a time itself. */
+.poster-netz-day { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.15; vertical-align: bottom; }
+.poster-netz-day + .poster-netz-day { margin-inline-start: 0.35em; }
+.poster-netz-day-label { font-size: 0.55em; color: var(--muted); }
+/* The שחרית block's own נץ lines (netzBlockLines), smaller than the row's own times and
+   centered like every other line in .poster-set rather than set apart from them: a
+   reference under the row's own times, not a second times line the same weight as the
+   first. Scoped under .poster.is-chanukah .poster-set-line, which this overrides, to win
+   on specificity rather than relying on source order. */
+.poster.is-chanukah .poster-set-line.poster-netz-line { font-size: 12pt; }
 /* A second label and time on the same row, as המלך sits beside שחרית. It needs air in front
    of it so it does not run into the first row's time, and it inherits .poster-row-label for
    the gap between its own word and its own time. */
@@ -3593,6 +4045,9 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
      and its descenders crossing it. See .poster's padding below, which is where the room
      for that comes from. */
   font-size: 10.5pt; font-weight: 700; line-height: 1.5; text-align: center;
+}
+.poster.is-pair .poster-legend {
+  font-size: 7.5pt; font-weight: 400; line-height: 1.45;
 }
 
 /* --- The whole season on one sheet ---------------------------------------------------
@@ -3813,29 +4268,48 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
   margin-top: 0.1in;
   padding-top: 0.05in;
   border-top: 1.5pt solid var(--op-rule);
-  /* Smaller than every line of the schedule, on every year. Asked for: a key that reads
-     larger than the times takes the page over.
-
-     It has to be scaled to manage that. A row is 9.5pt times --op-scale, and the fit runs
-     that scale from 0.90 to 1.25 across the years, so the schedule itself is anywhere from
-     8.55pt to 11.87pt. Against a flat 9.5pt key that came out at 0.80 of the row on the
-     busiest year and 1.11 on the lightest, where the note about where to daven was set
-     larger than the מנינים it is about. Measured on all twenty sheets.
-
-     0.8 of the row, which is 7.6pt before the scale: that is the ratio the busiest year
-     already had and liked, held on every year now instead of drifting. The floor is there
-     because a key still has to be read on the tightest year, and it only bites below 0.92,
-     where it leaves the key at 7pt against a 8.55pt row, still the smaller of the two.
-
-     The reckoning names over a pair of זמנים (מ"א, גר"א) are smaller than this and are meant
-     to be. They are labels on a time rather than a line of the schedule.
-
-     Not the week's One sheet below, which carries this same design and was not asked about.
-     Its type is fitted by a different rule (fitWeekSheet), its rows are far larger than its
-     key already, and changing it would move the size the week prints at. */
-  font-size: max(7pt, calc(7.6pt * var(--op-scale)));
+  /* The footer keeps one physical size even when the schedule is fitted for a fuller year. */
+  font-size: 7.5pt; font-weight: 400; line-height: 1.45;
 }
-.poster.is-onepage.is-weeksheet .poster-legend { font-size: 10.5pt; }
+.poster.is-onepage.is-weeksheet .poster-legend {
+  font-size: 10.5pt; font-weight: 700; line-height: 1.5;
+}
+
+/* The divider belongs to the letterhead, above the Netz title and location. */
+.poster.is-modern-vasikin { --netz-scale: 1; padding: var(--op-pad, 0.2in); }
+.poster.is-modern-vasikin .page-header {
+  flex: none; --sheet-header-scale: 0.88;
+  padding-bottom: 17px; margin-bottom: 14px;
+  border-bottom: 1.5pt solid var(--op-rule);
+}
+.netz-intro { flex: none; width: 100%; text-align: center; margin: 0 0 20px; padding: 5px 0 0; }
+.netz-motto { font-size: calc(18pt * var(--netz-scale)); line-height: 1.25; margin: 0 0 8px; }
+.netz-title {
+  font-family: inherit; font-size: calc(22pt * var(--netz-scale)); line-height: 1.25;
+  color: #000; margin: 0 0 6px; font-weight: 700;
+}
+.netz-location { font-size: calc(17pt * var(--netz-scale)); line-height: 1.25; margin: 0; }
+.netz-block { flex: none; width: 100%; }
+.poster.is-modern-vasikin .onepage-sec-head {
+  font-size: calc(22pt * var(--netz-scale)); line-height: 1.2; text-align: center; padding: 7px 10px; margin: 0;
+}
+.netz-days { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; direction: rtl; padding: 0 17px; }
+.netz-day { min-width: 0; position: relative; }
+.netz-day + .netz-day::before { content: ''; position: absolute; right: -13px; top: 48px; bottom: 2px; width: 1px; background: var(--op-hair); }
+.netz-day h3 { font-size: calc(19pt * var(--netz-scale)); line-height: 1.2; text-align: center; font-weight: 700; margin: 14px 0 7px; }
+.netz-rows { width: 100%; max-width: 310px; margin: auto; }
+.netz-row {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 32px; direction: rtl;
+  font-size: calc(22pt * var(--netz-scale)); line-height: 1.2;
+  padding: calc(8px * var(--netz-scale)) 10px; border-bottom: 0.5pt solid var(--op-hair); white-space: nowrap;
+}
+.netz-row:last-child { border-bottom: 0; }
+.netz-row strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+.netz-kippur { margin-top: calc(26px * var(--netz-scale)); }
+.netz-kippur .netz-rows { padding-top: 7px; }
+.netz-footer { flex: none; width: 100%; margin-top: auto; padding-top: 8px; border-top: 1pt solid var(--op-rule); text-align: center; font-family: Georgia, serif; font-size: 8pt; line-height: 1.35; }
+.netz-footer p { margin: 0; }
+
 .onepage-times { font-weight: 700; text-align: left; }
 .onepage-line { display: block; }
 /* Air between the lines of a run that has been cut in two or three, and only there.
@@ -3912,10 +4386,207 @@ body.is-luach .week-nav-print { border-top-color: rgba(22,42,67,0.12); }
 .onepage-times u { text-underline-offset: 0.12em; }
 .onepage-note { white-space: nowrap; }
 
+/* Half-page handouts: a real half-sheet, with each tefillah kept together. The full
+   landscape paper is added only for print, leaving the other half blank for cutting. */
+.poster-half-sheet { width: 5.5in; height: 8.5in; margin: 0 auto; display: flex; direction: ltr; }
+.poster-half-sheet.is-two-copies { width: 11in; }
+.poster-half-sheet.is-paired { width: 11in; }
+.poster-half-slot { width: 5.5in; height: 8.5in; flex: 0 0 5.5in; }
+.poster-half-slot.is-blank { display: grid; place-items: center; background: white; color: var(--muted); }
+.poster-paired-page + .poster-paired-page { margin-top: 1.5rem; }
+.poster.is-halfpage {
+  width: 5.5in; height: 8.5in;
+  flex: 0 0 5.5in;
+  --op-scale: 1.5;
+  --halfpage-heading-size: 18pt;
+}
+.poster.is-halfpage > * { flex-shrink: 0; }
+.poster.is-halfpage .page-header {
+  --sheet-font-size: 5.5pt;
+  --sheet-header-scale: 0.58;
+  margin-bottom: 0.15in;
+  padding-bottom: 0.05in; border-bottom: 1.5pt solid var(--op-rule);
+}
+.poster.is-halfpage .header-row {
+  grid-template-columns: 0.9in minmax(0, 1fr) 0.9in;
+  gap: 0.08in;
+}
+.poster.is-halfpage .header-center { min-width: 0; }
+/* Reserve the logo's height before it loads so the schedule is fitted against
+   the complete header, including after a reload. */
+.poster.is-halfpage .header-logo {
+  width: min(2.7in, 100%); height: auto;
+  aspect-ratio: 1776 / 237;
+}
+.poster.is-halfpage .onepage-title {
+  font-size: var(--halfpage-heading-size); margin-bottom: 0.06in;
+  padding-bottom: 0; border-bottom: 0;
+}
+.poster.is-halfpage > .halfpage-content {
+  width: 100%; flex: 1 1 auto; min-height: 0;
+  display: flex; flex-direction: column;
+  justify-content: center;
+  justify-content: safe center;
+}
+.halfpage-content > * { flex: 0 0 auto; }
+.halfpage-body { width: 100%; display: flex; flex-direction: column; gap: var(--halfpage-section-gap, 0.14in); }
+.poster.is-halfpage .halfpage-body.is-small-schedule {
+  margin-bottom: 0.16in;
+}
+.poster.is-halfpage .halfpage-body.is-asara {
+  gap: 0.16in; margin-bottom: 0.16in;
+}
+.halfpage-body.is-asara .asara-block { display: flex; flex-direction: column; gap: 0.1in; }
+.poster.is-halfpage .halfpage-body.is-asara .onepage-row {
+  padding-block: var(--asara-row-pad, 0.11in); line-height: 1.5; border-bottom: 0;
+}
+.poster.is-halfpage .onepage-sec-head { text-align: center; }
+.poster.is-halfpage .onepage-sec-head:not(.is-day-heading) { font-size: var(--halfpage-heading-size); }
+.poster.is-halfpage .onepage-row {
+  display: block; padding: var(--halfpage-row-pad, 0.065in) 0.08in;
+  line-height: 1.35;
+}
+.poster.is-halfpage .onepage-label:empty { display: none; }
+.poster.is-halfpage .onepage-label { display: block; font-size: 0.8em; font-weight: 700; margin-bottom: 0.025in; }
+.poster.is-halfpage .onepage-times { text-align: center; }
+.poster.is-halfpage .onepage-line + .onepage-line { margin-top: calc(var(--halfpage-line-gap, 0.04in) * var(--op-scale)); }
+.halfpage-zman {
+  display: flex; justify-content: center; align-items: baseline; gap: 0.12in;
+  font-size: calc(9.5pt * var(--op-scale));
+}
+.halfpage-zman > bdi { font-weight: 700; }
+.halfpage-netz {
+  display: flex; justify-content: center; align-items: center; gap: 0.12in;
+  padding: 0.04in 0.08in 0.065in;
+  font-size: calc(8.5pt * var(--op-scale));
+}
+.halfpage-netz > bdi { display: flex; justify-content: center; flex-wrap: wrap; column-gap: 0.7em; row-gap: 0.04in; }
+.halfpage-netz .poster-netz-day + .poster-netz-day { margin-inline-start: 0; }
+.halfpage-netz .poster-netz-day-label { font-size: 0.65em; }
+.poster.is-halfpage .poster-legend {
+  margin-top: 0; font-size: 6.5pt; font-weight: 400; line-height: 1.45;
+}
+
+/* Morning-only handouts share the compact letterhead, title and section band. */
+.poster.is-halfpage.is-shacharis .poster-legend {
+  line-height: 1.35; white-space: pre-line;
+}
+.shacharis-handout-dates {
+  width: 100%;
+  margin: 0 0 0.14in; text-align: center; font-size: 11pt; line-height: 1.4;
+}
+.shacharis-handout-date > div { font-weight: 700; }
+.poster.is-halfpage .shacharis-handout-row {
+  width: min(3.5in, 100%); margin-inline: auto; padding: 0.045in 0.08in;
+}
+.shacharis-handout-run {
+  position: relative; display: flex; align-items: baseline; justify-content: space-between;
+  gap: 0.1in; padding: 0.06in 0.09in;
+  font-size: calc(12pt * var(--op-scale)); font-weight: 700; line-height: 1.35;
+  white-space: nowrap;
+}
+.shacharis-handout-room, .shacharis-handout-time { position: relative; }
+.shacharis-handout-time { font-variant-numeric: tabular-nums; }
+.shacharis-handout-location { display: flex; align-items: baseline; gap: 0.5em; min-width: 0; }
+.shacharis-handout-room, .shacharis-handout-time { flex: 0 0 auto; }
+.shacharis-handout-room { font-size: 0.85em; }
+.shacharis-handout-separator { flex: 0 0 auto; font-size: calc(9pt * var(--op-scale)); }
+.shacharis-handout-days {
+  text-align: center; font-size: calc(9pt * var(--op-scale)); font-weight: 700;
+  line-height: 1.3; padding-top: 0.035in;
+}
+.shacharis-handout-note { min-width: 0; white-space: normal; font-size: calc(9pt * var(--op-scale)); font-weight: 700; line-height: 1.3; }
+
+/* The complete fast-day option writes morning rooms and retains later marks. */
+.poster.is-halfpage.is-asara-detailed .halfpage-body.is-asara {
+  margin-bottom: 0; gap: 0;
+}
+.asara-detailed-sections { width: 100%; flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--asara-section-gap, 0.16in); }
+.poster.is-halfpage .halfpage-body.is-asara .shacharis-handout-row {
+  padding: var(--asara-morning-pad, 0.045in) 0.08in; line-height: 1.35; border-bottom: 1px solid var(--op-hair);
+}
+.poster.is-halfpage .halfpage-body.is-asara .shacharis-handout-row:last-child { border-bottom: 0; }
+
 /* The dates the poster on screen is for, said in full above it. The sheet itself carries
    no year (the shul wants it clean), so this is the one place that answers "is this the
    right one", and it is worth more than a grey hint line: a ruled block, the Hebrew date
    and the English one under each other so neither has to be worked out from the other. */
+.time-explain-bar[hidden] { display: none !important; }
+
+@media screen {
+  .is-special-schedules { max-width: 88rem; }
+  .special-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+  .special-heading h2 { margin: 0 0 0.35rem; }
+  .special-heading p { margin: 0; }
+  .special-heading button { flex-shrink: 0; }
+  .special-workflow { max-width: 36rem; margin-bottom: 1.2rem; }
+  .special-workflow .week-switch-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .special-layout { display: grid; grid-template-columns: minmax(20rem, 23rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; }
+  .special-controls, .special-preview { min-width: 0; }
+  .special-controls { width: 100%; max-width: 30rem; padding: 1rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+  .special-controls .poster-bar { display: grid; gap: 1rem; margin: 0; }
+  .special-controls .poster-bar > *, .special-controls .poster-bar label, .special-controls .poster-year { min-width: 0; width: 100%; }
+  .special-controls .poster-year { justify-items: stretch; }
+  .special-field-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 2rem; }
+  .special-field-reset { min-width: 4.5rem; min-height: 2rem; padding: 0.25rem 0.5rem; border: 0; border-radius: var(--radius-sm); background: transparent; color: var(--ui-accent); font-family: inherit; font-size: 0.8rem; font-weight: 600; line-height: 1.4; cursor: pointer; }
+  .special-field-reset:hover:not(:disabled) { background: var(--ui-accent-soft); }
+  .special-field-reset:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 1px; }
+  .special-field-reset:disabled { color: var(--muted); opacity: 0.55; cursor: default; }
+  .special-controls .poster-year-step { width: 100%; }
+  .special-controls .poster-year-step button { flex: 0 0 2.75rem; min-height: 2.75rem; padding: 0; border-inline-start: 1px solid var(--border); font-size: 1.1rem; }
+  .special-controls .poster-year-step select { min-width: 0; width: 0; flex: 1; min-height: 2.75rem; border-inline: 0; padding-inline-start: 0.75rem; font-size: 0.95rem; }
+  .special-controls .poster-bar .poster-year-step select { min-width: 0; }
+  .special-controls .poster-year-now { padding: 0; min-width: 0; flex: 1; border-inline: 0; }
+  .special-controls .poster-year-now select { width: 100%; border: 0; }
+  .special-controls .poster-bar > label select { width: 100%; min-width: 0; }
+  .special-print-settings { border-top: 1px solid var(--border); padding-top: 0.75rem; }
+  .special-print-settings summary { color: var(--muted); font-weight: 600; cursor: pointer; }
+  .special-print-settings > div { display: grid; gap: 1rem; padding-top: 0.85rem; }
+  .special-print-action { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+  .special-print-action span { font-size: var(--fs-xs); color: var(--muted); }
+  .special-preview-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+  .special-preview-tools h3 { margin: 0 auto 0 0; }
+  .special-preview-tools button { font-size: var(--fs-sm); padding: 0.4rem 0.6rem; }
+  .special-preview-tools button[aria-pressed="true"] { background: var(--ui-accent-soft); border-color: var(--ui-accent); }
+  .special-preview .poster-when { max-width: none; }
+  .special-preview .zmanim-reference-panel { position: static; }
+  .special-set-list h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .special-set-actions { display: flex; gap: 0.5rem; margin-bottom: 0.4rem; }
+  .special-set-actions button, .special-set-entry > button { font-size: var(--fs-xs); padding: 0.35rem 0.5rem; }
+  .special-set-entry { display: flex; align-items: center; gap: 0.5rem; padding-block: 0.7rem; border-bottom: 1px solid var(--border); }
+  .special-set-entry label { display: flex !important; align-items: center; gap: 0.6rem; cursor: pointer; }
+  .special-set-entry input { flex-shrink: 0; width: 1.05rem; height: 1.05rem; accent-color: var(--ui-accent); }
+  .special-set-entry span { min-width: 0; flex: 1; }
+  .special-set-entry bdi { color: var(--ink); display: block; }
+  .special-set-entry small { display: block; margin-top: 0.2rem; font-weight: normal; letter-spacing: 0; }
+  .special-half-pairs h3 { margin: 0 0 0.5rem; font-size: 1rem; }
+  .special-half-pairs > .hint { font-size: var(--fs-xs); line-height: 1.5; }
+  .special-half-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-block: 0.75rem; }
+  .special-half-pairs button { font-size: var(--fs-xs); padding: 0.35rem 0.5rem; }
+  .special-half-pair { border-top: 1px solid var(--border); padding-block: 0.85rem; }
+  .special-half-pair-head { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; margin-bottom: 0.6rem; }
+  .special-half-pair-head h4 { margin: 0; font-size: var(--fs-sm); }
+  .special-half-pair-head > div { display: flex; gap: 0.25rem; }
+  .special-half-pickers { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0.5rem; margin-bottom: 0.5rem; }
+  .special-half-pickers label { font-size: var(--fs-xs); }
+  .special-controls .special-half-pickers select { width: 100%; min-width: 0; font-size: var(--fs-sm); padding-inline: 0.4rem 1.8rem; }
+  .special-half-error { color: #9d3030; font-size: var(--fs-xs); line-height: 1.5; margin: 0.5rem 0 0; }
+  .special-controls .own-editor { padding: 0; border: 0; }
+  .special-controls .own-top { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .special-controls .own-editor input, .special-controls .own-editor select { min-width: 0; max-width: 100%; }
+  .special-controls .own-blocks { overflow-x: auto; }
+  @media (pointer: coarse) {
+    .special-field-reset { min-height: 2.75rem; }
+  }
+  @media (max-width: 1050px) {
+    .special-layout { grid-template-columns: minmax(0, 1fr); }
+    .special-heading { align-items: start; flex-direction: column; gap: 0.65rem; }
+    .special-heading button { font-size: var(--fs-xs); padding: 0.45rem 0.6rem; }
+    .special-workflow { max-width: none; }
+    .special-controls { padding: 0.8rem; }
+  }
+}
+
 .poster-when {
   margin: 0 0 1.1rem; padding: 0.7rem 0.9rem;
   border-inline-start: 3px solid var(--accent);
@@ -4232,136 +4903,169 @@ body.is-locked { overflow: hidden; }
   .lock-key { font-size: 1.3rem; }
 }
 
-/* --- Traffic ------------------------------------------------------------------------
-   How many people are reading the congregation's site. The numbers come from a Worker in
-   the shul's Cloudflare account (see js/ui/traffic-view.js); everything here is about
-   putting them on a screen that is mostly opened on a phone. */
-.traffic-ranges { display: flex; gap: 0.4rem; margin: 0.2rem 0 1rem; }
-.traffic-range {
-  background: var(--surface); color: var(--ink); border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm); padding: 0.35rem 0.9rem; cursor: pointer;
-  font-family: inherit; font-size: var(--fs-sm);
+/* --- Site statistics --------------------------------------------------------------
+   Scoped to the admin traffic tab. Counts, unknown records and partial coverage each
+   have a distinct presentation; no printed schedule styling is inherited. */
+.traffic-view { --traffic-navy: #152b43; --traffic-gold: #aa8749; --traffic-line: #dce2e9; }
+.traffic-header { display: flex; justify-content: space-between; align-items: center; gap: 1.2rem; margin-bottom: 1.3rem; }
+.traffic-header h2 { margin: 0.15rem 0 0.4rem; font-size: clamp(1.65rem, 3vw, 2rem); letter-spacing: -0.035em; color: var(--traffic-navy); }
+.traffic-header p { margin: 0; color: var(--muted); font-size: 0.87rem; }
+.traffic-header .traffic-eyebrow { font-size: 0.68rem; font-weight: 650; text-transform: uppercase; letter-spacing: 0.1em; color: #647386; }
+.traffic-refresh, .traffic-apply, .traffic-range { min-height: 2.7rem; padding: 0.6rem 0.95rem; border: 1px solid var(--traffic-line); border-radius: 8px; font: inherit; font-size: 0.83rem; font-weight: 600; line-height: 1.2; cursor: pointer; background: #fff; color: var(--traffic-navy); }
+.traffic-refresh { flex: 0 0 auto; border-color: var(--traffic-navy); background: var(--traffic-navy); color: white; }
+.traffic-refresh:hover, .traffic-apply:hover { filter: brightness(1.12); }
+.traffic-refresh:disabled { opacity: 0.65; cursor: wait; }
+.traffic-view button:focus-visible, .traffic-view input:focus-visible, .traffic-view summary:focus-visible, .traffic-chart-scroll:focus-visible { outline: 3px solid #4a80bd; outline-offset: 3px; }
+.traffic-controls { background: var(--surface); border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1rem 1.2rem; }
+.traffic-ranges { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0 0 1rem; }
+.traffic-range { min-height: 2.35rem; padding: 0.5rem 0.9rem; background: #f6f8fa; border-color: transparent; }
+.traffic-range:hover { background: #e9eef4; }
+.traffic-range.is-on { background: var(--traffic-navy); color: white; border-color: var(--traffic-navy); }
+.traffic-range-form { display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: end; }
+.traffic-range-form label { display: flex; flex-direction: column; gap: 0.3rem; color: #596679; font-size: 0.76rem; font-weight: 600; }
+.traffic-range-form input { width: 10.5rem; max-width: 100%; min-height: 2.65rem; padding: 0.55rem 0.6rem; border: 1px solid #bdc8d5; border-radius: 7px; color: var(--traffic-navy); background: white; font: inherit; font-size: 0.9rem; }
+.traffic-apply { background: #f3eee3; border-color: #ddd0b5; }
+.traffic-range-error { flex-basis: 100%; margin: 0; color: var(--danger); font-size: 0.84rem; }
+.traffic-range-error:empty { display: none; }
+.traffic-range-summary { display: flex; align-items: end; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; padding-top: 1rem; margin-top: 1rem; border-top: 1px solid var(--traffic-line); }
+.traffic-range-summary strong { display: block; color: var(--traffic-navy); font-size: 0.92rem; }
+.traffic-range-summary span { color: #687487; font-size: 0.75rem; }
+.traffic-range-summary div > span { display: block; margin-top: 0.28rem; }
+.traffic-load-status { min-height: 1.1rem; margin: 0.75rem 0; color: #687487; font-size: 0.73rem; }
+.traffic-loading { padding: 3rem 1rem; text-align: center; color: var(--muted); border: 1px dashed var(--traffic-line); border-radius: 12px; }
+.traffic-totals { display: grid; grid-template-columns: 1.15fr 1fr 1fr; gap: 0.8rem; margin: 0 0 1rem; }
+.traffic-total { display: flex; flex-direction: column; padding: 1.2rem; border: 1px solid var(--traffic-line); background: var(--surface); border-radius: 11px; min-width: 0; }
+.traffic-total-label { font-size: 0.79rem; font-weight: 650; color: #536176; text-transform: uppercase; letter-spacing: 0.055em; }
+.traffic-total-n { margin: 0.5rem 0; color: var(--traffic-navy); font-size: clamp(1.5rem, 3.3vw, 2.5rem); line-height: 1.15; font-weight: 650; letter-spacing: -0.035em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.traffic-total p { margin: auto 0 0; font-size: 0.77rem; line-height: 1.55; color: #677387; }
+.traffic-total-primary { background: var(--traffic-navy); border-color: var(--traffic-navy); box-shadow: 0 3px 8px #152b4312; }
+.traffic-total-primary .traffic-total-label { color: #e6cc99; }
+.traffic-total-primary .traffic-total-n { color: white; }
+.traffic-total-primary p { color: #d0dbe6; }
+.traffic-total-coverage { margin: 0.7rem 0; color: var(--traffic-navy); font-size: 1.4rem; font-weight: 650; }
+.traffic-panel { min-width: 0; border: 1px solid var(--traffic-line); border-radius: 12px; padding: 1.2rem; margin: 0 0 1rem; background: var(--surface); }
+.traffic-activity-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); gap:.8rem; margin:1rem 0; }
+.traffic-activity-grid > div { min-width:0; padding:.8rem; border:1px solid var(--traffic-line); border-radius:8px; }
+.traffic-activity-grid dt { font-size:.75rem; color:#697486; overflow-wrap:anywhere; }
+.traffic-activity-grid dd { margin:.4rem 0 0; font-size:1.35rem; font-weight:700; color:var(--traffic-navy); }
+.traffic-admin-activity { display: grid; grid-template-columns: minmax(9rem, 0.8fr) minmax(0, 2fr); gap: 1.2rem; align-items: center; border-left: 3px solid var(--traffic-gold); }
+.traffic-admin-count strong { display: block; margin-top: 0.35rem; font-size: 1.5rem; line-height: 1.2; color: var(--traffic-navy); font-variant-numeric: tabular-nums; }
+.traffic-admin-count .traffic-admin-qualifier { display: block; color: #846631; font-size: 0.7rem; margin-top: 0.5rem; }
+.traffic-admin-browser { display: inline-block; padding: 0.3rem 0.5rem; border-radius: 5px; font-size: 0.72rem; font-weight: 600; color: #52677d; background: #eef2f6; }
+.traffic-admin-browser.is-excluded { color: #2e6354; background: #edf5f1; }
+.traffic-admin-explanation p { margin: 0.55rem 0 0; font-size: 0.76rem; line-height: 1.5; color: #586b7f; }
+.traffic-admin-explanation .traffic-small { font-size: 0.68rem; color: #6a7789; }
+.traffic-panel-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; margin-bottom: 1rem; }
+.traffic-panel h3 { margin: 0 0 0.3rem; font-size: 1rem; font-weight: 650; color: var(--traffic-navy); }
+.traffic-panel-heading p { font-size: 0.77rem; line-height: 1.5; color: #697486; margin: 0; }
+.traffic-unit { padding: 0.3rem 0; white-space: nowrap; color: #697486; font-size: 0.71rem; }
+.traffic-status { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 5px; white-space: nowrap; color: #617185; background: #edf1f5; font-size: 0.68rem; font-weight: 650; line-height: 1.2; }
+.traffic-status-complete { color: #2e6354; background: #edf5f1; }
+.traffic-status-partial { color: #80571d; background: #fbf1d8; }
+.traffic-notice { margin-bottom: 0.8rem; padding: 0.85rem 1rem; background: #fbf5e7; border: 1px solid #eadbbe; border-left: 3px solid #b99450; border-radius: 8px; color: #765c2e; font-size: 0.8rem; line-height: 1.55; }
+.traffic-notice p { margin: 0.25rem 0 0; }
+.traffic-notice strong { font-size: 0.83rem; }
+.traffic-notice-error { border-color: #edc6bf; border-left-color: #bd5541; background: #fff4f1; color: #8b3726; }
+.traffic-notice-quiet { background: #eff5f8; border-color: #ccdce4; border-left-color: #6b93a8; color: #3b6070; }
+.traffic-chart-scroll { overflow-x: auto; overscroll-behavior-inline: contain; padding: 0.2rem 0 0.6rem; }
+.traffic-chart { display: flex; width: 100%; min-width: min-content; gap: 0.45rem; height: 12.5rem; padding-bottom: 0; margin: 0; }
+.traffic-day-bar { display: grid; grid-template-rows: 1.2rem 1fr 2.2rem; align-items: stretch; justify-items: center; flex: 1 0 2.7rem; min-width: 2.7rem; padding: 0; border: 0; border-radius: 3px; background: transparent; font: inherit; cursor: pointer; color: var(--traffic-navy); }
+.traffic-day-value { white-space: nowrap; font-size: 0.68rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.traffic-day-track { display: flex; align-items: flex-end; width: 100%; border-bottom: 1px solid #c6d2df; background: repeating-linear-gradient(to top, transparent, transparent calc(25% - 1px), #f2f4f7 calc(25% - 1px), #f2f4f7 25%); }
+.traffic-day-fill { display: block; width: 100%; max-width: 2.8rem; margin: 0 auto; border-radius: 4px 4px 0 0; background: #3c6487; transition: filter 0.12s; }
+.traffic-day-bar:hover .traffic-day-fill { filter: brightness(0.85); }
+.traffic-day-label { font-size: 0.62rem; white-space: nowrap; color: #687487; padding-top: 0.4rem; }
+.traffic-day-label small { display: block; font: inherit; font-size: 0.58rem; margin-top: 0.1rem; }
+.traffic-day-partial .traffic-day-fill, .traffic-key-partial { background: repeating-linear-gradient(135deg, #c7a260, #c7a260 4px, #ebd8b2 4px, #ebd8b2 8px); }
+.traffic-day-unavailable .traffic-day-fill { background: #f5f6f8; border: 1px dashed #c1c9d2; border-bottom: 0; }
+.traffic-day-unavailable .traffic-day-value { color: #778290; font-weight: 400; }
+.traffic-chart-key { display: flex; flex-wrap: wrap; gap: 0.8rem; color: #697486; font-size: 0.67rem; margin: 0.65rem 0; }
+.traffic-chart-key span { display: inline-flex; align-items: center; gap: 0.3rem; }
+.traffic-chart-key i { width: 0.65rem; height: 0.65rem; border-radius: 2px; }
+.traffic-key-recorded { background: #3c6487; }
+.traffic-key-missing { border: 1px dashed #a8b5c4; background: #f5f6f8; }
+.traffic-reconcile { margin: 0.85rem 0; font-size: 0.77rem; color: #54677a; }
+.traffic-daily-details { margin-top: 1rem; padding-top: 0.8rem; border-top: 1px solid var(--traffic-line); }
+.traffic-view summary { cursor: pointer; font-size: 0.85rem; font-weight: 600; color: var(--traffic-navy); }
+.traffic-view summary::marker { color: var(--traffic-gold); }
+.traffic-table-scroll { width: 100%; overflow: auto; }
+.traffic-daily-table { max-height: 26rem; margin-top: 0.8rem; }
+.traffic-table { width: 100%; border-collapse: collapse; font: inherit; font-size: 0.8rem; table-layout: auto; margin: 0; }
+.traffic-table caption { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.traffic-table th, .traffic-table td { border: 0; border-bottom: 1px solid #e6ebf0; padding: 0.7rem 0.45rem; vertical-align: top; text-align: left; background: transparent; color: var(--traffic-navy); font: inherit; font-size: 0.8rem; line-height: 1.45; }
+.traffic-table thead th { font-size: 0.69rem; color: #647185; font-weight: 600; background: #f6f8fa; }
+.traffic-table tbody th { color: var(--traffic-navy); font-weight: 550; }
+.traffic-table tbody tr:nth-child(even) td, .traffic-table tbody tr:nth-child(even) th { background: transparent; }
+.traffic-table .traffic-figure { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.traffic-table .traffic-share { color: #697486; }
+.traffic-table small { display: block; color: #697486; font-size: 0.66rem; font-weight: 400; margin-top: 0.15rem; overflow-wrap: anywhere; }
+.traffic-table .traffic-row-name { overflow-wrap: anywhere; min-width: 5.5rem; }
+.traffic-table .traffic-residual th, .traffic-table .traffic-residual td { color: #805d28; background: #fdf8ed; }
+.traffic-table tfoot th, .traffic-table tfoot td { border-bottom: 0; border-top: 1px solid #cbd6e1; font-weight: 600; padding-top: 0.85rem; }
+.traffic-denominator { padding-top: 0.8rem; margin: 0; font-size: 0.69rem; color: #697486; line-height: 1.5; }
+.traffic-text-button { padding: 0; border: 0; background: transparent; color: #315f8b; text-align: left; font: inherit; cursor: pointer; text-decoration: underline; text-underline-offset: 0.2em; }
+.traffic-breakdowns { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem; }
+.traffic-breakdowns > .traffic-panel { margin-bottom: 0; }
+.traffic-breakdowns { margin-bottom: 1rem; }
+.traffic-panel-wide { grid-column: 1 / -1; }
+.traffic-unavailable { background: #f7f9fb; border-radius: 7px; padding: 1.1rem; color: #677487; font-size: 0.8rem; line-height: 1.55; }
+.traffic-unavailable strong { color: #4f6278; }
+.traffic-unavailable p { margin: 0.4rem 0 0; }
+.traffic-small { font-size: 0.75rem; line-height: 1.55; color: #697486; overflow-wrap: anywhere; }
+.traffic-patterns-content { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; padding-top: 1.1rem; }
+.traffic-patterns-content > section { min-width: 0; }
+.traffic-time-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0.45rem; margin: 0.8rem 0; }
+.traffic-time-grid div { padding: 0.55rem 0.3rem; text-align: center; background: #f5f7fa; border: 1px solid #e8ecf1; border-radius: 6px; }
+.traffic-time-grid span { display: block; color: #6a7688; font-size: 0.61rem; }
+.traffic-time-grid strong { display: block; margin-top: 0.3rem; font-size: 0.95rem; color: var(--traffic-navy); font-variant-numeric: tabular-nums; }
+.traffic-browser-details > .traffic-breakdowns { margin: 1rem 0 0; }
+.traffic-browser-details .traffic-panel { border-radius: 7px; padding: 1rem; }
+.traffic-method-content { padding-top: 1.2rem; }
+.traffic-definition-list, .traffic-technical-list { margin: 0.6rem 0 1.4rem; font-size: 0.77rem; line-height: 1.6; }
+.traffic-definition-list > div, .traffic-technical-list > div { display: grid; grid-template-columns: 9rem minmax(0, 1fr); gap: 1rem; padding: 0.6rem 0; border-bottom: 1px solid #eef1f5; }
+.traffic-definition-list dt, .traffic-technical-list dt { font-weight: 600; color: var(--traffic-navy); }
+.traffic-definition-list dd, .traffic-technical-list dd { margin: 0; color: #657286; overflow-wrap: anywhere; }
+.traffic-technical-list code { font-size: 0.73rem; }
+@media (min-width: 76rem) {
+  main.traffic-view { padding-inline: 2.2rem; }
 }
-.traffic-range:hover { background: var(--accent-soft); }
-.traffic-range.is-on { background: var(--ui-accent); color: #fff; border-color: var(--ui-accent); }
-/* The two figures, side by side and big enough to read across a desk. They wrap on a phone
-   rather than shrinking, since a number that has to be squinted at is no use. */
-.traffic-totals { display: flex; flex-wrap: wrap; gap: 1.4rem; margin-bottom: 1.2rem; }
-.traffic-total { display: flex; flex-direction: column; }
-.traffic-total-n { font-size: 2.1rem; font-weight: 600; line-height: 1.1; color: var(--ink); }
-.traffic-total-w { font-size: var(--fs-sm); color: var(--muted); }
-/* One bar a day. The row has the height, each bar's fill has a percentage of it, so nothing
-   is measured and it is right at any width. align-items:end is what stands them on the axis
-   rather than hanging them from the top. */
-.traffic-chart {
-  display: flex; align-items: flex-end; gap: 3px; height: 130px;
-  padding-bottom: 1.3rem; margin-bottom: 1.6rem;
-  border-bottom: 1px solid var(--border);
+@media (max-width: 58rem) {
+  .traffic-totals { grid-template-columns: 1fr 1fr; }
+  .traffic-total:last-child { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr; align-items: center; column-gap: 1rem; }
+  .traffic-total:last-child .traffic-total-coverage { margin: 0.4rem 0 0; grid-column: 1; }
+  .traffic-total:last-child p { grid-column: 2; grid-row: 1 / 3; margin: 0; }
+  .traffic-patterns-content { grid-template-columns: minmax(0, 1fr); }
 }
-/* Each bar is a <button> now, so the browser's own button styling has to be taken back off:
-   padding, border, background and the font are all inherited or cleared, and what is left is the
-   shape the chart already had. */
-.traffic-bar {
-  flex: 1 1 0; position: relative; height: 100%; display: flex; align-items: flex-end;
-  min-width: 4px; padding: 0; border: 0; background: none; font: inherit; color: inherit;
-  -webkit-tap-highlight-color: transparent;
+@media (max-width: 40rem) {
+  .traffic-admin-activity { grid-template-columns: minmax(0, 1fr); gap: 0.7rem; }
+  .traffic-admin-count strong { font-size: 1.3rem; }
+  .traffic-header { align-items: flex-start; gap: 0.65rem; }
+  .traffic-header .traffic-eyebrow { font-size: 0.57rem; }
+  .traffic-header h2 { font-size: 1.5rem; }
+  .traffic-header p { font-size: 0.75rem; }
+  .traffic-refresh { min-height: 2.6rem; padding: 0.6rem; font-size: 0.71rem; max-width: 5.2rem; }
+  .traffic-controls, .traffic-panel { padding: 0.9rem; border-radius: 10px; }
+  .traffic-range { flex: 1 0 26%; padding-inline: 0.4rem; }
+  .traffic-range-form label { flex: 1 1 40%; min-width: 0; }
+  .traffic-range-form input { width: 100%; min-width: 0; }
+  .traffic-apply { width: 100%; }
+  .traffic-total { padding: 0.9rem; }
+  .traffic-total-label { font-size: 0.67rem; letter-spacing: 0.025em; }
+  .traffic-total p { font-size: 0.69rem; }
+  .traffic-total-n { font-size: 1.9rem; }
+  .traffic-total-coverage { font-size: 1.15rem; }
+  .traffic-panel-heading { gap: 0.45rem; }
+  .traffic-panel-heading h3 { font-size: 0.92rem; }
+  .traffic-panel-heading p { font-size: 0.71rem; }
+  .traffic-unit { display: none; }
+  .traffic-breakdowns { grid-template-columns: minmax(0, 1fr); }
+  .traffic-table th, .traffic-table td { font-size: 0.73rem; padding-inline: 0.35rem; }
+  .traffic-table thead th { font-size: 0.65rem; }
+  .traffic-table .traffic-row-name { min-width: 5rem; }
+  .traffic-definition-list > div, .traffic-technical-list > div { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; }
+  .traffic-status { padding-inline: 0.35rem; font-size: 0.61rem; }
+  .traffic-browser-details .traffic-panel { padding: 0.8rem; }
 }
-/* Only where a bar actually opens something. The hours chart uses the same class for shapes
-   that are not buttons and must not look like one. */
-.traffic-chart.is-pickable .traffic-bar { cursor: pointer; border-radius: 3px; }
-.traffic-chart.is-pickable .traffic-bar:hover .traffic-bar-fill,
-.traffic-chart.is-pickable .traffic-bar:focus-visible .traffic-bar-fill {
-  filter: brightness(0.86);
-}
-.traffic-chart.is-pickable .traffic-bar:focus-visible { outline: 2px solid var(--ui-accent); outline-offset: 2px; }
-/* Why the chart's days are not the reader's days. Under the chart it is about rather than at the
-   foot of the tab, because that is where the two numbers stop agreeing: the shul read Today as
-   nothing and the bar over the same date as busy, which is a contradiction six panels above where
-   this used to be explained. Set close under the chart and away from the panel below it, so it
-   reads as a note on the chart rather than as the start of the next thing. */
-.traffic-utc-note { margin: 0.35rem 0 1.6rem; }
-
-/* The date field beside the ranges, and the way back out of a day. */
-.traffic-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
-.traffic-pick-label { color: var(--muted); font-size: var(--fs-sm); }
-.traffic-date {
-  font: inherit; font-size: var(--fs-sm); padding: 0.3rem 0.5rem;
-  border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
-  background: var(--surface); color: var(--ink);
-}
-/* The day being looked at, where the chart sits over a range. */
-.traffic-oneday {
-  margin: 0 0 1.2rem; font-size: var(--fs-lg); font-weight: 600; color: var(--ink);
-}
-/* --ui-accent, the blue this program's own controls are, and not --accent: that one is the
-   printed chart's grey and its value is load-bearing for what comes out of a printer. A screen
-   of numbers is a screen, not a board. */
-.traffic-bar-fill {
-  width: 100%; background: var(--ui-accent); border-radius: 2px 2px 0 0; min-height: 2px;
-}
-/* The day under its own bar, and only where there is room for it: at 30 bars on a phone the
-   labels would be a grey smear, so they are dropped and the bars keep the space. The title
-   on each bar still says the day and the count on a hover or a long press. */
-.traffic-bar-day {
-  position: absolute; bottom: -1.15rem; left: 50%; transform: translateX(-50%);
-  font-size: 0.62rem; color: var(--muted); white-space: nowrap;
-}
-.traffic-chart:has(.traffic-bar:nth-child(9)) .traffic-bar-day { display: none; }
-/* The hours chart is always 24 bars and is exempt, because the rule above was written for a
-   range of days where the labels are dates and every bar wants one. Here only every third hour
-   is labelled and the rest carry an empty label, so the row is already thinned and dropping it
-   wholesale leaves a chart nobody can read a time off. */
-.traffic-hours .traffic-bar-day { display: block !important; }
-.traffic-heading { font-size: var(--fs-lg); margin: 0 0 0.5rem; }
-/* Its own borders and its own background, said outright. A bare table in this stylesheet
-   inherits the printed chart's rules further up (`th, td` and the striped body rows), and this
-   one came out banded grey with a dark header, which is a wall chart's clothes on a list of
-   numbers. */
-.traffic-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
-.traffic-table th, .traffic-table td {
-  border: 0; border-bottom: 1px solid var(--border);
-  padding: 0.5rem 0.5rem; text-align: left; background-color: transparent; vertical-align: top;
-}
-.traffic-table th { color: var(--muted); font-weight: 500; }
-.traffic-table tbody tr:last-child td { border-bottom: 0; }
-/* And the band on every second row, which is the chart's again and needs one more class than
-   `tbody tr:nth-child(even) td` carries before it will let go.
-   background-color rather than the `background` shorthand, in both rules above and here. The
-   shorthand also resets background-image, and the share bars are a background image on the
-   cell: written as `background: none` this silently wiped the bar off every second row, which
-   on screen read as Monday and Wednesday having no visitors at all. */
-.traffic-table tbody tr:nth-child(even) td { background-color: transparent; }
-.traffic-figure { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-/* The address under the page's name, small: the name is what it is, the path is how to
-   check that it is. */
-.traffic-page { display: flex; flex-direction: column; }
-.traffic-path { font-size: 0.7rem; color: var(--muted); }
-/* A share bar behind the name, rather than a bar element beside it.
-   Painted as a background on the cell, so the table stays a table: the columns line up, the
-   figures stay in their own cells, and a screen reader still reads rows rather than a row of
-   divs pretending to be one. The share is of the largest row, not of the total, because what
-   these answer is which one is the big one. */
-.traffic-shares .traffic-page {
-  /* Thinned with color-mix rather than by picking a second, paler colour, so it follows the
-     accent the admin is set to instead of drifting away from it the first time that changes. */
-  background-image: linear-gradient(to right,
-    color-mix(in srgb, var(--ui-accent) 16%, transparent) 0 var(--share, 0%),
-    transparent var(--share, 0%));
-  background-repeat: no-repeat;
-  border-radius: 2px;
-  padding-inline: 0.4rem;
-}
-.traffic-pct { color: var(--muted); }
-/* A panel Cloudflare would not answer. Its own colour so it does not read as a figure, and it
-   sits where the panel would have been rather than at the top, since the rest of the screen is
-   fine. See trafficPanelError: the message is Cloudflare's own words on purpose. */
-.traffic-panel-error { color: var(--danger); margin-top: 0; }
-.traffic-foot { margin-top: 1.1rem; }
-.traffic-setup ol { margin: 0.6rem 0 0.8rem 1.1rem; padding: 0; }
-.traffic-setup li { margin-bottom: 0.4rem; }
-.traffic-setup code, .traffic-error code { background: var(--accent-soft); border-radius: 3px; padding: 0.05rem 0.3rem; }
-.traffic-error h3 { color: var(--danger); margin-top: 0; }
-
 /* ── What the Congregation Sees, the admin's own status tab ───────────────────────────────
    Read js/ui/status-view.js: three sections, one per congregation-facing page, the last one
    a table of the Special Schedules and their own lead-time window. */
@@ -4398,8 +5102,8 @@ body.is-locked { overflow: hidden; }
 /* ── The messages page, /texts/ ────────────────────────────────────────────────────────────
    Its own screen rather than a tab inside the program, because the person who sends the
    weekly message is not the person who prints the boards and the address is handed to them
-   alone. Nothing here links anywhere: no sidebar, no back, no congregation site. That is the
-   point of it and not an oversight. See js/ui/texts-view.js. */
+   alone. Its only return link opens the separately authenticated calendar editor; there is no
+   main-admin or congregation navigation. See js/ui/texts-view.js. */
 .tx-page { max-width: 44rem; margin: 0 auto; padding: 1.6rem 1rem 3rem; }
 .tx-title { font-size: 1.6rem; margin: 0 0 0.3rem; }
 .tx-hint { color: var(--muted); font-size: var(--fs-sm); margin: 0 0 1.4rem; }
@@ -4416,9 +5120,9 @@ body.is-locked { overflow: hidden; }
    asked for so that two cards a year apart cannot be mistaken for each other, which needs it
    to be read rather than skipped over. */
 .tx-date { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); white-space: nowrap; }
-/* Pushed against the button rather than against the name, so the button stays at the right
-   edge at every width and the words in front of it wrap without moving it. */
+/* The date and occasion wrap naturally; Copy stays on the right of its own flex line. */
 .tx-when { color: var(--muted); font-size: var(--fs-sm); margin-right: auto; }
+.tx-copy { margin-left: auto; }
 /* The message as it will be pasted, spacing and all. pre rather than a div, because the line
    breaks are the message: a chat message that lost them is not the same message. Wrapping is
    on so a long line is readable on a phone without the card scrolling sideways. */
@@ -4510,7 +5214,7 @@ body.is-locked { overflow: hidden; }
   html:has(body.is-luach) { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; scroll-padding-top: 110px; }
   body.is-luach .luach-bar { pointer-events: none; touch-action: pan-y; }
   body.is-luach .luach-bar a, body.is-luach .luach-bar button { pointer-events: auto; }
-  body.is-luach .luach-cap-photo { top: clamp(10px, calc(3.2px + 1.25vw), 16px); height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
+  body.is-luach .luach-cap-photo { top: calc(clamp(10px, calc(3.2px + 1.25vw), 16px) + var(--luach-safe-top, 0px)); height: clamp(38px, calc(26.667px + 2.0833vw), 48px); width: auto; }
   body.is-luach .luach-bar::after { pointer-events: none; }
 }
 
@@ -4550,11 +5254,9 @@ body.is-luach .luach-zmanim-group[open] > summary .luach-item-go { transform:rot
    to read as a label rather than as a stranded line: centred in the box the logo would have
    filled, and small enough that the longest of the four names sits on two lines inside 40px.
 
-   The box is 110x40 and object-fit keeps each logo whole inside it, so a logo squatter than
-   11:4 is drawn at the full 40px high and a wider one is drawn at the full 110px across.
-   OJC's is the squat one and is therefore the tallest of the four on the card. That is the
-   artwork, not a bug, and it is left alone: the other three are the providers' own files on
-   the providers' own servers and cannot be measured against from here.
+   The default box is 110x40 and object-fit keeps each logo whole. The donation page
+   adjusts The Donors' Fund and OJC sizes for a more even visual weight while preserving
+   their proportions.
 
    assets/daf-ojc.png is the one logo this site serves itself, because the file OJC's own
    site links is a small bitmap and the tile drew it visibly soft on a phone. It is the mark
@@ -4629,19 +5331,65 @@ body.is-luach #main .luach-zmanim-group:has(> summary:active) { transform:none; 
 body.is-luach #main a.luach-fund-row:active { background:var(--luach-navy);color:var(--luach-cream);border-color:var(--luach-gold);box-shadow:inset 0 2px 6px rgba(0,0,0,.3); }
 body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-body,.luach-give-title,.luach-account-title,.luach-account-blurb,.luach-fund-action) { color:var(--luach-cream);opacity:1; }
 
-/* Admin navigation grouped by task, with secondary tools inside their section. */
-#nav .admin-nav-group { display:flex; flex-direction:column; gap:.15rem; margin:0 0 .7rem; }
-#nav .admin-nav-label { margin:.2rem .75rem .3rem; color:rgba(255,255,255,.58); font-size:.65rem; font-weight:600; letter-spacing:.08em; text-transform:uppercase; }
-#nav a.nav-btn { text-decoration:none; }
-#nav .admin-site-link { margin-top:.3rem; border-top:1px solid rgba(255,255,255,.13); border-radius:0; padding-top:.85rem; }
+/* Admin home and navigation. These rules do not change any printed chart. */
+#nav .admin-nav-sections { display:flex; flex-direction:column; gap:.55rem; width:100%; }
+#nav .admin-nav-group { display:flex; flex-direction:column; gap:.15rem; margin:0; }
+#nav .admin-nav-label { margin:.65rem .75rem .3rem; color:#c8b57e; font-size:.67rem; font-weight:600; letter-spacing:.07em; text-transform:uppercase; }
+#nav a.nav-btn { text-decoration:none; min-height:44px; box-sizing:border-box; line-height:1.35; }
+#nav .nav-btn small { font-size:.68rem; opacity:.72; white-space:nowrap; }
+#nav .admin-nav-public-links { border-top:1px solid rgba(255,255,255,.16); padding-top:.55rem; margin-top:.25rem; }
+#nav .admin-nav-toggle { display:none; }
+#nav :is(a,button):focus-visible { outline:2px solid #d6ba70; outline-offset:2px; }
 .sidebar { overflow-y:auto; }
 .admin-section-tabs { flex-wrap:wrap; margin-bottom:1.2rem; }
+.admin-home { color:#142b43; }
+.admin-home-heading { padding:1.5rem; margin:0 0 1.4rem; background:#faf7ee; border:1px solid #e1d6b6; border-radius:12px; }
+.admin-home-eyebrow { margin:0 0 .6rem; color:#7c6837; font-size:.77rem; font-weight:650; letter-spacing:.025em; }
+.admin-home-heading h2 { font-size:clamp(1.8rem,3vw,2.25rem); letter-spacing:-.035em; }
+.admin-home-heading > p:not(.admin-home-eyebrow) { margin:.55rem 0 1rem; max-width:48ch; color:#566474; line-height:1.55; }
+.admin-home-quick-links { display:flex; gap:.5rem 1rem; align-items:center; flex-wrap:wrap; }
+.admin-home-quick-links > a { min-height:44px; display:inline-flex; align-items:center; gap:.35rem; color:#183650; font-weight:600; font-size:.86rem; text-underline-offset:3px; }
+.admin-home-quick-links .admin-home-primary { text-decoration:none; border-radius:7px; background:#16334b; color:#fff; padding:.65rem .9rem; box-sizing:border-box; }
+.admin-home-primary > span { margin-left:.6rem; }
+.admin-home-new-tab { font-size:.71rem; font-weight:400; }
+.admin-home-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; align-items:start; }
+.admin-home-section { min-width:0; background:#fff; border:1px solid #dbe0e5; border-radius:10px; overflow:hidden; }
+.admin-home-section > header { padding:1.05rem 1.1rem .95rem; border-bottom:2px solid #d6c28b; background:#fafbfc; }
+.admin-home-section h3 { margin:0 0 .3rem; color:#142b43; font-size:1.04rem; }
+.admin-home-section > header p { margin:0; color:#687380; line-height:1.45; font-size:.8rem; }
+.admin-home-task { display:flex; flex-direction:column; gap:.35rem; padding:1.05rem 1.1rem; border-bottom:1px solid #e8ebee; text-decoration:none; color:#17344d; }
+.admin-home-task:last-child { border-bottom:0; }
+.admin-home-task-title { display:flex; justify-content:space-between; align-items:baseline; gap:.5rem; font-size:.91rem; font-weight:700; }
+.admin-home-task-title > span { color:#a68a44; }
+.admin-home-task-description { font-size:.81rem; color:#627080; line-height:1.5; }
+.admin-home-task:hover { background:#f9f6ed; }
+.admin-home-secondary { display:flex; flex-wrap:wrap; gap:.1rem 1rem; padding:.45rem 1.1rem; background:#fafbfc; }
+.admin-home-secondary a { display:inline-flex; align-items:center; min-height:44px; font-size:.8rem; color:#1c405e; text-underline-offset:3px; }
+.admin-home-note { max-width:76ch; margin:1.25rem 0 0; font-size:.8rem; line-height:1.55; color:#6b7480; }
+.admin-home a:focus-visible { outline:2px solid #9b7b2e; outline-offset:-3px; }
 @media screen and (max-width:900px) {
  #nav { width:100%; }
- #nav .admin-nav-group { flex:1 1 100%; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; margin-bottom:.4rem; }
+ #nav .admin-nav-toggle { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:54px; box-sizing:border-box; padding:.45rem .85rem; margin:0; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.17); border-radius:7px; color:#fff; text-align:left; font-family:inherit; font-size:.95rem; font-weight:600; line-height:1.35; cursor:pointer; }
+ #nav .admin-nav-toggle small { display:block; color:#c8b57e; font-size:.65rem; font-weight:500; margin-bottom:.1rem; }
+ #nav .admin-nav-chevron { font-size:1.4rem; line-height:1; }
+ #nav.is-expanded .admin-nav-chevron { transform:rotate(180deg); }
+ #nav .admin-nav-sections { display:none; padding-top:.45rem; }
+ #nav.is-expanded .admin-nav-sections { display:flex; }
+ #nav .admin-nav-group { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; }
  #nav .admin-nav-label { grid-column:1 / -1; }
- #nav .nav-btn { min-width:0; height:auto; white-space:normal; }
- #nav .admin-site-link { width:100%; }
+ #nav .nav-btn { min-width:0; width:100%; height:auto; min-height:46px; white-space:normal; }
+ #nav .admin-nav-public-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.2rem; }
+ .admin-home-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .admin-home-heading { padding:1.2rem; }
+}
+@media screen and (max-width:580px) {
+ .admin-home-grid { grid-template-columns:1fr; }
+ .admin-home-heading { padding:1.05rem; }
+ .admin-home-quick-links { gap:.2rem .85rem; }
+ .admin-home-quick-links .admin-home-primary { width:100%; justify-content:space-between; margin-bottom:.25rem; }
+ .admin-home-task { padding:1rem 1.05rem; }
+ .admin-home-task-description { font-size:.85rem; }
+ .admin-home-section > header p { font-size:.85rem; }
 }
 
 
@@ -4680,6 +5428,17 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-shabbos-row > div { text-align: left; font: 700 1.15rem/1.5 Georgia,'Times New Roman',serif; overflow-wrap: anywhere; }
 .reader-shabbos { margin-top: 24px; }
 .reader-legend { display: flex; flex-wrap: wrap; justify-content: center; gap: 7px 15px; margin: 23px 0 0; font: 400 .78rem/1.5 Arial,sans-serif; color: #586474; }
+.reader-room-hint { margin: -8px 0 18px; color: #586474; font: 400 .8rem/1.5 Arial,sans-serif; text-align: center; }
+:where(button).reader-time { appearance: none; border: 0; padding: 0; margin: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; border-radius: 4px; }
+button.reader-time:focus-visible { outline: 2px solid #b88f3a; outline-offset: 4px; }
+.reader-room-dialog { width: min(22rem,calc(100% - 32px)); max-height: calc(100dvh - 32px); box-sizing: border-box; margin: auto; padding: 40px 24px 28px; overflow: auto; border: 1px solid #ddd6bc; border-radius: 18px; background: #faf8f2; color: #142640; text-align: center; box-shadow: 0 16px 48px rgba(18,39,79,.22); }
+.reader-room-dialog::backdrop { background: rgba(18,39,79,.3); }
+.reader-room-dialog .reader-room-close { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: #586474; font: 400 28px/1 Arial,sans-serif; cursor: pointer; }
+.reader-room-close:focus-visible { outline: 2px solid #b88f3a; }
+.reader-room-service { margin: 0 0 8px; font-size: 1rem; }
+.reader-room-clock { margin: 0 0 18px; font: 700 1.8rem/1.25 Georgia,'Times New Roman',serif; }
+.reader-room-dialog h2 { margin: 0 0 6px; font: 700 1.35rem/1.35 Arial,sans-serif; }
+.reader-room-hebrew { margin: 0; font-size: 1.1rem; }
 @media (min-width: 760px) { .reader-columns { grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; } }
 @media print {
   .weekly-reader { max-width: none; padding: 0; color: #000; }
@@ -4696,6 +5455,7 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .reader-agenda-day > summary { display:flex; align-items:center; gap:10px; padding:16px; cursor:pointer; list-style:none; }
 .reader-agenda-day > summary::-webkit-details-marker { display:none; }
 .reader-agenda-day > summary strong { display:block; font-size:1.15rem; }
+.reader-day-occasion { font-size:.82em; font-weight:500; color:#586474; }
 .reader-agenda-day > summary small { display:block; margin-top:4px; color:#586474; font:400 .8rem/1.4 Arial,sans-serif; }
 .reader-agenda-chevron { margin-left:auto; transition:transform .2s; }
 .reader-agenda-day[open] .reader-agenda-chevron { transform:rotate(180deg); }
@@ -4895,6 +5655,40 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 .luach-home-email { text-align:center; margin:.5rem auto 1.5rem; width:100%; max-width:100%; font-size:1.05rem; color:#12274f; }
 .luach-contact-email { color:inherit; white-space:nowrap; display:inline-block; max-width:100%; text-underline-offset:3px; }
 
+/* The "new chart" pop-up: a native dialog, so Escape and the backdrop close it for free
+   and nothing here has to track focus by hand. */
+.luach-announce {
+  position: relative; box-sizing: border-box; width: min(22rem,calc(100vw - 40px));
+  max-height: calc(100dvh - 32px); overflow: auto;
+  border: 1px solid #e4e4d1; border-radius: 18px; padding: 0;
+  background: #faf7f0; color: #142b46;
+  box-shadow: 0 24px 64px #0b203b55;
+}
+.luach-announce::backdrop { background: #101f3473; }
+.luach-announce-header { position: relative; padding: 70px 24px 22px; border-radius: 17px 17px 0 0; background: linear-gradient(125deg,#102e49,#142b46); text-align: center; }
+.luach-announce-icon { position: absolute; top: 18px; left: 22px; display: grid; place-items: center; width: 48px; height: 48px; border-radius: 50%; background: #d5aa37; color: #102b44; box-shadow: inset 0 1px 0 #ffe9a459; }
+.luach-announce-icon svg { width: 26px; height: 26px; }
+.luach-announce-close {
+  position: absolute; top: 8px; right: 8px; z-index: 1; display: grid; place-items: center;
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 50%;
+  background: #ffffff14; color: #e4eaf0; font: 400 25px/1 Arial,sans-serif; cursor: pointer;
+}
+.luach-announce-close:hover { background: #ffffff24; }
+.luach-announce-close:focus-visible { outline: 2px solid #e0bd63; outline-offset: 2px; }
+.luach-announce-season { margin: 0 0 10px; color: #e0bd63; font: 700 13px/1.3 Georgia,serif; letter-spacing: 1.7px; text-transform: uppercase; }
+.luach-announce-title { margin: 0; padding-top: 10px; border-top: 1px solid #d9b9654d; color: #fffdf3; font: 700 clamp(27px,7.8vw,34px)/1.18 Georgia,serif; }
+.luach-announce-footer { padding: 16px 22px 18px; border-top: 1px solid #d7bc75; }
+.luach-announce-open {
+  display: flex; align-items: center; justify-content: center; gap: 10px; box-sizing: border-box;
+  width: 100%; min-height: 50px; padding: 12px 14px; border: 1px solid #dfb848; border-radius: 12px;
+  background: linear-gradient(105deg,#d7ae3b,#cda02e); color: #0c2237; font: 700 22px/1.15 Georgia,serif;
+  text-decoration: none; box-shadow: inset 0 1px 0 #ffe4a354;
+}
+.luach-announce-open svg { flex: none; width: 16px; height: 16px; }
+.luach-announce-open:hover { background: #dfb84b; }
+.luach-announce-open:focus-visible { outline: 2px solid #142b46; outline-offset: 3px; }
+.luach-announce-open:active { transform: none; }
+
 /* The next-minyan badge shares the date line without shifting the centered date. */
 .reader-agenda-day > summary,
 .reader-agenda-day > summary:has(.reader-next-badge) { display:block; padding:16px; }
@@ -4970,6 +5764,7 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
   color: var(--ui-accent-dark);
 }
 .calc-because { color: var(--muted); }
+.calc-round-change { display: block; margin-top: 0.15rem; color: var(--muted); }
 .calc-fallback-why { font-size: var(--fs-xs); color: var(--muted); margin: 0 0 0.4rem; }
 .calc-fallback { margin-top: 1rem; }
 .calc-fallback p:last-child { margin: 0; line-height: 1.6; }
@@ -4993,11 +5788,18 @@ body.is-luach #main :is(summary,a.luach-fund-row):active :is(h3,p,.luach-give-bo
 }
 
 .reader-schedule-links { display:flex; gap:10px; margin:0 0 12px; }
-.reader-schedule-links a { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #c9b681; border-radius:14px; background:#f0e7d0; color:#15283f; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 2px 5px rgb(21 40 63 / 5%); }
-.reader-schedule-links a:hover { background:#e9ddbd; }
-.reader-schedule-links a:active { background:#e2d3ad; }
-.reader-schedule-links a:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
-.reader-schedule-links span { font-size:22px; color:#826b37; line-height:1; }
+.reader-schedule-links .schedule-link { flex:1; display:flex; align-items:center; justify-content:center; gap:9px; padding:16px 9px; border:1px solid #c9b681; border-radius:14px; background:#f0e7d0; color:#15283f; text-decoration:none; font:600 14px/1.3 Arial,sans-serif; box-sizing:border-box; box-shadow:0 2px 5px rgb(21 40 63 / 5%); }
+.reader-schedule-links a.schedule-link:hover { background:#e9ddbd; }
+.reader-schedule-links a.schedule-link:active { background:#e2d3ad; }
+.reader-schedule-links a.schedule-link:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
+.reader-schedule-links .chevron { font-size:22px; color:#826b37; line-height:1; }
+/* Greyed rather than removed, the same call made on the Previous button just below
+   (.reader-nav button:disabled) and for the same reason: the row keeps its shape from
+   week to week rather than the button disappearing and the other one jumping under the
+   thumb. A span, not a disabled <a> - an anchor stays focusable and "clickable" to
+   assistive tech with only aria-disabled set, and there is nowhere for its href to go. */
+.reader-schedule-links .schedule-link.is-disabled { color:#8b9098; background:#f4f4f2; border-color:#ddd; box-shadow:none; cursor:default; }
+.reader-schedule-links .schedule-link.is-disabled .chevron { color:#8b9098; }
 
 
 
@@ -5013,3 +5815,230 @@ body.is-luach #main .print-btn:hover:not(:disabled) { background:#e9ddbd; color:
 body.is-luach #main .print-btn:active:not(:disabled) { background:#e2d3ad; color:#15283f; box-shadow:none; transform:none; }
 body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outline-offset:3px; }
 
+/* All public pages share the homepage's straight navy cap and thin gold edge. */
+@media screen {
+ body.is-luach { --luach-cap-height:calc(64px + var(--luach-safe-top, 0px)); --luach-arc:0px; }
+ body.is-luach .luach-bar {
+  height:var(--luach-cap-height); min-height:0; padding:0 20px; margin:0; background:#142b46;
+  border-bottom:2px solid #cbb681; align-items:center; padding-top:var(--luach-safe-top, 0px);
+ }
+ body.is-luach .luach-bar::after { display:none; }
+ body.is-luach .luach-bar::before { inset:0; }
+}
+
+/* Approved Home and Donate design. Screen-only scope preserves other page content and paper. */
+@media screen {
+ body.is-luach:has(main:is(.is-home,.is-give)) {
+  --luach-navy:#142b46; --luach-ink:#142b46; --luach-cream:#faf7f0;
+ }
+ body.is-luach main:is(.is-home,.is-give) { display:block; min-height:100dvh; padding:calc(93px + var(--luach-safe-top, 0px)) 18px 27px; }
+ .is-home .luach-home-bar-inner { display:flex; align-items:center; gap:12px; height:100%; max-width:1080px; margin:auto; }
+ body.is-luach .is-home .luach-cap-photo { position:static; width:54px; height:35px; object-fit:cover; border-radius:6px; }
+ .luach-home-bar-name,.luach-home-bar-nav { display:none; }
+ .is-home .luach-masthead { width:100%; max-width:480px; margin:0 auto 23px; }
+ .is-home .luach-approved-name text { font-size:32px; }
+ .is-home .luach-masthead .luach-place { margin:9px 0 0; font:400 21px/1.3 "David CLM","David Libre",serif !important; }
+ .luach-home-date { min-height:1.5em; margin:15px 0 0; color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
+ .luach-home-layout { max-width:560px; margin:0 auto; }
+ .is-home .luach-home { display:block; flex:none; max-width:none; margin:0; }
+ .is-home .luach-next {
+  background:#fff; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:16px;
+  padding:16px 0; margin:0 0 20px; gap:0; box-shadow:0 2px 8px #142b4603;
+ }
+ .is-home .luach-next-box { background:transparent; border:0; border-radius:0; padding:0 9px; }
+ .is-home .luach-next-head { color:#686e70; justify-content:center; }
+ .is-home .luach-next-head::before,.is-home .luach-next-head::after { display:none; }
+ .is-home .luach-next.is-paired { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); grid-template-rows:repeat(4,auto); gap:8px 0; }
+ /* Size containment prevents the shared rows from measuring the Hebrew and countdown. */
+ .is-home .luach-next.is-paired .luach-next-box { container-type:normal; row-gap:8px; grid-row:1 / 5; grid-column:1; }
+ .is-home .luach-next.is-paired .luach-next-box + .luach-next-box { grid-column:2; border-left:1px solid #e8e3d7; }
+ .is-home .luach-next.is-paired .luach-next-head { font:700 10px/1.25 Arial,sans-serif; letter-spacing:.065em; white-space:nowrap; }
+ .is-home .luach-next.is-paired .luach-next-time { font:700 34px/1.1 Georgia,serif; font-variant-numeric:tabular-nums; }
+ .is-home .luach-next.is-paired .luach-next-time small { font-size:.53em; margin-left:4px; }
+ .is-home .luach-next.is-paired .luach-next-description { min-height:0; gap:4px 8px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:22px; line-height:1.2; }
+ .is-home .luach-next.is-paired .luach-next-where { font-size:14px; line-height:1.3; }
+ .is-home .luach-next.is-paired .luach-next-when { min-height:0; margin:0; font:400 12px/1.4 Arial,sans-serif; color:#7d652d; }
+ @supports (grid-template-rows:subgrid) {
+  .is-home .luach-next.is-paired .luach-next-box { grid-template-rows:subgrid; }
+ }
+ .is-home .luach-menu { gap:12px; }
+ .is-home .luach-item { gap:16px; padding:18px 20px; min-height:90px; border:1px solid #e9e5dc; border-radius:16px; box-shadow:0 3px 10px #142b4606; }
+ .is-home .luach-item-icon { width:27px; height:27px; }
+ .luach-item-copy { flex:1; min-width:0; text-align:left; }
+ .is-home .luach-item-title { display:block; font:700 25px/1.2 Georgia,serif; }
+ .luach-item-description { display:block; margin-top:4px; font:400 12px/1.4 Arial,sans-serif; color:#64707c; }
+ body.is-luach #main.is-home .luach-coming-soon-card[aria-disabled="true"] { width:100%; background:#eceeef; border-color:#d7dbdf; color:#69747d; opacity:1; cursor:default; transform:none; box-shadow:none; text-align:left; touch-action:manipulation; user-select:none; -webkit-user-select:none; }
+ body.is-luach #main.is-home .luach-coming-soon-card[aria-disabled="true"] svg { color:inherit; opacity:1; }
+ .is-home .luach-coming-soon-card .luach-item-title { font-size:clamp(20px,calc(8vw - 5.6px),25px); white-space:nowrap; }
+ .luach-coming-soon-tag { display:inline-block; margin-top:4px; padding:1px 7px; border-radius:5px; background:#dce0e3; color:#59646d; font:600 11px/1.3 Arial,sans-serif; }
+ .is-home .luach-item:hover { box-shadow:0 4px 14px #142b4610; }
+ .luach-site-footer { width:100%; max-width:1080px; margin:36px auto 0; padding:22px 0 0; border-top:1px solid #e5e2da; text-align:center; color:#576674; }
+ .luach-site-footer .luach-foot-part:first-child { display:block; font:400 15px/1.5 Georgia,serif; }
+ .luach-site-footer .luach-foot-part:last-child { display:block; margin:3px 0 0; font:400 12px/1.6 Arial,sans-serif; color:#576674; }
+ .luach-site-footer .luach-home-email { width:auto; margin:8px 0 0; font:400 12px/1.6 Arial,sans-serif; }
+ .luach-site-footer .luach-contact-email { color:#576674; min-height:30px; text-underline-offset:3px; }
+ .luach-calculation-credit { margin:16px 0 0; font:400 12px/1.65 Arial,sans-serif; color:#64707c; }
+ .luach-calculation-credit a { color:#576674; text-underline-offset:3px; }
+ .is-home .luach-site-footer { max-width:560px; }
+ body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:calc(24px + var(--donation-scroll-room,0px)); }
+ .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; min-height:calc(100dvh - 114px - var(--luach-safe-top,0px)); margin:0 auto; text-align:left; }
+ .is-give .luach-give-page > * { flex-shrink:0; }
+ .is-give .luach-give-page:has(.luach-campaign-details:not([hidden]) .luach-payment-panel:not([hidden]) .luach-give-frame:not([hidden])) { max-width:48rem; }
+ .is-give .luach-give-head-block { margin:0 0 22px; }
+ .is-give .luach-give-heading { margin:0; text-align:left; font:700 32px/1.2 Georgia,serif; letter-spacing:-.01em; }
+ .is-give .luach-give-thanks { margin:6px 0 0; text-align:left; font:400 14px/1.6 Arial,sans-serif; color:#64707c; opacity:1; }
+ .luach-payments { background:#fff; border:1px solid #e5e2da; border-radius:18px; overflow:hidden; }
+ .luach-payment-tabs { display:grid; grid-template-columns:repeat(var(--payment-methods),minmax(0,1fr)); gap:5px; padding:7px; background:#f0eee7; border-bottom:1px solid #e5e2da; }
+ .luach-payment-tab { display:flex; align-items:center; justify-content:center; gap:7px; min-height:44px; margin:0; padding:9px 8px; color:#142b46; border:1px solid #cfc6b2; border-radius:10px; background:#fff; box-shadow:0 1px 2px #142b4612; font:600 13px/1.6 Arial,sans-serif; white-space:nowrap; cursor:pointer; }
+ .luach-payment-tab[aria-selected="true"] { background:#fff; border-color:#ddd5c2; color:#142b46; box-shadow:0 1px 3px #142b4610; }
+ .luach-payment-tab[aria-expanded="true"] { background:#142b46; border-color:#142b46; color:#fff; box-shadow:0 1px 3px #142b4620; }
+ .luach-payment-tab:hover { border-color:#b39754; box-shadow:0 2px 4px #142b461c; }
+ .luach-payment-icon { width:18px; height:18px; flex:none; }
+ .luach-payment-icon.is-zelle { width:20px; height:20px; color:#6d1ed4; }
+ .luach-payment-tab[aria-expanded="true"] .luach-payment-icon.is-zelle { color:inherit; }
+ .luach-payment-panel { min-height:356px; padding:19px 18px 12px; }
+ .luach-payment-heading { margin:0; color:#142b46; font:700 22px/1.25 Georgia,serif; }
+ .luach-payment-intro { margin:4px 0 0; color:#64707c; font:400 12px/1.6 Arial,sans-serif; }
+ .is-give .luach-copy { padding:7px 10px; margin:13px 0 0; border:1px solid #e9e7e0; border-radius:10px; background:#f5f4f0; gap:10px; font:400 12px/1.6 Arial,sans-serif; }
+ .luach-copy-info { display:flex; align-items:baseline; gap:7px; min-width:0; }
+ .is-give .luach-copy-label { color:#64707c; opacity:1; }
+ .is-give .luach-copy-value { color:#142b46; font-size:14px; font-weight:700; }
+ .is-give .luach-copy .luach-copy-btn { min-height:44px; padding:0 11px; background:#fff; border:1px solid #e1ded5; border-radius:8px; font:400 12px Arial,sans-serif; }
+ .is-give .luach-daf-providers { display:flex; flex-direction:column; gap:0; margin:15px 0 0; border:1px solid #e5e2da; border-radius:12px; overflow:hidden; }
+ .is-give .luach-daf-provider { flex-direction:row; justify-content:space-between; gap:20px; min-height:56px; padding:10px 14px; border:0; border-bottom:1px solid #eae7df; border-radius:0; }
+ .is-give .luach-daf-provider:last-child { border-bottom:0; }
+ .is-give .luach-daf-provider:hover { background:#faf8f3; }
+ .is-give .luach-daf-provider:focus-visible { outline:2px solid var(--luach-ink); outline-offset:-3px; }
+ .is-give .luach-daf-provider img { width:var(--provider-logo-width,140px); height:34px; max-height:34px; max-width:calc(100% - 40px); object-fit:contain; object-position:left center; }
+ .is-give .luach-daf-provider img[alt="The Donors Fund"] { --provider-logo-width:160px; }
+ .is-give .luach-daf-provider img[alt="Pledger"] { --provider-logo-width:112px; }
+ .is-give .luach-daf-provider img[alt="OJC Fund"] { --provider-logo-width:73px; }
+ .is-give .luach-daf-provider img[alt="Matbia"] { --provider-logo-width:99px; }
+ .is-give .luach-daf-provider img[alt="iMaaser"] { --provider-logo-width:100px; }
+ .luach-daf-arrow { flex:none; display:block; width:18px; height:18px; color:#987b3e; }
+ .luach-give-accounts { margin-top:13px; }
+ .luach-campaigns { overflow-anchor:none; }
+ .luach-campaign:has(.luach-campaign-toggle[aria-expanded="true"]) { position:relative; background:#f5f3ed; }
+ .luach-campaign:has(.luach-campaign-toggle[aria-expanded="true"])::before { content:""; position:absolute; inset:0 auto 0 0; width:3px; background:#b39754; pointer-events:none; z-index:1; }
+ .luach-campaign-heading { margin:0; font:inherit; }
+ .is-give .luach-campaign-toggle.luach-fund-row { display:flex; align-items:center; justify-content:space-between; width:100%; min-height:62px; margin:0; padding:18px 20px; border-radius:0; cursor:pointer; }
+ .luach-campaign-toggle .luach-fund-action { transition:transform .18s ease; }
+ .luach-campaign-toggle[aria-expanded="true"] .luach-fund-action { transform:rotate(180deg); }
+ .luach-campaign-toggle:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+ .luach-campaign-details.is-opening { overflow:hidden; }
+ .luach-campaign-details .luach-payment-tabs { border-top:1px solid transparent; background:transparent; }
+ .luach-campaign-details .luach-payment-panel { min-height:0; padding-bottom:20px; }
+ .luach-campaign-details .luach-payment-panel.is-zelle { padding-block:24px; }
+ .luach-campaign-details .luach-payment-panel.is-card { padding-top:10px; padding-bottom:0; }
+ .is-give .luach-reopen-form { display:flex; justify-content:center; width:100%; min-height:44px; margin:8px 0 18px; padding:10px; box-sizing:border-box; }
+ .luach-payment-panel:has(.luach-give-frame:not([hidden])) > .luach-reopen-form { display:none; }
+ @media (prefers-reduced-motion:reduce) { .luach-campaign-toggle .luach-fund-action { transition:none; } }
+ .is-give .luach-give-account,.is-give .luach-give-account + .luach-give-account { margin:0; padding:0; border-top:1px solid #eeeae1; }
+ .is-give .luach-give-account:first-child { border-top:0; }
+ .is-give .luach-fund-row,.is-give .luach-give-go.luach-fund-row { width:calc(100% + 20px); min-height:51px; margin-inline:-10px; padding:12px 10px; gap:14px; border:0; border-radius:8px; background:transparent; box-shadow:none; text-align:left; }
+ .is-give .luach-account-title { font:700 17px/1.35 Georgia,serif; letter-spacing:0; }
+ .is-give .luach-fund-action { color:#987b3e; font:400 20px/1.2 Arial,sans-serif; }
+ /* A fund stays understated during touch and while its form is open. */
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) { background:#f5f3ed; color:#142b46; border-color:transparent; box-shadow:none; }
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) .luach-account-title { color:#142b46; opacity:1; text-decoration:none; }
+ body.is-luach #main.is-give .luach-fund-row:is(:hover,:active,[aria-expanded="true"]) .luach-fund-action { color:#987b3e; opacity:1; }
+ .luach-payment-panel.is-zelle { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; }
+ .luach-zelle-roundel { display:flex; align-items:center; justify-content:center; width:70px; height:70px; margin-bottom:15px; border-radius:50%; background:#6d1ed4; color:#fff; }
+ .luach-zelle-logo { width:43px; height:43px; }
+ .luach-zelle-recipient { margin:16px 0 0; color:#142b46; font:600 15px/1.5 Arial,sans-serif; }
+ .luach-payment-panel.is-zelle .luach-copy { align-self:stretch; justify-content:center; }
+ .luach-payment-panel.is-zelle .luach-copy-info { justify-content:center; max-width:100%; }
+ .luach-payment-panel.is-zelle .luach-copy-btn { margin:0; }
+ /* Keep the contact and nonprofit details together, after forms and spare height. */
+ .is-give .luach-site-footer { max-width:none; margin-top:auto; padding-top:17px; border-top:0; }
+ .is-give .luach-site-footer::before { content:""; display:block; height:1px; margin:9px 0 17px; background:#e5e2da; }
+ .is-give .luach-home-email { margin:3px 0 0; }
+ .is-give .luach-contact-email { min-height:32px; }
+ .is-give .luach-give-legal { max-width:none; margin:11px 0 0; padding:0; text-align:center; color:#707982; font:400 10.5px/1.6 Arial,sans-serif; opacity:1; }
+ .is-give .luach-give-legal p { margin:0; }
+ .is-give .luach-give-legal p + p { margin-top:2px; }
+ .is-give .luach-give-ein { display:inline-block; white-space:nowrap; }
+ .is-give :is(.luach-payment-tab,.luach-payment-panel):focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+
+}
+@media screen and (max-width:34rem) {
+ .is-give .luach-give-frame { margin-inline:-18px; }
+}
+@media screen and (max-width:350px) {
+ body.is-luach main:is(.is-home,.is-give) { padding-inline:14px; }
+ .is-home .luach-next.is-paired .luach-next-head { font-size:9px; letter-spacing:.015em; }
+ .is-home .luach-next.is-paired .luach-next-time { font-size:30px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:20px; }
+ .is-home .luach-next.is-paired .luach-next-when { font-size:11px; }
+ .is-home .luach-item { padding:17px; }
+ .is-home .luach-item-title { font-size:24px; }
+ .is-home .luach-item-description { font-size:11px; }
+ .luach-payment-tab { gap:5px; padding-inline:5px; font-size:11px; }
+ .luach-payment-panel { padding-inline:15px; }
+ .is-give .luach-account-title { font-size:16px; }
+ .luach-copy-info { gap:5px; font-size:11px; }
+ .is-give .luach-copy-value { font-size:13px; }
+ .is-give .luach-copy .luach-copy-btn { padding-inline:9px; }
+ .is-give .luach-give-frame { margin-inline:-15px; }
+}
+@media screen and (min-width:760px) {
+ body.is-luach { --luach-cap-height:calc(78px + var(--luach-safe-top, 0px)); }
+ .is-home .luach-cap-photo { display:block; }
+ .is-home .luach-home-bar-name { display:block; font:600 14px Georgia,serif; color:#fff; }
+ .is-home .luach-home-bar-nav { display:flex; align-items:center; margin-left:auto; gap:24px; font:400 14px Arial,sans-serif; }
+ .is-home .luach-home-bar-nav a { display:flex; align-items:center; min-height:44px; color:#fff; text-decoration:none; }
+ body.is-luach main.is-home { padding:calc(119px + var(--luach-safe-top, 0px)) 28px 28px; }
+ main.is-home .luach-masthead { width:100%; max-width:620px; margin:0 auto 30px; padding:12px 20px 0; }
+ .is-home .luach-masthead-name { width:100%; margin:0; }
+ .is-home .luach-approved-name { max-width:580px !important; }
+ .is-home .luach-approved-name text { fill:#142b46; font-size:37px; }
+ .is-home .luach-masthead .luach-place { color:#142b46; margin-top:13px; font-size:29px !important; }
+ .is-home .luach-home-date { margin-top:18px; color:#64707c; font-size:12px; }
+ .luach-home-layout { display:block; max-width:640px; margin:0 auto; }
+ .is-home .luach-home { max-width:640px; margin:0 auto; }
+ .is-home .luach-next { max-width:480px; padding:6px 18px; margin:0 auto 18px; border-radius:15px; box-shadow:0 4px 16px #142b4605; }
+ .is-home .luach-next-time { font-size:36px; line-height:1.1; }
+ .is-home .luach-next-time small { font-size:.55em; }
+ .is-home .luach-next-what { font-size:26px; }
+ .is-home .luach-next-when { margin-top:2px; font-size:13px; line-height:1.3; }
+ .is-home .luach-next-head { font:700 10px/1.2 Arial,sans-serif; letter-spacing:1.6px; margin-bottom:2px; }
+ .is-home .luach-next.is-paired { max-width:560px; gap:3px 0; }
+ .is-home .luach-next.is-paired .luach-next-box { row-gap:3px; }
+ .is-home .luach-next.is-paired .luach-next-head { font-size:11px; }
+ .is-home .luach-next.is-paired .luach-next-time { font-size:34px; }
+ .is-home .luach-next.is-paired .luach-next-what { font-size:22px; }
+ .is-home .luach-next.is-paired .luach-next-when { font-size:13px; }
+ .is-home .luach-menu { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; width:100%; max-width:480px; margin:0 auto; }
+ .is-home .luach-home:has(.luach-next.is-paired) .luach-menu { max-width:560px; }
+ .is-home .luach-item { min-height:106px; padding:16px 18px; gap:12px; border-radius:15px; }
+ .is-home .luach-item-title { font-size:27px; }
+ .is-home .luach-coming-soon-card { grid-column:1 / -1; max-width:calc((100% - 18px) / 2); justify-self:center; }
+ .is-home .luach-coming-soon-card .luach-item-title { font-size:21px; white-space:normal; }
+ .is-home .luach-site-footer { max-width:640px; margin-top:46px; padding-top:25px; }
+ body.is-luach main.is-give { padding-top:calc(112px + var(--luach-safe-top, 0px)); }
+ .is-give .luach-give-head-block { margin-bottom:25px; }
+ .luach-payment-tab { font-size:14px; }
+ .luach-payment-panel { padding:22px 24px 15px; min-height:367px; }
+ .is-give .luach-fund-row { min-height:52px; }
+ .is-give .luach-site-footer::before { margin-top:15px; }
+}
+
+@media screen {
+  .special-asara-options .week-switch { width: 100%; }
+  .special-controls .special-asara-options .week-switch-side { min-width: 0; white-space: normal; font-size: 0.75rem; padding: 0.5rem 0.2rem; display: flex; align-items: center; justify-content: center; }
+  .special-print-job { gap: 1.6rem; }
+  .special-job-page { width: 100%; min-width: 0; }
+  .special-job-page, .special-add-page { scroll-margin-top: 1rem; }
+  .special-job-heading { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.6rem; }
+  .special-job-heading h4 { margin: 0 auto 0 0; font-size: 1rem; }
+  .special-job-heading > div, .special-job-actions, .special-add-all { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .special-job-heading button, .special-job-actions button, .special-add-all button { font-size: var(--fs-xs); padding: 0.4rem 0.6rem; }
+  .special-job-actions { margin-top: 0.8rem; }
+  .special-job-half { width: 100%; display: flex; justify-content: center; }
+  .special-add-page { display: grid; gap: 0.7rem; margin-top: 0.7rem; padding: 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .special-add-page h4 { margin: 0; }
+  .special-add-page label { min-width: 0; font-size: var(--fs-sm); }
+  .special-add-page select { width: 100%; min-width: 0; display: block; margin-top: 0.3rem; }
+  .special-add-all { border-top: 1px solid var(--border); padding-top: 0.7rem; }
+}

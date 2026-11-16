@@ -172,7 +172,10 @@ export function weeklyAgenda(data, showing, state, settings, now = new Date()) {
     agendaSection(e,e.serial,settings).key,
     e.serial - (e.mins < 180 && /מעריב/.test(e.name) ? 1 : 0), e.name,
   ]);
-  const activeCategories = new Set(normalized.filter(e=>!e.auxiliary && delta(e)>=-5).map(categoryKey));
+  // 30 rather than the "Just started" badge's own 5 below: that one is about whether a time
+  // just happened, this is about whether the whole section (every time sharing its name and
+  // day) is still worth showing at all, asked for as a longer window on its own.
+  const activeCategories = new Set(normalized.filter(e=>!e.auxiliary && delta(e)>=-30).map(categoryKey));
   const remaining = normalized
     .filter(e=>e.auxiliary ? delta(e)>=0 : activeCategories.has(categoryKey(e)))
     .filter(e=>{const key=JSON.stringify([e.serial,e.mins,e.name,e.place]);if(unique.has(key))return false;unique.add(key);return true;})

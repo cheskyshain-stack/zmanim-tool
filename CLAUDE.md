@@ -2,11 +2,30 @@
 
 Printable zmanim boards for קהל לב מנחם (Bais Medrash Lakewood Commons, 44 Coles Way,
 Lakewood NJ). Three charts: שבת קיץ, שבת חורף, and a Weekday chart. Ported 1:1 from
-`../Lakewood Commons Zmanim tables.xlsx`, which is NOT in this repo but is the source of
-truth for every calculation. If a number looks wrong, the workbook decides, not a zmanim
-library.
+`../Lakewood Commons Zmanim tables.xlsx`, the user's supplied reference workbook.
+Its **FUNCTIONS** sheet, workbook defined names, **SETTINGS**, time zones and calendar
+tables are the source of truth for astronomical zmanim and calendar calculations.
+The two chart tabs are schedule and layout examples, not the calculation authority.
+Keep the user's later minyan schedules, rounding rules and configured shul location.
+If a calculated zman looks wrong, the calculation definitions decide, not a zmanim library.
+
+The supplied file's SHA256 is `64d2c2289a8b359cf1438a79dcaaf1a9798d6f46791e97db3b540e5293185c2f`.
+`fixtures/workbook-zmanim.json` preserves the exact shared named formulas, source cell
+locations, original Settings values and time-zone table, excluding both chart templates.
+Re-extract with `python scripts/extract-workbook-zmanim.py` (or pass the workbook path).
+`node --test tests/workbook-zmanim.mjs` independently evaluates those Excel definitions
+and compares the site's shared functions across a full year and elevation/chatzos settings.
+Degree-based Alos 16.1, Misheyakir 10.2 and Tzais 8.5/16.1 explicitly use zero elevation.
+Minute-based zmanim retain the workbook's elevation toggle. Preserve the UTC instant
+in `calcTIMEZONE`; use local wall time in `calcDST_LOCAL`. Both have 2am boundaries,
+and the workbook uses the standard UTC offset for both UTC transition thresholds.
+The actual homepage clock uses IANA timezone rules separately from that calculation rule.
 
 Live at https://baismedrashoflakewoodcommons.org (GitHub Pages from `main`, CNAME in the repo).
+The shared public website footer credits **Zmanim calculations by Shai Hershfeld**,
+with his name linking to `mailto:rambamkh@gmail.com`. Use the approved quiet 12px
+footer style below the shul's contact details. Do not mention a spreadsheet in the
+visible credit. This is website attribution, excluded from printed sheets.
 It was on lczmanim.cjaffa.com until the shul took a domain of its own. The address is written
 in `SITE_URL` in `build-offline.py` and in `CNAME`, and everything else is stamped from there.
 Read `README.md` for how a user runs it. This file is about changing it.
@@ -26,12 +45,157 @@ history turned out to be wrong and had to be retracted. Measure with
 **The user prints these boards.** A visual regression on paper is a real cost, not a
 cosmetic one. Layout invariants below are not preferences.
 
+Controls that update the current page must keep the clicked control in the same screen
+position, preserve open panels, and restore keyboard focus. Use `ui/keep-position.js`
+around redraws and late chart fitting. Restore synchronously so a later manual scroll
+or navigation is never pulled back. New pages still open at the top; pressing an already
+active page button stays put. Rule editors open beside their row.
+Donation campaigns expand in place. Only selecting a payment method deliberately
+scrolls that campaign's heading just below the public header in 360ms; respect reduced
+motion and cancel on manual input or navigation.
+`tests/button-scroll.cjs`
+checks public and admin controls, copy fallbacks, and delayed statistics at phone and
+desktop widths.
+Adding a special-schedule page deliberately scrolls: smoothly reveal the inline
+picker, then the added page or updated half-page pair. Bulk additions reveal the
+first added or filled page. Focus the picker or preview heading without an extra
+focus scroll, honor reduced motion, and cancel animation on user wheel, touch,
+pointer or keyboard input. Remove interruption listeners when scrolling ends or a
+new reveal starts. Do not schedule a later scroll that could pull the user back
+after a manual scroll.
+
+## Special schedules and chart printing
+
+The rejected Schedules/Pages/Appearance navigation remains removed. Special schedules
+now start with **Year**, **Occasion**, and one **New design / Old design** switch.
+New design uses the compact page and is the default; Old design uses the framed original where available.
+This includes both paired posters, Rosh Hashanah/Yom Kippur and Selichos/Tzom Gedalia.
+Their compact rows come from the same paired builders, with every Selichos morning
+retained on its standalone pair. Do not fall back to the framed pair under New design.
+Standalone Yom Kippur and its paired page also retain the after-Yom-Kippur schedule
+in compact form. The whole-occasion page has that section separately, so do not repeat it there.
+Pages with just one design remain available with either selection. Keep
+plus/minus/Current controls and position/focus during changes.
+The Occasion dropdown has Yom Tov, Rosh Chodesh and Other schedules sections.
+Rosh Hashana and Yom Kippur are one choice, opening the whole-occasion page with
+all its schedules. Netz is a separate direct choice for their combined Vasikin page.
+Netz has the approved New design: the original building picture and chart header,
+with the divider immediately below that header, then its motto, title and location.
+The two Rosh Hashana days appear side by side above the centered Yom Kippur schedule,
+with shaded section bars, ruled rows and the shul address at the foot. Keep all 15
+source times, including sunrise seconds and explanation traces. Old design retains
+the framed original. The public Special Schedules page uses the new Netz layout.
+Fit large margins without clipping text or splitting the portrait Letter page.
+`tests/modern-netz-design.cjs` checks both designs, years with Shabbos headings,
+margin extremes, original photo, explanation traces, public pages and native PDFs.
+Individual and paired pages remain in the Page dropdown. Selichos, Tzom Gedalia,
+Shabbos Shuva and the after-Yom-Kippur page are also separate other occasions.
+Rosh Chodesh appears once in the main Occasion dropdown and the Add-page Occasion
+picker. Selecting that main occasion opens all available months for the year.
+The separate Month picker offers **All Rosh Chodesh** and each available month,
+including both leap-year Adars and omitting Shabbos-only handouts. Keep its stepper.
+The main Occasion dropdown also offers **All Yom Tov**. These selections open the
+matching available pages using the normal multi-page print job. All Yom Tov uses the
+whole Rosh Hashana/Yom Kippur page once, plus the Netz page, without duplicate individual
+Yomim Noraim or alternate paired posters. Show unavailable holiday
+groups, including Shavuos, clearly without adding an empty printed page.
+Save the active collection and its `category/yomtov` or `category/roshchodesh`
+route. Changing year rebuilds the applicable set; design and margin changes retain
+it and its page IDs. Selecting an individual schedule leaves the collection for
+one page. Adding, removing, pairing or reordering pages leaves the automatic set
+and preserves the user's edited print job, including after reload.
+Use `specialOccasionChoices` for the main and Add-page dropdowns. Direct dropdown
+values use `poster:` without changing the canonical saved poster keys, group names
+or routes. Older paired/whole-occasion selections remain accessible in the Page
+dropdown under their occasion. Occasion plus/minus follow the displayed dropdown order,
+including All Yom Tov and the boundaries between its three sections.
+Page (and the Rosh Chodesh Month selector) also has minus/plus/Current controls.
+Keep the selection panel compact, capped at 30rem rather than filling a wide screen.
+Each dropdown comes first with its minus/plus pair on the right; Current sits beside
+the field label. Margin uses the same layout with Original. Phone touch buttons
+remain at least 44px tall. These are screen controls, not printed layout changes.
+Font-ready preview fitting preserves its current scroll position synchronously,
+including after a reset moves focus to that field's dropdown.
+Current chooses the active or next page within the selected occasion, falling back
+to its first available page when that occasion has ended. Hebrew occasion routes
+must encode individual URL segments and decode them before comparing or selecting,
+so whole-occasion pages survive selection, reload and browser Back/Forward.
+Under New design, standalone Selichos, Tzom Gedalia and the schedule after Yom Kippur
+use real half-page handouts, with all rows and notes retained. Their Old design stays
+full size. Reuse the same margin/ink controls, pairing and regular 6.5pt footer size.
+
+The **+ Custom schedule** button is removed. Retain already saved custom sheets and
+editing them. Asara B'Teves has three top choices: regular Shacharis/Mincha/Maariv,
+Shacharis only, and Shacharis with locations plus Mincha/Maariv on one page.
+Use the original full/half-page renderers and calculations. On Friday, retain that
+Friday's canonical schedule rather than adding weekday Maariv times.
+
+Each open page offers **Add another page**. Half pages also offer **Add on the other
+half**. The inline picker replaces separate Print a set / Pair half pages screens.
+It also offers bulk additions; reuse empty halves and avoid duplicate selections.
+`js/ui/special-print-job.js` retains logical selections when a design needs separate
+physical sheets. Mixed jobs use portrait Letter with half-page pairs turned together;
+all-half jobs use landscape Letter. Keep real 5.5 x 8.5 inch halves and fixed footers.
+Remember jobs in `zmanim-poster-bar-v1.printPages`, preserving old settings and migrating
+old pairings, location styles, sets and duplicate copies. Skip Shabbos-only Rosh
+Chodesh selections in a standalone handout when stepping to a new year; explicitly
+queued unavailable pages must be resolved before printing.
+
+Automatic seasons use two parts, except winter in a Hebrew leap year uses three.
+Use `defaultSeasonPageCount` for the automatic charts, Generate defaults and the
+summer first-page badge range. Keep matching weekday parts aligned by date. Older
+published sheet splits must not restore the retired three-part default; explicit
+`chartLayouts` and saved local print copies retain their chosen layouts.
+Three-part winters use a balanced split, putting an extra week in the middle
+first: 28 weeks is 9/10/9. Default winter boundaries must keep all Chanukah rows
+on one part, on both the
+Shabbos and weekday charts. Use `defaultSeasonPageSizes`, including each Shabbos
+anchor's preceding weekdays, so a Sunday tail is not split off. When a boundary
+cuts Chanukah, compare the safe boundaries before and after the holiday and
+rebalance the remaining parts. Choose the most even allocation, breaking ties
+before Chanukah. Thus 5784 and 5787 use 10/9/9 rather than 8/10/10. In 5790 the
+split remains 9/10/9, matching the approved PDF: part one ends with
+Vayeshev, part two runs Miketz through Terumah, and part three starts Tetzaveh.
+Keeping Chanukah together takes priority over balancing the parts evenly.
+Generate's default allocations use the same rule.
+
+Seasonal charts and saved charts print on separate Letter pages without a visible
+paper/layout label above Print. Together on Letter and 11 x 17 choices are removed;
+old remembered combined values fall back to separate pages without changing stored
+charts. Weekly schedule cards keep their own layout
+options. Keep the fractional-measurement correction below.
+
+Weekly card fitting compares text and available height in the same painted coordinates,
+including the preview zoom inherited by a full-season run. Refit after preview zoom
+changes. Do not compare a zoomed `getBoundingClientRect` with an unzoomed
+`clientHeight`: that enlarges phone printouts
+until their final rows are clipped. `tests/weekly-season-print.cjs` covers the actual
+53-page winter job and summer runs at phone and desktop widths, including native PDFs
+with every clock, room underline and footer retained.
+
+Weekly printed morning groups appear in order of their first weekday, with matching
+schedules still grouped together. Sort ordinary, Selichos, fast, Chanukah and Rosh
+Chodesh blocks by the earliest day they actually cover, including ordinary mornings
+that start after a holiday. `weekdayMornings.everydayDays` supplies those ordinary days.
+`tests/weekly-morning-order.cjs` checks separate and combined cards, chronological
+holiday weeks, all clocks and the native PDFs at phone and desktop widths.
+
+Current browser checks: `tests/contextual-special-printing.cjs` covers the new controls,
+all Asara choices, fallbacks, additions, pairing, bulk jobs, migration, existing custom
+sheets, fixed footers and actual PDF geometry. `tests/shacharis-handouts-print.cjs`
+checks the complete BHB/Asara/Rosh Chodesh handouts, and `tests/button-scroll.cjs`,
+`tests/time-explanations.cjs` and `tests/saved-chart-fit.cjs` retain their broader checks.
+The older control-specific suites for retired workflow/copy/combined-chart pickers
+are consolidated into these current tests. Their prior fixtures remain in Git history.
+The original setup remains backed up at `backup/print-navigation-2026-10-12`.
+
 ## Deploy loop
 
 Every change follows this, in order:
 
 1. Edit `js/`, `css/`, `index.html`, `data/`, or `assets/`.
-2. `python build-offline.py` (always, even for CSS only, see below).
+2. `python build-offline.py` (always, even for CSS only, see below), followed by
+   `node scripts/build-schedule-api.mjs` with Node.js 24 to generate the public API.
 3. Serve and test locally on a **fresh, unused port**: `python -m http.server 8907`.
    Reusing a port you served from earlier in the session gets you a cached page and a
    false pass.
@@ -69,10 +233,11 @@ Run it after **any** change to `js/`, `css/`, `data/`, or `assets/`:
   comment nodes in the DOM and are just as readable in devtools.
 - Stamps the analytics loader into `index.html` from `ANALYTICS_TOKEN`, before the route pages
   are written so they inherit it. Empty means nothing is written and anything an earlier run
-  wrote is taken out, so turning analytics off is emptying that line. The congregation's page
-  only: `/admin/` is a different file and the offline copy is built out of `/admin`, so a USB
-  stick carries nothing that would try to phone home.
-  It is a loader rather than the beacon's own tag because two of the three answers to "who is
+  wrote is taken out, so turning analytics off is emptying that line. The online `/admin/`
+  also carries a loader, which waits for `zmanim-admin-open` after the PIN is accepted or
+  remembered. Its `spa: false` setting counts document opens, not changes between tabs.
+  The offline build strips the loader, so a USB stick never sends analytics.
+  It is a loader rather than the beacon's own tag because the answers to "who is
   being counted" have to be given before the request goes out. It asks for the beacon only when
   `location.hostname` is `SITE_URL`'s own host, so a local `python -m http.server` and any
   preview count nothing, and only when this browser has not asked to be left out. **Opening the
@@ -98,7 +263,19 @@ that fakes a tint is a row of magic numbers nobody can check. The icon links liv
 `build-offline.py` strips that block, because the paths are site absolute and a web
 manifest cannot be fetched over `file://` at all.
 
-Both manifests carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
+Calendar, Seating and Yahrzeit have their own installable identities. The manifests
+use `/admin/calendar/`, `/seats/` and `/yahrzeits/` as their respective id, scope and
+start_url. Each installation opens its own tool. Their matching navy, cream and gold
+artwork lives under `icons/calendar/`, `icons/seats/` and `icons/yahrzeits/`.
+Run `node scripts/make-tool-icons.cjs` with the test Playwright and Chrome setup after
+editing a source SVG. Pass a tool folder name to rebuild only its art. Commit the
+generated PNGs. It creates ordinary 192/512px icons,
+maskable versions with all artwork inside the central 80%-diameter safe circle,
+180px Apple touch icons and mark-only 16/32px favicons. Keep the page icon URLs
+and manifest icon URLs versioned when changing artwork. Leave the original
+Zmanim/admin icons and application identities intact.
+
+The print-capable apps carry `"display_override": ["standalone"]` **and** `"display": "browser"`,
 and that pair is load-bearing, not a leftover. Android reads `display_override`, so Chrome
 installs the site as a real app: no Chrome badge on the icon, and the launcher gets the
 maskable icon instead of zooming and cropping the plain one. Safari does not implement
@@ -108,6 +285,42 @@ Collapsing the two into a plain `"display": "standalone"` would take printing aw
 every iPhone that has it on a home screen. Ask Chrome rather than guessing at any of this:
 CDP `Page.getInstallabilityErrors` names the reason a site will not install, and it has to
 be run in a persistent profile or the only answer you get is `in-incognito`.
+The private Calendar uses standalone on iPhone as well so its Home Screen app
+can receive opt-in phone reminders. It has no print action. Keep its separate identity.
+The public HTML `theme-color` remains cream (`#faf7f0`) for browser tabs and older
+installed app copies. The manifest `theme_color` is navy (`#142b46`), with the cream
+`background_color` retained. Keep the public head's `color-scheme: light` and the
+public root's `color-scheme: only light` for page controls.
+The user's actual Chrome 155 reports confirm Android standalone mode, a 384 x 750
+fitted viewport inside a 384 x 832 screen, and zero safe-area insets even with
+`viewport-fit=cover`. Do not guess a bottom strip from the combined screen-height gap.
+Chrome's fitted installed-app navigation bar uses the saved manifest theme, while
+the page's theme can change before that installed metadata updates. An early navy
+page-only change hid the bottom buttons on this phone.
+`js/ui/system-bars.js` now waits for the updated manifest launch URL,
+`/?app-theme=navy-v1`, before requesting navy in a fitted installed Android app.
+Chrome updates `start_url` and `theme_color` together. Keep the manifest `id: "/"`
+stable. Remove the launch parameter from the visible URL before it can be shared,
+and remember it in sessionStorage across page navigation/reloads. A browser tab must
+never set that installed-app marker. Do not ask an old app to open that versioned URL
+manually, since that would bypass the native-theme update safeguard.
+Older installed copies retain cream until Chrome refreshes their app metadata. If
+an actual bottom inset is exposed, its measured navy background can also permit
+navy; observe inset changes, reserve footer clearance, respect the top inset, and
+omit this area from print. Do not force edge-to-edge to try to expose native bars.
+Regular browser tabs, desktop and iOS retain their existing layout.
+The public entry heads are copied from `index.html` by `build-offline.py`. Browser
+emulation can verify the hints and light/dark preferences but does not render Android's
+native Home/Back/Recents buttons, so do not claim a device-level visual verification.
+`tests/installed-system-bars.cjs` checks old/new installed app launches, the browser
+case, blocked storage, session continuity, safe-area fallback/painting, rotation,
+footer clearance and print. The temporary Check app display control has been removed.
+Chrome's installed manifest refresh can take a day and waits for the app to close;
+the documented manual update uses `chrome://webapks` while charging on WiFi.
+Reference: https://web.dev/articles/manifest-updates#updates_on_chrome_for_android
+Chromium implementation: `WebappIntentDataProvider.ColorProviderImpl.getNavigationBarColor`
+and `BaseCustomTabActivity.updateNavigationBarColor` use the installed theme for
+the fitted system bar. Do not claim native button verification from desktop tests.
 
 The user has said the offline copy does not need to keep gaining new features, so do not
 contort a design to fit it. Keep running `build-offline.py` regardless: the cache
@@ -121,9 +334,477 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 ## Layout invariants for the charts
 
-- A page is letter landscape: 11in x 8.5in, which is 1056 x 817 px on screen at 100%.
-  All pages must measure 817px high. If they don't, something overflowed.
-- **Every row in a chart is the same height, including the header row.** The header may
+All Mincha Gedola-based schedule rules use **Mincha Gedola Lechumra**, the later
+of Gra Mincha Gedola and astronomical Chatzos plus 30 regular minutes. The weekly
+Sunday-Friday limit excludes full Yom Tov and rounds up to the whole minute.
+Friday's 12:30 opening uses that Friday's Lechumra value and rounds directly up
+to five minutes, preserving seconds until rounding. Holiday opening checks also
+round their lower limit up, never to the nearest minute. Custom calculated Mincha
+Gedola rows use Lechumra and offer only upward one- or five-minute rounding;
+older saved rounding choices resolve the same way. Keep the MGA 16.1° calculation
+available as a comparison zman and retain the workbook definitions themselves.
+`tests/mincha-gedola-lechumra.mjs` checks limits, seasonal branches, holiday
+openings, downstream schedules and legacy custom rows.
+
+Chart printing uses separate landscape Letter pages, with Shabbos page 1 followed
+by its matching weekday page 1, and so on. Each physical chart is 1056 by 816px
+(11 by 8.5 inches). Preserve every source cell, saved override, rule, room mark,
+Molad note and explanation attribute. Keep print controls and screen scaling off
+paper. Previously stored combined-layout preferences must not restore those removed
+choices. The legacy combined renderer remains internal; no live chart picker uses it.
+The congregation's `/chart/` enables `highlightCurrentWeek` on the chart browser.
+Show a gold This week badge, light row bands and a pointer in each page's right
+margin. Draw them outside `.pages`, as a screen-only sibling, without modifying
+the printable tables or their cells. Leave the standing Weekday Shacharis panel
+unshaded. Follow the shul's clock, Website preview and the existing end-of-week
+rule from the last printed Shabbos minyan. If the week has no row in the displayed
+chart, omit the indicator rather than marking a later week. Resize/font changes
+must keep pointers centered; navigation must dispose timers and observers.
+Admin/saved charts do not enable it. `tests/chart-current-week.cjs` measures phone
+and desktop alignment, holiday gaps, previews, automatic rollover and identical
+native print/PDF pixels with the screen decoration present and removed.
+Chart location underlines use a text-relative 0.1em offset so they stay close to the
+digits when a crowded chart shrinks. Keep each location underline continuous.
+
+When fitting chart height, ignore DOMRect differences smaller than 1/256 CSS pixel.
+Fractional screen placement can
+report an exact 816px page as 816.00024px; a strict comparison repeatedly shrinks
+every page to the 10% floor and falsely warns of zero pixels of overflow. Always
+start each fit from the saved font size, keep detecting genuine content overflow,
+and leave saved styles untouched. `tests/saved-chart-fit.cjs` reproduces fractional
+placement in the restored controls on mobile/desktop and verifies full-size fonts,
+recovery, saved data and native six-page landscape Letter PDFs.
+
+The standard chart palette uses neutral gray (`#cecece`) with neutral borders and
+shadows, plus black print text on white paper. Upgrade the old blue-gray default in
+saved charts and published settings. Black and white mode sets gray colour values
+directly, preserving PDF text; CSS grayscale filters rasterize the tables and text.
+`tests/chart-print-colors.cjs` checks actual PDF colours and selectable text in both
+ink modes, including saved defaults and a custom colour.
+
+CMYK controls belong only in Seats. Public charts, weekly pages, the luach, special
+schedules and other admin tools keep ordinary browser printing without a CMYK
+button, converter import or converter stylesheet. Browser Print / Save as PDF
+cannot guarantee CMYK output. In Seats, **Print options > Convert saved PDF**
+converts an already saved PDF locally using pinned, lazily loaded PDF.js under
+`vendor/pdfjs-6.5.438/`. `cmyk-document.js` writes Flate-compressed DeviceCMYK images
+at 1200 dpi using the shared `js/print-quality.js` policy. Both PDF exporters draw
+bounded 4096 by 1024 pixel tiles instead of allocating a page-sized bitmap or
+silently reducing resolution on large paper. Compression is lossless. The generic
+converter preserves physical page sizes and rotation. Neutral pixels use K
+only. This explicit copy flattens text; native printing must retain selectable text.
+For this saved-file converter, do not label native printing as CMYK, claim PDF/X
+compliance, or imply a specific ICC profile. No printer profile was supplied.
+Seats also has a direct, profiled SVG export described in its section below. The file picker never uploads its input.
+Keep conversion separate from HTML rendering: the old html2canvas/jsPDF exporter
+remains disabled. The USB copy keeps native printing without this hosted-only tool.
+Default modern building photos use the existing 1400px source rather than its
+240px thumbnail. Preserve custom images and the original workbook artwork.
+`node --test tests/cmyk-document.mjs` checks ink separations; `node tests/cmyk-pdf.cjs`
+checks the absence of CMYK outside Seats, conversion of saved chart/Netz/Seats
+PDFs from the seating tool, rotated mixed paper, mobile geometry,
+invalid/encrypted files, cancellation, download, colour spaces and page appearance.
+
+The Chanukah morning block uses a light neutral 4% gray (`#f5f5f5`). Draw it as
+decorative SVG artwork behind selectable text as well as a CSS background, so browsers
+can retain it when background graphics are disabled. Add the artwork after building the
+schedule grid; it must not change time parsing, explanations or chart geometry.
+Center the standing weekday Shacharis information and the Chanukah addition together
+as one block in the white panel, with the usual small gap between their schedules.
+`tests/chart-print-colors.cjs` checks its pixels with background printing disabled and
+economy colour adjustment on desktop and phone PDFs. Printer toner-saving controls can
+still change how light shading appears on paper.
+
+Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
+candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
+the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
+
+Every Sunday during Chanukah has an extra downstairs Mincha at 12:30. Move it later
+in five-minute steps until it is strictly after that Sunday's exact Mincha Gedola
+Lechumra, without rounding the limit down. Share this rule between the poster,
+weekday chart's Sunday-only note, daily schedule, next minyan, API, and weekly text.
+On the seasonal weekday chart, show the extra time inline with the other Mincha
+times, using the compact **חנוכה יום א׳** tag. Balance this cell with the tagged time
+and 1:00 on the first line, followed by 1:15 / 1:35 / 1:50 / 4:15 below. Keep the
+original line breaks in other chart cells and poster lists.
+Label the extra time Sunday only on both full-page and half-page Chanukah posters.
+If Chanukah includes two Sundays with different extra times, label each with its
+Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.
+
+Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
+under **New design**. **Old design** keeps the original full-page
+portrait poster, including its original headings, spacing and location notes; they
+never show or apply the Copies per page switch, even when two copies was remembered.
+Keep the original full-page type sizes. Tighten section gaps only when the extra
+Sunday line needs room to keep the location notes within the print margins.
+The original poster's last schedule block has no trailing margin; the legend provides
+the gap so its location notes stay clear of the frame even with six sunrise references.
+The contextual **Add on the other half** action selects another handout, including
+a second copy of the same page, for a manual cut. The default is one;
+both choices keep the same design and physical size.
+The half-page letterhead uses a larger 2.7in wordmark, with balanced 0.9in corner
+columns for the photo and rabbi's line. Let the wordmark shrink within its column
+when a wider print margin reduces the space, keeping all three parts clear.
+Reserve the logo's aspect ratio before loading so the fit includes its full height.
+The Shacharis day-group labels are bold. Keep Shacharis together,
+including all sunrise day labels in a compact strip with clear gaps between each
+day/time pair, followed by one Mincha section and Maariv. In New design, every
+Mincha day group has its complete menu under the single **מנחה** heading, including
+Sunday's extra time and Erev Shabbos. Order groups by their earliest actual date.
+Use weekday labels and Erev Shabbos parsha labels; when two Sundays or Fridays have
+different menus, keep separate rows with their own parsha names. The original
+full-page poster retains its separate **מנחה ערב שבת** heading. The printed Erev Shabbos list ends at
+3:00: omit the trailing candle-lighting reference from the shared poster menu, without
+adding a separate candle-lighting section. Retain the earlier Mincha times and location
+notes. Fit the type
+at full size and refit when fonts arrive; a phone's preview zoom must not reach paper.
+If a large margin leaves too little room at the minimum type size, tighten the
+compact Chanukah row padding, then extra line and section gaps, enough to keep all
+menus and the footer within the margin. Retain at least 9.5pt times, including years
+with two distinct Sunday menus at the largest margin. Outer row padding may reach
+0.01in and extra section gaps 0.04in only when needed to fit those dense pages with the fixed 18pt headings;
+retain the time lines' leading and verify clearance above the footer rule.
+Mixed whole-year runs keep portrait Letter paper and rotate the half-size handouts
+onto the top half, or both halves, of their own page. Public Special Schedules keep their full-page layout.
+`tests/contextual-special-printing.cjs` checks native half-page and mixed-job
+pagination, both designs, additions, remembered choices, margin extremes and content
+retention at phone and desktop widths.
+
+The after-Sukkos extra 9:00 Maariv is kept through Thursday, October 8, 2026 in Lakewood
+and omitted from Friday onward, including future years previewed before that date.
+`buildSukkosAfter` applies the cutoff to the shared list read by posters and weekday
+charts. The after-Yom-Kippur and Chol Hamoed lists keep their own 9:00 minyanim.
+
+Asara B'Teves has its own Special Schedule, built from the seasonal chart's fast-day
+Shacharis list. Add `סליחות קודם שחרית` at 6:40 only when sunrise is later than 7:05.
+Weekday Mincha is 12:45 downstairs, 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
+3:30 downstairs, and a final main minyan at least 40 minutes before true sunset,
+rounded down to the earlier five-minute mark. Maariv is 35 minutes after sunset in
+the main Bais Medrash, 50 minutes after downstairs, and 10:30 in the main Bais Medrash.
+Round the displayed Asara sunset up to the later whole minute on weekdays and Friday.
+For weekday Maariv, add 35 or 50 minutes to true sunset first, then round up, so the
+full interval has elapsed. Keep before-sunset Mincha and candle lighting on their
+earlier rules; do not calculate those deadlines from the rounded sunset display.
+On Friday, use the current regular early-Friday Mincha list and a final main Mincha
+25 minutes before true sunset with seconds dropped. This exception also appears on
+the seasonal Friday chart and Erev Shabbos message. The Friday poster has candle
+lighting and sunset, without a weekday Maariv block; the weekly page and next-minyan
+engine retain the chart's regular Friday-night Maariv. The same builder feeds the
+posters, public Special Schedules, weekly agenda, schedule API and fast-day message.
+Its admin **New design** uses the same 5.5in by 8.5in half-page handout as Chanukah.
+Add another schedule, or the same one, through Add on the other half. Keep the
+Selichos note beside 6:40 and every time and location mark. **Old design** and public
+Special Schedules retain the original full-page poster. Mixed jobs rotate complete
+half-page pairs together onto their own portrait sheet.
+The Asara half-page body keeps the tefillah blocks together as a centered group,
+with modest fixed gaps instead of distributing three blocks across the page.
+Retain comfortable leading within each list. Keep weekday sunset beside Maariv,
+and Friday candle lighting and sunset together below Mincha. Leave a clear gap
+above the location notes, and fit the schedule at the actual printed size.
+Do not draw divider lines between compact time rows within a half-page Asara tefillah.
+Asara's three top schedule choices include the regular compact full schedule and
+**Shacharis locations + Mincha/Maariv**, as well as morning only. The detailed option
+uses the morning handout's seven time/room rows and conditional Selichos note, followed
+by the original compact Mincha, sunset and Maariv. Friday retains its own Mincha,
+candle lighting and sunset and does not gain a weekday Maariv section. Use subtle row
+rules only in this detailed morning section. Preserve every later location mark and
+limit the footer's star key to marks actually used by Mincha/Maariv. Center the full
+title, weekday/parsha and tefillah group between the fixed letterhead and 6.5pt regular footer.
+At wide margins, reduce afternoon row padding if the minimum type size still needs
+room, then detailed morning outer padding and extra section gaps only when needed. Keep the inner room/time
+spacing and font sizes. Verify the full permitted 0.75in margin, not only 0.5in.
+`tests/contextual-special-printing.cjs` checks the variants, original times/marks,
+Friday rules, native Letter pages, widest margin, saved styles, pairing and swaps.
+`tests/asara-bteves.mjs` checks reference years, sunrise and rounding boundaries,
+51 calendar years, rooms and shared schedule output.
+
+Shiva Asar B'Tammuz now has a full Special Schedule under `שבעה עשר בתמוז`.
+`posters/shiva-asar-tammuz.js` uses the same `buildFastDayPoster` as Asara B'Teves,
+evaluated on 17 Tammuz, or Sunday 18 Tammuz when the 17th is Shabbos. Keep the
+standing special Shacharis list and conditional Selichos note. Final Mincha is
+true sunset minus 40 minutes rounded down to five; displayed sunset rounds up
+to a minute; Maariv is true sunset plus 35/50 minutes rounded up, then 10:30.
+The shared early Mincha list respects that day's Mincha Gedola Lechumra: omit
+12:45 when too early, use 1:15/1:20 only when eligible, advance the early
+downstairs 1:35 to the later five-minute time when needed, and retain eligible
+1:50 main and 3:30 downstairs. Never transplant winter times before summer
+Mincha Gedola. Both print designs, public schedules, messages, weekly agenda,
+upcoming minyanim and schedule API read this builder. New design uses the
+existing half-page fast-day layout and pairing; Old design uses the framed full
+page. `tests/shiva-asar-tammuz.mjs` checks 51 years, postponement, offsets and
+shared outputs; `tests/shiva-asar-tammuz-print.cjs` checks native Letter PDFs,
+both designs, margin extremes, pairs and actual message/public schedule output.
+
+Separate admin Shacharis-only handouts are available for Asara B'Teves and both BHB
+rounds, titled `בה"ב אחר סוכות` and `בה"ב אחר פסח`, followed by the Hebrew year.
+Place the BHB title and Hebrew year directly above its actual weekdays and upcoming
+Shabbos parsha, together in the centered schedule block above שחרית. Keep the
+letterhead's rule at the top rather than a rule between those two heading lines.
+All similar half-page schedules use this title placement and fixed 18pt size for
+both the title and tefillah section headings, including Chanukah, Rosh Chodesh, fast days
+and after Yom Kippur. Selichos also groups its title with the schedule, retaining
+the smaller day/date headings. Keep each occasion's existing day labels and times.
+Chanukah retains its day groups within each section. Combine
+days belonging to the same upcoming Shabbos with a ו, and join all groups into one
+centered header with a middle dot and ו between parsha groups, for example
+`יום ב' וה' לך לך · ויום ב' וירא`, reading chronologically
+from right to left. Keep all three BHB days together, rather than spreading the two
+parsha groups across columns. Longer headers may wrap naturally within the full
+width of the handout at wide print margins. Do not print a calendar
+date or month underneath. The same grouped weekday/parsha header is used by Rosh
+Chodesh and Asara morning handouts and both complete Asara half-page layouts.
+Print only `שחרית` in their section bar, without a month name. These always use the compact 5.5in by 8.5in design on landscape
+Letter paper, sharing the complete schedules' letterhead, ruled title and section bar,
+with the remembered one-or-two Copies per page switch. Spell out each
+room beside its time instead of printing location marks or a location key. Include the
+shul name and address from `settings.footerAddress` under a bottom rule on every
+morning handout, including Rosh Chodesh. Put the name above the street address;
+this footer contains the address, without the compact rounding reminder.
+Anchor it at the bottom inside each copy's print margin;
+do not add location keys when the rooms are already written beside the times. Read the
+times from the seasonal special Shacharis list. Both Asara and BHB add `סליחות קודם שחרית`
+beside the written location in the 6:40 row when exact sunrise is later than 7:05,
+without rounding sunrise first. Keep the short note on the same baseline as the room,
+in smaller type, separated from the location by a middle dot. Longer notes identifying particular BHB dates wrap within that
+location group, clear of the time at the left.
+Keep every half-page list with written locations in a centered 3.5in-wide block,
+limited to the available width at larger margins. Align all times along the left
+and locations along the right, with tabular numerals. Retain the current text size,
+row spacing, full-width section bands and fixed footer. Apply this to BHB, Rosh
+Chodesh and fast-day morning handouts and the morning portion of the detailed
+fast-day layout, matching the approved closer-column mockup.
+Check each of BHB's three dates separately. If all three qualify, print only
+`סליחות קודם שחרית`. If only some qualify, add their weekdays and upcoming Shabbos
+parsha in parentheses, grouping days in the same week, for example
+`סליחות קודם שחרית (יום ב׳ וה׳ לך לך)`. If none qualify, omit the note.
+Use Hebrew parsha names in either admin language.
+BHB dates come from the same `hasBehab` rule as the charts. All morning
+rows have a plain background, without alternating location shading. The Yom Tov
+picker orders all groups by the first date they cover, including BHB and undrawn
+occasions, and older saved BHB month labels map to their renamed choices. These supplementary handouts are
+selected separately and do not duplicate the complete schedules in public or
+whole-year print runs. `tests/shacharis-handouts.mjs` checks 51 years of calendar and
+room data; `tests/shacharis-handouts-print.cjs` checks actual half-page PDFs, Hebrew
+coordinates, content, copies, margins, saved choices, and original schedule retention.
+
+Rosh Chodesh morning handouts use that same design under the `ראש חודש` occasion,
+with a Month picker in calendar order. Print the month and Hebrew year in the title,
+and label the applicable weekdays. Use `nextRoshChodesh` for one- and two-day dates,
+including both leap-year Adars. These handouts cover Sunday through Friday only;
+skip a month when Rosh Chodesh falls entirely on Shabbos. Keep the weekday portion
+of a two-day Rosh Chodesh that also includes Shabbos. Omit Tishrei, which has its Rosh Hashana poster.
+Read posted Rosh Chodesh times from `roshChodeshSchedule` in `posters/rosh-chodesh-schedule.js`.
+The first two minyanim use the later of their standing times (6:40 and 7:00) and
+the latest weekday sunrise minus 25 minutes, rounded upward to a whole minute.
+Use the workbook's `sunriseElev` with the configured location and elevation settings.
+For two-day occasions, ignore any Shabbos date when finding the latest sunrise.
+For Chanukah, when all weekday candidates are pushed later by netz, both ordinary
+and Rosh Chodesh first-minyan rows use one average of all those days' unrounded
+candidates, rounded down to a whole minute. This is the user's requested
+Chanukah exception to the first Rosh Chodesh minyan's latest-day floor. Keep
+the second Rosh Chodesh minyan's limit and all later times/room marks. Otherwise
+Teves retains its latest-weekday first-minyan floor. The shared posted provider
+quotes the complete Chanukah row, including on partial weeks and split charts.
+For Rosh Chodesh during Chanukah 5787 only (December 10 and 11, 2026), the user
+confirmed that the first minyan was already printed as **6:43**, so retain that fixed
+announced time instead of the calculated 6:44 in every view and explanation. Keep
+ordinary Chanukah at 6:50, the second and later minyanim, the underlying sunrise
+calculation, later occasions and other years unchanged. Scope this exception to the
+event dates, so archived sheets agree with the paper and future Chanukah stays calculated.
+`tests/chanukah-shared-average.mjs` covers 51 years, daily views and the screenshot
+year 5788, where both first rows print 6:53. The base calculation stays separate
+in `special-shacharis.js` so building the posted Chanukah rows cannot recurse.
+Seasonal chart panels, weekly cards/One sheet, messages and upcoming minyanim
+share these times. Group equal seasonal panel schedules. When several Rosh Chodesh
+months share one block on a chart, label that block `ראש חודש` without month names.
+Keep a single-month block labelled by its month when it has its own schedule.
+When BHB or Taanis is present and a Rosh Chodesh block matches the complete standing
+schedule, including room marks, print that schedule once under a shared heading,
+for example `בה"ב · ראש חודש` or `תענ"צ · ראש חודש` for matching multiple months.
+Retain separate blocks whenever their printed times or rooms differ.
+Upcoming Rosh Chodesh minyanim read traced morning values directly: the first
+two can share a start in different rooms, and must not roll the second into PM.
+`tests/shacharis-handouts.mjs` checks all weekday occasions across 51 years;
+`tests/rosh-chodesh-netz-floor.mjs` checks rounding boundaries and shared views. Do not carry
+Asara's Selichos note into these charts. Preserve the selected month in the address
+and saved bar, falling back to an available month when the year changes. These are
+supplementary handouts and do not join full-year or public Special Schedule runs.
+
+The admin's **Explain times** switch stays available on every tab. Shared chart, week and
+poster renderers register their own time traces through `ui/time-explanations.js`; the
+congregation's page never installs that registry and emits no inspector markup. Clicks
+use measured text ranges to select one time inside a cell, without wrapping or changing
+chart text. All seasonal and weekday chart cells are read-only, including admin print
+layouts and saved copies. Tapping a chart cell must not open the keyboard. Print controls
+remain available, and the `readOnly` renderer option still selects the congregation's
+announced times rather than controlling editing. Explain mode adds temporary focus and
+click targets and restores their original attributes when turned off. Saved manual overrides
+and rules replace the corresponding traces with explicitly
+entered times, so a changed value cannot claim its old solar formula. The modal closes
+before printing. `tests/time-explanations.cjs` checks actual clicks and chart geometry.
+Rounding steps show the rule, the actual earlier or later movement, and the values before
+and after rounding. Traces also record nearest-minute display rounding separately from
+the arithmetic, while times printed with seconds retain that precision.
+The separate Calculation guide was removed. Old `#calc` bookmarks open Seasonal charts;
+calculation details come from clicking a time with Explain times enabled.
+
+Special schedules keeps Year, Occasion and Design first. The occasion dropdown has
+Yom Tov and Other schedules sections, each chronological. Current includes active
+and upcoming morning handouts and selects the actual Rosh Chodesh month. Asara's
+three options share its occasion; public builders keep their existing group names.
+Check zmanim and Explain times stay beside the preview, backed by shared controllers.
+Other admin screens retain their sidebar switches. Clear special-screen and
+half-Letter classes when leaving the screen. Controls and existing custom editors
+stay off paper. Pages are added beside their preview instead of on separate setup
+screens; physical sheets are calculated from the selected designs and placements.
+
+Half-page schedules center their title, dates and schedule together between the letterhead rule and
+the footer rule. Keep the header and footer fixed and retain the existing row spacing.
+Compact special-schedule printing now defaults to 0.15in margins on all four sides,
+including top and bottom. Adopt this default once for older remembered print setups
+through `zmanim-poster-bar-v1.marginDefault`, retaining the rest of each saved job.
+Later custom margin selections still persist, and Original restores 0.15in.
+Rosh Chodesh and fast-day morning handouts use BHB's grouped Hebrew weekday and
+upcoming Shabbos parsha before the Shacharis section, without a date/month subline.
+Center one week's label and give separate weeks equal-width columns. For example,
+two Rosh Chodesh days in the same week appear as `יום א' ב' נח`.
+Remove the duplicate weekday label below the Rosh Chodesh section heading. Keep
+skipping the Shabbos portion of Rosh Chodesh as before.
+Declare standard `justify-content: center` before `safe center` so browsers that do
+not support overflow-safe alignment still center the morning handouts on screen.
+The shared renderer must use the same centering for individual, duplicate, paired and
+mixed print sets. Fuller handouts fit within the available space through the existing
+type-size fitter rather than stretching their rows.
+Choose the other half or a new sheet through the contextual add picker. Retain swaps,
+page ordering, removal and separation. Asara location styles travel with their
+selection as the stable `asaralocations` key in printPages. Old leftShacharis /
+rightShacharis preferences migrate without losing their layout. Bulk half-page
+additions fill existing empty halves, then append remaining schedules chronologically.
+All-half jobs use landscape Letter; mixed jobs turn the full pair canvas together
+on portrait Letter. Render actual halves at 5.5 by 8.5 inches throughout.
+
+Half-page footers use fixed 6.5pt regular-weight text, including the shul name and
+address on morning handouts. Combined special schedules and paired full-page posters
+use fixed 7.5pt regular-weight footers, independent of the fitted schedule font size.
+Chanukah's location note uses the same "All underlined מנינים will be בבית מדרש למטה"
+wording as the other special schedules. The weekly One sheet retains its own footer style.
+Bulk addition offers all half-page schedules or all available pages. Skip missing
+entries when building a bulk job. Explicit unavailable selections in existing jobs
+warn and disable Print until resolved. Comparison contexts include all dates on each
+physical sheet. Clear is-half-paired-print when leaving Special schedules.
+`tests/contextual-special-printing.cjs` verifies actual PDF page counts, slot geometry,
+fixed footer type, all available schedules, remembered selections and mobile widths.
+
+Admin also has a remembered **Show zmanim** switch for comparing every seasonal page,
+saved print layout, weekly schedule and special poster with the actual day's zmanim.
+Shared renderers register their own covered dates only after the admin installs
+`ui/zmanim-references.js`; public renderers emit no comparison metadata or controls.
+The screen-only panel sits immediately before the charts, outside all scaled or
+printed pages, and stays visible while scrolling on desktop. It selects the schedule,
+date and Shacharis/Mincha/Maariv group, with additional references under More zmanim.
+BHB exposes only its three mornings. Weekday chart rows include Sunday through Friday;
+Shabbos pages also include the weekdays which determine early Mincha. Clicking a chart
+cell chooses its tefillah and the correct Friday, Shabbos or weekday-row date.
+Read raw times from the same named solar functions and settings as the schedules,
+including the chart's actual MGA Plag reckonings, and show seconds before minute
+rounding. Distinguish the always-elevated sunrise/sunset where they differ from the
+zmanim elevation setting. The weekly Mincha Gedola limit uses the chart's shared rule
+and explicitly retains its upward whole-minute rounding. This is a comparison tool, never
+a change to a schedule or to how any zman is rounded. `tests/zmanim-references.mjs`
+checks dates, reckonings and rounding boundaries; `tests/zmanim-references.cjs` checks
+all chart families, cell/date navigation, mobile widths, saved choices and unchanged
+actual PDF text, sizes and rows with the option on or off.
+
+Admin print layouts have a **Spring clock change** switch on winter charts (also when
+opening their Weekday companion). **Separate headers** gives weeks before spring DST
+their own winter columns and puts the summer header below them on the same page. The
+choice lives in the winter sheet's `style.splitSpringDst` and is remembered in
+`settings.sheetStyle` for new print layouts. The default is one header. Only the admin's
+`renderSheet` passes it into `buildSheetPages`; congregation charts keep their layout.
+Both tables share one measured row height, including both headers, and the existing
+shrink-to-fit loop makes room for the extra header. Keep the summer cell keys and rules
+on a mixed page, including `L` for the winter section's Erev Shabbos menu, so changing
+the header layout cannot move or lose a saved override. Browser coverage is in
+`tests/dst-print-layout.cjs`.
+In the saved chart's print controls, show **Molad format** only while Molad is on.
+Keep the selected format when switching Molad off and on. Put explanatory copy,
+the format example and the shrink-to-fit notice inside the initially closed
+**Explain settings** disclosure. Show the example only with Molad on. Preserve the
+disclosure's open state, control focus and scroll position during settings redraws.
+Actual print-overflow errors stay visible outside the disclosure.
+Measure and shrink the full-size pages before applying Fit to screen. Measuring a
+phone's zoomed preview hid the overflow and put page 5's address on page 6. Browser
+coverage must start on a phone viewport and check footer placement in the actual PDF.
+All charts in a print job share the same top and bottom edges for double-sided printing.
+Each physical chart page explains the location stars it prints: `*בעזרת נשים` and
+`**באולם השמחות`. Build this key from the rendered tables after joining DST sections,
+including saved edits, rules and the weekday morning panel. Keep each star count with
+its Hebrew label in a separate bidi isolate and reserve its space before fitting pages.
+Omit unused locations, including the standard downstairs line on a page without an
+underlined minyan time. Use the full sentence `All underlined מנינים will be בבית מדרש למטה`
+and the needed star keys on one unwrapped line, separated by dots. Read the location
+entries from right to left, with the full English sentence isolated in left-to-right
+order and each Hebrew phrase isolated inside it. Keep each star beside its Hebrew room name and
+verify actual text coordinates rather than the DOM text order. Rebuild standard
+location keys from older custom footers per page and preserve unrelated notes.
+The early Friday Mincha columns name their rooms in the headings: `מנחה / (בעזר"נ) /
+פלג מ"א 72` and `מנחה / (למטה) / פלג מ"א`. The בעזר"נ chart times have no stars;
+למטה retains its underline. Set the parenthesized room labels in chart headings to 70%
+of the heading size, smaller than the Plag line. Center the three lines together using each
+line's own font size, a 1.12 line height and a 0.1em gap so the printed lines stay easy
+to read. Keep the room metadata used by posters, messages and the weekly reader, whose
+compact schedules still use their own location marks.
+`syncHeaderRowHeight` reserves the largest required header/footer regions across the job,
+without changing saved styles. Collapsed table borders and the gap between DST sections
+are included in row-height calculations. Measurement temporarily removes screen scaling
+and the print height cap so genuine overflow stays visible to the fit loop. Refit when
+fonts arrive and before printing. Browser coverage checks chart bounds, different saved
+styles, and identical footer positions in the physical desktop and phone PDFs.
+When a saved print job overflows at its chosen size, try flexible body rows with
+0.03in vertical cell padding before shrinking text. Keep the same weeks and page breaks;
+one tall holiday row can use more space than the others. Keep a parsha name centered
+when its molad note fits below it; otherwise center the compact name/note group together.
+Measure the morning panel across its actual tbody
+instead of multiplying one row's height. Recheck the full chosen size on every fitting
+pass, including before printing, and keep all saved styles untouched. Recover the last
+percentage point between fitting steps when it fits. The approved 5787 winter two-page
+layout prints at 85% rather than about 66%, on four landscape Letter sheets including
+its weekday companion. Ordinary full-size charts retain their equal rows.
+`tests/dense-chart-print.cjs` verifies crowded winter/summer charts, both molad formats,
+split DST headers and an entire season on one page at phone and desktop widths, including
+native PDF page counts, every printed time, panel bounds and aligned footers.
+The public and admin seasonal chart browsers use the same `chartPaperFitter` as saved
+charts before fitting the preview to the window, after fonts load, and before printing.
+Screen scaling alone can hide a footer that spills over the next printed header.
+`tests/chart-browser-fit.cjs` checks crowded and roomy winter/summer pairs at phone and
+desktop widths, retaining every time and exactly two physical sheets with aligned footers.
+Only charts whose entire season is assigned to one page use one-line time menus,
+tighter spacing and a separate Friday שקיעה column between מנחה מעריב and מעריב,
+following the Friday reading order in both languages and DST sections. Measure every
+column's longest content at the current fitted font size, then divide spare width
+equally among automatic columns on both Shabbos and Weekday charts. Include explicit
+header lines, parsha notes and the morning panel in those intrinsic measurements;
+remove the ordinary parsha width floor and percentage-based morning panel inset only
+for these full-season pages. Retain explicitly saved column widths. Keep their
+saved styles and times intact, and fit both text width and paper height. Full-season
+cell spacing must never consume its padding to fit: keep at least 0.04in
+at each side, 0.02in above/below body content and 0.03in above/below headers, including
+flexible fitting. Reserve the morning panel's actual inner padding when checking fit.
+Unrecognized candle-lighting edits retain their complete content in the original cell. Multi-page
+seasonal charts retain their existing layout. `tests/full-season-chart-print.cjs`
+checks both languages, Molad formats, DST sections, saved edits, real page-count controls,
+reopening, calculation/date controls, and native two-sheet Letter PDFs on phone/desktop.
+
+- A page is letter landscape: 11in x 8.5in, which is 1056 x 816 px on screen at 100%.
+  All pages must measure 816px high. If they don't, something overflowed.
+- Printing must clear `main:not(.is-sheet-view)`'s 62rem screen width limit as well as
+  `.pages`' screen scrolling overflow. The more specific screen selector otherwise wins
+  over bare `main`, leaving a 992px scrollport that clips the rightmost 16px of the chart
+  inside its margin. PDF text extraction still reports the clipped letters, so check
+  clipping ancestors and actual raster output as well as selectable text coordinates.
+  `tests/chart-print-width.cjs` covers the seasonal admin and public browser at phone and
+  desktop widths, visible right-edge PDF pixels, original type size and printer margins.
+- **Roomy charts use equal rows, including the header row.** The header may
   be taller than the body rows when its text needs it, but never shorter. This is
   `syncHeaderRowHeight` in `js/ui/sheet-view.js` and it took several attempts to get
   right. Sub-pixel spread (under 1px) is rounding and is fine.
@@ -189,6 +870,9 @@ reads as "your fix didn't work". Never hand-edit the import map or anything in
 
 This is where the sneaky bugs live.
 
+- Display Hebrew double quotes with the straight mark used in `ס"ז קר"ש`, including
+  headings, notes and Hebrew years. `useStraightHebrewQuotes` changes text nodes before
+  layout measurements, preserving attributes and calculation keys.
 - `.cell` and `.shacharis-merged` set `direction: ltr` deliberately. Changing that
   scrambles the time strings.
 - Wrap Hebrew inside an otherwise-LTR string in `<bdi>`, or you get output like
@@ -211,7 +895,8 @@ Everything lives in one localStorage key, `zmanim-app-state-v1`:
 `{ settings, sheets, rules, seeded }`. There is no backend and there will not be one.
 Export/Import in Settings moves it between devices.
 
-- **Per-cell overrides** are one-off, tied to one generated sheet.
+- **Per-cell overrides** are historical saved values tied to one generated sheet.
+  Saved sheets and imported backups retain them, but chart cells cannot create new ones.
 - **Rules** apply at generation time to every future sheet. Conditions: `always`,
   `specialParsha`, `parsha`, `dateISO`, `hebrewDate` (`"5-9"`, month-day counting Nisan
   as 1, recurs yearly). Column keys are sheet-qualified: `kayitz:C`, `choref:B`.
@@ -259,6 +944,67 @@ Export/Import in Settings moves it between devices.
 
 ## Screen layout
 
+- The homepage's desktop layout starts at the existing 760px breakpoint. Use the
+  approved centered Hebrew name without a label above it, a 640px content column,
+  and side-by-side Zmanim and Donate links. Keep the desktop next-minyan card compact
+  and centered: 480px for one card, 560px when paired with candle lighting, with 6px
+  vertical padding and tight gaps between text rows. Keep the current text sizes.
+  The combined desktop Zmanim/Donate row matches the next-minyan card's outer edges,
+  using 480px normally and 560px while the candle-lighting pair is present. Keep the
+  two links side by side, with room for their complete titles and descriptions.
+  Show the small 54px by 35px header photo
+  at the top left on desktop, and omit the large homepage picture. Keep the existing
+  phone layout below 760px, including its small header photo, Hebrew name, minyan type
+  and stacked links.
+  Keep both single and paired minyan/candle-lighting cards working at the breakpoint.
+  After changing the next-minyan layout, run `node tests/home-next-layout.cjs` against
+  a fresh build. It uses the actual renderer and fitter with distinct name/room/clock
+  combinations and candle-lighting pairings from the automatic seven-year schedule
+  window, plus countdown wording and clock boundaries. It checks visible text bounds,
+  overlaps, retained text, paired row alignment, navigation bounds and the divider
+  at responsive widths.
+  Longer descriptions may wrap and increase card height; do not clip them to 88px.
+- New-chart pop-ups use the approved navy-and-gold design: gold calendar badge,
+  Winter Zmanim or Summer Zmanim label from the announced chart, cream serif
+  "New chart is up" heading and a gold View Chart button on a cream footer.
+  Retain the native dialog, close button, Escape/backdrop dismissal, existing
+  announcement window and per-browser/per-part seen marker. Date previews do
+  not mark announcements seen. Keep notices off paper and the chart link working.
+- Donations start with all five campaign names and all payment choices collapsed.
+  Use “Choose a campaign” in the existing subtitle line below Donate so the prompt
+  does not add another row or extra scrolling.
+  Opening a campaign closes the others, reveals Card · ACH and DAF, and reveals Zelle
+  only for Neileich. Give the expanded campaign heading and its payment choices one
+  continuous light background with a 3px gold line along the left of the active group.
+  Use an overlay for that line so grouping adds no height or changes to content width.
+  Payment methods are visibly separate rounded white buttons with an outline and subtle
+  shadow. The selected method is navy with white text and icons. Retain the 44px touch
+  height and compact row so making the controls clearer adds no page height.
+  Campaigns visibly unfold their payment choices in 200ms. Honor reduced motion and
+  finish that opening effect before closing, switching campaigns, selecting a method
+  or navigating away. Leave no fixed height or overflow clipping when it finishes.
+  Selecting a method reveals its information below the choices;
+  do not load merchant frames before that selection. Keep entered forms when switching
+  methods, and load only one campaign's merchant form at a time.
+  Campaign clicks reveal choices in place without scrolling. Only a payment-method
+  selection scrolls that campaign to 8px below the fixed public header in 360ms. Honor reduced
+  motion, stop on manual scrolling or navigation, and add only the bottom scroll room
+  needed to align the last campaign. `tests/donation-campaign-scroll.cjs` checks the
+  animation duration, alignment, interruption and navigation cleanup.
+  DAF shows five matching full-width provider rows in this
+  order: The Donors Fund, Pledger, OJC Fund, Matbia and iMaaser. Use their local original
+  logos in compact 56px rows with 34px logo boxes, a gold arrow and quiet dividers. iMaaser links to
+  `https://app.imaaser.org/donor/login`. DAF has the only Copy EIN button; clicking any
+  provider also copies the shul's EIN once per visit. Keep the complete row clickable
+  and open provider accounts in a separate tab. `tests/daf-copy.cjs` covers the layout,
+  link order, clipboard, keyboard and fund form lifecycle on phones and desktop.
+  Keep the condensed nonprofit information and plain EIN inside the contact footer
+  at the bottom. The footer follows expanded forms and uses spare height above it
+  when the page is short. Switching methods preserves entered payment forms.
+  Zelle is available only inside Neileich, after Card · ACH and DAF, using its real brand mark in
+  `GIVE_ICONS`. The confirmed recipient is Bais Medrash of Lakewood Commons at
+  `donations@neileich.org`. Show the recipient name, banking-app instructions and
+  Copy email button. Keep the email selectable and let its copy row wrap on phones.
 - `main:not(.is-sheet-view)` is capped at 62rem and left aligned against the sidebar.
   This is deliberate and was asked for twice: the point is not dragging the mouse from
   one edge of the screen to the other. **Do not centre it.** Centring was tried and
@@ -266,137 +1012,397 @@ Export/Import in Settings moves it between devices.
 - `main.is-wide` (Saved sheets) gets 78rem, because a six-column table wraps at 62rem.
 - A sheet view is exempt from the cap entirely; a page is a fixed 11in.
 - `.gen-column` holds the Generate flow to 42rem.
+- On the congregation's `/week/`, minyan times are buttons opening room details in
+  English and Hebrew. The room comes from the existing agenda event: underlined means
+  downstairs, one star means Ezras Nashim, two mean Simcha hall, and an unmarked minyan
+  means the main Bais Medrash. Auxiliary zmanim and unmarked Kiddush Levana get no
+  indoor room. Keep the hint and dialog off paper, and defer the minute redraw while
+  the dialog is open. `tests/weekly-room-details.cjs` checks phone taps, keyboard access,
+  all four rooms, week navigation, and native printing.
+- Weekly day headings also name Rosh Chodesh (including its month), BHB, and fast days
+  beside the weekday. Read these labels from the existing calendar helpers in English;
+  keep section keys, grouping, and minyan calculations independent of the labels. Use
+  the same labels in notices for days whose full schedule has not been supplied.
+- Open donation forms get a 48rem page cap and reach the card edges on phones. Give the
+  cross-origin form at least a 360px internal viewport and scale it to the available
+  width, keeping the visible height and vertical scrolling. Resize the existing frame
+  on rotation so entered fields survive, and disconnect its observer when it closes.
+  Check actual pointer clicks inside scaled frames, every payment field and security
+  checkbox, and all five card/ACH forms. Cardknox's Rav's Fund tab strip itself remains
+  700px wide, but its tab labels and payment controls fit the narrower phone viewport.
 
-## Traffic, and the one thing in this project that is not a browser
+## Admin community calendar
 
-The admin's **Traffic** tab shows the congregation site's visitor numbers. They are counted by
-the Cloudflare beacon the congregation's pages carry (`ANALYTICS_TOKEN`, above) and read back
-through **`worker/traffic-worker.js`**, a Cloudflare Worker in the shul's own account.
+`/admin/#calendar` is the first, admin-only preview. Do not add it to congregation
+navigation or public feeds until the user asks to publish it. Reuse the workbook
+Hebrew calendar, published lookup tables and configured shul timezone. English months
+run Sunday through Shabbos, with Hebrew dates, month transitions, holidays and parshas.
+Use `js/calendar/model.js`; keep all manual events separate from minyan calculations.
+The calendar uses its own navy, cream and gold CSS, with plain-text event types and
+colours. Do not let global chart table stripes, fonts or borders alter its cells.
+New event categories are Shalom Zachor, Kiddush, Vort, Aufruf, Chasuna, Bar mitzva
+shabbos, Bar mitzva dessert and Custom. Retain the existing wedding ID for Chasuna.
+Custom requires a plain-text category name of up to 60 characters, saved with the
+event and shown in its labels, details and accessible day text. Escape it everywhere;
+never use custom wording as a CSS class. Preserve older generic event types for
+existing events and editing them without migration. Deploy the matching shared
+event validator before its client. Category changes retain normal role checks,
+revision conflicts, calendar dates and private activity tracking.
+The event form has Admin information and Congregation information textareas.
+Either field can be left blank. Calendar admins see both texts and can copy the
+admin text exactly. The service sends only congregation information to signed-in
+viewers and congregation previews, and omits events with only admin information.
+Derive the calendar-cell title and other legacy summary fields from the text for
+the congregation when present. Existing events put all their text in the box for
+their stored audience and keep unchanged legacy fields. There is no All day checkbox.
+Both times are optional independently;
+blank times show no time label, and an end alone is labelled Until. Preserve old
+allDay records. Deploy the optional-time validator before publishing its client.
+Daily events sort by the category-picker order, keeping every matching category
+together. Named custom categories have their own alphabetical groups. Within each
+group, untimed events precede timed events in time order, with titles as tie-breakers.
+Apply the same order to month markers and day details without changing stored data.
+Remove Kahal Lev Menachem from the calendar header and sign-in cards.
+The owner has a View as selector for Main admin, Calendar editor and Congregation.
+Previews retain the real owner session and do not grant or change account roles.
+They show role-specific controls but disable writes. Announcement previews use
+GET, do not count opens or mark posts read, and cannot post, edit or delete.
+Switching previews ignores pending responses from the previous announcement view.
+Congregation announcement timestamps use the shul's timezone: today's messages show
+the time to the minute, yesterday's show Yesterday, and older messages show only
+the date. Compare local calendar days across daylight-saving changes and refresh
+open message labels on the existing polling/focus cycle. Keep original timestamps
+stored and keep full dates and times in the calendar manager's announcement view.
+Owners and calendar editors can set an optional Added date and time when posting,
+or change it in Edit. Use the shul timezone, preserve unchanged seconds, and reject
+nonexistent or ambiguous local times rather than guessing. Added dates determine
+the order. The API returns newest first. Congregation Messages and the manager's
+announcement feed open at the newest message at the bottom. Load older messages
+above the current view, preserve the reader's place, and follow new messages while
+at the bottom. The manager's composer stays below the scrolling feed, with the
+optional date and time collapsed. Show a sent message from the confirmed server
+response and keep any loaded history. Backdated posts follow their chosen date.
+Retain the original createdAt, sequence, source receipts and read markers.
+Synchronize date changes into open lists and retain unsaved drafts.
+The congregation can retrieve only the last 10 New York calendar days, including
+today. Enforce the same cutoff in feed pagination, edits and unread counts on the
+server; viewers cannot extend it using query parameters. Managers keep full history,
+and their Congregation view applies the same limit. End the list at that cutoff.
+Use timestamped status snapshots so aging or moving messages can reduce
+unread counts without older responses restoring stale counts.
+The standalone calendar uses the compact navy subpage header, with the same
+left arrow and Home link as Donate, a quiet Community Calendar label and the
+gold-outlined Donate pill with its giving-hand icon on the right, linking to /donate/.
+Three quick taps or clicks on the navy header's title or empty space open /admin/
+through the shared wireSecretDoor handler. Home and Donate keep their ordinary
+link actions. Keep the header text unselectable and suppress double-tap zoom so
+the gesture works on phones. Admin and calendar access checks remain in place.
+It has no building photo or homepage navigation. Keep its 64px height at phone and desktop
+widths, plus safe-area padding. The Refresh button reloads the page so it can fetch
+published website changes, fresh events and unread message counts. After the saved
+session is validated, restore the month, selected date and owner Congregation preview.
+Use the dynamic viewport height
+and safe-area insets; distribute the month into equal, compact rows without page
+scrolling. Rows prefer 1.35 times their column width, between 72px and 128px, and
+shrink further when needed to keep the whole month within the remaining screen.
+Do not stretch the month to the bottom of a tall phone. Keep Back to the congregation homepage,
+the Community Calendar title on its own row, followed by Messages with its
+bell and unread badge, Refresh and More. Keep month arrows and Today below that row.
+Put the color key, account and Sign out in More. Day details and notifications open dialogs,
+not extra sections below the month. The owner preview uses the same congregation UI.
+Readers browse only the previous, current and next month in the shul's timezone.
+Enforce that UI limit on arrows, month input, padding-day clicks and keyboard moves,
+and refresh it at month rollover. Admin/editor browsing remains unrestricted.
+Readers can swipe left for next month and right for previous month on the grid,
+or scroll a trackpad horizontally. Vertical gestures remain unaffected. One wheel
+gesture advances once despite inertia; suppress the day click generated by a swipe.
+Preload the other two allowed months with separate requests, each within the deployed
+62-day API limit. Keep a memory-only 30-second cache, share pending requests, and
+retain the visible month if a gesture beats prefetch. Show stale cached events while
+refreshing them instead of clearing the grid. Sign-out, session expiry and role
+changes clear the cache and ignore older responses. `tests/calendar-month-navigation.cjs`
+checks actual CDP touch gestures, trackpad inertia, offline cache use, slow prefetch,
+background updates, bounds and expired access without production records.
+Show a total event count and every category's color on crowded days. The full list
+always opens on a date click. Keep Hebrew parsha words whole, fitting the font when
+necessary instead of splitting a word. Very short windows keep labels that cannot
+fit without overlap in their day dialogs. Measure calendar controls separately from
+row space so the heading never stretches or crowds the dates. `tests/calendar-congregation.cjs` checks fitting,
+whole words, eight-event Shabbos dates, month limits, rollover and the homepage.
+The homepage puts the gray Community calendar card after Donate, with the same
+width and height as its other cards. Keep Coming soon and its inert appearance.
+Ordinary single/double clicks do nothing. Three quick clicks or taps (within 750ms
+of each other and 1.5 seconds overall) open `/admin/calendar/?preview=congregation`.
+Use aria-disabled instead of native disabled so touch/click events can reach this
+hidden action; cancelled or interrupted gestures reset it. Do not advertise it as
+a public link. The destination retains normal calendar authentication and always
+shows the congregation experience, including for an owner or editor. Hide Preview,
+View as, editing, account management and Schedule messages from this screen and its
+dialogs. Actual server roles stay unchanged; management remains on the admin page.
+Reading announcements here records only that signed-in account's reads and opens,
+so the badge shows unread messages, hides at zero and updates for new posts. This
+is distinct from the main admin's explicit View as preview, which remains inert
+and never changes read markers. The query cannot grant ownership or bypass sign-in.
+`tests/calendar-home-preview.cjs` checks card order/geometry, mouse/touch gestures,
+sign-in, role preservation, congregation-only controls, visible-message read counts
+and unchanged read-only admin previews.
+Phone day clicks open a details dialog; the event dialog follows the visual viewport
+so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
+Calendar cells keep the English number at the top left and the unpunctuated Hebrew
+day at the bottom right, with clear space around both. The Hebrew month/year range,
+holiday wording and parshas always use Hebrew, independently of the schedule language.
+Follow the supplied April 2028 and December 2027 references: compact ר״ח, numbered
+פסח and חנוכה, חול המועד, שבת הגדול, מברכים, יזכור and בה״ב. Calendar-only wording
+and observances must not change the shared engine's labels or minyan calculations.
+The טל ומטר marker is the first daytime date whose preceding evening starts recitation,
+including the diaspora's Shabbos deferral and Gregorian/Julian century drift.
+`tests/calendar-hebrew-layout.cjs` measures both reference months on phone and desktop,
+including crowded event cells, to keep text and event markers above the Hebrew date.
 
-The Worker exists for one reason: reading the numbers needs a Cloudflare **API token**, and a
-token cannot live in the admin. `/admin/` is a public address, the four digits in front of it
-are not security, and this repository is public, so anything the page carries is published.
-The token is a Worker secret instead, and the admin asks the Worker.
+With `data/calendar.json` blank, only main admin gets device preview storage. Label
+that limitation. Examples are optional and are never persisted. Keep backup/restore
+and storage-error handling; never silently replace corrupt data or claim a failed
+write succeeded. The restricted `/admin/calendar/` page must not pretend that device
+storage or the main admin PIN is server authentication.
 
-- Deploying it is written at the top of `worker/traffic-worker.js`, and it is now **one**
-  setting: `CF_API_TOKEN`, a read-only Account Analytics token, as a Secret. It was three. The
-  account id and the site tag are both looked up and cached by the Worker. `CF_SITE_TAG` and
-  `CF_ACCOUNT_ID` still override, and `CF_ACCOUNT_ID`
-  has to be set by hand in two cases, both of which the Worker names on the screen rather than
-  guessing: a token that can see more than one account, and a token `/accounts` hands back
-  nothing for. The value is the 32 characters after `dash.cloudflare.com/` in the dashboard
-  address, and it is not a secret.
-- **A Web Analytics site has a token and a tag and they are different strings.** The token is
-  what goes in the page (`data-cf-beacon`, and `ANALYTICS_TOKEN` here); the tag is what the
-  GraphQL dataset filters on. Assuming they were one string cost a day: the query ran, matched
-  nothing, and the admin said "no visits counted in this period yet" while the dashboard showed
-  50 page views the same day. `siteTagFor` tries to get the tag properly, by listing the
-  account's sites and taking it off the one whose `site_token` is the beacon token, but **on the
-  shul's own Worker that listing is refused**: the read-only Account Analytics token queries the
-  analytics data fine and gets "Authentication error" from that REST endpoint, which is a
-  different permission. So in practice the query narrows by **`requestHost`** instead, which is
-  the same site said another way and is what is actually running. The reply says which of the two
-  it used and the empty state prints it, because an answer of zero and a wrong question look
-  identical. Measured once it worked: 23 visits and 51 page views, matching the dashboard.
-- **Cloudflare counts days in UTC, and this shul is not in UTC.** From about 8pm in Lakewood the
-  UTC day has already turned over, which put a bar labelled tomorrow on the chart at 9:40 at
-  night and, far worse, filed every evening visit under the next day: Friday night counted as
-  Shabbos. The per-day chart and the weekday panel are therefore rebuilt in the browser out of
-  the **hourly** buckets, which are real instants (`trafficLocalDays`), and the tab asks the
-  Worker for one day more than it shows so the oldest local day is whole. Both figures sum across
-  that fold: a page view is one event and a visit belongs to exactly one hour. Where the hourly
-  grouping does not reach back over the whole period it falls back to the UTC days and says so on
-  screen. Do not "simplify" this back to `byDay`.
-- **The days drawn are the calendar's, not the ones that have traffic in them.** `trafficLocalDays`
-  used to take the last N hourly buckets that had rows, which is two wrong answers at once. A quiet
-  day vanished rather than being drawn empty. And the newest bucket with rows is not today: before
-  the first visit of the morning it is yesterday, so the screen put **yesterday's whole day under a
-  button marked Today**. Worse, Cloudflare's hourly detail was reaching back only about a day, so
-  every range, Today and 7 days and 30 days alike, was adding up that one day: **30 days read lower
-  than Today**, which is an impossible number rather than a stale one. The shul reported both. The
-  days now come from the calendar and the hourly rows are used only where they actually cover the
-  period asked for (`TRAFFIC_HOUR_SLACK_MS`, one day of slack for a quiet morning at the start).
-- **Any one day can be opened on its own, and then every panel is that day's.** Asked for: the
-  panels are Cloudflare aggregates over the window the Worker was asked about, so over a range they
-  describe the range, and there was no way to ask what was opened on a Tuesday. The browser now
-  works out the two instants that bound one day **on the reader's own clock** and sends them as
-  `since` and `until`; the Worker answers about exactly that window, so the pages, devices, hours,
-  referrers, browser and system are the day's own. Reached two ways: a date field beside the range
-  buttons, and **every bar of the day chart is a real `<button>` that opens its own day**.
-  `trafficDayWindow` builds the window with `new Date(y, m - 1, d + 1)` rather than by adding
-  86400000, so the day a clock changes is one whole day rather than 23 or 25 hours of one and an
-  hour of its neighbour. The timezone is the reason this is worked out in the browser at all: the
-  Worker does not know where its reader is standing.
-- **Whether the hours cover a range is an exact test, not a guess** (`trafficHoursCover`): no day
-  may carry a day total while carrying no hours. It used to be how far back the earliest hourly row
-  sat, with a day of slack, and that was wrong in the direction that matters once the Worker keeps
-  a record: asked for three months with thirty days stored, the earliest hour was two months past
-  the start of the range, so the old test threw the whole chart onto UTC days when every day that
-  had anything in it folded exactly. The screen gave up local days precisely because it had been
-  given more history.
-- **While the days are UTC, no bar opens its own day, and the reason is said under the chart**
-  (`trafficUtcNote`), not at the foot under six panels, which is where it used to be and is not
-  where the contradiction is. A day view is always the reader's own midnight to midnight, so the
-  day behind a UTC bar is not the day clicking it would open: a bar reading 6 would open a day
-  reading 0. The note names the consequence (the bar over today holds last night) and the cure,
-  and the cure differs depending on whether a record is being kept at all.
-- **The Worker has to be deployed again for the day view to work**, and an older one fails in the
-  one way that looks like success: it ignores `since` and `until` and answers about its own range,
-  which would put a week's pages under one day's date. So the Worker returns `window: 'exact'` when
-  it honoured the two instants, and the tab refuses to draw a day without it, saying the copy
-  running is older instead. `askedWindow` in the Worker refuses a window it cannot parse, one the
-  wrong way round, or one longer than `MAX_WINDOW_DAYS` (40), rather than answering about some
-  other stretch of time.
-- Over a **range**, the panels are still the whole window Cloudflare was asked about, which starts
-  at midnight UTC and takes in one extra day, so they reach a few hours further back than the chart.
-  Only the two headline figures and the chart are on a Lakewood clock, and the foot of the tab says
-  so. Over a **day** there is nothing to fold or trim and the foot says that instead.
-- Cloudflare keeps about a month, so a day older than that reads as nothing unless the Worker's
-  archive was running by then. The empty state for a day says so, and says when the archive is off.
-- **Cloudflare is collected from, not read from.** Asked for by the shul in those terms, after
-  they caught the screen contradicting itself: Today said no visits yet and the seven day chart
-  drew a bar on that same day. Two questions to Cloudflare, answered on two different clocks.
-  The shape is **collector, store, reader**:
-  **Collect.** A daily Cron Trigger (`0 6 * * *`) pulls every day Cloudflare still has that the
-  store has not got, plus the last `CRON_REFRESH` (3) whether or not it has them, one whole UTC
-  day at a time. Opening the tab collects **today and nothing else**, today being the only day
-  whose figures still move, plus at most `READ_BACKFILL_MAX` (6) gaps so a cold store fills as it
-  is read without making a reader wait on thirty days of requests.
-  **Store.** KV bound as `ARCHIVE`, **one key a month** (`m:2026-09`), each holding its days as 24
-  hours of visits and page views plus that day's pages, devices, browsers, systems and referrers.
-  Hours because the screen folds them into Lakewood days and that fold needs the hour. A month a
-  key because a write then touches one small value: today is rewritten on every tab open and the
-  history is never touched. It was one key for everything, which had to be rewritten whole every
-  time and let two writers drop each other's work across the entire record. An `index` key carries
-  what the store covers and **when it was last written**, which the screen prints: a collector that
-  has stopped does not look broken, it looks like a quiet week.
-  **Read.** Every figure is a slice of the store, so no two periods can be answered on different
-  footings and a day older than Cloudflare's month is as answerable as yesterday. Nothing is ever
-  asked of Cloudflare past `LIVE_DAYS` (30): past that it answers zero rather than answering no.
-  **The binding and the cron are both optional and the Worker deploys and runs without either**,
-  falling back to asking Cloudflare live (`liveOnly`) and saying `archive: 'off'` on screen.
-  The record starts when the collecting starts: the first run backfills the thirty days Cloudflare
-  still has and no more, so a full year is real a year from now. Say that rather than let it be
-  discovered.
-  Test it with `worker-test.mjs` in the scratchpad pattern: the real Worker module imported into
-  Node with `fetch`, `caches` and the KV namespace stubbed, and a fake month of traffic behind it.
-  That is the only way anything here gets measured, since this container cannot reach Cloudflare.
-- The Worker's address goes in `TRAFFIC_API` in `js/ui/traffic-view.js`. **While that is empty
-  the tab is the deploying instructions**, not an error.
-- `worker/` is not in `DIST_TREES`, so it is not copied into `dist/`. It holds no secret
-  either way.
-- The endpoint is open, and that is a decision rather than an oversight: CORS is a rule only
-  browsers keep, and a key in the admin page would be as public as the page. What it hands out
-  is aggregate visit counts for one shul's zmanim. Closing it properly means Cloudflare Access
-  in front of the Worker.
-- The tab shows Cloudflare's own error text verbatim when something is wrong. The shape of the
-  analytics schema is the one thing here that cannot be checked from this repository, so the
-  useful thing on the screen is exactly what Cloudflare said.
-- Test the screen by pointing `TRAFFIC_API` at a made-up address and fulfilling the request in
-  Playwright with `page.route`. Four states are worth covering: not set up, numbers, nobody has
-  visited yet, and the Worker refusing.
+`worker/calendar/` prepares a separate, authenticated service. Owner setup uses a
+private bootstrap link. Only the server creates roles; owners control all events and
+account access, editors can change only their own events. Invitations are one-use,
+seven-day links; passwords use salted PBKDF2, sessions are hashed, and revocation or
+reset invalidates them immediately. Do not expose private events or accounts in the
+public schedule API. Keep the endpoint disabled until the service has been deployed
+and verified with the user's Cloudflare account. `scripts/activate-calendar.mjs`
+stores the private setup link outside Git and preserves an existing owner. The main
+calendar admin must set their own server password; never derive owner authority from
+the client-side admin PIN. Activation does not publish a congregation calendar.
+After activation, the main admin sign-in and Calendar access screens retain
+Previous device preview backup. It downloads the exact existing local data without
+uploading it or replacing it with shared events. Calendar-only accounts do not see it.
+After signing in on `/admin/calendar/`, calendar accounts can open
+Schedule messages at `/texts/` from the calendar toolbar. Open it in the same tab
+so its Back to calendar button can return with the editor's session preserved.
+The return link goes to `/admin/calendar/` and retains server authentication and
+the actual account role. It does not grant other admin access.
+
+New readers can register immediately with their name, email address and their own
+password. The server always assigns viewer access; submitted role fields cannot
+grant editing. Viewers read calendar events and announcements but cannot add,
+change or delete events, post or delete announcements, invite people or see account activity.
+The owner can grant calendar editing or return an editor to viewing access; role
+changes invalidate existing sessions and can never change the owner's role.
+Existing owner/editor accounts and invitation flows are preserved. Removed emails
+cannot reactivate themselves through registration. Schedule messages at `/texts/`
+remains open by direct link, as explicitly requested; this access restriction covers
+only the calendar and its private announcements.
+
+Calendar account rows give the name and email their full width, with action buttons
+on a separate wrapping row below. Never let the buttons compete with the identity
+column on phones or stretch to match wrapped account text. Check pending invitations,
+editors, viewers and long names/emails at 320px through 393px before publishing.
+
+Show the Calendar access toolbar button only to the owner of the shared calendar.
+Editors and viewers do not manage accounts, so omit this button for them. Keep it
+in the main admin's device preview, where it provides backup and restore controls.
+
+Calendar access offers an owner-only Sign-in history list with every account's
+name, email, successful sign-in count, first/last sign-in and paginated timestamps.
+Account creation and invitation acceptance create the first recorded sign-in.
+GET session checks, page refreshes and failed passwords must not increase counts.
+Keep removed accounts' history and distinguish unrecorded earlier activity from
+new history. No password material, session tokens or IP addresses belong in the
+activity response. Show the recording notice on account forms. Deploy the updated
+calendar service before the client; keep the existing Durable Object and migration.
+
+The signed-in calendar toolbar also offers Announcements, a private plain-text
+message feed. Owners and calendar editors can append posts and delete any admin's
+post; every active calendar
+account can read them. Keep author identity server-owned, preserve Hebrew and line
+breaks, and escape all displayed text. Post IDs make retries idempotent. The existing
+calendar Durable Object stores messages and individual per-account read markers;
+reading in one session carries to that account's other devices. An author's own post
+is read immediately, without clearing other posts. Never use a shared
+read flag or a client-supplied user ID. Loading a page of messages does not mark it
+read. The UI marks a message only when its end is visible in the open feed, and
+updates the badge after server confirmation. Older paginated messages remain unread
+until viewed. Late read requests cannot clear newer announcements. Refresh counts
+on focus/visibility and every 30 seconds, with a button for new posts in an open
+feed. Stop timers and observers on logout or navigation. This feed does not publish
+calendar information or activate the separate phone-notification feature.
+Every announcement displays Shul as its author, including legacy records. Project
+the label in API responses without rewriting old stored author identity. All owners
+and calendar editors can edit any active announcement. Keep its ID, original creation
+date, sequence and read markers. A separate addedAt controls its displayed date and
+list position. Use optimistic revisions
+and operation IDs so concurrent edits conflict and retries count once. Record edits
+in private activity totals. Sync edited messages into open feeds without losing
+older pages or drafts; skip deleted posts and keep a conflicting edit draft intact.
+Viewers cannot edit. Never expose an author-name choice in the posting form.
+Deleting requires confirmation and removes the post from every account's feed and
+unread count. Keep a private tombstone and the existing record for recovery, remove
+its ordering entry, and never restore a deleted post when an old submission retries.
+Deletion retries are idempotent. Count deleted posts as seen for every account so
+read markers remain valid, including late reads and old status responses. Bounded
+congregation unread counts exclude expired messages without marking them read.
+An open feed syncs deletion IDs after the status count changes, retaining older
+loaded messages, scroll position and unsent drafts. Viewers cannot delete through
+either the UI or API. Existing events, accounts and sign-in history stay unchanged.
+Deploy the calendar service before the client. Keep CALENDAR, CommunityCalendar,
+the lakewood-commons object name and v1 migration. Use only synthetic local records
+for write tests; production verification must not create announcements or accounts.
+
+The LC Text email connection is owner-only under Calendar access. Its client must
+check `emailImport:true` before enabling setup. The Google script is a separate
+project for ads@neileich.org, with only its own five-minute trigger. Keep the existing
+Commons Comments script/trigger unchanged. Match the exact LC Text subject and
+Google Voice originating phone 18483564187 in both Google and the receiver. Only
+the keyed POST `/api/email-import/receive` can omit Origin; all calendar reads and
+other writes keep their original authentication and origin restrictions. Store only
+the integration key hash, never a real owner's session in the script or public data.
+Keep original message wording/dates; remove known Google wrappers, and send uncertain
+extraction to owner review. Stable Gmail-ID receipts prevent duplicates and replay
+after edits, deletion or key rotation. Auto imports mark nobody as read. Keep source
+email metadata private and do not add AI, outbound email or phone push. Google consent
+and authenticated Cloudflare deployment are actual activation requirements; publishing
+source or a setup screen alone must never be reported as an active mailbox connection.
+`tests/calendar-email-import.mjs` and `.cjs` cover extraction, long historical scans,
+lost responses, real server permissions/deduplication and phone/desktop setup.
+
+The owner also has a Shul SMS connection under Calendar access. Only its keyed
+POST `/api/sms-import/receive` may omit Origin, alongside the email receiver.
+Preserve exact SMS text up to 16,000 characters and never expose source phone
+numbers or integration keys in the feed. Stable receipts survive edits, deletion
+and key rotation; imports mark nobody as read. Normal manual posts keep their
+4,000-character limit. Deploy `smsImport:true` before the setup client and retain
+all existing calendar bindings and accounts. See `tests/calendar-sms-import.cjs`
+and `CODEX-DESKTOP-SHUL-SMS-CONNECTION.txt`; local browser/write tests use synthetic
+records and production verification must not create announcements or accounts.
+
+`tests/calendar-model.mjs`, `tests/calendar.cjs` and the calendar admin-shell tests
+cover date grids across 51 years, actual phone/desktop layouts, event persistence,
+safe text rendering, keyboard viewport, private accounts and server role boundaries.
+
+## Public schedule API
+
+Admin **Website preview** (`/admin/#preview`) embeds the real congregation pages with
+a date/time chosen in the published shul timezone. Use `websiteNow` only for the public
+document's schedule clock; `luach.js` enables it from the validated `website-preview`
+UTC URL parameter. Never replace global Date, change published settings, or save a
+preview clock into shared storage. Carry the parameter through public navigation and
+new-tab links. Render a clear nonprinted preview banner, preserve footer clearance,
+omit preview visits from analytics and avoid marking chart announcements as seen.
+Automatic charts must be generated around the chosen year. Real visitors and the
+parent admin retain real time. The admin screen's own remembered form selection is
+session-only; dispose its frame observer/message listener when leaving the tab.
+Keep previous/next-day buttons directly above the embedded screen, with the chosen
+date between them. Step calendar days while retaining the local time and current
+public page, including its query/hash. Keep the parent scroll and button focus steady.
+Reject nonexistent DST times and identify repeated times. `tests/website-clock.mjs`
+checks date/time conversion; browser checks must compare preview pages to ordinary
+pages running at the same date/time, including year boundaries and public route changes.
+
+`/api/schedule.json` returns only ten calendar dates: today and the following nine
+days in the shared settings' timezone (`America/New_York` for this shul). It is a
+read-only public JSON feed with no date/range query parameters. Serialize an explicit
+allowlist of date, service, time, parsha, and occasion fields. Never include rooms,
+addresses, coordinates, stars, underlines, or raw settings. Merge identical services
+at the same time after discarding rooms, while retaining different zman reckonings.
+
+`scripts/schedule-feed.mjs` adapts the same weekly reader and agenda engine as `/week/`.
+Use a clock before the ten-day window when collecting events so today's already-passed
+times remain. Normalize overnight events to their actual calendar date, and include
+the preceding week when collecting the window's first day's overnight services.
+Keep `unconfirmed` and `unavailable` dates explicit, without inventing normal schedules.
+
+`node scripts/build-schedule-api.mjs` writes `dist/api/schedule.json` after the ordinary
+Python build; the Python build clears dist first. Do not commit generated JSON or put
+the API adapter/build scripts into dist. The Pages workflow runs this generator on
+every deployment and daily at 04:07 and 05:07 UTC, covering both New York DST offsets.
+Consumers must check the published range and timestamp because scheduled deployment
+can be delayed. `node --test tests/schedule-feed.mjs` checks the ten-day limit, omitted
+location fields, full-day retention, midnight/DST transitions, and special schedules.
+Verify the live JSON, response CORS, and a real fetch from another origin after deploy.
+
+## Site statistics
+
+The statistics page and analytics Worker share one exact America/New_York date
+window and snapshot. Read [worker/README.md](worker/README.md) before changing
+collection, archives, metric definitions, or deployment. Missing history must never
+be presented as measured zero. Deploy the compatible Worker before its frontend.
+Tracking also covers Schedule messages, unlocked Seats and signed-in calendar page
+opens, once per document, with the existing live-host, preview and device exclusions.
+These pages were added November 5, 2026; do not imply older opens were recorded.
+Documents opened through one-time calendar setup/invitation links never load analytics,
+including after their hashes are cleared. Browser navigation timing retains the original
+URL, so waiting for sign-in alone would not keep the secret out of the beacon.
+The aggregate page-view endpoint remains separate from private calendar activity.
+Only the calendar owner can read `/api/activity`, using the same New York dates and
+snapshot as Site statistics. Activity records contain a timestamp and fixed operation
+types, without account names, emails or message text. Record successful sign-ins,
+viewer registrations, event changes, announcement posts/deletions and feed opens.
+Count retries once. Keep activity entries with their successful mutation, and retain
+the first tracking timestamp so older ranges show Not tracked or partial coverage.
+Operational counts include successful operations from excluded browsers. Sign-in
+history remains unchanged and owner-only. No new public feed or billing plan is added.
+
+An empty `/schedules/` replaces its current history entry with the congregation home
+page and updates the title/canonical URL. Legacy `/#schedules` behaves the same way.
+Keep an active schedule on its page, preserving printing and the current date rules.
+Check expiry every minute and on returning to the tab. Date previews follow the same
+fallback while retaining their preview date. Back/Forward must not loop on an empty page.
 
 ## הדלקת נרות on the congregation's home page
+
+Same-day countdowns show hours and remaining minutes, such as **in 2 hours 5 minutes**.
+Round the total minutes up before splitting into units, omit zero minutes at an exact
+hour, and keep the existing minute refresh and return-to-tab refresh behavior.
+Keep each number together with its unit when the narrow Friday cards wrap.
+When both home time cards are present, align their headings, clock times and countdown
+areas in matching rows, with the Hebrew event and room above the large clock time,
+followed by the countdown.
+Keep the complete countdown wording and omit decorative card/hourglass icons in the
+pair so phone text has room. A single card retains its icon and wider inline layout.
+
+The candle-lighting half opens a ZIP-code lookup on tap or keyboard activation.
+Keep its ordinary visible design without a hint or extra label. The main card always
+retains the published shul location and time. ZIP results appear only in the dialog,
+for the clicked card's date, and never mutate settings, charts or the schedule API.
+Resolve five-digit U.S. ZIP locations from the site's own
+`assets/location-data/v1/zips/` snapshot, including U.S. territories. Never call
+Hebcal or an outside geocoding API. Load only the requested two-digit prefix.
+The dialog also offers **Use my location**, which requests browser geolocation
+only after that button is pressed. Use its actual coordinates and the locally
+hosted exact time-zone boundaries, rather than the device's clock zone or a
+nearest-ZIP guess. Keep coordinates in memory, out of URLs, analytics and storage.
+Handle permission denial, unavailable coordinates, timeouts and stale callbacks.
+The local time-zone index covers the world, with 256KiB boundary chunks loaded
+only for points that need polygon checks. `vendor/location-decode-v1.js` decodes
+those boundaries. All location data and scripts are served by the site itself.
+Keep data credits out of the ZIP/GPS pop-up. Retain the bundled license notices
+with the data and decoder.
+Rebuild the snapshot with `scripts/build-location-data.mjs`, downloaded GeoNames
+US/PR/GU/VI/AS/MP postal archives and pinned geo-tz 8.1.10, geobuf 4.0.0, pbf 4.0.1,
+Turf 7.2.0 and esbuild 0.25.12 build tools. The manifest records input and chunk
+hashes. A later data snapshot needs a new versioned path and decoder filename.
+Calculate the result with the shared candle-lighting formula at zero elevation,
+using the configured minutes-before-sunset setting and the location's actual IANA
+offset at sunset. Show the city, date, local time zone and a live countdown. Keep the
+minutes-before-sunset explanation removed. The countdown uses the selected ZIP's
+absolute instant, refreshes each minute and on return to the tab, and clears its timer
+and listeners when the ZIP changes, the dialog closes or the page changes.
+Keep requests on demand, cancel them on input changes, close or navigation, and
+prevent late responses from replacing a newer result. Pause home-card replacements
+while the dialog is open so minute ticks preserve the input and focus return.
+`tests/candle-lighting-lookup.mjs` and `tests/candle-lighting-lookup.cjs` cover
+location validation, calendar/time-zone cases, failures, keyboard/touch interaction,
+timer refreshes and preservation of the shul's displayed time and settings.
+Anchor the dialog 16px below the top of `visualViewport`, centered horizontally,
+so it opens in the top half of the screen and keeps the same top position when
+showing a result. Track its height and offsets when the phone keyboard opens,
+closes or pans the visible area. Keep the ZIP field and Show
+time button inside that area, scrolling only the dialog on short screens. Blur the
+ZIP field after a valid submission so the keyboard clears the result. Remove viewport
+listeners on close/navigation. Test keyboard geometry with the layout viewport held
+at full height; simply resizing the whole browser misses Android's keyboard behavior.
 
 The "what is on next" card shows the next מנין and, beside it, that day's הדלקת נרות. It used to
 read that off the chart's H column alone, which only ever has one on a **Friday with a שבת row
@@ -422,15 +1428,50 @@ it on ערב ראש השנה, where the card named the מנין off the sheet an
 
 ## The messages page, `/texts/`
 
+The full message audit is covered by `tests/text-message-sources.mjs` (51 calendar
+years, all 13 holiday/full-fast formats, chart edits and room marks) and
+`tests/text-message-audit.cjs` (real year views, Rosh Chodesh weekday portions,
+partial Chanukah weeks, latest saved charts, Yizkor, editable text and copying).
+Rosh Hashana and Yom Kippur messages read their built `erevLines`, including
+Chatzos, rather than reparsing template constants. Every Friday room marker uses
+the shared room key, including a star placed after a closing underline tag.
+When several saved weekday charts cover a week, the newest `createdAt` wins.
+Rosh Chodesh messages read `buildRoshChodeshShacharisPoster` rows and dates:
+omit Shabbos-only months, keep only the weekday portion of mixed dates, and use
+the Chanukah morning for Teves. Weekly messages name each applicable Chanukah
+morning group through Friday, including ordinary mornings in partial weeks.
+When all weekday mornings fall during Chanukah, write just Shacharis and its times;
+retain day labels only when distinguishing ordinary mornings in a partial week.
+Put the extra Sunday Mincha inline before the regular times: `Mincha: (Sunday: 12:30d) ...`,
+using the shared calculated Sunday time rather than a fixed minute.
+Keep Rosh Chodesh mornings only in their separate message, including during Chanukah;
+do not repeat that group in the weekly Chanukah message. The Chanukah chart panel and messages use the
+complete posted schedule's agreed first minyan via `chanukahPostedShacharisRows`,
+with its averaging/floor rule for ordinary Chanukah days. Both first rows use the
+same full-period average when all weekday candidates are pushed by netz; otherwise
+Rosh Chodesh uses its latest-weekday netz-minus-25 floor, with matching traces.
+Do not return to independently rounding a day when quoting that combined row.
+
 The chat messages the shul sends out, on a page of their own. **A third entry page beside
 `index.html` and `admin/index.html`**, with its own entry module (`js/texts-app.js`) and its
 own view (`js/ui/texts-view.js`), stamped by `build-offline.py` exactly the way the admin is
 and listed in `DIST_TREES`.
 
-- **It carries no link of any kind**, no sidebar, nothing back to the admin or out to the
-  congregation's site. That is the whole point: the person who sends the weekly message is not
-  the person who prints the boards, so the address is handed to them on its own. A browser test
-  asserts there are zero `<a>` elements on it. Do not "helpfully" add a back link.
+The standalone Messages page uses the shared Shul photo/header, cream background,
+navy Georgia headings, gold-edged cards and navy Copy buttons. `css/messages.css`
+scopes this styling to `body.is-texts-page`. Its compact header shows only the
+54px by 35px building photo and Back to calendar, with both contained on one row
+and a 44px return target. Keep its header layout in messages.css, independent of
+calendar.css; calendar header changes must not break Messages. Keep dates, editable message text,
+local-only edits, copying and the heading's year-view gesture unchanged. Editing
+help stays in How to edit and copy and remains open across filter redraws.
+
+- **Its only navigation link is Back to calendar**, explicitly requested by the user,
+  returning to `/admin/calendar/`. Keep it in the Shul header with a 44px touch target.
+  Messages itself remains open without a PIN or calendar account. The return destination
+  requires the usual calendar sign-in and keeps the real owner/editor/viewer role.
+  Do not add other admin, site-menu or congregation links. Browser checks assert this
+  single return link and verify the editor can make the round trip without signing in again.
 - The admin's sidebar gets a **Messages** entry, and it is an `<a href="/texts/">` rather than
   a tab, because it leaves the page. Beside it is **Congregation site**, `<a href="/">`, asked for:
   there was no door from the admin to the congregation's own page at all and the only way across
@@ -494,26 +1535,15 @@ and listed in `DIST_TREES`.
   locale (`txDateLabel`, UTC parts throughout, since a serial is a whole day and a local midnight
   lands on the day before west of Greenwich). Asked for after the stale-card bug above: a message
   is only times, so one carrying last year's looked exactly like one carrying this year's.
-- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads its שחרית off the wall chart, from
-  `WEEKDAY_SHACHARIS_SPECIAL`, the second schedule the chart prints on a ר"ח, a בה"ב and a
-  תענית. The letters come off that cell's own marks (`erevWhereMark`), so editing the schedule in
-  Settings moves the message with it. No times of its own: it broke that rule twice and the shul
-  caught both.
-  It carried a hand-written copy of the schedule, and the copy had a **6:50 בעזרת נשים the chart has
-  not got**, so the message announced a מנין the board does not show. And it carried the
-  `(T"T 7:25)` every one of the seventeen sent messages has, which is on no chart at all, so nothing
-  here knows how that time is arrived at or what would move it.
-  What it does work out is the calendar, not the clock: the month, and the day ראש חודש starts on,
-  which is the thirtieth of the month before wherever that month has one. **תשרי is skipped**, its
-  ראש חודש being ראש השנה, which has its own message. אב is written "Menachem Av" and חשון
-  "Mar Cheshvon" (`RC_TEXT.spelling`); `JEWISH_MONTHS_EN` keeps saying Av and Cheshvan for the
-  charts. Where the chart has no second schedule the card is dropped rather than sent as a heading
-  with no times under it.
-  One thing deliberately not built: three of the seventeen, in חשון, טבת and שבט, open
-  "6:50m&ns, [Netz 7:15]" instead, where the bracket is sunrise and the מנין is sunrise less twenty
-  five minutes. Neither number is on a chart, so neither is built.
-- **The year view has five switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
-  Taanis and Rosh Chodesh**, and everything on it is in **date order**, which is the order these get
+- **ROSH CHODESH** (`js/rosh-chodesh-text.js`) reads the shared morning handout
+  rows. The first two minyanim obey the netz-minus-25 earliest start and all rooms
+  come from the same marks (`erevWhereMark`). Do not keep a second copy of the
+  times or add a T"T minyan that is absent from the charts.
+  Omit Tishrei and Shabbos-only months. Keep the message spellings "Menachem Av"
+  and "Mar Cheshvon" in `RC_TEXT.spelling`; chart month names stay unchanged.
+
+- **The year view has six switches under "Include in messages", Erev Shabbos, Weekday, Yom Tov,
+  Taanis, Rosh Chodesh and Behab**, and everything on it is in **date order**, which is the order these get
   sent in. All on to begin with, and turning them all off says so rather than looking broken.
   The weekly message is its own switch rather than part of Erev Shabbos, asked for: they are the
   week's schedule and Friday's, they are checked for different things, and fifty of each on one
@@ -530,6 +1560,9 @@ and listed in `DIST_TREES`.
   rather than the day itself, which is what the sort runs on.
 - **ערב שמיני עצרת reads the שמיני עצרת block, not the sheet's first**, since that evening is
   הושענא רבה's, five blocks in, and every block before it carries the same three calcs (`ytBlock`).
+  On Shabbos, Yizkor is approximately 9:40 downstairs (weekday 9:10 plus 30 minutes)
+  and 11:05 in the main Bais Medrash (weekday 10:25 plus 40 minutes).
+  Yom Kippur Yizkor is approximately 11:50 in the main Bais Medrash.
   Its sent message carries **no sign-off**, where every other one ends on a fixed line, and that is
   written the way it was sent. Its afternoon is the sheet's and **the sheet disagrees with the
   message that was sent**: the shul asked for the whole run to be למטה (the main בית מדרש is being
@@ -605,6 +1638,9 @@ and listed in `DIST_TREES`.
   סוכות, of פסח, of שבועות and of ראש השנה had no message at all**, which the shul reported. Those
   weeks are named for the yom tov in them, the way the chart's own row is: "Week of Sukkos", and
   the "P'" goes in front of a parsha only.
+  A full Chanuka week keeps the parsha: "Week of P' Miketz - Chanuka". Erev Shabbos messages
+  add " - Chanuka" when Shabbos itself is during Chanuka, including before its first night.
+  Both the upcoming and full-year views use that calendar rule.
   **The morning is not always the everyday שחרית**, and the shul asked why the message still said
   it was. Through the סליחות season the shul opens earlier and on the סליחות sheet's own lists, so
   `wkMornings` asks `weekdayMornings` in `posters/day.js`, which is the same question the week card
@@ -622,9 +1658,8 @@ and listed in `DIST_TREES`.
   time for time, 6:35 on the two קריאת התורה mornings and 6:40 on the rest, which is what their
   "6:40(m&t6:35)" says; the week of שבועות is their שחרית time for time. Where a מנחה or מעריב
   differs from what they sent (6:55 against their 7:00 that week), the chart is what is kept.
-- **The fast day messages** (`js/taanis-text.js`). **צום גדליה is the only fast with a sheet and
-  the only one with all three lines**: `posters/tzomgedalia.js` carries שחרית, מנחה and מעריב, so
-  the message is the sheet's own. The other three public fasts carry **the morning and nothing
+- **The fast day messages** (`js/taanis-text.js`). צום גדליה and עשרה בטבת read their full
+  schedules from their own posters. The remaining public fasts carry **the morning and nothing
   else**, which is the ר"ח / בה"ב / תענית list out of Settings, the second schedule the wall chart
   prints, and their sent messages carry it time for time. Their מנחה and מעריב are on no board: a
   fast afternoon is not the everyday one (the sent תענית אסתר runs 4:45, 5:10 and 5:15 after the
@@ -652,6 +1687,22 @@ and listed in `DIST_TREES`.
 - The shul is feeding these over time as they send them. Each new one is a builder plus an
   entry in `renderTexts`.
 
+The BHB messages (`js/behab-text.js`) read the existing BHB Shacharis handout for
+each of the three mornings after Sukkos and after Pesach. The first four chart
+minyanim say Behab; list the remaining three below "The following will NOT be saying
+Selichos". Keep the chart's times and
+room marks, including `sh` for its 7:35 hall minyan, rather than the older message's
+extra 6:50 minyan or different room wording. Carry the 6:40 Selichos-before-Shacharis
+note only on that morning's qualifying date, using the handout's `selichosDays`
+metadata. The message computes no zman. Use Tomorrow Behab for the message sent
+the night before, and Today Behab on the actual date. Each morning has its own card
+in the existing four-day window and a separate Behab filter in the year view.
+Past mornings disappear from both views. Preserve editable text, copying the edited
+content, rebuilding fresh text on refresh, and the standalone Messages page without
+links or a PIN. `tests/behab-text.mjs` verifies both annual rounds across 51 years
+and date-specific notes; `tests/behab-text-page.cjs` covers actual mobile/desktop
+cards, date windows, filtering, editing and copying.
+
 ## The PIN on the admin
 
 `/admin/` asks for four digits before it draws anything, remembered on that device for three
@@ -676,9 +1727,272 @@ the shipped hash in 0.004 seconds. This was put to the shul with both facts and 
 was that it does not really have to be hidden. So do not raise it again, and do not quietly
 "harden" it. Behind it is one browser's own localStorage and nothing else.
 
+## Seats chart scrolling
+
+Seats home prioritizes updating existing charts. View saved charts comes first
+and uses the prominent navy style; Create new chart is the secondary white action.
+The Saved charts folder keeps compact list rows with matching navy and gold
+styling. Its close button stays visible at the top while scrolling long folders.
+
+Seat numbers are omitted from the chart and printouts. **Open seats** shows
+**Open** only in unassigned, unblocked table seats; off leaves them blank. This
+display choice is remembered separately for each chart on this device, outside
+shared chart data, with new charts off. It works with Initials, Reserved and
+Room design in both print styles. Keep accessible seat positions and editor
+navigation labels. The Rav always displays **Rav** and has no seat editor,
+assignment target or editable label. Skip it in Tab navigation and seat-picker
+lists. Retain any legacy Rav name, assignment and object label in stored data;
+do not clear them as a migration. The existing room footprint is retained.
+`tests/seats-open-seats.cjs` verifies these controls, both print paths, phone and
+desktop views, independent preferences and unchanged stored assignments.
+
+**Table numbers** shows or hides table labels such as A1 and B2 on the chart,
+native printouts and CMYK PDFs. Labels are shown by default. Remember this display
+choice independently for each chart on this device, outside shared chart data.
+Keep the Rav label, accessible seat/table names, editing controls and alphabetical
+list table names available when chart labels are hidden. Never renumber tables or
+change saved names, assignments or geometry for this preference.
+
+The regular Color chart uses warm cream (#fbf5e8) tabletops and cool pale gray
+(#f1f3f4) for the bookcases, bimah, amud and Aron Kodesh. The Rav station follows
+the tables' color and their tabletop material in illustrated Room design. Custom
+bookcase label backgrounds share their fixture fill. Black & white stays white.
+These flat fills are independent of the illustrated Room design materials.
+
+Room design is a display switch remembered separately for each chart on this
+device, outside shared chart data. New charts start with it off. Resolve the
+choice from the active chart on every render and print, including folder opens,
+Back/Forward and reloads. Migrate the old device-wide flag only to the previously
+active chart, once; never use it as a fallback for other charts. Keep independent
+storage keys so another tab cannot overwrite other charts' choices.
+With Color selected it uses light
+tables with dark names and subtle wood edges. Keep wood and burgundy as small
+accents drawn from the room photos, not a dark brown fill across the tables.
+Tables have a pale ivory, realistic fine-grain surface from
+assets/seats/light-tabletop-v1.png. Keep the texture subtle and the tables light,
+with at least 4.5:1 contrast for names and Open labels. The grain spans
+the entire tabletop with no separate name backgrounds. Retain the existing
+table edges, outlines and shadows. The texture ships offline and printing waits
+for it to load. Bookcases keep their previous light appearance.
+Aron Kodesh uses a transparent photo-based illustration from the
+user's room photos, clipped from assets/seats/room-fixtures-photo-v1.png. The bimah
+uses assets/seats/bimah-two-panel-photo-v2.png, with two equal front sections,
+a lower rectangular silhouette, and clean clear glass without reflected ceiling
+lights or cloudy glare. Its picture is 25% narrower than the original wide
+three-section illustration; preserve its natural
+proportions and center. The amud uses assets/seats/amud-front-photo-v1.png,
+a straight-on view with level front edges and no visible side panel, matching
+the other fixtures. Keep
+natural image proportions, with no people or invented inscriptions. The crown's
+top is a plain round gold bead, using the small clipped correction from
+assets/seats/aron-crown-round-v1.png; do not restore the cross-like finial.
+Omit visible Aron Kodesh, bimah and amud captions in this illustrated mode; retain
+their saved object names and accessible labels. Fixture pictures stay clear of
+seat names. The approved straight-on amud retains its current size and follows
+the covered lectern visible in front of the Aron. Saved footprints stay unchanged.
+Shelves have molded cornices and plinths around inward-facing dark books with
+red, blue, green and off-white spine labels, grouped like the sets in the photos.
+Keep the existing light bookcase frames and pale shelf interiors.
+The open front and lower spine labels face the room; the cabinet back faces the
+wall. The unrotated shelf elevation opens along local +y, not -y. Verify the
+actual book bases and labels, not just the shelf's direction attribute.
+Keep the floor a very pale neutral gray, using #fafafa with only .08 opacity of
+the original stone texture in
+assets/seats/light-marble-floor-v1.png. Do not restore drawn marble-vein curves.
+Grayscale the floor texture in both print styles so it has no beige or green cast
+and its neutral raster pixels use only black ink in the CMYK file.
+The stone swatch spans a centered 3 by 3 group of 2:1 rectangular tiles. Keep the
+original photographic texture without mirrored repeats; the user preferred the
+earlier, more natural floor. Grout is subtle neutral #e8e8e8 with .5-unit lines.
+Keep the joints as separate sharp SVG paths, drawn
+between the marble and the room furnishings, rather than inside the image pattern. Center one tile on both axes of SEATS_BOUNDS
+so the cuts at opposite walls match. The texture ships offline and printing
+waits for it to load. Saved fixture footprints and hit areas stay unchanged;
+the tall Aron picture uses the clear
+front margin above the wall. Printing keeps the normal chart view and full room
+scale. Let the tall Aron overflow upward into the existing empty center header,
+clear of the top-left minyan logo; do not reserve extra room height or shrink it.
+Keep the whole picture inside the printable page, clear of seat names, and
+preserve its proportions on fixed-size and auto-fit printouts. The asset must
+ship offline too.
+Assigned seat names retain the approved Liberation Serif letter shapes with a
+very slight weight increase. The Seats Serif face has weight 450 and strengthens
+the original outlines by just 0.004em. `scripts/build-seats-name-font.py` generates
+the renamed OFL derivative from the shipped regular font using FreeType, keeping
+all advance widths, glyph order, Unicode mappings and hinting. Its WOFF2 serves
+the screen/native print; its matching TTF embeds as SeatsNames in RGB/CMYK PDFs.
+Render the stronger outlines directly from the font so native PDFs keep a single
+selectable text layer. The original serif faces remain for other lettering.
+Load the name face before starting the editor so canvas fitting and the first
+visible names use the same metrics. Keep the existing size, spacing and fitting.
+Fixed Legal printouts may fit names up to 16 diagram units instead of the normal
+13, using the actual wider seat width and the same shared-size/long-name fitting.
+Auto fit can grow assigned names uniformly on wider paper by up to 16/13, with
+shared and per-name line-height limits to keep them inside their seats. Apply
+this proportional growth only to the assigned-name lettering wrapper, preserving
+the existing horizontal paper correction. Keep normal Letter sizes, editing text,
+table labels, Open labels and fixture captions unchanged. Check actual native
+Legal and Auto fit PDFs for larger names, uniform sizing and full character bounds.
+Measure their wrapping and shared font size with the same name face so long
+English and Hebrew names stay within their seats. Keep Open labels and fixture
+captions at their existing weights. Preserve stored names, assignments and room
+geometry when changing this display style.
+Names and empty seats share one continuous table background in every chart style,
+with Room design on or off. Keep seat fills transparent for assigned names,
+hover, editing, drop targets and remote reservations; use outlines for those
+interaction states so names never recolor the tabletop. Black & white uses the
+same complete room design with marble, table grain and detailed bookcases.
+The Aron Kodesh, bimah and amud use light outline sketches derived from their
+original photos, with light gray interiors and defined pencil details instead of
+solid dark fills. Use a paper tone around #e6e6e6 and slightly stronger gray lines
+so the fixtures stand apart from the marble without looking like white cutouts.
+Keep the existing detail, shapes and sizes. Preserve their
+exact silhouettes, proportions and corrected
+round crown tip. Apply the sketch filter to each combined picture; do not stack
+another image grayscale filter inside it. Color keeps the original photographs,
+with a shared sRGB tone lift (RGB slope .55, intercept .4, alpha unchanged) on
+each combined photo and crown correction so the three fixtures print lighter.
+Keep this same treatment in the screen preview, native print and CMYK PDF.
+Convert vector paint to neutral grays and filter only raster artwork so printed
+names and shelf details stay sharp. Both
+styles wait for the artwork before printing. Turning the switch off restores
+the original art.
+Do not change chart geometry, names, assignments or saved-chart dates for this
+display preference. Keep separate SVG paint IDs for screen and print.
+`tests/seats-room-design-choice.mjs` checks isolation, migration and storage failure.
+`tests/seats-room-design.cjs` checks both styles, phone/desktop, native PDFs,
+contained books, uniform seat backgrounds and unchanged chart data.
+
+The chart's **Header & footer** section below the print settings edits per-chart
+`printHeader` (80 characters) and `printFooter` (240 characters). Starting wording
+is **First Draft** at the top right and **Anyone who would like a seat should
+speak to the Gabbaim.** below the room. Missing fields show that wording without
+rewriting legacy chart data; empty strings hide the corresponding note. Custom
+notes save, copy, restore and sync with the chart, independently of seats. Keep
+the header clear of the center Aron and the left minyan wordmark. Wrap notes on
+paper, reserving only the footer height actually needed; blank footers restore
+the original room print area. Both native and CMYK chart printing use the same
+note layout. Commit focused note inputs before printing or leaving. Shared field
+patches use explicit nulls for missing notes so new wording can be undone back
+to the legacy state. Deploy the updated shared service before the new client.
+`tests/seats-print-notes.mjs` and `tests/seats-print-notes.cjs` cover storage,
+concurrent merging, immediate printing, wrapping and unchanged assignments.
+
+Seats **Print / PDF** offers **PDF colors: CMYK / Standard (RGB)** for both the
+chart and alphabetical name list. Paper, Style, PDF colors, Header & footer,
+Printer dialog and Convert saved PDF belong inside one collapsed **Print options**
+dropdown. Keep the main Print / PDF action visible. The dropdown stays open and
+retains focus/scroll when its settings change, but starts closed on a new page.
+Keep CMYK as the default. Remember the choice
+per chart on this device, outside shared chart data, so it cannot change another
+organizer's printing preference or saved-chart dates. Both formats use the same
+layout, embedded Hebrew/Latin fonts, vector text/rules and lossless 1200 dpi tiled
+artwork. Name downloaded files with -CMYK.pdf or -RGB.pdf, and identify the selected
+format in progress, ready and error messages. Standard RGB exports must work without
+fetching Little CMS or the CMYK profile and must contain RGB artwork and transparency
+groups, without a CMYK output intent. Keep both choices visible on phone and desktop.
+`js/seats/cmyk-pdf.js` shares the PDF writer, fonts and tiling between both formats.
+The CMYK option uses Little CMS with the embedded
+FOGRA39L Coated output profile and a 300% total ink limit. Neutral grays and the
+Black & white option use only K. Keep all page artwork in DeviceCMYK and all
+vector colors in CMYK or gray, with no silent RGB fallback. Text stays selectable and
+uses embedded Hebrew/Latin fonts. Keep logical Unicode input and visual PDF glyph
+ordering so Hebrew words print in the correct direction. All chart print lettering
+uses solid black, including Color, so small names do not require screened navy
+toner. Keep the subtly strengthened serif seat names and fitting; other lettering
+retains its current fonts and weights. The editing preview retains its existing
+colors. Plain seating charts and alphabetical lists remain
+fully vector, including their table outlines, fills, pillar hatching and rules.
+Photos and surface textures are sampled at 1200 dpi in small tiles to bound
+phone memory. Tile joints stay vector between the marble and furnishings. Use
+CMYK transparency blending and grayscale soft masks for the furniture overlay
+so grout stays hidden under tables, chairs and fixtures. Keep the existing room geometry and fixture
+proportions. `js/seats/pdf-pages.js` captures the current SVG appearance, including
+initials, Reserved and per-chart Room design, without changing saved names or
+assignments. The name list keeps names unique and table labels grouped, wraps
+long cells and paginates between rows.
+Auto fit opens the native printer dialog from the main Print / PDF action and
+fills the paper chosen there, including Legal. Its color control reads Printer
+managed and is disabled; native printing cannot promise a CMYK file. Remember
+the RGB/CMYK choice for when a fixed paper is selected again. Never silently
+generate a Letter-sized PDF for Auto fit. Fixed-size
+PDFs use Letter for Letter, 14 x 8.5 landscape for Legal, and 17 x 11
+landscape for Tabloid. Legal is remembered per chart on this device outside chart
+data, using the same display-choice storage as the PDF colors option. Older shared
+services normalize unknown paper values to Letter, so never send a Legal paper
+patch to them. The effective paper choice must drive the preview's print SVG,
+native @page dimensions, footer/header fitting and both RGB/CMYK PDF page sizes.
+Switching back to the chart's existing paper must also refresh that geometry.
+Keep the usual shared paper behavior for Auto fit, Letter and Tabloid. Retain the original
+browser printing under **Print options > Printer dialog**, and on the name-list page, for
+custom printer paper. That legacy browser path cannot guarantee a CMYK file.
+New tabs open directly from the click for phone compatibility, falling back to a
+named download if blocked. Failures remain visible and retryable; never silently
+substitute an RGB browser printout for a failed CMYK export.
+The printing libraries in `vendor/cmyk/` and fonts/profile in `assets/print/` are
+self-hosted and loaded only on export. Keep all license notices. No names or chart
+data are uploaded for conversion. This is a CMYK PDF, not a claim of PDF/X
+conformance or an exact match to an unspecified printer's paper and inks.
+`tests/seats-cmyk-pdf.cjs` preflights the actual PDF image channels, vector operators,
+embedded ICC profile, ink coverage, searchable Hebrew/Latin text, page dimensions,
+roster pagination, phone/desktop output, failure/retry and blocked-popup downloads.
+
+
+Seat edit selections expire after 30 minutes, without changing an assigned name
+or saving unfinished typing. Connection heartbeats, repeated reservation messages
+and reconnecting the same page must not extend its deadline. The editor closes
+and keeps unfinished text on that page for reselecting the seat, retaining its
+original saved-name snapshot so a newer assignment still requires conflict review.
+The service independently ignores expired reservations, including legacy sockets
+without a deadline. Old clients cannot automatically reclaim an expired selection
+until they clear it or change seats. Keep anonymous seat protection and no viewer
+list. `tests/seats-reservations.mjs` and `tests/seats-reservation-timeout.cjs` cover
+the exact deadline, stale clients, two-device release and unfinished drafts.
+
+The chart status box and Saved charts rows show the organizer who last assigned
+a name to a seat. Later renames, room edits, name-list imports, restores and
+opening a chart must not replace that attribution. Keep the normal creation and
+last-edit dates in the saved list. Chart change history displays only added seat
+assignments with their organizer and timestamp, including only seat lines within
+mixed edits. Skip history pages containing only unrelated edits automatically.
+Keep the complete underlying audit records intact for recovery and backups.
+Use the existing paginated history API so this works with the deployed service.
+Never substitute its generic updatedBy field when seat history is unknown.
+`tests/seats-seat-activity.mjs`, `tests/seats-records.mjs` and the sharing browser
+checks cover attribution, older pages of history and later edits by another actor.
+
+The full-width Seats chart grows down the website page on desktop. Scroll the page
+to reach its back rows at the same readable size. Do not restore a viewport-height
+chart box with its own vertical scrollbar. The names sidebar stays sticky and
+uses its natural content height, capped by the full viewport. Do not size it from
+its initial page offset, which leaves a short scrolling box after page scrolling.
+Short or empty lists show their controls without an inner scrollbar. Long name
+lists may scroll independently. Horizontal chart panning still contains zoomed charts, and
+Whole chart remains an optional small overview. Seat dragging near the viewport's
+top or bottom scrolls the page. A diagram edge in the middle of the viewport must
+not move the page during a seat drag. `tests/seats-desktop.cjs` checks page wheel scrolling,
+back-row reachability, retained chart width, drag autoscroll and actual print PDFs.
+The editor uses the same navy and gold style as Seats home and Saved charts, with
+an editable chart name, inline saved status, grouped print and chart controls, and
+a natural-height People panel. Keep Save available for linked charts as well as
+drafts. Display switches retain their full accessible names; their shorter visible
+labels do not change stored names, room geometry, assignments or printed content.
+The bimah and every pillar draw square artwork centered within their saved
+footprints, without migrating positions or changing assignments. Like the Rav's
+shtender and amud, their print surfaces undo the chart's horizontal paper-fitting
+stretch. Verify squares in actual native PDFs across the supported paper sizes.
+Reserved instead of names is a device-only display switch beside Initials + last
+name, remembered in `lakewood-commons-seats-print-reserved`. It replaces every
+occupied chart seat, including the Rav, with Reserved on both the page and paper
+so the organizer can see the print labels before printing. Empty-seat numbers,
+the People list, seat editor, stored people, shared history, backups and seating-list
+exports remain unchanged. Both display fitting and print fitting check the actual
+Reserved text when this switch is on. Switching it off restores the chosen full-name
+or initials display.
+
 ## Verify before you call it done
 
-Generate a sheet and check: all pages 817px, rows equal within a page, interleaved order,
+Generate a sheet and check: all pages 816px, rows equal within a page, interleaved order,
 the דרשה afternoon built (מצורע/הגדול in a חורף sheet and האזינו/שובה in a קיץ one both
 read as three lines: times, then a דרשה line, then times), no console errors,
 no horizontal overflow at 375px on every screen, and the live hash matches after deploy.

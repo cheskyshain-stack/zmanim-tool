@@ -52,13 +52,9 @@ export const WEEKDAY_SHACHARIS = '<span class="big">7:00 7:20* <u>7:35</u>\n8:00
  *  the everyday one above it rather than on a short line. */
 export const WEEKDAY_SHACHARIS_SPECIAL = '6:40 7:00* <u>7:15</u>\n7:35** 8:00 8:20* <u>8:40</u>';
 
-/** The note at the foot of the Weekday chart, which replaces the regular footer note there.
- *
- *  It says what the marks on the times above it mean, so it belongs with the schedules and not
- *  with the shul's own footer: the stars are written by the schedules and read by every screen
- *  that names a room off one (erevWhereMark in erev-text.js), and a footer that stopped listing
- *  one of them would be the board explaining its own marks wrongly. */
-export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה\nבעזרת נשים **באולם השמחות*';
+/** The Weekday chart's fixed note. Location stars are explained separately by the chart
+ *  renderer from the times on each physical page, including its שחרית panel. */
+export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית מדרש למטה';
 
 /** The heading printed above the second schedule on the wall chart, and the three pieces it
  *  is built out of.
@@ -110,10 +106,9 @@ export const LEGACY_FOOTER_ADDRESS = [
   'Bais Medrash Lakewood Commons 44 Coles Way Lakewood, NJ 08701',
 ];
 
-/** The chart's header colour, which the parsha column is painted in too. Light gray with
- *  dark ink, rather than the dark gray it shipped with: a full column of solid dark on
- *  every page is a lot of toner, and the user asked for the light one. */
-export const DEFAULT_ACCENT_COLOR = '#c9ced5';
+/** Neutral light gray for the printed chart. The previous blue-gray could acquire a
+ *  green cast on paper; equal RGB channels keep the standard shading free of a hue. */
+export const DEFAULT_ACCENT_COLOR = '#cecece';
 
 /** How each season is named in the interface. Defined once and imported, rather than
  *  written out in each screen that needs it: build-offline.py flattens every module into
@@ -125,18 +120,18 @@ export const SEASON_LABELS = { kayitz: 'שבת קיץ', choref: 'שבת חורף
 /** Accent colours that were once the shipped default. Same carry-forward treatment as
  *  LEGACY_FOOTER_ADDRESS: a sheet still holding one of these was never given a colour
  *  by hand, so it follows the default instead of staying on the old one for ever. */
-export const LEGACY_ACCENT_COLORS = ['#54595f'];
+export const LEGACY_ACCENT_COLORS = ['#54595f', '#c9ced5'];
 
 export const DEFAULT_SETTINGS = {
   shulName: 'קהל לב מנחם',
-  // Printed header: assets/logo-building-icon.png + assets/logo-text.png (the shul's
+  // Printed header: assets/shul-240.jpg + assets/logo-text.png (the shul's
   // actual logo, pulled straight from the workbook) plus this editable text -
   // headerSubtitle under the logo, headerRabbiLine on the opposite side.
   headerSubtitle: 'ליקוואוד קאמענס',
   headerRabbiLine: 'הרב אריה שרבינטר שליט"א\nמרא דאתרא',
   // Custom header photo (top-left of the printed page), as a cropped data: URL saved
   // via the image-crop tool in Settings - null means "use the bundled default",
-  // assets/logo-building-icon.png (see sheet-view.js).
+  // assets/shul-240.jpg (see sheet-view.js).
   headerIconImage: null,
   // Printed footer: a note line (as in the workbook - underlined-minyan location,
   // rounding disclaimer, etc.) plus the shul's address.
@@ -161,7 +156,37 @@ export const DEFAULT_SETTINGS = {
   useGregorianBefore1582: false,
   // Last-used sheet display style (font/size/logo scale) - new sheets start with
   // whatever was last set, instead of resetting to a hardcoded default every time.
-  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR },
+  sheetStyle: { fontFamily: 'Times New Roman', fontSizePt: 10, headerScale: 1, accentColor: DEFAULT_ACCENT_COLOR, splitSpringDst: false },
+  /* Not a time default like the ones above, and not a per-cell override either: the Weekday
+     chart's 11:30 מעריב runs every week of קיץ now (sheets/weekday.js), regardless of BMG,
+     and not at all in חורף - this flag never touches that. It only controls whether 11:30
+     prints with a "NEW" tag, and only where it actually is new: page 1 of the summer (קיץ)
+     season current the moment the admin turned it on (ui/settings-view.js, publish.js's
+     firstWeekdayPageRangeForSummer - always קיץ, since BMG being in session is the only
+     reason a קיץ week would not already have had 11:30 and BMG's own middle range reaches
+     into קיץ too, ר"ח אייר -> ט' באב), further narrowed to the weeks on that page BMG is
+     actually in session on. A week BMG is already out of session had 11:30 all along.
+     Turning it back off just hides the tag; it does not touch the minyan itself. */
+  newMinyanBadge: { on: false, firstSerial: null, lastSerial: null },
+  /* Off by default and admin-only, asked for in those exact terms: whether a שבת that is
+     שבת מברכים also prints the molad underneath its parsha name. Worked out fresh from
+     each week's own date (sheet-view.js, off shabbosMevarchimMonth/moladFor in
+     hebrew-calendar.js) rather than stored on the week object, so a sheet saved before
+     this setting existed shows it immediately once turned on, with nothing to
+     regenerate. Read only by renderSheet's own call into buildSheetPages (sheet-view.js);
+     the congregation's own reading copy (chart-view.js) never reads this field at all, so
+     there is no path by which turning it on for the admin's own chart could show it to
+     the congregation, even once a season carrying it on is published - see
+     buildSheetPages's own comment. */
+  showMolad: false,
+  /* Which sentence the molad is said in once showMolad is on: 'compact' (default, the
+     short "מולד: יום ג׳, 4:23pm, ז׳ חלקים" line) or 'yiddish' (the shul's own shorthand,
+     "מולד: דינסטאג נאכמיטאג, 23 מינוט מיט 7 חלקים נאך 4."). Read by hebrew-calendar.js's
+     own moladLabel, which is the one place that dispatches on it - sheet-view.js and
+     anything else that wants a molad sentence call that, never format one itself, so
+     there is exactly one place either sentence is built. Same admin-only safety as
+     showMolad itself: this is never read by the congregation's own chart. */
+  moladFormat: 'compact',
 };
 
 /** Expands stored settings into the shape zmanim.js / hebrew-calendar.js expect. */

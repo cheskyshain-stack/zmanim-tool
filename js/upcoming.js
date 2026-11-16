@@ -23,12 +23,14 @@ import { formatTime, UL_START, UL_END } from './format.js';
 import { DAY_NAMES } from './util.js';
 import { KAYITZ_COLUMNS } from './sheets/kayitz.js';
 import { WEEKDAY_COLUMNS, buildWeekdayRow } from './sheets/weekday.js';
-import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis } from './hebrew-calendar.js';
+import { excelWeekday, hasRoshChodesh, hasBehab, hasTaanis, chanukahYearFor } from './hebrew-calendar.js';
 import { announcedCell } from './announced.js';
 import { mergeRow } from './overrides.js';
 import { rowFor, weekIndex, weekdayChartFor } from './sheets/rows.js';
 import { specialMinyanim, specialShacharis, specialCandleLighting } from './posters/day.js';
+import { roshChodeshSchedule } from './posters/rosh-chodesh-schedule.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from './settings.js';
+import { chanukahSundayMincha, chanukahPostedShacharisRows } from './posters/chanukah.js';
 
 /* Which cells on a שבת chart hold מנינים, which day each belongs to, and how to read it.
  *
@@ -134,8 +136,22 @@ function parseCell(cell, { morning = false, firstLine = false } = {}) {
  *  second, earlier schedule, which the card prints as its own line. Whichever one applies to this
  *  particular day is the one to read. See WEEKDAY_SHACHARIS in settings.js. */
 function weekdayShacharis(serial, settings) {
+  const chanukahYear = chanukahYearFor(serial, settings);
+  if (chanukahYear) {
+    const posted = chanukahPostedShacharisRows(chanukahYear, settings)
+      .find(row => row.isRoshChodesh === Boolean(hasRoshChodesh(serial, settings)));
+    if (posted) return posted.cells.map(cell => ({
+      mins: Math.round((cell.trace || cell.traces[0]).value * 1440),
+      place: PLACES[cell.mark || (cell.underlined ? 'u' : '')] || '',
+    }));
+  }
   const special = [hasRoshChodesh(serial, settings), hasBehab(serial, settings), hasTaanis(serial, settings)]
     .some(Boolean);
+  const rc = hasRoshChodesh(serial, settings) ? roshChodeshSchedule(serial, settings) : null;
+  // Two rooms may start at the same adjusted time. Read the shared morning
+  // values directly so the generic cell parser cannot roll the second into PM.
+  if (rc) return rc.lines.flat().map(cell => ({ mins: Math.round(cell.trace.value * 1440),
+    place: PLACES[cell.mark || (cell.underlined ? 'u' : '')] || '' }));
   const text = special ? WEEKDAY_SHACHARIS_SPECIAL : WEEKDAY_SHACHARIS;
   // Written as HTML, where an underline is a real <u> rather than the sentinel a computed cell
   // carries, so it is turned back into the sentinel form parseCell reads before the times are
@@ -177,22 +193,18 @@ function entryForDay(serial, state) {
  *  A day is served by whichever chart covers it: Sunday through Thursday by the Weekday
  *  chart, Friday and Shabbos by the שבת chart for that week. */
 export function minyanimForDay(serial, state, settings) {
-  /* The sheets on the wall first, on the six days a year they are the whole schedule: ערב
-     ר"ה, both days of ר"ה, צום גדליה, ערב יו"כ and יו"כ. Neither chart carries those days,
+  /* The complete special-day sheets on the wall first, including עשרה בטבת and the
+     תשרי schedules. The ordinary charts do not carry their complete day schedules,
      and both carry the ordinary weekday row for the week they fall in, so this used to offer
      it: on יום כיפור the card said מנחה 1:15 where the sheet says 4:15. See posters/day.js
-     for which days are taken over and why the list stops at six. */
+     for which days are taken over. */
   const special = specialMinyanim(serial, settings);
   if (special.length) return special;
-
   return chartMinyanimForDay(serial, state, settings);
 }
 
-/** Read the saved regular chart using the same validated cell parser. A caller
- * joining a holiday to Shabbos can request only the evening chart columns,
- * without substituting ordinary weekday services for the holiday's daytime. */
+/** Read chart services when a display needs to join a holiday to Shabbos. */
 export function chartMinyanimForDay(serial, state, settings, { onlyColumns = null, includeFridayMorning = true } = {}) {
-
   const dow = excelWeekday(serial);
   const found = entryForDay(serial, state);
   if (!found) return [];
@@ -255,7 +267,7 @@ export function chartMinyanimForDay(serial, state, settings, { onlyColumns = nul
          the minutes come off the time that is being shown: a card counting down to 8:15 while
          printing 8:10 would be worse than either time on its own. Nothing there most days,
          and nothing there ever reaches the board or the formula. */
-      for (const t of parseCell(announcedCell(row[column.key], column.key, serial))) out.push({ ...t, name });
+      for (const t of parseCell(announcedCell(row[column.key], column.key, serial, settings))) out.push({ ...t, name });
     }
     /* The morning, which through the סליחות season is not the everyday one. From the Sunday
        סליחות begin until ערב יו"כ the shul davens an earlier list with סליחות in it, and the
@@ -266,6 +278,13 @@ export function chartMinyanimForDay(serial, state, settings, { onlyColumns = nul
     const morning = specialShacharis(serial, settings);
     if (morning.length) out.push(...morning);
     else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
+  }
+  const sundayMincha = chanukahSundayMincha(serial, settings);
+  if (sundayMincha) {
+    const extra = parseCell(sundayMincha.text())[0];
+    if (!out.some(t => t.name === 'מנחה' && t.mins === extra.mins && t.place === extra.place)) {
+      out.push({ ...extra, name: 'מנחה' });
+    }
   }
   out.sort((a, b) => a.mins - b.mins);
   return out;
@@ -393,9 +412,7 @@ export function meridiem(mins) {
   return (((mins % 1440) + 1440) % 1440) < 720 ? 'AM' : 'PM';
 }
 
-/** How far off, in the coarsest words that are still true: "in 25 minutes", "in 2 hours",
- *  "tomorrow", "Monday". A countdown to the second would be stale the moment it was drawn,
- *  and is not what anyone is asking the page.
+/** How far off: "in 25 minutes", "in 2 hours 5 minutes", "tomorrow", "Monday".
  *
  *  `item.in` is not a whole number of minutes. shulNow reads the clock to the millisecond,
  *  which is what the search wants so that a מנין starting this very minute is not skipped,
@@ -404,8 +421,8 @@ export function meridiem(mins) {
  *
  *  Minutes round up. Anything still to come is at least a minute away until it has
  *  actually arrived, and rounding down would count the last thirty seconds as "in 0
- *  minutes". Hours round to the nearest, where being half an hour out either way is the
- *  whole point of saying "in 3 hours" rather than a number of minutes. */
+ *  minutes". Split that rounded total into hours and remaining minutes so the two
+ *  units agree at an hour boundary, and omit zero minutes at an exact hour. */
 export function howFar(item) {
   if (!item) return '';
   // Started, but only just: a מנין held on the card for its grace, or הדלקת נרות in the
@@ -419,8 +436,10 @@ export function howFar(item) {
   if (minutes === 0) return 'now';
   if (minutes < 60) return `in ${minutes} minute${minutes === 1 ? '' : 's'}`;
   if (item.daysOff === 0) {
-    const hours = Math.round(item.in / 60);
-    return `in ${hours} hour${hours === 1 ? '' : 's'}`;
+    const hours = Math.floor(minutes / 60);
+    const remaining = minutes % 60;
+    return `in ${hours} hour${hours === 1 ? '' : 's'}`
+      + (remaining ? ` ${remaining} minute${remaining === 1 ? '' : 's'}` : '');
   }
   if (item.daysOff === 1) return 'tomorrow';
   return DAY_NAMES[excelWeekday(item.serial) - 1];

@@ -1,0 +1,148 @@
+import { candleZipLocation, candleTimeAtLocation } from '../candle-lighting-lookup.js';
+import { dateFromSerial } from '../zmanim/solar.js';
+import { clock, meridiem, howFar } from '../upcoming.js';
+import { websiteNow } from '../website-clock.js';
+import { candleDeviceLocation } from '../location-data.js';
+
+/** Delegate from the stable homepage so minute-by-minute card replacements still work. */
+export function wireCandleLightingDialog(root, settings) {
+  let dialog = null, request = null, timer = null, generation = 0, serial = null, trigger = null;
+  let viewportFrame = null;
+  let countdownTimer = null, candleInstant = null;
+  const updateCountdown = () => {
+    if (!dialog?.open || candleInstant === null) return;
+    clearTimeout(countdownTimer);
+    const remaining = (candleInstant - websiteNow().getTime()) / 60000;
+    dialog.querySelector('.luach-candle-countdown').textContent = howFar({ in: remaining, daysOff: 0 }) || 'Candle lighting has passed';
+    countdownTimer = setTimeout(updateCountdown, 60025 - Date.now() % 60000);
+  };
+  const refreshCountdown = () => { if (document.visibilityState !== 'hidden') updateCountdown(); };
+  const stopCountdown = () => {
+    clearTimeout(countdownTimer); countdownTimer = null; candleInstant = null;
+    document.removeEventListener('visibilitychange', refreshCountdown);
+    window.removeEventListener('focus', refreshCountdown);
+    window.removeEventListener('pageshow', refreshCountdown);
+  };
+  const fitViewport = () => {
+    if (!dialog?.open) return;
+    const view = window.visualViewport;
+    const width = view?.width || window.innerWidth, height = view?.height || window.innerHeight;
+    dialog.style.setProperty('--candle-view-width', `${width}px`);
+    dialog.style.setProperty('--candle-view-height', `${height}px`);
+    dialog.style.setProperty('--candle-view-x', `${(view?.offsetLeft || 0) + width / 2}px`);
+    dialog.style.setProperty('--candle-view-y', `${(view?.offsetTop || 0) + 16}px`);
+    // On a very short landscape screen, scroll only inside the dialog to keep the
+    // complete input/button row above the keyboard. The page behind it stays put.
+    if (document.activeElement === dialog.querySelector('input')) {
+      const fields = dialog.querySelector('.luach-candle-fields').getBoundingClientRect();
+      const bounds = dialog.getBoundingClientRect();
+      if (fields.bottom > bounds.bottom - 12) dialog.scrollTop += fields.bottom - bounds.bottom + 12;
+      else if (fields.top < bounds.top + 12) dialog.scrollTop -= bounds.top + 12 - fields.top;
+    }
+  };
+  const queueViewportFit = () => {
+    if (viewportFrame !== null) return;
+    viewportFrame = requestAnimationFrame(() => { viewportFrame = null; fitViewport(); });
+  };
+  const stopViewportFit = () => {
+    window.visualViewport?.removeEventListener('resize', queueViewportFit);
+    window.visualViewport?.removeEventListener('scroll', queueViewportFit);
+    window.removeEventListener('resize', queueViewportFit);
+    if (viewportFrame !== null) cancelAnimationFrame(viewportFrame);
+    viewportFrame = null;
+  };
+  const cancel = () => { generation++; request?.abort(); request = null; clearTimeout(timer); timer = null; };
+  const create = () => {
+    dialog = document.createElement('dialog');
+    dialog.className = 'luach-candle-dialog no-print';
+    dialog.setAttribute('aria-labelledby', 'luach-candle-title');
+    dialog.innerHTML = `<button type="button" class="luach-candle-close" aria-label="Close candle-lighting lookup">&times;</button>
+      <h2 id="luach-candle-title">Candle lighting</h2>
+      <p class="luach-candle-date"></p>
+      <form class="luach-candle-form" novalidate>
+        <label for="luach-candle-zip">U.S. ZIP code</label>
+        <div class="luach-candle-fields"><input id="luach-candle-zip" name="zip" type="text" inputmode="numeric" autocomplete="postal-code" maxlength="5" pattern="[0-9]{5}" aria-describedby="luach-candle-status" required><button type="submit">Show time</button></div>
+      </form>
+      <button type="button" class="luach-candle-device">Use my location</button>
+      <p id="luach-candle-status" class="luach-candle-status" role="status" aria-live="polite"></p>
+      <div class="luach-candle-result" hidden><p class="luach-candle-location"></p><p class="luach-candle-clock"></p><p class="luach-candle-zone"></p><p class="luach-candle-day" hidden></p><p class="luach-candle-countdown" role="timer"></p></div>`;
+    root.appendChild(dialog);
+    const form = dialog.querySelector('form'), input = dialog.querySelector('input'), button = form.querySelector('button');
+    const deviceButton = dialog.querySelector('.luach-candle-device');
+    const status = dialog.querySelector('.luach-candle-status'), result = dialog.querySelector('.luach-candle-result');
+    const reset = () => { cancel(); stopCountdown(); button.disabled = false; deviceButton.disabled = false; form.removeAttribute('aria-busy'); status.textContent = ''; status.classList.remove('is-result'); result.hidden = true; input.removeAttribute('aria-invalid'); };
+    input.addEventListener('input', reset);
+    const lookup = async useDevice => {
+      reset();
+      const zip = input.value.trim();
+      if (!useDevice && !/^\d{5}$/.test(zip)) {
+        status.textContent = 'Enter a five-digit U.S. ZIP code.';
+        input.setAttribute('aria-invalid', 'true'); input.focus({ preventScroll: true }); return;
+      }
+      input.blur();
+      button.disabled = true; deviceButton.disabled = true; form.setAttribute('aria-busy', 'true'); status.textContent = useDevice ? 'Finding your location…' : 'Looking up ZIP code…';
+      const current = generation, controller = new AbortController(); request = controller;
+      timer = setTimeout(() => controller.abort(), useDevice ? 20000 : 12000);
+      try {
+        const location = await (useDevice ? candleDeviceLocation(controller.signal) : candleZipLocation(zip, controller.signal));
+        if (current !== generation || !dialog.open) return;
+        const time = candleTimeAtLocation(serial, location, settings);
+        dialog.querySelector('.luach-candle-location').textContent = location.title;
+        dialog.querySelector('.luach-candle-clock').textContent = `${clock(time.mins)} ${meridiem(time.mins)}`;
+        dialog.querySelector('.luach-candle-zone').textContent = time.timeZoneName;
+        const day = dialog.querySelector('.luach-candle-day');
+        day.hidden = time.dayOffset === 0;
+        day.textContent = time.dayOffset ? dateFromSerial(serial + time.dayOffset).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric' }) : '';
+        candleInstant = time.instant;
+        document.addEventListener('visibilitychange', refreshCountdown);
+        window.addEventListener('focus', refreshCountdown);
+        window.addEventListener('pageshow', refreshCountdown);
+        updateCountdown();
+        result.hidden = false; status.textContent = '';
+        // Announce the complete result after the independent location/time fields update.
+        status.textContent = `${location.title}: ${clock(time.mins)} ${meridiem(time.mins)}, ${time.timeZoneName}${time.dayOffset ? ', ' + day.textContent : ''}.`;
+        status.classList.add('is-result');
+      } catch (error) {
+        if (current !== generation || !dialog.open) return;
+        status.classList.remove('is-result');
+        status.textContent = error.name === 'AbortError' ? 'The lookup timed out. Please try again.'
+          : error instanceof TypeError ? 'Could not connect. Check your internet connection and try again.' : error.message;
+      } finally {
+        if (current === generation) { clearTimeout(timer); timer = null; request = null; button.disabled = false; deviceButton.disabled = false; form.removeAttribute('aria-busy'); }
+      }
+    };
+    form.addEventListener('submit', event => { event.preventDefault(); lookup(false); });
+    deviceButton.addEventListener('click', () => lookup(true));
+    dialog.querySelector('.luach-candle-close').addEventListener('click', () => dialog.close());
+    dialog.addEventListener('click', event => {
+      if (event.target !== dialog) return;
+      const bounds = dialog.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
+    });
+    dialog.addEventListener('close', () => { stopViewportFit(); reset(); status.classList.remove('is-result'); if (trigger?.isConnected) trigger.focus({ preventScroll: true }); });
+  };
+  const open = element => {
+    if (dialog?.open) return;
+    serial = Number(element.dataset.candleDate);
+    if (!Number.isInteger(serial)) return;
+    trigger = element;
+    if (!dialog) create();
+    dialog.querySelector('.luach-candle-date').textContent = dateFromSerial(serial).toLocaleDateString('en-US', { timeZone: 'UTC', weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+    dialog.showModal();
+    dialog.scrollTop = 0;
+    window.visualViewport?.addEventListener('resize', queueViewportFit);
+    window.visualViewport?.addEventListener('scroll', queueViewportFit);
+    window.addEventListener('resize', queueViewportFit);
+    fitViewport();
+    dialog.querySelector('input').focus({ preventScroll: true });
+    fitViewport();
+  };
+  const click = event => { const element = event.target.closest('[data-candle-date]'); if (element && root.contains(element)) open(element); };
+  const key = event => {
+    const element = event.target.closest('[data-candle-date]');
+    if (element && root.contains(element) && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(element); }
+  };
+  const beforePrint = () => { if (dialog?.open) dialog.close(); };
+  root.addEventListener('click', click); root.addEventListener('keydown', key); window.addEventListener('beforeprint', beforePrint);
+  return () => { stopViewportFit(); stopCountdown(); cancel(); root.removeEventListener('click', click); root.removeEventListener('keydown', key); window.removeEventListener('beforeprint', beforePrint); if (dialog?.open) dialog.close(); dialog?.remove(); };
+}

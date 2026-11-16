@@ -31,10 +31,13 @@
 // per-cell override and rendered instead of anything computed here (see overrides.js).
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
-import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
+import { excelWeekday, hebrewDateExtended, dateFromHebrew, roshHashana, isAssurMelacha, chanukahYearFor } from '../hebrew-calendar.js';
 import { buildAfterYomKippur, afterYomKippurDays } from '../posters/yomkippur.js';
 import { buildSukkosAfter, sukkosAfterDays } from '../posters/sukkos.js';
-import { formatTime, underlineTime } from '../format.js';
+import { weekLatestMinchaGedola } from './common.js';
+import { isKayitzWeek } from './weeks.js';
+import { chanukahEarlyMaariv, chanukahSundayMincha } from '../posters/chanukah.js';
+import { formatTime, underlineTime, newMinyanTag, chanukahTag } from '../format.js';
 import { splitLinesInHalf } from '../util.js';
 import { clockTime } from '../zmanim/trace.js';
 
@@ -63,6 +66,29 @@ function renderTime(mins, place) {
   return text;
 }
 
+/** Which, if any, of this week's own five days fall inside חנוכה's eight - used by
+ *  maarivParts below, to decide whether the row runs חנוכה's own early מעריב at all. Sunday
+ *  through Thursday only, matching this row's own columns: Friday is never one of this
+ *  row's own days, it is the Shabbos chart's. See chanukahDaysThroughFriday below for the
+ *  wider question the שחרית panel asks instead. */
+export function chanukahDaysInWeek(serial, settings) {
+  return sundayThroughThursday(serial).filter((d) => chanukahYearFor(d, settings));
+}
+
+/** The same week, through Friday - what sheet-view.js's own שחרית panel asks instead of
+ *  chanukahDaysInWeek, since the panel's standing special-schedule heading already covers
+ *  Sunday through Friday (Friday morning still davens the weekday שחרית too, see
+ *  specialShacharisKinds in hebrew-calendar.js), not just the Sunday-Thursday this row's
+ *  own columns schedule. Asked separately rather than this row's own list plus one more
+ *  day tacked on where it happens to be needed, so a Friday that is itself חנוכה (and,
+ *  some years, also ר"ח טבת - see hasRoshChodesh) is never silently left out of the one
+ *  place a reader would see its morning: a page whose only ר"ח ever falls on such a
+ *  Friday had been showing the plain, non-חנוכה ר"ח ובה"ב box for it, since the panel's
+ *  own list never reached a Friday to begin with. */
+export function chanukahDaysThroughFriday(serial, settings) {
+  return sundayThroughFriday(serial).filter((d) => chanukahYearFor(d, settings));
+}
+
 /** The five days this row schedules. Weekday rows are anchored on their Shabbos serial
  *  like every other row, so Sunday is six days back. Two rows on a Weekday chart are
  *  anchored on a stand-in date instead of a real Saturday (the season's trailing gap
@@ -71,6 +97,25 @@ function renderTime(mins, place) {
 function sundayThroughThursday(serial) {
   const sunday = serial - (excelWeekday(serial) - 1);
   return [0, 1, 2, 3, 4].map((i) => sunday + i);
+}
+
+/** The same anchor, extended one day further - see chanukahDaysThroughFriday above. */
+function sundayThroughFriday(serial) {
+  const sunday = serial - (excelWeekday(serial) - 1);
+  return [0, 1, 2, 3, 4, 5].map((i) => sunday + i);
+}
+
+/** `days`, minus any that are themselves full יום טוב - never all of them, since a run of
+ *  five weekdays cannot be entirely יום טוב. Nobody davens this board's schedule on a יום
+ *  טוב day, so it has no business setting how early or how late the *other* days of the
+ *  week may print (see weekLatestMinchaGedola in sheets/common.js, which this mirrors, for
+ *  the week שבת בראשית found it on). minchaParts's earliestShkia and maarivParts's
+ *  latestShkia both weigh their own extreme against every day of the week the same way, so
+ *  a שבועות or a יום כיפור sitting inside an otherwise ordinary week's Sunday-Thursday
+ *  cannot quietly set either bound merely by being the earliest or the latest day counted. */
+function regularDays(days, settings) {
+  const regular = days.filter((d) => !isAssurMelacha(d, settings));
+  return regular.length ? regular : days;
 }
 
 function shkiaMinutes(serial, settings) {
@@ -134,51 +179,93 @@ function slotTrace(slot, { label, until, untilAt, backwards, place, keptReason }
 
 /** מנחה.
  *
- *  Regular times: 12:45, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
+ *  Regular times: 1:00, 1:15, 1:35, 1:50, 4:15, 6:35, 7:30, 8:00.
  *  All of them are למטה except 1:50, which is the main בית מדרש, and a zman that moves
- *  keeps the location it started with. */
+ *  keeps the location it started with. None of the evening three (6:35, 7:30, 8:00) run at
+ *  all while the clocks are back - 4:15, the BMG מנחה, is the last one of the day every
+ *  standard-time week. */
 function minchaParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
   const dates = days.map(dateFromSerial);
 
-  // 12:45 and 1:15 only run on standard time. DST always flips on a Sunday, so all five
-  // days agree; .every() is just being explicit about which way a split week would go.
-  const standardTime = dates.every((d) => !Z.dstLocal(d, settings));
+  // 1:00 only runs on standard time. Check the afternoon's clock: at midnight on
+  // the transition Sunday the workbook's local DST function still uses the old clock.
+  const standardTime = dates.every((d) => !Z.dstLocal(new Date(d.getTime() + 13 * 3600000), settings));
   const bmg = isBmgWeek(week.serial, settings);
 
+  /* 1:15/1:20 and 1:35/1:40 are both weighed against the same value: מנחה גדולה לחומרא's
+     latest reach across the week's own regular days, Sunday through Friday with any full
+     יום טוב day among them left out, not just the five days this row schedules for (see
+     weekLatestMinchaGedola in sheets/common.js, which is where the Erev Shabbos row on the
+     שבת chart weighs its own early מנחה the same way, against the same days, so the two
+     charts cannot answer this question differently about days that sit right next to
+     each other). */
+  const latestMinchaGedola = toMinutes(weekLatestMinchaGedola(week.serial, settings));
+
   // 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.
-  // Never anything else. The workbook makes the same call the same way for its ערב שבת
-  // מנחה menu (common.js), against the same MINCHA_GEDOLA_LECHUMRA.
-  const latestMinchaGedola = Math.max(...dates.map((d) => toMinutes(Z.minchaGedolaLechumra(d, settings))));
+  // Never anything else.
   const earlyAfternoon = latestMinchaGedola > HM(13, 35) ? HM(13, 40) : HM(13, 35);
 
-  // The evening מנחה must clear שקיעה by 15 minutes on every one of the five days, so it
-  // is the *earliest* שקיעה that binds. Rounded down, so a stray fraction of a minute
-  // can never leave a zman a few seconds short of the 15.
-  const earliestShkia = Math.floor(Math.min(...days.map((d) => shkiaMinutes(d, settings))));
+  /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
+     neither if it creeps past 1:20 too. Used to read the clock (DST) instead of מנחה
+     גדולה, the same rule 1:00 above still runs on; sheets/common.js's own note on
+     weekLatestMinchaGedola has the week that rule got wrong. */
+  const earlyMincha = latestMinchaGedola <= HM(13, 15) ? HM(13, 15)
+    : latestMinchaGedola <= HM(13, 20) ? HM(13, 20)
+    : null;
+
+  // The evening מנחה must clear שקיעה by 15 minutes on every one of the week's own regular
+  // days, so it is the *earliest* שקיעה of those that binds - a full יום טוב day left out
+  // (regularDays), the same reason weekLatestMinchaGedola leaves one out. Rounded down, so
+  // a stray fraction of a minute can never leave a zman a few seconds short of the 15.
+  const earliestShkia = Math.floor(Math.min(...regularDays(days, settings).map((d) => shkiaMinutes(d, settings))));
   const latestAllowed = earliestShkia - 15;
-  const clears = 'at least 15 minutes before the earliest שקיעה of the five days';
+  const clears = "at least 15 minutes before the earliest שקיעה of the week's own regular days";
 
   /* **A time that does not run this week stays in the list, marked, rather than being taken
-     out of it.** Removed, the column simply had no 12:45 and nothing to say about it, which
+     out of it.** Removed, the column simply had no 1:00 and nothing to say about it, which
      is the same fault the shul found on the 1:35 carried one step further: not a rule with a
      side missing but a מנין missing altogether. offSeason slots are held out of the stepping
      and the crowding below, since neither applies to a time that is not on the board. */
   const clocksBack = 'offered only while the clocks are back';
   const slots = [
-    { mins: HM(12, 45), place: LMATA, offSeason: standardTime ? null : clocksBack },
-    { mins: HM(13, 15), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    { mins: HM(13, 0), place: LMATA, offSeason: standardTime ? null : clocksBack },
+    /* 1:15, 1:20, or neither, and which one turns on a number, the same reason the 1:35
+       line below does. */
+    { mins: earlyMincha ?? HM(13, 15), place: LMATA,
+      offSeason: earlyMincha == null
+        ? `מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past even 1:20`
+        : null,
+      label: earlyMincha === HM(13, 20)
+        ? `1:20 rather than 1:15, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
+        : earlyMincha === HM(13, 15)
+          ? `1:15, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it`
+          : `neither 1:15 nor 1:20, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, past both` },
     /* 1:35 or 1:40, and which one turns on a number, so the label carries that number: the
        reader wants to see how close it came, not be told a rule and left to trust it. */
     { mins: earlyAfternoon, place: LMATA, label: latestMinchaGedola > HM(13, 35)
-      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the five days`
-      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the five days, which is not past it` },
+      ? `1:40 rather than 1:35, מנחה גדולה לחומרא reaching ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days`
+      : `1:35, מנחה גדולה לחומרא reaching only ${fmtMinutes(latestMinchaGedola)} on the latest of the week's own regular days, which is not past it` },
     { mins: HM(13, 50), place: MAIN },
     { mins: HM(16, 15), place: LMATA, label: 'the BMG מנחה',
       offSeason: bmg ? null : 'offered only while BMG is in session' },
-    { mins: HM(18, 35), place: LMATA, shkiaDriven: true },
-    { mins: HM(19, 30), place: LMATA, shkiaDriven: true },
-    { mins: HM(20, 0), place: LMATA, shkiaDriven: true },
+    /* Asked for, corrected twice over: first a 5:00 cutoff, then a 4:15 one that still let
+       a stepped time through whenever it landed clear of BMG's own 4:15 (חיי שרה תשפ"ז's own
+       4:30, fifteen minutes clear). Neither was it: while the clocks are back, none of these
+       three run at all, full stop, so the BMG מנחה is the last one of the day every standard
+       time week, not just the ones where stepping happened to land close to it. They come
+       back on their own the moment the clocks go forward - offSeason reads standardTime
+       directly, the same switch 1:00 above already turns on and off by.
+       earliestPrinted stays as a second, narrower guard: standardTime already keeps these
+       off the board all winter, but if a stray DST week were ever early enough to need
+       stepping, nothing should print within sight of BMG's own 4:15 there either. Read below,
+       after the stepping loop, since it needs each slot's own stepped value to check. */
+    { mins: HM(18, 35), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15),
+      offSeason: standardTime ? 'offered only while the clocks are forward' : null },
+    { mins: HM(19, 30), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15),
+      offSeason: standardTime ? 'offered only while the clocks are forward' : null },
+    { mins: HM(20, 0), place: LMATA, shkiaDriven: true, earliestPrinted: HM(16, 15),
+      offSeason: standardTime ? 'offered only while the clocks are forward' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
 
@@ -195,6 +282,10 @@ function minchaParts(week, settings) {
   const kept = [];
   for (const slot of slots) {
     if (slot.offSeason) continue;
+    if (slot.earliestPrinted != null && slot.mins <= slot.earliestPrinted) {
+      slot.droppedBecause = `stepped back to ${fmtMinutes(slot.mins)}, at or before ${fmtMinutes(slot.earliestPrinted)}, which this מנין does not run`;
+      continue;
+    }
     const prev = kept[kept.length - 1];
     if (slot.moved && prev && slot.mins - prev.mins <= TOO_CLOSE) {
       slot.droppedBecause = `moved back to within ${TOO_CLOSE} minutes of the ${fmtMinutes(prev.mins)} in front of it`;
@@ -229,17 +320,47 @@ function place845(mins) {
  *
  *  Regular times: 6:35, 7:00, 7:30, 8:00, 8:45, 9:30, 10:00, 10:30, 11:00, 11:30, 12:00.
  *  למטה throughout except 10:30 (main בית מדרש) and the 8:45 מנין, which moves around
- *  (see place845). 11:30 and 12:00 run only when BMG is out of session. */
+ *  (see place845). 12:00 runs only when BMG is out of session; 11:30 runs in קיץ only,
+ *  regardless of BMG (see isKayitzWeek below), and not at all in חורף. */
 function maarivParts(week, settings) {
   const days = sundayThroughThursday(week.serial);
 
   const bmg = isBmgWeek(week.serial, settings);
+  const kayitz = isKayitzWeek(week.serial, settings);
 
-  // A מעריב must be 50 minutes after שקיעה on every one of the five days, so here it is
-  // the *latest* שקיעה that binds. Rounded up, for the same reason מנחה rounds down.
-  const latestShkia = Math.ceil(Math.max(...days.map((d) => shkiaMinutes(d, settings))));
+  // חנוכה's own extra, earlier מנין (see chanukahEarlyMaariv in posters/chanukah.js), on
+  // any week that touches any of the eight days at all - a week only partly חנוכה runs
+  // this same extra מנין on its own nights exactly as a week entirely inside חנוכה does,
+  // since it is genuinely that night's own מנין and not a stand-in for the whole week.
+  // It goes into `text` plainly, the same value every other reader of this column reads -
+  // the week card, "what is on next", the messages page - and is tagged "חנוכה" only in
+  // the print-only `printText` below, the same split the "NEW" tag already makes.
+  // Built and traced apart from the standing slots below: it does not walk later to clear
+  // שקיעה the way they do (it already is 50 minutes past the latest שקיעה of חנוכה's own
+  // nights) and it is never dropped for crowding its neighbour, being far earlier than
+  // anything else on this line.
+  const chanukahDays = chanukahDaysInWeek(week.serial, settings);
+  const chanukahYear = chanukahDays.length ? chanukahYearFor(chanukahDays[0], settings) : null;
+  const chanukahEarly = chanukahYear ? chanukahEarlyMaariv(chanukahYear, settings).underline() : null;
+
+  // A מעריב must be 50 minutes after שקיעה on every one of the week's own regular days, so
+  // here it is the *latest* שקיעה of those that binds - a full יום טוב day left out
+  // (regularDays), the same reason weekLatestMinchaGedola leaves one out. Rounded up, for
+  // the same reason מנחה rounds down.
+  const latestShkia = Math.ceil(Math.max(...regularDays(days, settings).map((d) => shkiaMinutes(d, settings))));
   const earliestAllowed = latestShkia + 50;
-  const clears = 'at least 50 minutes after the latest שקיעה of the five days';
+  const clears = "at least 50 minutes after the latest שקיעה of the week's own regular days";
+
+  // Whether this week prints the "NEW" tag on 11:30 - only while the admin's switch is on
+  // (ui/settings-view.js), only for the season it was pinned to the moment that happened
+  // (publish.js's firstWeekdayPageRangeForSummer), never whatever season happens to be
+  // current when the chart is later printed, and only on a week `bmg` is holding true:
+  // BMG being in session is the only reason a קיץ week would not already have had 11:30
+  // before this change (BMG's own middle range reaches into קיץ too, ר"ח אייר -> ט' באב),
+  // so a week BMG is already out of session had 11:30 all along and calling it new would
+  // be wrong. See settings.js's newMinyanBadge.
+  const badge = settings.newMinyanBadge;
+  const showNewBadge = !!(badge?.on && kayitz && bmg && week.serial >= badge.firstSerial && week.serial <= badge.lastSerial);
 
   const slots = [
     { mins: HM(18, 35) },
@@ -251,7 +372,9 @@ function maarivParts(week, settings) {
     { mins: HM(22, 0) },
     { mins: HM(22, 30), place: MAIN }, // 10:30 is the main בית מדרש
     { mins: HM(23, 0) },
-    { mins: HM(23, 30), offSeason: bmg ? 'offered only while BMG is out of session' : null },
+    // קיץ only, regardless of BMG; off entirely in חורף. See the note over
+    // newMinyanBadge in settings.js for the "NEW" tag this slot can carry in קיץ.
+    { mins: HM(23, 30), isNewMinyan: true, offSeason: kayitz ? null : 'offered only in the summer (קיץ) months' },
     { mins: HM(24, 0), offSeason: bmg ? 'offered only while BMG is out of session' : null },
   ].filter(Boolean);
   for (const slot of slots) slot.base = slot.mins;
@@ -289,14 +412,47 @@ function maarivParts(week, settings) {
 
   const placeOf = (slot) => (slot.is845 ? place845(slot.mins) : slot.place ?? LMATA);
   const trace = (slot) => slotTrace(slot, {
-    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it' : 'one of the standing מעריב times'),
+    label: slot.label || (slot.is845 ? 'the 8:45 מנין, which keeps its place on the board wherever the clock pushes it'
+      : slot.isNewMinyan ? 'the 11:30 מנין, which runs every week of קיץ regardless of BMG and not at all in חורף'
+      : 'one of the standing מעריב times'),
     until: clears, untilAt: fmtMinutes(earliestAllowed), backwards: false,
     place: placeOf(slot), keptReason: slot.droppedBecause,
   });
+  const chanukahEarlyText = chanukahEarly ? chanukahEarly.text() : null;
+  const text = splitLinesInHalf([
+    ...(chanukahEarlyText ? [chanukahEarlyText] : []),
+    ...kept.map((slot) => renderTime(slot.mins, placeOf(slot))),
+  ]);
+  /* The tag is a *second*, print-only rendering, never mixed into `text` above. `text` is
+     what every other reader of this column reads too - the week card, the "what is on
+     next" card, the messages page (js/week-text.js parses these cells for their room
+     letters and would choke on an extra word stitched into a time) - and none of them are
+     the printed chart, so none of them should ever show a tag. Only sheet-view.js's own
+     cell rendering reaches for `printOverrides`, and only when this week's own column has
+     not been typed over by hand.
+     showNewBadge (קיץ only) and chanukahEarly (חורף only) can never both be true the same
+     week, so the two tags never have to share one line and the "NEW" cut below only ever
+     has to answer for kept's own slots. */
+  /* One fewer plain item on the tagged line than the even count split would give it
+     (splitLinesInHalf's own `cut` override), so the tag's extra width doesn't leave that
+     line reading visibly wider than the other. 11:30 is always the last kept slot whenever
+     the badge can show at all (12:00 is off precisely when bmg is true, which showNewBadge
+     already requires), so it always falls on the second line and ceil rather than floor is
+     always the direction that shortens it. */
+  const printText = (showNewBadge || chanukahEarlyText)
+    ? splitLinesInHalf([
+        ...(chanukahEarlyText ? [chanukahTag(chanukahEarlyText)] : []),
+        ...kept.map((slot) => {
+          const rendered = renderTime(slot.mins, placeOf(slot));
+          return showNewBadge && slot.isNewMinyan ? newMinyanTag(rendered) : rendered;
+        }),
+      ], undefined, showNewBadge ? Math.ceil(kept.length / 2) : null)
+    : null;
 
   return {
-    text: splitLinesInHalf(kept.map((slot) => renderTime(slot.mins, placeOf(slot)))),
-    times: kept.map(trace),
+    text,
+    printText,
+    times: [...(chanukahEarly ? [chanukahEarly] : []), ...kept.map(trace)],
     dropped: slots.filter((s) => s.droppedBecause || s.offSeason).map(trace),
     note: 'Every time here has to work for all five days at once, which is what makes this the only chart whose times move themselves.',
   };
@@ -394,15 +550,27 @@ export function buildWeekdayRow(week, settings) {
   }
   const maariv = maarivParts(week, settings);
   const mincha = minchaParts(week, settings);
+  const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
+  const printOverrides = {
+    ...(maariv.printText != null ? { B: maariv.printText } : {}),
+    // The Sunday tag adds width: keep its time and 1:00 above the four remaining times.
+    ...(sundayMincha ? { C: splitLinesInHalf([
+      chanukahTag(sundayMincha.text(), 'חנוכה יום א׳'), ...mincha.times.map(time => time.text()),
+    ], undefined, 2) } : {}),
+  };
   return {
     B: maariv.text,
     C: mincha.text,
     /* The traces from that same pass, for the calculations page. E, the merged שחרית block,
        is not calculated at all: it is the schedule the program carries, printed as written,
        and the page says so rather than pretending there is working to show. */
-    traces: { B: maariv.times, C: mincha.times },
-    notes: { B: maariv.note, C: mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
+    traces: { B: maariv.times, C: [...(sundayMincha ? [sundayMincha] : []), ...mincha.times] },
+    notes: { B: maariv.note, C: sundayMincha ? "Regular times work for all five weekdays. The extra Chanukah Mincha is Sunday only, checked against that Sunday's exact מנחה גדולה לחומרא." : mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
+    /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
+       itself, which stays the plain text every other reader - the week card, "what is
+       on next", the messages page - reads). See the note on maariv.printText above. */
+    printOverrides: Object.keys(printOverrides).length ? printOverrides : undefined,
   };
 }
 

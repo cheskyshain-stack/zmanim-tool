@@ -5,7 +5,7 @@ import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended } from '../hebrew-calendar.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { T, inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
+import { T, inPlagWindow, fridayMainMinchaParts, fridayLateMinchaTrace, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
 
@@ -97,8 +97,8 @@ export function buildKayitzRow(week, settings) {
     .floor().underline();
   const F = maarivFri.text();
 
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
-  const gBase = floorToMinute(sunsetFriday - 15 / 1440);
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
+  const gBase = minchaFri.value;
   const secondMaariv = zman('שקיעה', sunsetFriday, 'on the Friday').plus(30).floor()
     .onlyWhen(extraMaariv, `printed only inside ${sefirah}`);
   const G = formatTime(gBase) + (extraMaariv ? `\nמעריב\u00a0${secondMaariv.text()}` : '');
@@ -108,14 +108,14 @@ export function buildKayitzRow(week, settings) {
 
   const plagWindow = inPlagWindow(friday, settings);
   const [early72, early50, earlyGRA] = earlyMinchaPlag(fridayDate, settings);
-  // Each column is one of those pairs as the chart writes it: the מנין on one line, "פלג" and
-  // its own זמן under it. NBSP after the word so the pair can never wrap apart.
+  // The room is named in each column's heading. The בעזר"נ times have no stars;
+  // למטה also keeps its underline. NBSP keeps each פלג label with its time.
   const cell = (e) => `${e.underlined ? underlineTime(e.mincha) : formatTime(e.mincha)}\nפלג ${formatTime(e.plag)}`;
   const I = plagWindow ? cell(early72) : '';
   const J = plagWindow ? cell(early50) : '';
   const K = plagWindow ? cell(earlyGRA) : '';
 
-  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const L = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and L come from sheets/common.js
@@ -155,13 +155,19 @@ export function buildKayitzRow(week, settings) {
     I: cutOf(earlyCols.I), J: cutOf(earlyCols.J), K: cutOf(earlyCols.K),
   };
 
-  return { B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped };
+  return {
+    B, C, D, E, F, G, H, I, J, K, L, traces, notes, dropped,
+  };
 }
 
 export const KAYITZ_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against: the two
+  // opinions or the room. That part prints smaller,
+  // all of it, not just a bracketed word - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: ' מעריב ' },
   { key: 'G', header: 'מנחה\nמעריב' },
@@ -169,9 +175,11 @@ export const KAYITZ_COLUMNS = [
   // Both I and J are פלג מ"א; the difference is the tzais the day is measured to - 72
   // minutes here, 50 in J (see plagMA/plagMA2 above). The "72" says which is which, and
   // sits after פלג מ"א on its own line to match the printed board.
-  { key: 'I', header: 'מנחה\n(בעזר"נ)\nפלג מ"א 72' },
-  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א' },
-  { key: 'K', header: 'מנחה\nפלג גר"א' },
+  // Name the room in the heading, so the בעזר"נ times need no stars.
+  { key: 'I', header: 'מנחה\n(בעזר"נ)\nפלג מ"א 72', headerSub: true },
+  { key: 'J', header: 'מנחה\n(למטה)\nפלג מ"א', headerSub: true },
+  { key: 'K', header: 'מנחה\nפלג גר"א', headerSub: true },
+  // Not headerSub: "ערב שבת" names which מנחה this is, the same weight as "מנחה" above it,
+  // not a reckoning read against the name the way a פלג line or ס"ז קר"ש's two opinions are.
   { key: 'L', header: 'מנחה\nערב שבת' },
 ];
-

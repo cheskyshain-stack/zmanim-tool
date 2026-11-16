@@ -1,0 +1,3225 @@
+{
+  "source": "Lakewood Commons Zmanim tables.xlsx",
+  "sha256": "64d2c2289a8b359cf1438a79dcaaf1a9798d6f46791e97db3b540e5293185c2f",
+  "scope": "FUNCTIONS, workbook defined names, SETTINGS and the time zones table. Chart templates excluded.",
+  "settings": {
+    "latitude": {
+      "cell": "SETTINGS!C3",
+      "value": 40.067
+    },
+    "longitude": {
+      "cell": "SETTINGS!C5",
+      "value": -74.202
+    },
+    "elevation": {
+      "cell": "SETTINGS!C7",
+      "value": 0.0
+    },
+    "timezoneId": {
+      "cell": "SETTINGS!C9",
+      "value": "America/New_York"
+    },
+    "language": {
+      "cell": "SETTINGS!C11",
+      "value": "עברית"
+    },
+    "inIsrael": {
+      "cell": "SETTINGS!G4",
+      "value": false
+    },
+    "candleLightingMinutes": {
+      "cell": "SETTINGS!G7",
+      "value": 18.0
+    },
+    "useAstronomicalChatzos": {
+      "cell": "SETTINGS!G13",
+      "value": true
+    },
+    "useElevation": {
+      "cell": "SETTINGS!G16",
+      "value": false
+    },
+    "horizon": {
+      "cell": "SETTINGS!G19",
+      "value": -0.8333333333333334
+    },
+    "ateretTorahTzaisOffset": {
+      "cell": "SETTINGS!G21",
+      "value": 40.0
+    },
+    "useGregorianBefore1582": {
+      "cell": "SETTINGS!G23",
+      "value": false
+    }
+  },
+  "functionsCells": {
+    "ALOS_16.1": "FUNCTIONS!C35",
+    "ALOS_72": "FUNCTIONS!C28",
+    "MINCHA_GEDOLA": "FUNCTIONS!C98",
+    "MINCHA_GEDOLA_16.1": "FUNCTIONS!C100",
+    "MINCHA_GEDOLA_30_MINUTES_AFTER_CHATZOS": "FUNCTIONS!C104",
+    "MINCHA_GEDOLA_LECHUMRA": "FUNCTIONS!C106",
+    "MINCHA_KETANA": "FUNCTIONS!C115",
+    "MISHEYAKIR_10.2": "FUNCTIONS!C41",
+    "PLAG_HAMINCHA": "FUNCTIONS!C124",
+    "SAMUCH_LEMINCHA_KETANA": "FUNCTIONS!C110",
+    "SOF_ZMAN_SHMA_GRA": "FUNCTIONS!C67",
+    "SOF_ZMAN_SHMA_MGA_72": "FUNCTIONS!C49",
+    "SOF_ZMAN_TFILA_GRA": "FUNCTIONS!C91",
+    "SOLAR_NOON": "FUNCTIONS!C11",
+    "SUNRISE": "FUNCTIONS!C9",
+    "SUNRISE_elev": "FUNCTIONS!C10",
+    "SUNSET": "FUNCTIONS!C12",
+    "SUNSET_elev": "FUNCTIONS!C13",
+    "TZAIS_16.1": "FUNCTIONS!C175",
+    "TZAIS_50": "FUNCTIONS!C179",
+    "TZAIS_60": "FUNCTIONS!C180",
+    "TZAIS_72": "FUNCTIONS!C181",
+    "TZAIS_GEONIM_8.5": "FUNCTIONS!C172",
+    "__MINCHA_GEDOLA": "FUNCTIONS!C326",
+    "__MINCHA_KETANA": "FUNCTIONS!C328",
+    "__PLAG_HAMINCHA": "FUNCTIONS!C329",
+    "__SAMUCH_LMINCHA_KETANA": "FUNCTIONS!C327",
+    "__SOF_ZMAN_SHMA": "FUNCTIONS!C324",
+    "__SOF_ZMAN_TFILA": "FUNCTIONS!C325",
+    "__ZMAN_LECHUMRA": "FUNCTIONS!C333",
+    "calcDST_LOCAL": "FUNCTIONS!C289",
+    "calcELEVATION": "FUNCTIONS!C286",
+    "calcEccentricityEarthOrbit": "FUNCTIONS!C297",
+    "calcElevAdjust": "FUNCTIONS!C310",
+    "calcEquationOfTime": "FUNCTIONS!C304",
+    "calcGeomMeanAnomalySun": "FUNCTIONS!C296",
+    "calcGeomMeanLongSun": "FUNCTIONS!C295",
+    "calcHourAngleSunrise": "FUNCTIONS!C305",
+    "calcJD": "FUNCTIONS!C293",
+    "calcJDToJCent": "FUNCTIONS!C294",
+    "calcLATITUDE": "FUNCTIONS!C284",
+    "calcLONGITUDE": "FUNCTIONS!C285",
+    "calcMeanObliquityOfEcliptic": "FUNCTIONS!C301",
+    "calcObliquityCorrection": "FUNCTIONS!C302",
+    "calcSunApparentLong": "FUNCTIONS!C300",
+    "calcSunDeclination": "FUNCTIONS!C303",
+    "calcSunEqOfCenter": "FUNCTIONS!C298",
+    "calcSunTrueLong": "FUNCTIONS!C299",
+    "calcSunriseSet": "FUNCTIONS!C307",
+    "calcSunriseSetUTC": "FUNCTIONS!C306",
+    "calcTIMEZONE": "FUNCTIONS!C287",
+    "calcZENITH": "FUNCTIONS!C283",
+    "funACOSD": "FUNCTIONS!C246",
+    "funASIND": "FUNCTIONS!C247",
+    "funCOSD": "FUNCTIONS!C249",
+    "funIFOMITTED": "FUNCTIONS!C282",
+    "funSIND": "FUNCTIONS!C250",
+    "funTAND": "FUNCTIONS!C251"
+  },
+  "definedNames": {
+    "ALOS_16.1": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.timezone,SUNRISE(_xlpm.date,16.1,_xlpm.latitude,_xlpm.longitude,0,_xlpm.timezone))",
+    "ALOS_72": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)-72/1440)",
+    "MINCHA_GEDOLA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__MINCHA_GEDOLA(SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "MINCHA_GEDOLA_16.1": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.timezone,__MINCHA_GEDOLA(TZAIS_16.1(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),ALOS_16.1(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.timezone)))",
+    "MINCHA_GEDOLA_30_MINUTES_AFTER_CHATZOS": "_xlfn.LAMBDA(_xlop.date,_xlop.longitude,_xlop.timezone,SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone)+30/1440)",
+    "MINCHA_GEDOLA_LECHUMRA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__ZMAN_LECHUMRA(TRUE,MINCHA_GEDOLA(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),MINCHA_GEDOLA_30_MINUTES_AFTER_CHATZOS(_xlpm.date,_xlpm.longitude,_xlpm.timezone)))",
+    "MINCHA_KETANA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__MINCHA_KETANA(SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "MISHEYAKIR_10.2": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.timezone,SUNRISE(_xlpm.date,10.2,_xlpm.latitude,_xlpm.longitude,0,_xlpm.timezone))",
+    "PLAG_HAMINCHA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__PLAG_HAMINCHA(SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "SAMUCH_LEMINCHA_KETANA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__SAMUCH_LMINCHA_KETANA(SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "SOF_ZMAN_SHMA_GRA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__SOF_ZMAN_SHMA(SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "SOF_ZMAN_SHMA_MGA_72": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__SOF_ZMAN_SHMA(ALOS_72(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),TZAIS_72(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "SOF_ZMAN_TFILA_GRA": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,__SOF_ZMAN_TFILA(SUNRISE_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone),SOLAR_NOON(_xlpm.date,_xlpm.longitude,_xlpm.timezone),SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)))",
+    "SOLAR_NOON": "_xlfn.LAMBDA(_xlop.date,_xlop.longitude,_xlop.timezone,_xlfn.LET(_xlpm.lon,calcLONGITUDE(_xlpm.longitude)/360,_xlfn.MAP(funIFOMITTED(_xlpm.date,TODAY()),_xlfn.LAMBDA(_xlpm.date,_xlfn.LET(_xlpm.JDay,calcJD(_xlpm.date),_xlpm.tnoon,calcJDToJCent(_xlpm.JDay-_xlpm.lon),_xlpm.EoT,calcEquationOfTime(_xlpm.tnoon),_xlpm.newt,calcJDToJCent(_xlpm.JDay-_xlpm.lon-_xlpm.EoT),0.5-_xlpm.lon-calcEquationOfTime(_xlpm.newt)+calcTIMEZONE(_xlpm.date+0.5-_xlpm.lon,_xlpm.timezone))))))",
+    "SUNRISE": "_xlfn.LAMBDA(_xlop.date,_xlop.horizon,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,_xlfn.MAP(funIFOMITTED(_xlpm.date,TODAY()),_xlfn.LAMBDA(_xlpm.date,_xlfn.LET(_xlpm.rise,calcSunriseSet(TRUE,calcJD(_xlpm.date),calcLATITUDE(_xlpm.latitude),calcLONGITUDE(_xlpm.longitude),calcZENITH(_xlpm.horizon)+calcELEVATION(_xlpm.elevation)),_xlpm.rise+calcTIMEZONE(_xlpm.date+_xlpm.rise,_xlpm.timezone)))))",
+    "SUNRISE_elev": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,_xlfn.MAP(funIFOMITTED(_xlpm.date,TODAY()),_xlfn.LAMBDA(_xlpm.date,_xlfn.LET(_xlpm.rise,calcSunriseSet(TRUE,calcJD(_xlpm.date),calcLATITUDE(_xlpm.latitude),calcLONGITUDE(_xlpm.longitude),calcZENITH()+IF(constUSE_ELEVATION,calcELEVATION(_xlpm.elevation))),_xlpm.rise+calcTIMEZONE(_xlpm.date+_xlpm.rise,_xlpm.timezone)))))",
+    "SUNSET": "_xlfn.LAMBDA(_xlop.date,_xlop.horizon,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,_xlfn.MAP(funIFOMITTED(_xlpm.date,TODAY()),_xlfn.LAMBDA(_xlpm.date,_xlfn.LET(_xlpm.set,calcSunriseSet(FALSE,calcJD(_xlpm.date),calcLATITUDE(_xlpm.latitude),calcLONGITUDE(_xlpm.longitude),calcZENITH(_xlpm.horizon)+calcELEVATION(_xlpm.elevation)),_xlpm.set+calcTIMEZONE(_xlpm.date+_xlpm.set,_xlpm.timezone)))))",
+    "SUNSET_elev": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,_xlfn.MAP(funIFOMITTED(_xlpm.date,TODAY()),_xlfn.LAMBDA(_xlpm.date,_xlfn.LET(_xlpm.set,calcSunriseSet(FALSE,calcJD(_xlpm.date),calcLATITUDE(_xlpm.latitude),calcLONGITUDE(_xlpm.longitude),calcZENITH()+IF(constUSE_ELEVATION,calcELEVATION(_xlpm.elevation))),_xlpm.set+calcTIMEZONE(_xlpm.date+_xlpm.set,_xlpm.timezone)))))",
+    "TZAIS_16.1": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.timezone,SUNSET(_xlpm.date,16.1,_xlpm.latitude,_xlpm.longitude,0,_xlpm.timezone))",
+    "TZAIS_50": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)+50/1440)",
+    "TZAIS_60": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)+60/1440)",
+    "TZAIS_72": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.elevation,_xlop.timezone,SUNSET_elev(_xlpm.date,_xlpm.latitude,_xlpm.longitude,_xlpm.elevation,_xlpm.timezone)+72/1440)",
+    "TZAIS_GEONIM_8.5": "_xlfn.LAMBDA(_xlop.date,_xlop.latitude,_xlop.longitude,_xlop.timezone,SUNSET(_xlpm.date,8.5,_xlpm.latitude,_xlpm.longitude,0,_xlpm.timezone))",
+    "__MINCHA_GEDOLA": "_xlfn.LAMBDA(_xlpm.end_of_day,_xlop.midday,_xlop.start_of_day,_xlpm.end_of_day-IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)*5.5/12,IF(_xlfn.ISOMITTED(_xlpm.start_of_day),(_xlpm.end_of_day-_xlpm.midday)*5.5/6,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.end_of_day-_xlpm.midday)*5.5/6,(_xlpm.end_of_day-_xlpm.start_of_day)*5.5/12))))",
+    "__MINCHA_KETANA": "_xlfn.LAMBDA(_xlpm.end_of_day,_xlop.midday,_xlop.start_of_day,_xlpm.end_of_day-IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)*2.5/12,IF(_xlfn.ISOMITTED(_xlpm.start_of_day),(_xlpm.end_of_day-_xlpm.midday)*2.5/6,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.end_of_day-_xlpm.midday)*2.5/6,(_xlpm.end_of_day-_xlpm.start_of_day)*2.5/12))))",
+    "__PLAG_HAMINCHA": "_xlfn.LAMBDA(_xlpm.end_of_day,_xlop.midday,_xlop.start_of_day,_xlpm.end_of_day-IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)*1.25/12,IF(_xlfn.ISOMITTED(_xlpm.start_of_day),(_xlpm.end_of_day-_xlpm.midday)*1.25/6,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.end_of_day-_xlpm.midday)*1.25/6,(_xlpm.end_of_day-_xlpm.start_of_day)*1.25/12))))",
+    "__SAMUCH_LMINCHA_KETANA": "_xlfn.LAMBDA(_xlpm.end_of_day,_xlop.midday,_xlop.start_of_day,_xlpm.end_of_day-IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)/4,IF(_xlfn.ISOMITTED(_xlpm.start_of_day),(_xlpm.end_of_day-_xlpm.midday)/2,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.end_of_day-_xlpm.midday)/2,(_xlpm.end_of_day-_xlpm.start_of_day)/4))))",
+    "__SOF_ZMAN_SHMA": "_xlfn.LAMBDA(_xlpm.start_of_day,_xlop.midday,_xlop.end_of_day,_xlpm.start_of_day+IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)/4,IF(_xlfn.ISOMITTED(_xlpm.end_of_day),(_xlpm.midday-_xlpm.start_of_day)/2,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.midday-_xlpm.start_of_day)/2,(_xlpm.end_of_day-_xlpm.start_of_day)/4))))",
+    "__SOF_ZMAN_TFILA": "_xlfn.LAMBDA(_xlpm.start_of_day,_xlop.midday,_xlop.end_of_day,_xlpm.start_of_day+IF(_xlfn.ISOMITTED(_xlpm.midday),(_xlpm.end_of_day-_xlpm.start_of_day)/3,IF(_xlfn.ISOMITTED(_xlpm.end_of_day),(_xlpm.midday-_xlpm.start_of_day)/1.5,IF(constUSE_ASTRONOMICAL_CHATZOS,(_xlpm.midday-_xlpm.start_of_day)/1.5,(_xlpm.end_of_day-_xlpm.start_of_day)/3))))",
+    "__ZMAN_LECHUMRA": "_xlfn.LAMBDA(_xlpm.latest,_xlpm.zman1,_xlpm.zman2,_xlfn.MAP(_xlpm.zman1,_xlpm.zman2,_xlfn.LAMBDA(_xlpm.a,_xlpm.b,IF(_xlpm.latest,MAX(_xlpm.a,_xlpm.b),MIN(_xlpm.a,_xlpm.b)))))",
+    "calcDST_LOCAL": "_xlfn.LAMBDA(_xlpm.date_time,_xlop.timezone,_xlfn.MAP(_xlpm.date_time,_xlfn.LAMBDA(_xlpm.date_time,_xlfn.LET(_xlpm.row,MATCH(funIFOMITTED(_xlpm.timezone,constTIMEZONE),TIMEZONE_TABLE[ZONE],0),_xlpm.rule,CHOOSE(INDEX(TIMEZONE_TABLE[RULE],_xlpm.row)+1,_xlfn.LAMBDA(_xlpm.row,_xlpm.date_time,FALSE),_xlfn.LAMBDA(_xlpm.row,_xlpm.date_time,_xlfn.LET(_xlpm.year,YEAR(_xlpm.date_time),AND(_xlpm.date_time>=DATE(_xlpm.year,3,14-MOD(DATE(_xlpm.year,3,6),7))+2/24,_xlpm.date_time<DATE(_xlpm.year,11,7-MOD(DATE(_xlpm.year,3,6),7))+2/24)))),_xlpm.dst,IF(_xlpm.date_time>0,IF(_xlpm.rule(_xlpm.row,_xlpm.date_time),INDEX(TIMEZONE_TABLE[DST],_xlpm.row))),_xlpm.dst/24))))",
+    "calcELEVATION": "_xlfn.LAMBDA(_xlop.elevation,calcElevAdjust(funIFOMITTED(_xlpm.elevation,constELEVATION)))",
+    "calcEccentricityEarthOrbit": "_xlfn.LAMBDA(_xlpm.JCent,0.016708634-_xlpm.JCent*(0.000042037+0.0000001267*_xlpm.JCent))",
+    "calcElevAdjust": "_xlfn.LAMBDA(_xlpm.elevation,funACOSD(6356.9/(6356.9+_xlpm.elevation/1000)))",
+    "calcEquationOfTime": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.epsilon,calcObliquityCorrection(_xlpm.JCent),_xlpm.long,calcGeomMeanLongSun(_xlpm.JCent),_xlpm.e,calcEccentricityEarthOrbit(_xlpm.JCent),_xlpm.m,calcGeomMeanAnomalySun(_xlpm.JCent),_xlpm.y,funTAND(_xlpm.epsilon/2)^2,_xlpm.sin2long,funSIND(_xlpm.long*2),_xlpm.sinm,funSIND(_xlpm.m),_xlpm.cos2long,funCOSD(2*_xlpm.long),_xlpm.sin4long,funSIND(_xlpm.long*4),_xlpm.sin2m,funSIND(_xlpm.m*2),DEGREES(SUM(_xlpm.y*_xlpm.sin2long,-2*_xlpm.e*_xlpm.sinm,4*_xlpm.e*_xlpm.y*_xlpm.sinm*_xlpm.cos2long,-0.5*_xlpm.y*_xlpm.y*_xlpm.sin4long,-1.25*_xlpm.e*_xlpm.e*_xlpm.sin2m))/360))",
+    "calcGeomMeanAnomalySun": "_xlfn.LAMBDA(_xlpm.JCent,357.52911+_xlpm.JCent*(35999.05029-0.0001537*_xlpm.JCent))",
+    "calcGeomMeanLongSun": "_xlfn.LAMBDA(_xlpm.JCent,MOD(280.46646+_xlpm.JCent*(36000.76983+0.0003032*_xlpm.JCent),360))",
+    "calcHourAngleSunrise": "_xlfn.LAMBDA(_xlpm.lat,_xlpm.solarDec,_xlpm.zenith,_xlfn.LET(_xlpm.HAarg,funCOSD(_xlpm.zenith)/(funCOSD(_xlpm.lat)*funCOSD(_xlpm.solarDec))-funTAND(_xlpm.lat)*funTAND(_xlpm.solarDec),ACOS(funCOSD(_xlpm.zenith)/(funCOSD(_xlpm.lat)*funCOSD(_xlpm.solarDec))-funTAND(_xlpm.lat)*funTAND(_xlpm.solarDec))))",
+    "calcJD": "_xlfn.LAMBDA(_xlpm.date,_xlpm.date+2415018.5+IF(_xlpm.date<61,1))",
+    "calcJDToJCent": "_xlfn.LAMBDA(_xlpm.Julian_date,(_xlpm.Julian_date-2451545)/36525)",
+    "calcLATITUDE": "_xlfn.LAMBDA(_xlop.latitude,_xlfn.LET(_xlpm.lat,funIFOMITTED(_xlpm.latitude,constLATITUDE),IF(_xlpm.lat>89.8,89.8,IF(_xlpm.lat<-89.8,-89.8,_xlpm.lat))))",
+    "calcLONGITUDE": "_xlfn.LAMBDA(_xlop.longitude,funIFOMITTED(_xlpm.longitude,constLONGITUDE))",
+    "calcMeanObliquityOfEcliptic": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.seconds,21.448-_xlpm.JCent*(46.815+_xlpm.JCent*(0.00059-_xlpm.JCent*0.001813)),SUM(23,26/60,_xlpm.seconds/3600)))",
+    "calcObliquityCorrection": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.omega,125.04-1934.136*_xlpm.JCent,calcMeanObliquityOfEcliptic(_xlpm.JCent)+0.00256*funCOSD(_xlpm.omega)))",
+    "calcSunApparentLong": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.omega,125.04-1934.136*_xlpm.JCent,calcSunTrueLong(_xlpm.JCent)-0.00569-0.00478*funSIND(_xlpm.omega)))",
+    "calcSunDeclination": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.e,calcObliquityCorrection(_xlpm.JCent),_xlpm.lambda,calcSunApparentLong(_xlpm.JCent),funASIND(funSIND(_xlpm.e)*funSIND(_xlpm.lambda))))",
+    "calcSunEqOfCenter": "_xlfn.LAMBDA(_xlpm.JCent,_xlfn.LET(_xlpm.m,calcGeomMeanAnomalySun(_xlpm.JCent),SUM(funSIND(_xlpm.m)*(1.914602-_xlpm.JCent*(0.004817+0.000014*_xlpm.JCent)),funSIND(_xlpm.m*2)*(0.019993-0.000101*_xlpm.JCent),funSIND(_xlpm.m*3)*0.000289)))",
+    "calcSunTrueLong": "_xlfn.LAMBDA(_xlpm.JCent,SUM(calcGeomMeanLongSun(_xlpm.JCent),calcSunEqOfCenter(_xlpm.JCent)))",
+    "calcSunriseSet": "_xlfn.LAMBDA(_xlpm.rise,_xlpm.JDay,_xlpm.latitude,_xlpm.longitude,_xlpm.zenith,_xlfn.LET(_xlpm.passOne,calcSunriseSetUTC(_xlpm.rise,_xlpm.JDay+IF(_xlpm.rise,-0.25,0.25),_xlpm.latitude,_xlpm.longitude,_xlpm.zenith),calcSunriseSetUTC(_xlpm.rise,_xlpm.JDay+_xlpm.passOne,_xlpm.latitude,_xlpm.longitude,_xlpm.zenith)))",
+    "calcSunriseSetUTC": "_xlfn.LAMBDA(_xlpm.rise,_xlpm.JDay,_xlpm.latitude,_xlpm.longitude,_xlpm.zenith,_xlfn.LET(_xlpm.JCent,calcJDToJCent(_xlpm.JDay),_xlpm.EoT,calcEquationOfTime(_xlpm.JCent),_xlpm.solarDec,calcSunDeclination(_xlpm.JCent),_xlpm.hourAngle,calcHourAngleSunrise(_xlpm.latitude,_xlpm.solarDec,_xlpm.zenith)*IF(_xlpm.rise,1,-1),_xlpm.delta,_xlpm.longitude+DEGREES(_xlpm.hourAngle),_xlpm.timeUTC,0.5-_xlpm.delta/360-_xlpm.EoT,_xlpm.timeUTC))",
+    "calcTIMEZONE": "_xlfn.LAMBDA(_xlpm.date_time,_xlop.timezone,_xlfn.MAP(_xlpm.date_time,_xlfn.LAMBDA(_xlpm.date_time,_xlfn.LET(_xlpm.row,MATCH(funIFOMITTED(_xlpm.timezone,constTIMEZONE),TIMEZONE_TABLE[ZONE],0),_xlpm.rule,CHOOSE(INDEX(TIMEZONE_TABLE[RULE],_xlpm.row)+1,_xlfn.LAMBDA(_xlpm.row,_xlpm.date_time,FALSE),_xlfn.LAMBDA(_xlpm.row,_xlpm.date_time,_xlfn.LET(_xlpm.year,YEAR(_xlpm.date_time),_xlpm.utc,INDEX(TIMEZONE_TABLE[UTC],_xlpm.row),AND(_xlpm.date_time>=DATE(_xlpm.year,3,14-MOD(DATE(_xlpm.year,3,6),7))-_xlpm.utc/24+2/24,_xlpm.date_time<DATE(_xlpm.year,11,7-MOD(DATE(_xlpm.year,3,6),7))-_xlpm.utc/24+2/24)))),_xlpm.time_offset,INDEX(TIMEZONE_TABLE[UTC],_xlpm.row)+IF(_xlpm.date_time>0,IF(_xlpm.rule(_xlpm.row,_xlpm.date_time),INDEX(TIMEZONE_TABLE[DST],_xlpm.row))),_xlpm.time_offset/24))))",
+    "calcZENITH": "_xlfn.LAMBDA(_xlop.horizon,funIFOMITTED(_xlpm.horizon,-constHORIZON)+90)",
+    "funACOSD": "_xlfn.LAMBDA(_xlpm.number,DEGREES(ACOS(_xlpm.number)))",
+    "funASIND": "_xlfn.LAMBDA(_xlpm.number,DEGREES(ASIN(_xlpm.number)))",
+    "funCOSD": "_xlfn.LAMBDA(_xlpm.angle,COS(RADIANS(_xlpm.angle)))",
+    "funIFOMITTED": "_xlfn.LAMBDA(_xlpm.parameter,_xlop.if_omitted,IF(_xlfn.ISOMITTED(_xlpm.parameter),_xlpm.if_omitted,_xlpm.parameter))",
+    "funSIND": "_xlfn.LAMBDA(_xlpm.angle,SIN(RADIANS(_xlpm.angle)))",
+    "funTAND": "_xlfn.LAMBDA(_xlpm.angle,TAN(RADIANS(_xlpm.angle)))"
+  },
+  "timezones": [
+    {
+      "ZONE": "Africa/Abidjan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Accra",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Addis_Ababa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Algiers",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Asmara",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Asmera",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Bamako",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Bangui",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Banjul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Bissau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Blantyre",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Brazzaville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Bujumbura",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Cairo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Casablanca",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Ceuta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Conakry",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Dakar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Dar_es_Salaam",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Djibouti",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Douala",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/El_Aaiun",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Freetown",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Gaborone",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Harare",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Johannesburg",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Juba",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Kampala",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Khartoum",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Kigali",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Kinshasa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Lagos",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Libreville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Lome",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Luanda",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Lubumbashi",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Lusaka",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Malabo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Maputo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Maseru",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Mbabane",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Mogadishu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Monrovia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Nairobi",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Ndjamena",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Niamey",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Nouakchott",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Ouagadougou",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Porto-Novo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Sao_Tome",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Timbuktu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Tripoli",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Tunis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Africa/Windhoek",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Adak",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Anchorage",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Anguilla",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Antigua",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Araguaina",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Buenos_Aires",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Catamarca",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/ComodRivadavia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Cordoba",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Jujuy",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/La_Rioja",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Mendoza",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Rio_Gallegos",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Salta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/San_Juan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/San_Luis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Tucuman",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Argentina/Ushuaia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Aruba",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Asuncion",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Atikokan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Atka",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Bahia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Bahia_Banderas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Barbados",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Belem",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Belize",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Blanc-Sablon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Boa_Vista",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Bogota",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Boise",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Buenos_Aires",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cambridge_Bay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Campo_Grande",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cancun",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Caracas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Catamarca",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cayenne",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cayman",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Chicago",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Chihuahua",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Coral_Harbour",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cordoba",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Costa_Rica",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Creston",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Cuiaba",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Curacao",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Danmarkshavn",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Dawson",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Dawson_Creek",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Denver",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Detroit",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Dominica",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Edmonton",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Eirunepe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/El_Salvador",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Ensenada",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Fort_Nelson",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Fort_Wayne",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Fortaleza",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Glace_Bay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Godthab",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Goose_Bay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Grand_Turk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Grenada",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Guadeloupe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Guatemala",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Guayaquil",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Guyana",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Halifax",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Havana",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Hermosillo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Indianapolis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Knox",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Marengo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Petersburg",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Tell_City",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Vevay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Vincennes",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indiana/Winamac",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Indianapolis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Inuvik",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Iqaluit",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Jamaica",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Jujuy",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Juneau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Kentucky/Louisville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Kentucky/Monticello",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Knox_IN",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Kralendijk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/La_Paz",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Lima",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Los_Angeles",
+      "UTC": -8.0,
+      "DST": 1.0,
+      "RULE": 1.0
+    },
+    {
+      "ZONE": "America/Louisville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Lower_Princes",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Maceio",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Managua",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Manaus",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Marigot",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Martinique",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Matamoros",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Mazatlan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Mendoza",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Menominee",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Merida",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Metlakatla",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Mexico_City",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Miquelon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Moncton",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Monterrey",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Montevideo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Montreal",
+      "UTC": -5.0,
+      "DST": 1.0,
+      "RULE": 1.0
+    },
+    {
+      "ZONE": "America/Montserrat",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Nassau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/New_York",
+      "UTC": -5.0,
+      "DST": 1.0,
+      "RULE": 1.0
+    },
+    {
+      "ZONE": "America/Nipigon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Nome",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Noronha",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/North_Dakota/Beulah",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/North_Dakota/Center",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/North_Dakota/New_Salem",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Nuuk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Ojinaga",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Panama",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Pangnirtung",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Paramaribo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Phoenix",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Port-au-Prince",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Port_of_Spain",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Porto_Acre",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Porto_Velho",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Puerto_Rico",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Punta_Arenas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Rainy_River",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Rankin_Inlet",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Recife",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Regina",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Resolute",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Rio_Branco",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Rosario",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Santa_Isabel",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Santarem",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Santiago",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Santo_Domingo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Sao_Paulo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Scoresbysund",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Shiprock",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Sitka",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Barthelemy",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Johns",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Kitts",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Lucia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Thomas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/St_Vincent",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Swift_Current",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Tegucigalpa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Thule",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Thunder_Bay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Tijuana",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Toronto",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Tortola",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Vancouver",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Virgin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Whitehorse",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Winnipeg",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Yakutat",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "America/Yellowknife",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Casey",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Davis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/DumontDUrville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Macquarie",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Mawson",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/McMurdo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Palmer",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Rothera",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/South_Pole",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Syowa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Troll",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Antarctica/Vostok",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Arctic/Longyearbyen",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Aden",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Almaty",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Amman",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Anadyr",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Aqtau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Aqtobe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ashgabat",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ashkhabad",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Atyrau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Baghdad",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Bahrain",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Baku",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Bangkok",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Barnaul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Beirut",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Bishkek",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Brunei",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Calcutta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Chita",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Choibalsan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Chongqing",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Chungking",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Colombo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Dacca",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Damascus",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Dhaka",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Dili",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Dubai",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Dushanbe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Famagusta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Gaza",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Harbin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Hebron",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ho_Chi_Minh",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Hong_Kong",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Hovd",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Irkutsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Istanbul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Jakarta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Jayapura",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Jerusalem",
+      "UTC": 2.0,
+      "DST": 1.0,
+      "RULE": 0.0
+    },
+    {
+      "ZONE": "Asia/Kabul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kamchatka",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Karachi",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kashgar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kathmandu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Katmandu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Khandyga",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kolkata",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Krasnoyarsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kuala_Lumpur",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kuching",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Kuwait",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Macao",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Macau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Magadan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Makassar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Manila",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Muscat",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Nicosia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Novokuznetsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Novosibirsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Omsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Oral",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Phnom_Penh",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Pontianak",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Pyongyang",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Qatar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Qostanay",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Qyzylorda",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Rangoon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Riyadh",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Saigon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Sakhalin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Samarkand",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Seoul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Shanghai",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Singapore",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Srednekolymsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Taipei",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tashkent",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tbilisi",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tehran",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tel_Aviv",
+      "UTC": 2.0,
+      "DST": 1.0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Thimbu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Thimphu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tokyo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Tomsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ujung_Pandang",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ulaanbaatar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ulan_Bator",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Urumqi",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Ust-Nera",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Vientiane",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Vladivostok",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Yakutsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Yangon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Yekaterinburg",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Asia/Yerevan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Azores",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Bermuda",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Canary",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Cape_Verde",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Faeroe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Faroe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Jan_Mayen",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Madeira",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Reykjavik",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/South_Georgia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/St_Helena",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Atlantic/Stanley",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Adelaide",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Brisbane",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Broken_Hill",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Darwin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Eucla",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Hobart",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Lindeman",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Lord_Howe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Melbourne",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Perth",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Australia/Sydney",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-14",
+      "UTC": -14.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-13",
+      "UTC": -13.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-12",
+      "UTC": -12.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-11",
+      "UTC": -11.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-10",
+      "UTC": -10.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-9",
+      "UTC": -9.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-8",
+      "UTC": -8.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-7",
+      "UTC": -7.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-6",
+      "UTC": -6.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-5",
+      "UTC": -5.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-4",
+      "UTC": -4.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-3",
+      "UTC": -3.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-2",
+      "UTC": -2.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-1",
+      "UTC": -1.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT-0",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+0",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+1",
+      "UTC": 1.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+2",
+      "UTC": 2.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+3",
+      "UTC": 3.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+4",
+      "UTC": 4.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+5",
+      "UTC": 5.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+6",
+      "UTC": 6.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+7",
+      "UTC": 7.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+8",
+      "UTC": 8.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+9",
+      "UTC": 9.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+10",
+      "UTC": 10.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+11",
+      "UTC": 11.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT+12",
+      "UTC": 12.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/GMT0",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/Greenwich",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/UCT",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/UTC",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/Universal",
+      "UTC": 0.0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Etc/Zulu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Amsterdam",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Andorra",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Astrakhan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Athens",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Belfast",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Belgrade",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Berlin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Bratislava",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Brussels",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Bucharest",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Budapest",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Busingen",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Chisinau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Copenhagen",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Dublin",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Gibraltar",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Guernsey",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Helsinki",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Isle_of_Man",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Istanbul",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Jersey",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Kaliningrad",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Kiev",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Kirov",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Lisbon",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Ljubljana",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/London",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Luxembourg",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Madrid",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Malta",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Mariehamn",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Minsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Monaco",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Moscow",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Nicosia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Oslo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Paris",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Podgorica",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Prague",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Riga",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Rome",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Samara",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/San_Marino",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Sarajevo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Saratov",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Simferopol",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Skopje",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Sofia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Stockholm",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Tallinn",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Tirane",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Tiraspol",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Ulyanovsk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Uzhgorod",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Vaduz",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Vatican",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Vienna",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Vilnius",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Volgograd",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Warsaw",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Zagreb",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Zaporozhye",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Europe/Zurich",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Antananarivo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Chagos",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Christmas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Cocos",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Comoro",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Kerguelen",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Mahe",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Maldives",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Mauritius",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Mayotte",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Indian/Reunion",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Apia",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Auckland",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Bougainville",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Chatham",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Chuuk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Easter",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Efate",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Enderbury",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Fakaofo",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Fiji",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Funafuti",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Galapagos",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Gambier",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Guadalcanal",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Guam",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Honolulu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Johnston",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Kiritimati",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Kosrae",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Kwajalein",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Majuro",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Marquesas",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Midway",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Nauru",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Niue",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Norfolk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Noumea",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Pago_Pago",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Palau",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Pitcairn",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Pohnpei",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Ponape",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Port_Moresby",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Rarotonga",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Saipan",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Samoa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Tahiti",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Tarawa",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Tongatapu",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Truk",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Wake",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Wallis",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    },
+    {
+      "ZONE": "Pacific/Yap",
+      "UTC": 0,
+      "DST": 0,
+      "RULE": 0
+    }
+  ]
+}

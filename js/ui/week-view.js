@@ -1,3 +1,4 @@
+import { websiteNow } from '../website-clock.js';
 import { safeHeaderImage, sanitizeRichText } from '../security.js';
 import { renderWeeklyReader, readerWeekIndex, readerWeekHasTimes } from './weekly-reader.js';
 // One week on its own page, for the congregation to read rather than for printing a
@@ -19,11 +20,11 @@ import { weekdayMornings } from '../posters/day.js';
 import { inSpringDstWindow } from '../sheets/common.js';
 import { applyRules } from '../rules.js';
 import { mergeRow } from '../overrides.js';
-import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis, specialDaysInWeek,
+import { hebrewDateExtended, hasRoshChodesh, hasBehab, hasTaanis,
   jewishDateString, isYomTovWeekLabel, weekOfLabel } from '../hebrew-calendar.js';
 import { UL_START, UL_END, markHeaderRoom } from '../format.js';
 import { buildPublishedPayload, publishableGroups, getPublishToken, publishToSite, unpublishFromSite, fetchPublished } from '../publish.js';
-import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr } from '../util.js';
+import { SLASH, SOFT_SLASH, DAY_NAMES, hebrewLang, escAttr, useStraightHebrewQuotes } from '../util.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { switchHtml } from './switch.js';
 import { weekSheetHtml, fitWeekSheet } from './week-sheet.js';
@@ -36,7 +37,10 @@ import { dateFromSerial, shulNow } from '../zmanim/solar.js';
 import { weekEndsMins } from '../upcoming.js';
 import { weekIndex, weekdayChartFor, weekdayCompanionOf, rowFor } from '../sheets/rows.js';
 import { currentSerial, wireSwipe, navUnlocked } from './nav-helpers.js';
-import { chartSpreads } from './chart-view.js';
+import { chartSpreads, CHART_EARLY_DAYS } from './chart-view.js';
+import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
+import { zmanimReferenceAttrs } from './zmanim-references.js';
+import { chartReferenceDates } from '../zmanim/references.js';
 
 /** The ר"ח / בה"ב / תענית days falling in the week leading up to this Shabbos, named and
  *  with the day they fall on.
@@ -79,7 +83,7 @@ const CARD_ORDER_KEY = 'zmanim-week-card-order';
  *  asks what time it is here. */
 function autoCardOrder(state, settings) {
   try {
-    const { serial, mins } = shulNow(new Date(), settings);
+    const { serial, mins } = shulNow(websiteNow(), settings);
     const day = dateFromSerial(serial).getUTCDay();
     if (day === 5) return 'shabbos';
     // On Shabbos itself it stays the שבת card until the card is spent, the same moment the
@@ -202,7 +206,7 @@ const LUACH_SKIP_MAX = 3;
  *  default is the first week with something left on it rather than simply the first that is
  *  not in the past), pulled out so the admin's status panel can ask it directly. A second
  *  reader of the one answer, not a second way of working it out. */
-export function currentReaderWeek(state, settings, now = new Date()) {
+export function currentReaderWeek(state, settings, now = websiteNow()) {
   const index = readerWeekIndex(state);
   const today = shulNow(now, settings).serial;
   const serials = [...index.keys()].filter((s) => s >= today).sort((a, b) => a - b);
@@ -800,12 +804,12 @@ function formatLabel(label) {
 }
 
 /** A label/time line. */
-function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '') {
+function line(label, value, isHtml = false, keepEmpty = false, labelHtml = '', explanation = '') {
   const text = String(value ?? '').trim();
   if (!text && !keepEmpty) return '';
   return `<div class="week-line">
     <span class="week-label"${hebrewLang(labelHtml || formatLabel(label))}>${labelHtml || formatLabel(label)}</span>
-    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}>${isHtml ? text : weekNl2br(text)}</span>
+    <span class="week-time"${hebrewLang(isHtml ? text : weekNl2br(text))}${explanation === true ? timeExplanationAttrs({ header: label, printed: text, fixed: true }) : explanation}>${isHtml ? text : weekNl2br(text)}</span>
   </div>`;
 }
 
@@ -868,6 +872,7 @@ const MAX_GROW_ACROSS = 2.6;
 const growCapFor = (card) => (card.classList.contains('is-weekday-card') ? MAX_GROW_ACROSS : MAX_GROW);
 
 function fitLinesToPage(container) {
+  useStraightHebrewQuotes(container);
   container.querySelectorAll('.week-card').forEach((card) => {
     const box = card.querySelector('.week-lines');
     const inner = box?.firstElementChild;
@@ -878,6 +883,10 @@ function fitLinesToPage(container) {
     const needed = inner.scrollHeight;
     if (!room || !needed) return;
     if (card.matches('.is-shabbos-print, .is-weekday-card')) {
+      // Both heights must include the card's preview zoom. A season run inherits that
+      // zoom from its wrapper; comparing painted text with clientHeight enlarged every
+      // phone-printed card past the bottom of its list.
+      const paintedRoom = box.getBoundingClientRect().height;
       // Fit height while keeping both ruled lists at the full printable width.
       const measure = (scale) => {
         card.style.setProperty('--fit-scale', scale.toFixed(4));
@@ -888,7 +897,7 @@ function fitLinesToPage(container) {
       let high = growCapFor(card);
       for (let i = 0; i < 14; i++) {
         const mid = (low + high) / 2;
-        if (measure(mid) <= room * 0.98) low = mid;
+        if (measure(mid) <= paintedRoom * 0.98) low = mid;
         else high = mid;
       }
       measure(low);
@@ -991,6 +1000,7 @@ function fitLinesToPage(container) {
  *  will really be drawn. It re-reads its own breaks back into separators before deciding
  *  again, so calling it repeatedly settles rather than accumulating. */
 function fitPairColumns(sheet) {
+  useStraightHebrewQuotes(sheet);
   /* Each column is sized on its own first, and then **both are set to the smaller of the two
      answers**, so the two lists are in one size across the sheet.
 
@@ -1248,9 +1258,13 @@ function fitPagesToWindow(container) {
     wrap.style.removeProperty('--page-zoom');
     const available = wrap.clientWidth;
     const pageWidth = card.getBoundingClientRect().width;
-    if (!available || !pageWidth || pageWidth <= available) return;
-    wrap.style.setProperty('--page-zoom', (available / pageWidth).toFixed(4));
-    wrap.classList.add('is-scaled');
+    if (!available || !pageWidth) return;
+    if (pageWidth > available) {
+      wrap.style.setProperty('--page-zoom', (available / pageWidth).toFixed(4));
+      wrap.classList.add('is-scaled');
+    }
+    // Preview zoom can wrap a row differently, so fit the page at its final size too.
+    fitLinesToPage(container);
   };
   apply();
   if (fitPagesHandler) window.removeEventListener('resize', fitPagesHandler);
@@ -1347,8 +1361,10 @@ function weekCardsHtml(showing, index, state, settings) {
       const value=shabbos.row[c.key], html=shabbos.overriddenKeys.has(c.key);
       if(value==null || value==='')continue;
       const parts=String(value).split('\n');
-      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key)});
+      const add=(label,text,pair=null)=>printRows.push({label,text,html,pair,friday:fridayKeys.has(c.key), explanation: chartExplanationAttrs(shabbos.row, c.key, label, `Weekly schedule · ${week.parsha || ''}`, { value: text })});
       if(!html && c.header.includes('פלג') && parts.length>1) {
+        // The wall chart names the room in its heading. The compact weekly print
+        // uses its usual time marks instead, so it keeps the same room information.
         const minchaLabel = c.header.split('\n').filter(x=>!x.startsWith('פלג')).join(' ').replace(/\s*\((?:למטה|בעזר["״]נ)\)/g,'');
         const minchaTime = /בעזר["״]נ/.test(c.header) && !parts[0].includes('*') ? parts[0] + '*' : parts[0];
         add(minchaLabel,minchaTime,c.key);
@@ -1365,11 +1381,11 @@ function weekCardsHtml(showing, index, state, settings) {
   const orderedRows=[...printRows.filter(r=>r.friday).sort((a,b)=>firstTime(a)-firstTime(b)),...printRows.filter(r=>!r.friday)];
   const shownPairs = new Set();
   const shabbosLines=orderedRows.map(r=>{
-    if (!r.pair) return line(r.label,r.text,r.html);
+    if (!r.pair) return line(r.label,r.text,r.html,false,'',r.explanation);
     if (shownPairs.has(r.pair)) return '';
     shownPairs.add(r.pair);
     const pair = printRows.filter(item=>item.pair===r.pair);
-    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html)).join('')}</div>`;
+    return `<div class="week-mincha-plag">${pair.map(item=>line(item.label,item.text,item.html,false,'',item.explanation)).join('')}</div>`;
   }).join('');
 
   const weekday = weekdayChartFor(sheet, showing, state);
@@ -1384,78 +1400,43 @@ function weekCardsHtml(showing, index, state, settings) {
        posters/day.js, which the One sheet asks the same question of: the two draw this block
        and were deciding separately what was on it. */
     const mornings = weekdayMornings(showing, settings, WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL);
-    const parts = [...WEEKDAY_COLUMNS]
-      .reverse()
-      // The everyday שחרית comes off a week where every morning already has a line of its
-      // own: see weekdayMornings. Filtered rather than left out of the map, so the columns
-      // beside it keep their order.
-      .filter((c) => c.key !== 'E' || mornings.everydayStands)
-      // keepEmpty: מנחה and מעריב should hold their row even on a week that computes to
-      // nothing, or the card reads as though the minyan does not exist rather than as
-      // though the time is not set yet.
-      // isHtml only for an override (already real HTML) and for שחרית (rich text out of
-      // Settings). A computed value still carries the underline sentinels, which
-      // weekNl2br has to turn into real <u> elements.
-      .map((c) =>
-        c.key === 'E'
-          ? line(c.header, htmlLines(WEEKDAY_SHACHARIS), true, false, '', true)
-          // Through announced.js as well: see the same call in upcoming.js. A block is one
-          // line for the whole week, so a swap that covers any weekday of it shows on it.
-          : line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing), wdOverridden.has(c.key), true)
-      );
-
-    // The second שחרית schedule, only on weeks that actually have one of those days,
-    // labelled with which day it is rather than the chart's catch-all heading. It goes
-    // directly after the everyday schedule, not before it: most of the week still runs
-    // on the regular times, so those are what should be read first.
-    /* The יומים נוראים season, which decides the morning outright rather than adding a day to
-       it. From the first סליחות to יום כיפור the shul opens earlier and on a different list,
-       and that list is on the סליחות sheet: this week card was printing the ordinary 7:00
-       through the whole of it. One line per schedule, the same rule the ר"ח and בה"ב lines
-       below keep. Spliced in at the same place they are, so the day that is not the general
-       rule reads first: those splice after these and so end up above them, which puts a fast
-       ahead of the season line covering the rest of its week. */
-    const season = mornings.season;
-    if (season.length) {
-      // Under the everyday line where there is one, and at the head of the block where there
-      // is not: splice(1) would put it after מנחה on a week whose שחרית has come off.
-      const at = mornings.everydayStands ? 1 : 0;
-      parts.splice(at, 0, ...season.map((g) => line(
-        '',
-        htmlLines(g.html),
-        true, false,
+    // The shared schedules keep matching days together. Order each morning block by
+    // its first actual weekday, including ordinary mornings that start later in a week.
+    const morningParts = [];
+    const addMorning = (days, html) => morningParts.push({
+      firstDay: Math.min(...days.split(', ').map(day => DAY_NAMES.indexOf(day))), html,
+    });
+    if (mornings.everydayStands) {
+      addMorning(mornings.everydayDays.join(', '), line('שחרית', htmlLines(WEEKDAY_SHACHARIS), true, false, '', true));
+    }
+    for (const g of mornings.season) {
+      addMorning(g.day, line(
+        '', htmlLines(g.html), true, false,
         `${weekEsc(g.name)}<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(g.day))})</span>`,
         true
-      )));
+      ));
     }
+    // A fast morning keeps the name and times from its own sheet. Rosh Chodesh and
+    // BHB retain their shared schedules and the individual day labels within a group.
+    const dayLabel = (d) =>
+      `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
+      + `<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(d.day))})</span>`;
+    for (const d of mornings.fasts) {
+      addMorning(d.day, line('', htmlLines(TZG_TEXT.morning), true, false, dayLabel(d), true));
+    }
+    for (const group of mornings.otherGroups) {
+      addMorning(group.days.map(d => d.day).join(', '),
+        line('', htmlLines(group.html), true, false, group.days.map(dayLabel).join('<br>'), true));
+    }
+    morningParts.sort((a, b) => a.firstDay - b.firstDay);
 
-    const special = specialDaysInWeek(showing, settings);
-    if (special.length) {
-      const at = mornings.everydayStands ? 1 : 0;
-      // The day names go on their own line, in their own direction. Run together with
-      // the Hebrew they came out as "(Monday,)" on one line and "(Thursday" on the next:
-      // a bracketed Latin list inside a right-to-left label gets reordered when it wraps.
-      /* The word in front of the day's name is what is davened at it: a fast morning is
-         called סליחות, off the same constant its own sheet is headed with, so the card and
-         the sheet on the wall cannot end up calling one morning two things. ר"ח and בה"ב
-         have no סליחות and stay שחרית. */
-      const dayLabel = (d) =>
-        `${weekEsc(`${d.fast ? TZG_TEXT.shacharis : 'שחרית'} ${d.name}`)}`
-        + `<br><span class="week-days" dir="rtl">(${weekEsc(printedDayNames(d.day))})</span>`;
-      /* One line per schedule rather than per day: the ר"ח and בה"ב days of a week share a
-         list and read as one line naming both, which is what this has always done, and צום
-         גדליה has a list of its own off the ימים נוראים sheet and so gets a line of its own.
-         The fast first, since it is the one that is not the general rule. */
-      const groups = [];
-      for (const d of mornings.fasts) {
-        groups.push({ label: dayLabel(d), html: TZG_TEXT.morning });
-      }
-      if (mornings.others) {
-        groups.push({ label: mornings.others.map(dayLabel).join('<br>'), html: WEEKDAY_SHACHARIS_SPECIAL });
-      }
-      parts.splice(at, 0, ...groups.map((g) => line('', htmlLines(g.html), true, false, g.label, true)));
-    }
-    weekdayLines = parts.join('');
+    // Mincha and Maariv follow the mornings, with saved edits and explanation traces.
+    // Empty entries stay visible when their schedule has not been set yet.
+    const parts = [...WEEKDAY_COLUMNS].reverse().filter(c => c.key !== 'E').map(c =>
+      line(c.header, announcedWeekCell(wdRow[c.key], c.key, showing, settings), wdOverridden.has(c.key), true, '',
+        chartExplanationAttrs(wdRow, c.key, c.header, 'Weekly weekday schedule', { announcedWeek: { anchor: showing, settings } }))
+    );
+    weekdayLines = [...morningParts.map(part => part.html), ...parts].join('');
   }
 
   const cardTitle = weekTitle(showing, index, state, settings);
@@ -1478,21 +1459,26 @@ function weekCardsHtml(showing, index, state, settings) {
  *  after, and could not reach ראש השנה the week before either, which sits inside the very
  *  dates the chart covers.
  *
- *  So a chart owns from its own first week until the next chart begins, and the last one
- *  owns everything after it. That is the honest span: the summer chart is what is on the
- *  wall through Sukkos, because the winter chart does not start until בראשית.
+ *  So a chart owns from CHART_EARLY_DAYS before its own first week until the same point
+ *  before the next chart begins, and the last one owns everything after it: a chart posts
+ *  a week ahead of its own first date everywhere, including the turn into בראשית, so the
+ *  summer chart's own stretch ends a week before שבת בראשית rather than running through it.
  *
  *  chartSpreads is the chart browser's own list, already in date order across the seasons,
- *  so the two views cannot disagree about where one chart ends and the next starts. */
+ *  and CHART_EARLY_DAYS is shared from there too, so the two views cannot disagree about
+ *  where one chart ends and the next starts. */
 function chartStretchSerials(showing, index, state) {
   const spreads = chartSpreads(state);
   if (!spreads.length) return null;
   const starts = spreads.map((s) => Math.min(...s.serials));
   let i = -1;
-  for (let n = 0; n < starts.length; n++) if (starts[n] <= showing) i = n;
+  for (let n = 0; n < starts.length; n++) {
+    if (starts[n] - CHART_EARLY_DAYS <= showing) i = n;
+  }
   if (i === -1) return null; // before the first chart there is: nothing to be held to
-  const from = starts[i];
-  const until = i + 1 < starts.length ? starts[i + 1] : Infinity;
+  const from = starts[i] - CHART_EARLY_DAYS;
+  const nextStart = starts[i + 1] ?? Infinity;
+  const until = nextStart === Infinity ? Infinity : nextStart - CHART_EARLY_DAYS;
   const within = [...index.keys()].filter((s) => s >= from && s < until).sort((a, b) => a - b);
   return within.length ? within : null;
 }
@@ -1510,7 +1496,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
   const settings = resolveSettings(state.settings);
   const index = luach ? readerWeekIndex(state) : weekIndex(state);
   const allSerials = [...index.keys()].sort((a, b) => a - b);
-  const today = luach ? shulNow(new Date(), settings).serial : null;
+  const today = luach ? shulNow(websiteNow(), settings).serial : null;
   const availableSerials = luach ? allSerials.filter(s => s >= today) : allSerials;
   let serials = availableSerials;
 
@@ -1550,6 +1536,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
     .filter(s => availableSerials.includes(s));
   const at = serials.indexOf(showing);
   if (luach) {
+    setPrintPage('letter portrait');
     renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange,
       title: index.get(showing).week.parsha ? weekTitle(showing, index) : 'זמני השבוע' });
     return;
@@ -1591,7 +1578,7 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
         <button type="button" id="week-prev" ${at <= 0 ? 'disabled' : ''}>
           <span aria-hidden="true">&larr;</span><span class="week-nav-word">Previous</span>
         </button>
-        <button type="button" id="week-today">Today</button>
+        <button type="button" id="week-today">This week</button>
         <button type="button" id="week-next" ${at >= serials.length - 1 ? 'disabled' : ''}>
           <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
         </button>
@@ -1635,7 +1622,8 @@ export function renderWeek(container, state, onSerialChange, serial = null, opts
           : ''
       }
     </div>
-    <div class="week-cards">${onOneSheet ? sheetHtml : cardsHtml}</div>
+    <div class="week-cards"${zmanimReferenceAttrs({ title: weekTitle(showing, index, state, settings),
+      days: chartReferenceDates([{ serial: showing }]), settings, weeklyLimit: true })}>${onOneSheet ? sheetHtml : cardsHtml}</div>
     ${luach ? '' : publishPanelHtml(sheet, state, Boolean(opts.openPublish))}
   `;
 

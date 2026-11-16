@@ -3,7 +3,8 @@ import {createOfflineSeed} from './offline-seed.js';
 import { themeAt } from '../public/display-assets/appearance.js';
 import { actor, allow, ApiError, CAPABILITIES } from "./auth.js";
 import { validate, conflicts, publicItem, publicItems, warnings, text } from "./model.js";
-import { scheduleSnapshot, catalog, dateInfo, previewMonth } from "./schedules.js";
+import { scheduleCalendar } from "./schedules.js";
+import { loadCongregationSchedule } from "./published-calendar.js";
 import { phase, localStamp, addDays } from "../public/display-assets/time.js";
 import {nextMinyanChangeAt} from '../public/display-assets/minyan-timing.js';
 const json = (x, status = 200) => Response.json(x, { status });
@@ -43,10 +44,10 @@ async function body(req) {
     throw new ApiError(400, "Invalid JSON.");
   }
 }
-async function snapshot(items, at, preview = false, appearance) {
-  const controls = items.filter((i) => i.kind === "schedule"), schedule = scheduleSnapshot(at, controls);
+async function snapshot(items, at, appearance, calendar, preview = false) {
+  const controls = items.filter((i) => i.kind === "schedule"), schedule = calendar.scheduleSnapshot(at, controls);
   const boundaries = items.filter((i) => i.status === "published").flatMap((i) => [i.startsAt, i.endsAt, i.data.previewAt]).filter((x) => x && x > at);
-  const today = dateInfo(schedule.date);
+  const today = calendar.dateInfo(schedule.date);
   boundaries.push(today.civilEnd);
   if (today.sunset > at) boundaries.push(today.sunset);
   const minyanChangeAt = nextMinyanChangeAt(schedule.next);
@@ -67,15 +68,20 @@ async function handle(req, env) {
     url.pathname = '/tv/';
     return Response.redirect(url.href, 308);
   }
+  const currentCalendar = async () => scheduleCalendar(await loadCongregationSchedule(req));
   if (path === '/api/display/offline' && req.method === 'GET') {
     const at=new Date().toISOString();
-    const items=await publicSourceItems(env.DB, at);
-    return json(createOfflineSeed(items,await readAppearance(env.DB),at));
+    const [items, appearance, published] = await Promise.all([
+      publicSourceItems(env.DB, at), readAppearance(env.DB), loadCongregationSchedule(req),
+    ]);
+    return json(createOfflineSeed(items, appearance, at, published));
   }
   if (path === "/api/display/public" && req.method === "GET") {
     const at = new Date().toISOString();
-    const items = await publicSourceItems(env.DB, at);
-    return json(await snapshot(items, at, false, await readAppearance(env.DB)));
+    const [items, appearance, calendar] = await Promise.all([
+      publicSourceItems(env.DB, at), readAppearance(env.DB), currentCalendar(),
+    ]);
+    return json(await snapshot(items, at, appearance, calendar));
   }
   const isAdmin = path.startsWith("/admin/display") || path.startsWith("/api/display/");
   let who;
@@ -90,28 +96,29 @@ async function handle(req, env) {
     if (path === "/api/display/admin/catalog") {
       const year = Number(url.searchParams.get("year"));
       if (!Number.isInteger(year) || year < 5700 || year > 5900) throw new ApiError(422, "Choose a Hebrew year from 5700 to 5900.");
-      return json(catalog(year).map(({ events, ...p }) => ({ ...p, eventCount: events.length })));
+      return json((await currentCalendar()).catalog(year).map(({ events, ...p }) => ({ ...p, eventCount: events.length })));
     }
     if (path === "/api/display/admin/date" && req.method === "POST") {
       const d = await body(req);
-      return json(dateInfo(d.date, d.hebrew));
+      return json((await currentCalendar()).dateInfo(d.date, d.hebrew));
     }
     if(path === '/api/display/admin/calendar' && req.method === 'GET') {
       const month=url.searchParams.get('month');
       if(!/^(20\d{2})-(0[1-9]|1[0-2])$/.test(month||''))throw new ApiError(422,'Choose a month between 2000 and 2099.');
-      return json(previewMonth(month));
+      return json((await currentCalendar()).previewMonth(month));
     }
     if (path === "/api/display/admin/preview" && req.method === "POST") {
       const raw = await body(req), at = new Date(raw.at).toISOString();
       if (+new Date(at) < Date.parse("2000-01-01") || +new Date(at) > Date.parse("2100-01-01")) throw new ApiError(422, "Choose a preview between 2000 and 2099.");
+      const [calendar, appearance] = await Promise.all([currentCalendar(), readAppearance(env.DB)]);
       let items = await list(env.DB);
       if (raw.item) {
         allow(who, raw.item.kind);
-        const draft = validate({ ...raw.item, status: "published" });
+        const draft = validate({ ...raw.item, status: "published" }, calendar);
         items = items.filter((i) => i.id !== raw.item.id);
         items.push({ ...draft, id: raw.item.id || "unsaved-preview" });
       }
-      const result = await snapshot(items, at, true, await readAppearance(env.DB));
+      const result = await snapshot(items, at, appearance, calendar, true);
       result.timeline = items.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ id: i.id, title: i.internalName || i.title, phase: phase(i, at) }));
       return json(result);
     }
@@ -156,7 +163,7 @@ async function handle(req, env) {
         }
       }
       allow(who, raw.kind);
-      const value = validate(raw), itemId = action === "duplicate" || !id ? crypto.randomUUID() : id, updating = !!old && action !== "duplicate";
+      const value = validate(raw, await currentCalendar()), itemId = action === "duplicate" || !id ? crypto.randomUUID() : id, updating = !!old && action !== "duplicate";
       if (updating && old.kind !== value.kind) throw new ApiError(422, "Item type cannot be changed.");
       if (updating && raw.version !== old.version) throw new ApiError(409, "This item changed. Reopen it first.");
       const overlaps = conflicts({ ...value, id: itemId }, await list(env.DB));

@@ -1,0 +1,5 @@
+PDF.js 6.5.438 (pdfjs-dist)
+Apache-2.0
+https://registry.npmjs.org/pdfjs-dist/-/pdfjs-dist-6.5.438.tgz
+sha512-vg8Pw1x+AFKy4AMDvhuWl5cOYV8d698UoEANoFFhc79hqXDnZQqnOXoxw3HG907WHOg1JYOvLhP756boddFxpA==
+Runtime files copied unchanged from the integrity-verified npm package.

@@ -7,7 +7,7 @@ a fraction of a day, exactly like an Excel serial's fractional part.
 """
 import math
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 # Day 0 in Excel's serial system. No 1900 leap bug correction: it is irrelevant for any
 # date this program will ever be asked about.
@@ -165,15 +165,24 @@ def _nth_sunday(year: int, month: int, nth: int) -> date:
     return date(year, month, first_sunday + (nth - 1) * 7)
 
 
-def _us_dst_active(d: date) -> bool:
-    """The US rule the workbook implements: second Sunday in March at 2am through the
-    first Sunday in November at 2am, local time."""
-    return _nth_sunday(d.year, 3, 2) <= d < _nth_sunday(d.year, 11, 1)
+def _us_dst_active(d, standard_offset_hours=0) -> bool:
+    """Workbook 2am boundaries, using wall time or its standard-offset UTC conversion."""
+    instant = d if isinstance(d, datetime) else datetime.combine(d, datetime.min.time())
+    offset = timedelta(hours=2 - standard_offset_hours)
+    start = datetime.combine(_nth_sunday(d.year, 3, 2), datetime.min.time()) + offset
+    end = datetime.combine(_nth_sunday(d.year, 11, 1), datetime.min.time()) + offset
+    return start <= instant < end
 
 
 def timezone_offset(d: date, tz: Timezone):
-    """calcTIMEZONE / calcDST_LOCAL, with the two rule types the workbook itself has."""
+    """calcDST_LOCAL, interpreting the date/time as local wall time."""
     is_dst = tz.rule == "us" and _us_dst_active(d)
+    return tz.utc_offset + (tz.dst_offset if is_dst else 0), is_dst
+
+
+def timezone_offset_utc(instant, tz: Timezone):
+    """calcTIMEZONE, retaining the UTC instant's time of day."""
+    is_dst = tz.rule == "us" and _us_dst_active(instant, tz.utc_offset)
     return tz.utc_offset + (tz.dst_offset if is_dst else 0), is_dst
 
 
@@ -192,5 +201,6 @@ def sun_event(rise: bool, d: date, horizon_deg: float, settings, use_elevation: 
     z = zenith(horizon_deg) + elev_adjust(elev_m)
     serial = excel_serial(d)
     event_utc = _sunrise_set(rise, calc_jd(serial), lat, settings.longitude, z)
-    offset_hours, _ = timezone_offset(date_from_serial(serial + event_utc), settings.timezone)
+    instant = datetime.combine(date_from_serial(serial), datetime.min.time()) + timedelta(days=event_utc)
+    offset_hours, _ = timezone_offset_utc(instant, settings.timezone)
     return event_utc + offset_hours / 24

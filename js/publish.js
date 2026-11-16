@@ -1,7 +1,8 @@
+import { websiteNow } from './website-clock.js';
 import { loadTables } from './data-loader.js';
 import { DEFAULT_SETTINGS, resolveSettings } from './settings.js';
-import { computeSeasonWeeks, computeWeekdayWeeks } from './sheets/weeks.js';
-import { defaultPageSizes, alignPageSizesTo } from './pagination.js';
+import { computeSeasonWeeks, computeWeekdayWeeks, nextAvailableYearFor } from './sheets/weeks.js';
+import { defaultSeasonPageSizes, alignPageSizesTo } from './pagination.js';
 import { hebrewDateExtended } from './hebrew-calendar.js';
 import { excelSerial } from './zmanim/solar.js';
 // Publishing a season for the congregation.
@@ -98,7 +99,7 @@ export function withoutRetiredDrasha(data) {
 
 /** Reads what is currently published, or null when nothing is. A 404 is the normal state
  *  before the first publish, not an error worth shouting about. */
-export async function loadPublished({ automatic = false } = {}) {
+export async function loadPublished({ automatic = false, now = websiteNow() } = {}) {
   try {
     const res = await fetch('/data/published.json', { cache: 'no-cache' });
     if (!res.ok) throw new Error('Schedule download failed: ' + res.status);
@@ -121,7 +122,7 @@ export async function loadPublished({ automatic = false } = {}) {
     }
     if (!data || !Array.isArray(data.sheets)) throw new Error('Invalid schedule data');
     const clean = withoutRetiredDrasha(data);
-    return automatic ? buildAutomaticCharts(clean, await loadTables()) : clean;
+    return automatic ? buildAutomaticCharts(clean, await loadTables(), now) : clean;
   } catch (err) {
     if (err?.message === 'blocked') throw err;
     throw err;
@@ -158,8 +159,38 @@ export async function unpublishFromSite() {
   throw new Error('Automatic charts cannot be removed through browser publishing.');
 }
 
+/** Page 1 of the Weekday chart for the soonest קיץ season, as a Shabbos-anchored serial
+ *  range (its first week through its last). The only caller is settings-view.js, the
+ *  moment the admin turns on the 11:30 מעריב "new" badge (sheets/weekday.js).
+ *
+ *  Always קיץ, never חורף: 11:30 runs in קיץ only now (sheets/weekday.js), and the badge
+ *  only ever marks a week BMG being in session kept it off the board before that (see the
+ *  bmg check in maarivParts) - BMG's own middle range reaches into קיץ too, ר"ח אייר ->
+ *  ט' באב. `nextAvailableYearFor` rather than "whichever season contains today" so a
+ *  switch flipped on the last day of a חורף season pins to the קיץ about to start, not a
+ *  חורף page that already went to print months ago.
+ *
+ *  Captures which weeks were page 1 right when the switch was turned on, so the badge
+ *  stays pinned to that one season even once a later one becomes current - not whichever
+ *  season happens to be on the wall whenever the chart is next printed, which would walk
+ *  the badge forward every time a new season starts. Mirrors buildAutomaticCharts's own
+ *  page-1 arithmetic (defaultPageSizes, alignPageSizesTo) rather than a size guessed
+ *  independently, so the range matches the real printed chart's actual first page. */
+export function firstWeekdayPageRangeForSummer(settings, tables) {
+  const resolved = resolveSettings({ ...DEFAULT_SETTINGS, ...settings });
+  const season = 'kayitz';
+  const hebrewYear = nextAvailableYearFor(season, resolved);
+  const { weeks } = computeSeasonWeeks(season, hebrewYear, resolved, tables);
+  const sizes = defaultSeasonPageSizes(weeks, season, hebrewYear);
+  const weekdayWeeks = computeWeekdayWeeks(season, hebrewYear, resolved, tables).weeks;
+  const weekdaySizes = alignPageSizesTo(weeks, sizes, weekdayWeeks);
+  const firstPage = weekdayWeeks.slice(0, weekdaySizes[0]);
+  if (!firstPage.length) return null;
+  return { season, hebrewYear, firstSerial: firstPage[0].serial, lastSerial: firstPage[firstPage.length - 1].serial };
+}
+
 /** Regenerate three Hebrew years before and after the current year from shared formulas.
- * Previously published sheets supply page splits only; times are always recalculated. */
+ * Use the current season split rather than a previously published sheet's old defaults. */
 export function buildAutomaticCharts(config, tables, now = new Date()) {
   const settings = { ...DEFAULT_SETTINGS, ...config.settings,
     sheetStyle: { ...DEFAULT_SETTINGS.sheetStyle, ...config.settings?.sheetStyle } };
@@ -182,7 +213,7 @@ export function buildAutomaticCharts(config, tables, now = new Date()) {
     const custom = config.chartLayouts?.[key];
     const valid = sizes => Array.isArray(sizes) && sizes.length > 0 && sizes.length <= 8 &&
       sizes.every(n => Number.isInteger(n) && n > 0) && sizes.reduce((a, b) => a + b, 0) === s.weeks.length;
-    const sizes = valid(custom) ? custom : valid(old?.pageSizes) ? old.pageSizes : defaultPageSizes(s.weeks.length, 3);
+    const sizes = valid(custom) ? custom : defaultSeasonPageSizes(s.weeks, s.season, s.year);
     const weekdayWeeks = computeWeekdayWeeks(s.season, s.year, resolved, tables).weeks;
     const id = 'auto-' + key;
     const base = { hebrewYear: s.year, createdAt: old?.createdAt || '2000-01-01T00:00:00.000Z',

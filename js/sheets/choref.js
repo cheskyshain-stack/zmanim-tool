@@ -4,7 +4,7 @@
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { ceilToMinute, floorToMinute, formatTime, underlineTime } from '../format.js';
-import { inPlagWindow, fridayMainMinchaParts, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
+import { inPlagWindow, fridayMainMinchaParts, fridayLateMinchaTrace, tishaBavMaariv, shabbosMinchaParts, shacharisParts, candleLightingParts } from './common.js';
 import { textjoin, SLASH } from '../util.js';
 import { zman } from '../zmanim/trace.js';
 
@@ -44,7 +44,7 @@ export function buildChorefRow(week, settings) {
   const plagGRA = zman('פלג המנחה גר״א', Z.plagHamincha(fridayDate, settings), 'the day measured from sunrise to שקיעה').minus(15);
   const plag50 = zman('פלג המנחה מ״א', Z.plagHaminchaCustom(Z.tzais50(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 50').minus(15);
   const plag72 = zman('פלג המנחה מ״א 72', Z.plagHaminchaCustom(Z.tzais72(fridayDate, settings), Z.alos16_1(fridayDate, settings)), 'the day measured from עלות 16.1 degrees to צאת 72').minus(15);
-  const minchaFri = zman('שקיעה', sunsetFriday, 'on the Friday').minus(15).floor();
+  const minchaFri = fridayLateMinchaTrace(fridayDate, settings);
   const plagWindow = inPlagWindow(friday, settings);
   /* The three פלג מנינים are silenced outside their season rather than branched away, so the
      column can still say they exist and when. Branched, a winter week simply had one time in
@@ -57,7 +57,7 @@ export function buildChorefRow(week, settings) {
 
   const candles = candleLightingParts(fridayDate, settings);
   const H = candles.text;
-  const erevMincha = fridayMainMinchaParts(fridayDate, settings);
+  const erevMincha = fridayMainMinchaParts(fridayDate, settings, shabbos);
   const I = erevMincha.text;
 
   /* Only the columns this file works out itself. C, E, H and I come from sheets/common.js
@@ -83,17 +83,24 @@ export function buildChorefRow(week, settings) {
     G: plagTimes.filter((t) => t.held === false),
   };
 
-  return { B, C, D, E, F, G, H, I, traces, notes, dropped };
+  return {
+    B, C, D, E, F, G, H, I, traces, notes, dropped,
+  };
 }
 
 export const CHOREF_COLUMNS = [
   { key: 'B', header: 'מעריב' },
   { key: 'C', header: 'מנחה' },
-  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א' },
+  // headerSub: true - this column's heading has a name on its first line (set at the
+  // heading's own regular size) and, under it, what the name is read against. That part
+  // prints smaller - see headerHtml in ui/sheet-view.js.
+  { key: 'D', header: 'ס"ז קר"ש\nגר״א / מ״א', headerSub: true },
   { key: 'E', header: 'שחרית' },
   { key: 'F', header: 'מעריב' },
   { key: 'G', header: 'מנחה\nמעריב' },
   { key: 'H', header: 'הדלקת\nנרות' },
+  // Not headerSub: "ערב שבת" names which מנחה this is, the same weight as "מנחה" above it,
+  // not a reckoning read against the name the way D's two opinions are.
   { key: 'I', header: 'מנחה\nערב שבת' },
 ];
 

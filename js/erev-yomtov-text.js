@@ -16,10 +16,10 @@
 //
 // Where each piece comes from, all of it out of buildRoshHashanaPoster:
 //
-//   Selichos      RH_TEXT.slichos.times, the סליחות מנין on ערב ר"ה.
+//   Selichos      the poster's erevLines, the סליחות מנין on ערב ר"ה.
 //   Chatzos       the poster's own חצות, cut to the minute rather than rounded, because no
 //                 printed זמן should say חצות is a minute later than it is.
-//   Mincha        RH_TEXT.erevMincha.times, the afternoon menu.
+//   Mincha        the poster's erevLines, the afternoon menu.
 //   Hadlakas      the first day's block, its candles line: שקיעה less the shul's candle
 //                 lighting minutes.
 //   Mincha        the same block's nightMincha: שקיעה less fifteen. It is after candle
@@ -37,10 +37,8 @@
 import { RH_TEXT } from './posters/roshhashana.js';
 import { blockHasEiruv } from './posters/eiruv.js';
 import { VS_TEXT } from './posters/vasikin.js';
-import { YK_TEXT } from './posters/yomkippur.js';
 import { PS_TEXT } from './posters/pesach.js';
 import { SK_TEXT } from './posters/sukkos.js';
-import { parseTimes } from './posters/slichos.js';
 import { erevWhereMark } from './erev-text.js';
 
 /** The room the ותיקין מנין davens in, said the way the message says it.
@@ -150,6 +148,17 @@ const ytBlock = (poster, name) =>
   (poster?.blocks || []).find((b) => String(b.heading || '').startsWith(name)) || null;
 const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc) || null;
 
+/** Announce only the Yizkor times on the relevant holiday's saved sheet rows.
+ *  Use the messages' room letters for every time, including the main Bais Medrash. */
+function ytYizkorLines(rows, holiday) {
+  const times = (rows || []).filter((row) => row.calc === 'yizkor')
+    .flatMap((row) => row.times || []).filter((time) => time?.text)
+    .map((time) => time.text + ytWhere(time));
+  if (!times.length) return [];
+  const when = times.join(' ');
+  return [`Yizkor on ${holiday}, approximately ${when}.`];
+}
+
 /** The ערב ראש השנה message.
  *
  *  @param poster - straight from buildRoshHashanaPoster, so this reads exactly what the
@@ -159,17 +168,20 @@ const ytLine = (block, calc) => (block?.lines || []).find((l) => l.calc === calc
  *  missing a line is one somebody can see is short; a message carrying a time nobody
  *  computed is one they cannot. */
 export function erevRoshHashanaText(poster) {
+  if (!poster) return '';
   const first = poster?.blocks?.[0];
   const timeFor = (calc) => first?.lines?.find((l) => l.calc === calc)?.times?.[0];
+  const erevLine = label => poster.erevLines?.find(row => row.label === label);
 
   const lines = ['Erev Rosh Hashana'];
 
-  const slichos = parseTimes(RH_TEXT.slichos.times);
+  const slichos = erevLine(RH_TEXT.slichos.label)?.times || [];
   if (slichos.length) lines.push(`Selichos ${ytList(slichos)}`);
 
-  if (poster?.chatzos) lines.push(`Chatzos ${poster.chatzos}`);
+  const chatzos = erevLine(RH_TEXT.chatzos)?.times?.[0]?.text;
+  if (chatzos) lines.push(`Chatzos ${chatzos}`);
 
-  const mincha = parseTimes(RH_TEXT.erevMincha.times);
+  const mincha = erevLine(RH_TEXT.erevMincha.label)?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   /* Off the sheet's own ערב heading, which is the day the עירוב is made on. It used to ask the
@@ -213,14 +225,15 @@ const YT_SIGN_OFF_YK =
  *
  *  @param poster - straight from buildYomKippurPoster. */
 export function erevYomKippurText(poster) {
+  if (!poster) return '';
   const timeFor = (calc) => poster?.dayLines?.find((l) => l.calc === calc)?.times?.[0];
 
   const lines = ['Erev Yom Kippur'];
 
-  const selichos = parseTimes(YK_TEXT.erevShacharis.times);
+  const selichos = poster.erevLines?.find(row => row.calc === 'erevShacharis')?.times || [];
   if (selichos.length) lines.push(`Selichos ${ytList(selichos)}`);
 
-  const mincha = parseTimes(YK_TEXT.erevMincha.times);
+  const mincha = poster.erevLines?.find(row => row.calc === 'erevMincha')?.times || [];
   if (mincha.length) lines.push(`Mincha ${ytList(mincha)}`);
 
   const candles = timeFor('candles');
@@ -232,6 +245,7 @@ export function erevYomKippurText(poster) {
   const drasha = timeFor('nightDrasha');
   if (drasha) lines.push(`Ravs Drasha ${drasha.text}`);
 
+  lines.push(...ytYizkorLines(poster?.dayLines, 'Yom Kippur'));
   lines.push(YT_SIGN_OFF_YK);
   return lines.join('\n');
 }
@@ -361,9 +375,8 @@ export function erevSukkosText(poster) {
  *    Hadlakas Neiros 6:02
  *    Mincha 6:05m
  *
- *  **No sign-off, and that is what the sent message does.** Every other one of these ends on a
- *  fixed line and this one simply stops after the מנחה. Written the way it was sent rather than
- *  given a "Chag Kosher V'Sameiach" of its own to match its neighbours.
+ *  No fixed sign-off. The Yizkor announcement follows the evening Mincha and
+ *  reads its approximate times and room marks from this same day's sheet rows.
  *
  *  Off the שמיני עצרת block rather than the first block on the sheet: this evening is הושענא
  *  רבה's, five blocks in, and every block before it carries the same three calcs.
@@ -398,7 +411,72 @@ export function erevShminiAtzeresText(poster) {
   const nightMincha = timeOf('candlesMincha');
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
+  lines.push(...ytYizkorLines(block.lines, 'Shemini Atzeres'));
   return lines.join('\n');
+}
+
+
+/** The fixed note after the חול המועד שחרית line, as the shul writes it. Not a time and not
+ *  on either sheet - a room, the same kind of fixed wording the sign-off lines above are - so
+ *  it is a constant here rather than something asked of the board. If the shul moves where
+ *  תפילין are put on, this is the one line to change. */
+const CHM_TEFILLIN_NOTE = ' (TEFILLIN in Simcha Hall)';
+
+/** The חול המועד message, off either the סוכות or the פסח sheet.
+ *
+ *  The two sheets build the same three calcs for their own middle days - chmShacharis,
+ *  chmMincha, chmMaariv - off the same shape (see sukkosChmMincha/sukkosChmMaariv in
+ *  posters/sukkos.js and their פסח namesakes), so one reader serves both rather than one
+ *  copy of this per sheet.
+ *
+ *  What the shul sends:
+ *
+ *    Chol Hamoed
+ *    Shacharis 7:00d, 8:00m, 8:40d (TEFILLIN in Simcha Hall)
+ *    Mincha 1:35d, 1:50m, 4:15d, 6:00d, 6:35d, 6:55d, 7:10d
+ *    Mariv 8:15d, 8:45m, 9:30d, 10:00d, 10:30m, 11:00d, 11:30d, 12:00d
+ *
+ *  שחרית is fixed (SK_TEXT.chmShacharis / PS_TEXT.chmShacharis, the same three times every
+ *  year), while מנחה and מעריב move with the week's own שקיעה - reading them off the block
+ *  rather than typing the fixed line and computing the other two separately keeps all three
+ *  honestly off the one sheet the board itself prints them from.
+ *
+ *  @param poster - buildSukkosPoster or buildPesachPoster.
+ *  @param headingText - SK_TEXT.cholHamoed or PS_TEXT.cholHamoed, so the right block is found
+ *    on a sheet that carries more than one heading. */
+export function cholHamoedText(poster, headingText) {
+  const block = ytBlock(poster, headingText);
+  if (!block) return '';
+  const shacharis = ytLine(block, 'chmShacharis')?.times;
+  const mincha = ytLine(block, 'chmMincha')?.times;
+  const maariv = ytLine(block, 'chmMaariv')?.times;
+  if (!shacharis?.length && !mincha?.length && !maariv?.length) return '';
+
+  const lines = ['Chol Hamoed'];
+  if (shacharis?.length) lines.push(`Shacharis ${ytList(shacharis)}${CHM_TEFILLIN_NOTE}`);
+  if (mincha?.length) lines.push(`Mincha ${ytList(mincha)}`);
+  if (maariv?.length) lines.push(`Mariv ${ytList(maariv)}`);
+  return lines.join('\n');
+}
+
+/** The night and morning of Hoshana Rabba, from its own block on the Sukkos sheet.
+ *  NETZ is the sheet's formatted sunrise, not another minyan or a new calculation. */
+export function hoshanaRabbaText(poster) {
+  const block = ytBlock(poster, SK_TEXT.hoshana);
+  if (!block) return '';
+  const lines = ['Hoshana Rabba'];
+  const mishna = ytLine(block, 'mishna')?.times?.[0];
+  if (mishna?.text) {
+    const rooms = { en: 'Ezras Nashim', sh: 'Simcha Hall', m: 'main Bais Medrash', d: 'downstairs Bais Medrash' };
+    const maariv = ytLine(block, 'mishnaMaariv') ? ', followed by Maariv' : '';
+    lines.push(`MISHNA TORAH in the ${rooms[ytWhere(mishna)]} at ${mishna.text} PM${maariv}`);
+  }
+  const morning = ytLine(block, 'hoshanaShacharis');
+  const times = (morning?.times || []).filter((time) => time?.text)
+    .map((time) => time.text + ytWhere(time));
+  if (times.length && morning?.netz) times[0] += ` [NETZ ${morning.netz}]`;
+  if (times.length) lines.push(`Shacharis: ${times.join(', ')}`);
+  return lines.length > 1 ? lines.join('\n') : '';
 }
 
 
@@ -490,6 +568,7 @@ export function erevShviiShelPesachText(poster) {
   const nightMincha = timeOf('candlesMincha');
   if (nightMincha) lines.push(`Mincha ${nightMincha.text}${ytWhere(nightMincha)}`);
 
+  lines.push(...ytYizkorLines(ytBlock(poster, PS_TEXT.achron)?.lines, 'Acharon Shel Pesach'));
   lines.push(YT_SIGN_OFF_YOMTOV);
   return lines.join('\n');
 }

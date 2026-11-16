@@ -8,6 +8,7 @@ Object.assign(connecting.style,{position:'absolute',inset:'40% 0 auto',textAlign
 const OFFLINE_GRACE=5*60*1000;
 let seed=null,data=null,offset=0,lastSyncAt=0,inflight=false,recomputeAt=0,seedKey='';
 const now=()=>Date.now()+offset;
+const contentKey=seed=>JSON.stringify([seed.engine,seed.publishedSchedule,seed.appearance,seed.items]);
 function draw(){
   connecting.hidden=!!(seed||data);
   if(seed){
@@ -37,7 +38,8 @@ async function refresh(){
       lastSyncAt=Date.now();offset=Date.parse(incoming.generatedAt)-lastSyncAt;
       // Server timestamps change on every poll; unchanged public content must not
       // force a DOM rebuild or reset the fitted original page.
-      const key=JSON.stringify([incoming.engine,incoming.appearance,incoming.items]);
+      incoming.publishedSchedule??=seed?.publishedSchedule;
+      const key=contentKey(incoming);
       seed=incoming;
       if(key!==seedKey){seedKey=key;recomputeAt=0;}
       await saveOfflineCache({seed,offset,lastSyncAt}).catch(()=>{});
@@ -48,7 +50,7 @@ async function refresh(){
 async function start(){
   try{
     const cached=await readOfflineCache();
-    if(validSeed(cached?.seed)){seed=cached.seed;offset=Number(cached.offset)||0;lastSyncAt=Number(cached.lastSyncAt)||0;seedKey=JSON.stringify([seed.engine,seed.appearance,seed.items]);draw();}
+    if(validSeed(cached?.seed)){seed=cached.seed;offset=Number(cached.offset)||0;lastSyncAt=Number(cached.lastSyncAt)||0;seedKey=contentKey(seed);draw();}
   }catch{/* Browsers with storage disabled still support the live display. */}
   if('serviceWorker' in navigator){
     // New Workers wait for a normal close/reopen. Never reload a live screen.

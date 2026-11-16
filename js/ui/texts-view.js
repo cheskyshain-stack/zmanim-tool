@@ -8,9 +8,8 @@
 //
 // This is a page rather than a button on each sheet, and that is the point of it: the person
 // who sends the messages is not the person who prints the boards, and the address can be handed
-// to them on its own. It carries no way back into the admin or out to the congregation's site
-// deliberately, so nothing on it invites somebody who was given one link to wander into the
-// rest of the program.
+// to them on its own. Its only return link opens the separately authenticated calendar editor.
+// It does not expose the main admin or grant a calendar role.
 //
 // It asks for no PIN. The admin does, because somebody wandering in there can change the boards;
 // nothing here changes anything, and what it prints is about to be sent to the whole congregation
@@ -19,27 +18,32 @@
 
 import { weekIndex, rowFor } from '../sheets/rows.js';
 import { computeSeasonWeeks, computeWeekdayWeeks } from '../sheets/weeks.js';
-import { hebrewDateExtended, hasParsha, hasYomTov } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasParsha, hasYomTov, chanukahYearFor } from '../hebrew-calendar.js';
 import { currentSerial } from './nav-helpers.js';
 import { switchHtml, wireSwitch } from './switch.js';
 import { wireCopyButton } from './copy.js';
+import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
 import { erevShabbosText, erevParshaEnglish } from '../erev-text.js';
 import { weekText, weekName, afterYomKippurDayInWeek, WK_TEXT } from '../week-text.js';
 import { shulNow } from '../zmanim/solar.js';
-import { tzomGedaliaText, chartFastText, fastsBetween } from '../taanis-text.js';
+import { tzomGedaliaText, asaraBTevesText, shivaAsarTammuzText, chartFastText, fastsBetween } from '../taanis-text.js';
+import { buildShivaAsarTammuzPoster } from '../posters/shiva-asar-tammuz.js';
+import { behabMessagesBetween } from '../behab-text.js';
+import { buildRoshChodeshShacharisPoster } from '../posters/shacharis.js';
 import { buildTzomGedaliaPoster } from '../posters/tzomgedalia.js';
-import { buildWeekdayRow } from '../sheets/weekday.js';
+import { buildAsaraBTevesPoster } from '../posters/asarabteves.js';
+import { buildWeekdayRow, chanukahDaysInWeek } from '../sheets/weekday.js';
 import { weekdayChartFor } from '../sheets/rows.js';
 import { mergeRow } from '../overrides.js';
-import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText } from '../erev-yomtov-text.js';
+import { erevRoshHashanaText, erevYomKippurText, erevSukkosText, erevShminiAtzeresText, erevPesachText, erevShviiShelPesachText, netzMinyanText, cholHamoedText, hoshanaRabbaText } from '../erev-yomtov-text.js';
 import { buildRoshHashanaPoster } from '../posters/roshhashana.js';
 import { buildVasikinPoster } from '../posters/vasikin.js';
 import { buildYomKippurPoster } from '../posters/yomkippur.js';
-import { buildPesachPoster } from '../posters/pesach.js';
-import { buildSukkosPoster } from '../posters/sukkos.js';
+import { buildPesachPoster, pesachChmDays, PS_TEXT } from '../posters/pesach.js';
+import { buildSukkosPoster, sukkosChmDays, SK_TEXT } from '../posters/sukkos.js';
 import { nextRoshChodesh, roshChodeshText, roshChodeshMonthName } from '../rosh-chodesh-text.js';
-import { hebrewYear, dateFromHebrew } from '../hebrew-calendar.js';
+import { hebrewYear, dateFromHebrew, roshHashana } from '../hebrew-calendar.js';
 import { WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL } from '../settings.js';
 
 const txEsc = (s) => String(s ?? '').replace(/[&<>"]/g, (c) => (
@@ -61,7 +65,7 @@ function txErevShabbos(state, settings, tables, today) {
      simply does not appear until it is four days off. */
   if (found.week.serial - today > TX_AHEAD_DAYS) return null;
   const { columns, row } = rowFor(found.week, found.sheet, state, settings);
-  const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+  const english = txErevParshaName(found.week, settings, tables);
   return {
     id: 'erev-shabbos',
     kind: 'parsha',
@@ -173,6 +177,12 @@ function txWeekName(week, settings, tables) {
   return weekName(yomTov || week.parsha, false);
 }
 
+/** Both message views name Chanuka from Shabbos itself, even before its first night. */
+function txErevParshaName(week, settings, tables) {
+  const name = erevParshaEnglish(week.parsha, tables?.parshaNames);
+  return name && chanukahYearFor(week.serial, settings) ? `${name} - Chanuka` : name;
+}
+
 /** Which of the two morning-after-יום כיפור lines the Week message carries right now, or ''
  *  the rest of the time: nothing before שקיעה the night יום כיפור ends, "TOMORROW..." from
  *  there through 3am, "TODAY..." from 3am through the last שחרית of that morning, then nothing
@@ -209,8 +219,10 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  Friday in front of it, which is exactly the week this message is about. Its מנחה and מעריב are
  *  built the way the chart builds them and then have any saved sheet's overrides laid over, so a
  *  cell somebody corrected by hand reaches the message. The morning is not part of that row: it
- *  is the Settings schedule the chart prints as one merged cell, or the סליחות season's own lists
- *  where the week is in one (see wkMornings in week-text.js).
+ *  is the Settings schedule the chart prints as one merged cell, the סליחות season's own lists
+ *  where the week is in one, or חנוכה's posted mornings, grouped by their actual weekdays
+ *  through Friday (see wkMornings in week-text.js). A full Chanukah
+ *  week keeps its parsha name and adds Chanuka to the message heading.
  *
  *  Sent on the Sunday, which is six days before the Shabbos. See TX_WEEK_FROM for how long it
  *  stands.
@@ -218,7 +230,14 @@ function afterYomKippurLine(shabbos, settings, now) {
  *  @param entry - a week and its season, from txWeekdayWeeks. */
 function txWeek(state, settings, tables, entry, now) {
   const shabbos = entry.week.serial;
-  const name = txWeekName(entry.week, settings, tables);
+  /* A full Chanuka week keeps its parsha name: "Week of P' Miketz - Chanuka".
+     The same five-day test decides whether the Weekday chart adds "· חנוכה" to its row.
+     Partial weeks keep their plain parsha label. weekText names the ordinary, Chanukah
+     and Rosh Chodesh mornings separately, using the chart panel's shared posted schedule. */
+  const chanukahDays = chanukahDaysInWeek(shabbos, settings);
+  const isChanukahWeek = chanukahDays.length === 5;
+  const name = txWeekName(entry.week, settings, tables) + (isChanukahWeek ? ' - Chanuka' : '');
+  const shacharisCell = WEEKDAY_SHACHARIS;
   const built = buildWeekdayRow(entry.week, settings);
   /* Overrides only where a saved Weekday chart actually covers this week. mergeRow wants a real
      sheet to read them off and throws on null, and most weeks here have no saved chart at all:
@@ -227,7 +246,7 @@ function txWeek(state, settings, tables, entry, now) {
      weeks no Shabbos sheet has. */
   const chart = weekdayChartFor(null, shabbos, state);
   const { row } = chart ? mergeRow(built, chart, shabbos) : { row: built };
-  const text = weekText(WEEKDAY_SHACHARIS, row, name, shabbos, settings, afterYomKippurLine(shabbos, settings, now));
+  const text = weekText(shacharisCell, row, name, shabbos, settings, afterYomKippurLine(shabbos, settings, now));
   if (!text) return null;
   return {
     id: `week-${shabbos}`,
@@ -374,6 +393,48 @@ function txErevShminiAtzeres(year, settings, today) {
   };
 }
 
+/** Hoshana Rabba starts the previous evening and remains through its own morning/day. */
+function txHoshanaRabba(year, settings, today) {
+  const day = dateFromHebrew(21, 7, year);
+  if (!txDaysInWindow(day - 1, day, today)) return null;
+  const text = hoshanaRabbaText(buildSukkosPoster(year, settings));
+  if (!text) return null;
+  return {
+    id: `hoshana-rabba-${year}`,
+    kind: 'yomtov',
+    serial: day - 1,
+    name: 'Hoshana Rabba',
+    when: hebrewYear(year),
+    text,
+  };
+}
+
+/** The חול המועד סוכות message.
+ *
+ *  Windowed on the everyday חול המועד days themselves (sukkosChmDays - the same days the
+ *  message's own מנחה and מעריב are computed from), not on the sheet's span, for the same
+ *  reason ערב סוכות is windowed on ערב rather than the sheet: a card that is still up before
+ *  Yom Tov even begins, or after the last day is back to ordinary weekdays, is not what
+ *  TX_AHEAD_DAYS is for. */
+function txCholHamoedSukkos(year, settings, today) {
+  const poster = buildSukkosPoster(year, settings);
+  if (!poster) return null;
+  const days = sukkosChmDays(roshHashana(year - 3761));
+  if (!days.length) return null;
+  const from = Math.min(...days), to = Math.max(...days);
+  if (!txDaysInWindow(from, to, today)) return null;
+  const text = cholHamoedText(poster, SK_TEXT.cholHamoed);
+  if (!text) return null;
+  return {
+    id: `chm-sukkos-${year}`,
+    kind: 'yomtov',
+    serial: from,
+    name: 'Chol Hamoed',
+    when: hebrewYear(year),
+    text,
+  };
+}
+
 /** The ערב פסח message.
  *
  *  Its own Hebrew year rather than ראש השנה's: פסח is in ניסן, half a year along, so the year
@@ -425,6 +486,35 @@ function txErevShviiShelPesach(rhYear, settings, today) {
   return null;
 }
 
+/** The חול המועד פסח message.
+ *
+ *  Same shape as the סוכות one: windowed on the everyday חול המועד days themselves
+ *  (pesachChmDays), not the sheet's span, and asked of both candidate years for the same
+ *  reason ערב פסח and ערב שביעי ask both - פסח's own Hebrew year runs half a year behind
+ *  ראש השנה's. `dateFromHebrew(1, 1, y)` is 1 ניסן, the same rh pesachChmDays wants
+ *  internally (buildPesachPoster works it out as pesach - 14, which is the same day). */
+function txCholHamoedPesach(rhYear, settings, today) {
+  for (const y of [rhYear - 1, rhYear]) {
+    const poster = buildPesachPoster(y, settings);
+    if (!poster) continue;
+    const days = pesachChmDays(dateFromHebrew(1, 1, y));
+    if (!days.length) continue;
+    const from = Math.min(...days), to = Math.max(...days);
+    if (!txDaysInWindow(from, to, today)) continue;
+    const text = cholHamoedText(poster, PS_TEXT.cholHamoed);
+    if (!text) continue;
+    return {
+      id: `chm-pesach-${y}`,
+      kind: 'yomtov',
+      serial: from,
+      name: 'Chol Hamoed',
+      when: hebrewYear(y),
+      text,
+    };
+  }
+  return null;
+}
+
 /** The ראש חודש messages.
  *
  *  A list rather than one, because the year view wants every ראש חודש the year holds and the four
@@ -439,23 +529,22 @@ function txErevShviiShelPesach(rhYear, settings, today) {
 function txRoshChodesh(settings, today, howMany = 1) {
   const out = [];
   let from = today;
-  /* The chart's own ר"ח schedule, read from where the chart reads it: the program's copy of the
-     second schedule, which is the same source upcoming.js and the wall chart use for the same
-     list. See WEEKDAY_SHACHARIS_SPECIAL in settings.js. */
-  const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
+  /* Read the handout's weekday dates and rows, including Chanukah's own Teves morning.
+     A month whose entire Rosh Chodesh falls on Shabbos has no weekday handout or message. */
   for (let i = 0; i < howMany; i += 1) {
     const rc = nextRoshChodesh(from, settings.useGregorianBefore1582);
     if (!rc) break;
     from = rc.last + 1;
-    if (!txDaysInWindow(rc.first, rc.last, today)) continue;
-    const text = roshChodeshText(rc, shacharisCell);
+    const poster = buildRoshChodeshShacharisPoster(rc.year, rc.month, settings);
+    if (!poster || !txDaysInWindow(poster.span.from, poster.span.to, today)) continue;
+    const text = roshChodeshText(rc, poster.rows);
     if (!text) continue;
     out.push({
       id: `rosh-chodesh-${rc.year}-${rc.month}`,
       kind: 'roshchodesh',
       // The first day, which is the day it is about. The shul sends it the night before or that
       // morning, and the four day window covers both.
-      serial: rc.first,
+      serial: poster.span.from,
       name: `Rosh Chodesh ${roshChodeshMonthName(rc.month)}`,
       when: hebrewYear(rc.year),
       text,
@@ -469,7 +558,7 @@ function txRoshChodesh(settings, today, howMany = 1) {
  *  Their own kind, `taanis`, rather than folded in with the yom tov ones. A fast is not a yom tov,
  *  and the switch that turns the ערב messages off should not take it with them.
  *
- *  צום גדליה comes off the sheet the shul hangs for that day, whole. The other three come off the
+ *  צום גדליה, עשרה בטבת and שבעה עשר בתמוז come off their own sheets. The other fasts come off the
  *  chart: the ר"ח / בה"ב / תענית schedule is the morning those days daven, and their מנחה and
  *  מעריב are on no board, so those two lines are left out (see taanis-text.js). The page carried
  *  צום גדליה alone at first and the shul asked for the rest: a switch called Taanis over one
@@ -500,7 +589,11 @@ function txTaanis(year, settings, today, days) {
   const shacharisCell = WEEKDAY_SHACHARIS_SPECIAL;
   for (const fast of fastsBetween(today, today + days, settings)) {
     if (!txDaysInWindow(fast.serial, fast.serial, today)) continue;
-    const text = chartFastText(fast.title, shacharisCell);
+    const asara = fast.title === "Asara B'Teves"
+      ? buildAsaraBTevesPoster(hebrewDateExtended(fast.serial, settings.useGregorianBefore1582).year, settings) : null;
+    const tammuz = fast.title === "Shiva Asar B'Tammuz"
+      ? buildShivaAsarTammuzPoster(hebrewDateExtended(fast.serial, settings.useGregorianBefore1582).year, settings) : null;
+    const text = asara ? asaraBTevesText(asara) : tammuz ? shivaAsarTammuzText(tammuz) : chartFastText(fast.title, shacharisCell);
     if (!text) continue;
     out.push({
       id: `taanis-${fast.serial}`,
@@ -605,7 +698,7 @@ function txCard(msg) {
  *
  *  Only the year view has them. The four day window is a handful of cards and filtering that
  *  would be two buttons over almost nothing. */
-const txKinds = { parsha: true, week: true, yomtov: true, taanis: true, roshchodesh: true };
+const txKinds = { parsha: true, week: true, yomtov: true, taanis: true, roshchodesh: true, behab: true };
 
 /** The weekly message is its own switch rather than part of Parsha, asked for: it is the week's
  *  own schedule and the Erev Shabbos one is Friday's, they are checked for different things, and
@@ -616,13 +709,19 @@ const TX_KIND_NAMES = {
   yomtov: 'Yom Tov',
   taanis: 'Taanis',
   roshchodesh: 'Rosh Chodesh',
+  behab: 'Behab',
 };
 
 /** The screen. */
 export function renderTexts(container, state, settings, tables) {
+  return keepPosition(container, () => drawTexts(container, state, settings, tables));
+}
+
+function drawTexts(container, state, settings, tables) {
+  const helpOpen = container.querySelector('[data-tx-help]')?.open === true;
   const messages = [];
   const now = new Date();
-  const today = Math.floor((now.getTime() - Date.UTC(1899, 11, 30)) / 86400000);
+  const today = shulNow(now, settings).serial;
 
   const year = txTishreiYear(today);
 
@@ -635,8 +734,11 @@ export function renderTexts(container, state, settings, tables) {
       txErevRoshHashana(year, settings, today),
       txErevYomKippur(year, settings, today),
       txErevSukkos(year, settings, today),
+      txCholHamoedSukkos(year, settings, today),
+      txHoshanaRabba(year, settings, today),
       txErevShminiAtzeres(year, settings, today),
       txErevPesach(year, settings, today),
+      txCholHamoedPesach(year, settings, today),
       txErevShviiShelPesach(year, settings, today),
       ...txTaanis(year, settings, today, txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS + 1),
       ...txNetz(year, settings, today),
@@ -675,7 +777,7 @@ export function renderTexts(container, state, settings, tables) {
       const found = txAgainst(state, weeks, serial);
       if (!found) continue;
       const { columns, row } = rowFor(found.week, found.sheet, state, settings);
-      const english = erevParshaEnglish(found.week.parsha, tables?.parshaNames);
+      const english = txErevParshaName(found.week, settings, tables);
       messages.push({
         id: `erev-shabbos-${serial}`,
         kind: 'parsha',
@@ -697,6 +799,11 @@ export function renderTexts(container, state, settings, tables) {
     messages.push(...yomTov());
     messages.push(...txRoshChodesh(settings, today, 1));
   }
+
+  messages.push(...behabMessagesBetween(today, today + (txAll ? TX_ALL_DAYS : TX_AHEAD_DAYS), settings, tables).map(message => ({
+    id: `behab-${message.day}`, kind: 'behab', serial: message.day - 1,
+    name: 'Behab', when: `${message.round} · ${hebrewYear(message.year)}`, text: message.text,
+  })));
 
   /* Everything in date order, which is the order they get sent in and the only order somebody
      looking for "what comes after סוכות" can read. It used to be the yom tov ones and then the
@@ -721,16 +828,14 @@ export function renderTexts(container, state, settings, tables) {
   container.innerHTML = `
     <div class="tx-page">
       <h1 class="tx-title" title="Triple click to show the whole year">Messages</h1>
+      <p class="tx-lead">Schedule messages to share with the community.</p>
       ${txAll ? `<p class="tx-all">Showing everything for the year ahead, in date order. Triple
         click the heading again for the next ${TX_AHEAD_DAYS} days only.</p>
         <div class="tx-switches">
           <p class="tx-switches-head">Include in messages</p>
           <div class="week-switches tx-kinds">${kinds}</div>
         </div>` : ''}
-      <p class="tx-hint">Every time here is read off the shul's own boards and sheets, so this
-      and the paper cannot disagree. Type into a message to add a line, then press Copy. Edits
-      are for this visit only: reload and the times come back fresh, which is the way round that
-      cannot leave an old time in a new message.</p>
+      <details class="tx-help" data-tx-help ${helpOpen ? 'open' : ''}><summary>How to edit and copy</summary><p class="tx-hint">Times come from the shul's schedules. Edit a message, then press Copy. Your changes apply to this visit; refreshing restores the latest schedule.</p></details>
 
       ${shown.map(txCard).join('')}
       ${shown.length ? '' : `<div class="panel"><p>${txAll

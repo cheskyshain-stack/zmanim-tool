@@ -225,7 +225,7 @@ export function afterEarlyMaariv(earliestShkia) {
 
 /** The rest of the מעריב list, which does not move. 8:30 is added to the everyday run, and
  *  the marks follow the boards: everything is למטה except 8:45 and 10:30, which are the main
- *  בית מדרש (see calculations-view for where that comes from). */
+ *  בית מדרש. */
 const AFTER_MAARIV_REST = [
   [20, 0, true], [20, 30, true], [20, 45, false], [21, 0, true], [21, 30, true],
   [22, 0, true], [22, 30, false], [23, 0, true], [23, 30, true],

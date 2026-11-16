@@ -1,3 +1,5 @@
+import { clearCombinedChartPrint } from './combined-chart-print.js';
+
 // Printing.
 //
 // One button a screen, which opens the browser's own print dialog and lets the person
@@ -47,6 +49,7 @@ export function wirePrintButton(root, id = 'print-btn') {
    with no JavaScript gets, and it is the charts' orientation because the charts are the
    thing this site is for. */
 export function setPrintPage(size) {
+  clearCombinedChartPrint();
   let el = document.getElementById('print-page-size');
   if (!el) {
     el = document.createElement('style');

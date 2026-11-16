@@ -1,0 +1,70 @@
+Publish the prepared Seats header/footer update
+
+The user authorized this feature and publishing it. The implementation is in:
+https://github.com/cheskyshain-stack/zmanim-tool/pull/302
+Branch: feat/seats-header-footer
+
+It adds editable Header text and Footer text below the Seats print settings.
+Starting text:
+Header: First Draft
+Footer: Anyone who would like a seat should speak to the Gabbaim.
+
+Text follows each chart through sharing, copies, backups and restoration. Blank
+fields hide the note. Native and CMYK chart printing share the note layout.
+Existing chart names, assignments and room geometry are preserved.
+
+The cloud Codex cannot deploy the shared service: GitHub Actions run 41856884209
+stopped because CLOUDFLARE_API_TOKEN is missing. Local Wrangler is not signed in.
+Use the desktop's existing authenticated Cloudflare account, or configure that
+GitHub Actions secret and rerun the service-only workflow on this branch. Never
+paste a token into a chat, source file, command argument or deployment output.
+
+1. Fetch the branch in the existing zmanim-tool repository. Preserve any desktop
+   edits by using a separate worktree. Do not reset or overwrite other work.
+
+   git fetch origin
+   SEATS_NOTES_WORKTREE="$(mktemp -d /tmp/seats-header-footer.XXXXXX)"
+   git worktree add "$SEATS_NOTES_WORKTREE" origin/feat/seats-header-footer
+   cd "$SEATS_NOTES_WORKTREE"
+
+2. Deploy the shared service BEFORE merging or publishing the new website.
+   Use the existing production Worker and Durable Object in this config:
+
+   npx wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+
+   The account is 04b085d9f19ac1ba6d333e0006fc94c1 and the Worker is zmanim-seats.
+   Keep its existing storage and v1 migration. Do not create a temporary Worker,
+   delete storage, replace chart records, or test by editing a real chart.
+
+3. Verify the new authenticated capability without exposing a session token:
+
+   node --input-type=module <<'JS'
+   import assert from 'node:assert/strict';
+   const api='https://zmanim-seats.cheskyshain.workers.dev';
+   const headers={Origin:'https://baismedrashoflakewoodcommons.org','Content-Type':'application/json'};
+   const response=await fetch(api+'/api/session',{method:'POST',headers,body:JSON.stringify({pin:'4444',name:'Header footer deployment check'})});
+   assert.equal(response.status,200);
+   const session=await response.json();
+   const info=await fetch(api+'/api/info',{headers:{...headers,Authorization:'Bearer '+session.token}});
+   assert.equal(info.status,200);
+   const features=await info.json();
+   assert.equal(features.printNotes,true);
+   assert.equal(features.trash60Days,true);
+   console.log('Shared chart notes are supported; existing recovery remains enabled.');
+   JS
+
+4. Read PR 302's final validation results. All relevant unit, browser and PDF
+   checks must pass. Merge the prepared PR, preserving any newer main changes.
+   Watch the GitHub Pages workflow for the merge commit until it succeeds.
+
+5. Verify the live Seats build at:
+   https://baismedrashoflakewoodcommons.org/seats/
+
+   Use a fresh browser context and a synthetic local chart, keeping production
+   chart mutations blocked. Check the Header & footer fields, the default words,
+   editing and clearing them, and a generated CMYK PDF. Do not alter real names,
+   assignments, saved-chart dates or organizer attribution for verification.
+
+6. Tell the user it is live only after service and Pages verification succeed.
+   Explain that Header & footer is below the print settings. They can edit the
+   starting wording manually, or clear either field to hide it.

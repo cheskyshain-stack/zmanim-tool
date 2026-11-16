@@ -1,0 +1,166 @@
+# Shared seating plans
+
+The existing Seats page stays on GitHub Pages. This separate Cloudflare Worker
+stores shared plans in a SQLite Durable Object and broadcasts changes through
+WebSockets. It does not use or change the statistics Worker's archive or secret.
+
+Each organizer enters a name and the shared Seats PIN. PIN checks happen
+on the server before any plan can be read or changed. New sessions expire at the
+first 3 a.m. in New York after at least seven full days, regardless of activity.
+The browser remembers the session across visits. Tokens are sent in an authorization
+header or the first WebSocket message, never a URL. Failed PIN attempts are limited per IP address.
+Only the congregation site's origin is allowed. Request logging is disabled.
+
+Local plans and backups stay available. Sharing is opt-in: choose Save to site,
+then Save this plan to the site. The second organizer chooses Shared plans and
+opens that same plan. Each subsequent committed edit saves automatically. The
+active seat is reserved and highlighted anonymously for other editors. There is
+no viewer list or live organizer name. Only open seat editors send reservations;
+browsing a chart leaves its presence unset. The input waits for the service's
+reservation confirmation, and a busy seat cannot be typed into or saved. Draft
+typing remains local until saved with Enter, Tab, Save, or selecting another seat.
+Each selection expires after 30 minutes, even if the browser stays connected.
+Heartbeats, repeated presence messages and reconnection do not extend the page's
+selection deadline. The editor closes and releases the seat without saving or
+clearing its name. Unfinished text stays on that page and returns when the same
+seat is selected again, with the usual conflict check if its saved name changed.
+The service also expires reservations independently, including those from older
+clients. An expired selection must be cleared or changed before that connection
+can reserve the same seat again. Existing reservations without a deadline expire
+when the updated service next handles a message. No chart records are migrated.
+GET /api/info reports seatReservationMinutes: 30 after this service update.
+
+Updates contain individual field and seat changes with their original values.
+Changes to different seats merge; a conflicting change is rejected as a unit.
+An unsynced version is kept as a separate local copy and a recovery record.
+Undo/Redo affect the originating organizer's edits and refuse to erase a newer
+change from the other organizer. Offline changes queue locally and rebase when
+the connection returns. A local pending copy must sync before it is discarded.
+
+The shared connection is separate from downloaded backups. Restoring a backup
+creates independent local plans and cannot overwrite an online plan.
+
+## Yahrzeit Calendar
+
+The private page at /yahrzeits/ has its own sign-in and uses the same private
+organizer PIN as Seats. Records are stored under their own prefix in the
+existing Seats Durable Object and require a Yahrzeit Calendar session.
+Each member can have one Father and one Mother
+entry and additional custom relationships. The Hebrew dates repeat automatically;
+the entry records the family's preference when there are two Adars or a missing
+30 Cheshvan or Kislev.
+
+The new routes require the same origin as Seats and a bearer session issued by
+POST /api/session with scope yahrzeits. The member list is at GET /api/yahrzeits.
+POST and DELETE at /api/yahrzeits/:id take the record
+revision so a change from a second organizer cannot silently overwrite an edit.
+A member can have no dates. POST /api/yahrzeits/import imports named members in
+one transaction. It adds missing addresses and dates to matching names and leaves saved details
+intact. Newly added members and yahrzeits get the signed-in organizer name and server time.
+Editing keeps those details, and records saved before tracking have no attribution.
+Set the Cloudflare Worker secret SEATS_PRIVATE_PIN to a new private 6–8 digit
+Seats PIN before publishing /yahrzeits/. The old PIN was documented publicly,
+so the Worker never grants it yahrzeit access. Enter the private PIN separately
+on each page. Ordinary Seats sign-in and existing sessions still open seating
+charts. Never commit the private PIN.
+Deploy the Seats service before publishing /yahrzeits/. Authenticated GET /api/info
+reports yahrzeits: true when the private PIN is set. Keep the existing account,
+Worker name, and binding.
+
+## Activate through GitHub
+
+The source ships with `data/seats-sync.json` disabled, so the current local tool
+keeps working until the online service has been deployed and verified.
+
+1. In the Cloudflare account already used for the site, create a Workers deployment
+   API token restricted to that account, with Workers Scripts Edit permission.
+2. In this GitHub repository, open Settings, Secrets and variables, Actions. Add
+   `CLOUDFLARE_API_TOKEN` as a repository secret. Never put its value in a commit,
+   a seating plan, an issue, a workflow input, or a chat message.
+3. Open Actions, Activate shared seating plans, Run workflow on main.
+
+That workflow deploys only the new `zmanim-seats` Worker, verifies authenticated
+storage, records the returned backend URL, and publishes the website. The API token
+is passed only through the deployment command's environment. No seating names are
+committed to GitHub or copied into the deployment output.
+
+The existing Cloudflare account ID is already in `wrangler.jsonc`. If deploying
+to another account, change that ID and verify its returned workers.dev address.
+The account must support SQLite Durable Objects and have a workers.dev subdomain.
+If Cloudflare reports account setup or a plan requirement, resolve that in the
+Cloudflare dashboard before rerunning activation.
+
+## Deploy from a computer instead
+
+With Cloudflare access configured in Wrangler:
+
+```sh
+npx wrangler@4.152.0 deploy --config worker/seats/wrangler.jsonc
+```
+
+Set `data/seats-sync.json` to `{"endpoint":"https://<returned-worker-address>"}`,
+then run the repository's normal build, checks and GitHub Pages publishing loop.
+Deploy and verify the Worker before enabling that endpoint on the website.
+
+## Verify locally
+
+```sh
+node --test tests/seats-sharing-model.mjs tests/seats-model.mjs tests/seats-records.mjs
+python build-offline.py
+node scripts/build-schedule-api.mjs
+SEATS_WRANGLER_BIN=/path/to/wrangler node tests/seats-sharing.cjs
+```
+
+The browser test uses fresh random ports, a local Workerd runtime, isolated
+temporary storage and three Chromium contexts. All test names are synthetic.
+It checks server PIN protection, private viewing, anonymous seat reservations,
+simultaneous same-seat clicks, independent assignments, draft text,
+Undo/Redo, offline reconnection, reload persistence, desktop and phone layouts.
+The existing Seats browser and actual PDF print checks must also pass.
+
+Chart dates and change history require the updated Worker. The activation workflow
+has a service_only input to deploy and verify the Worker from a prepared branch
+without publishing the website. Its normal run still connects and publishes the
+site after the service check. The service uses the existing Durable Object and
+keeps existing chart keys and revisions. Each accepted update writes the chart and
+an append-only history entry together. GET /api/plans/:id/history returns 50 entries
+at a time with a nextBefore cursor. Retries do not add duplicate history entries.
+Older records retain their last known editor and time; unknown creation dates and
+unrecorded earlier changes are not invented. GET /api/info reports support for dates
+and history after sign-in.
+
+The same PIN-protected service stores reusable name files at /api/name-lists.
+Uploads normalize and deduplicate up to 2,000 names, retain their file ID across
+retries, and record the uploading organizer and date. GET lists active files;
+GET /api/name-lists/:id reads a file; DELETE removes it from the shared folder.
+DELETE /api/plans/:id removes a shared chart. Deletion markers prevent old clients
+and retried uploads from recreating removed files. Watched clients keep the latest
+local chart copy when the shared file is deleted. All mutations require the server
+session and the existing allowed origin. API feature verification now includes
+sharedNameFiles and deleteFiles as well as changeHistory.
+
+Chart header and footer wording require printNotes in /api/info. The optional
+printHeader and printFooter fields accept 80 and 240 characters respectively,
+including empty strings to hide the note. They use the existing field-level
+conflict checks and remain separate from seat assignment history. Missing fields
+are retained as missing for older charts; the client supplies the starting text.
+
+Trash requires trash60Days in /api/info. GET /api/trash returns only metadata for
+deleted charts and name files within their 60-day recovery period. POST
+/api/plans/:id/restore and /api/name-lists/:id/restore take {deletedAt}, restore the
+same file ID and contents, retain creation dates, and record the restoring editor.
+The exact deletion timestamp makes retries idempotent without undoing a later
+deletion. Folder limits also apply to restoration. Old deletion markers with
+retained contents are recoverable until their original 60-day deadline.
+The daily Durable Object alarm removes expired chart/name payloads and chart
+history, but retains small deletion markers to block stale offline uploads.
+Restore enforces the deadline even before cleanup runs. Cleanup and restoration
+run under the same concurrency guard, so cleanup cannot erase a restored file.
+No new Durable Object binding, migration or storage namespace is needed.
+
+Editing name files also requires editNameFiles in /api/info. POST /api/name-lists/:id
+updates a file in place using its revision and a stable operationId. The server keeps
+creation metadata, records the latest editor and date, rejects stale revisions with
+409 and deduplicates retries after a lost response. Legacy files start at revision 1.
+Deleted files cannot be edited or recreated by an old retry. The editor keeps each
+unfinished draft under lakewood-commons-seats-name-draft-v1-<file ID> on the device.

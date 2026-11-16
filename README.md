@@ -4,7 +4,372 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 [Support the shul and donate](https://baismedrashoflakewoodcommons.org/donate/).
 
+## Calendar preview
+
+Open **Admin → Calendar** to test the monthly community calendar. It has English and
+Hebrew dates, parshas, Jewish holidays, previous/next month, Today and a month picker.
+Click a day for its events. Add kiddushim, weddings, bar mitzvahs, other simchas,
+schedules or announcements with distinct colours and labels. Events can include a
+time, location, details and multiple dates. They do not change the minyan schedule.
+
+The first preview stays off the congregation pages. Test events are saved only in
+this browser. **Calendar access** offers backup and restore. Example events are
+optional and never saved. The prepared separate-account service must be activated
+before calendar editors can sign in from another device. The main calendar admin
+controls all events and invitations; editors choose their own password and manage
+their own events. See [calendar service setup](worker/calendar/README.md).
+
+## CMYK print PDFs
+
+CMYK printing is available only in Seats. Other charts, weekly cards and special
+schedules use their normal **Print / Save as PDF** controls.
+
+In Seats, open **Print options** to choose paper, style and **CMYK / Standard (RGB)**.
+Fixed Letter, Legal and 11 × 17 choices create a PDF with selectable text and
+embedded fonts. CMYK uses a FOGRA39L Coated profile, with black-and-white output
+using only black ink. Auto fit opens the browser printer dialog and uses the
+paper selected there, including Legal.
+
+The same Print options panel contains editable **Header & footer** text. It starts
+with “First Draft” in the top right and “Anyone who would like a seat should speak
+to the Gabbaim.” beneath the room. Leave a field blank to hide it. Wording saves
+with the chart and follows copies and shared edits.
+
+Seats also has **Convert saved PDF** under Print options. This saved-file converter
+preserves page sizes and layout, uses generic CMYK at 1200 dpi, and flattens text.
+
+Both conversions run on your device. The direct Seats export uses a standard
+coated-paper profile, rather than a profile supplied for a particular printer.
+The saved-file converter uses no ICC profile. Neither claims PDF/X certification.
+The USB offline copy retains regular printing.
+
 ## Development
+
+The separate organizer tool at `/seats/` is linked from the admin home and sidebar.
+Sign in once with your name and the Seats PIN to open charts and shared name files.
+After three hours of inactivity the tool asks you to sign in again. Your PIN is never saved.
+The first visit opens the home page, which
+offers Create new chart and View saved charts. With 7:30 minyan as the only
+available room, these buttons skip location selection. Create opens the standard
+empty layout without a pop-up. Add names opens the name files chooser when needed;
+names can also be entered directly on seats. View saved charts opens all existing setups directly. Existing device
+drafts remain available. Refreshing Seats
+returns to the same screen and chart. Even an untouched draft resumes
+without becoming a saved file. A fresh tab starts at home. Direct links to a shared chart still open that chart.
+New charts use the current 36-table room, with nine tables in each column.
+A and D run from 1 to 9; B and C skip 7 and continue through 10. The added A7
+and D7 sit before the entrance walkway, with the existing front tables retained
+in front of them. A9 has three seats; A8, C1, C2, B6 and C6 have four. Other tables
+have five. The room has 172 usable seats including the Rav, with two chair
+positions blocked by pillars. Each new chart starts with no names or assignments.
+Seat numbers are hidden on the chart and printouts. **Open seats** adds **Open**
+to empty, available seats and is remembered for each chart on this device. The
+Rav label is fixed and cannot be assigned a different name from the editor.
+Existing saved charts retain their own geometry, names and assignments. The new
+default does not migrate or overwrite them. Both original and current untouched
+room drafts stay out of Saved charts. Printed charts carry a fixed 7:30 Minyan wordmark instead of the saved chart title. Width follows seat count, using
+five seats as the standard size. Table labels appear above the table surfaces.
+Tables use 48 units per seat, about 12% wider than the original 43. Names use
+Liberation Serif letter shapes with a very slight weight increase, on screen
+and in every print format. A shared font size fits most assigned seats, with only the longest names
+shrinking further. Names wrap between whole words; exceptionally long names
+still show the fit warning so their table can be enlarged before printing.
+Standard tables are 40 units high. The middle columns and rear rows keep 48-unit
+gaps; the outside front rows use closer spacing to fit the added tables before
+the entrances. Names, counts and custom sizes in saved charts are retained.
+The current blank geometry is defined in `js/seats/default-room.js`, without
+people, assignments or saved-chart metadata. The original 34-table factory is
+retained for recognizing older empty drafts and verifying existing-room compatibility.
+Added tables keep their positions. The main walkway between rows 6 and 7 stays clear.
+Set counts individually or by column, then add people manually or import the first
+worksheet of an Excel file, CSV, TSV, or a text file with one name per line.
+The importer finds name headers beneath up to 49 title/note rows, so directory
+files can include house numbers before First name and Last name. Numeric-only
+entries are skipped. The room is called 7:30 minyan. New chart titles use the
+current New York date and time, such as Seating plan - Oct 26, 2026 at 4:30 PM.
+Charts created in the same minute get a numbered suffix. Exact older room-only chart titles use
+their last-edit date, creation date or today's date when those dates are unknown.
+Custom titles remain unchanged. More > Use today’s date suggests a current date
+name, which can be edited for an occasion or other useful detail. Delete beside
+a name removes one person. Delete names opens checkboxes for selecting
+people, including those already seated. Select all shown follows the search;
+Delete all names clears the current plan's full list. Deletion clears the affected
+seats, preserves the room, and supports Undo and Redo.
+The Sort names selector orders the list by First name or Last name, ignoring common
+titles and suffixes. The choice is remembered on the device and also orders the
+downloaded seating list. Displayed names and seat assignments stay unchanged.
+More > Alphabetical seat list opens a live list with Name and Table columns.
+Each seated full name appears once. Repeated names at the same table share one
+row; names at different tables list those tables together in numeric order.
+Matching ignores letter case, repeated spaces and equivalent Unicode forms.
+Sort by first or last name, print the list, or download the same two-column CSV.
+The Rav's name is included, and unassigned people are left out. The separate
+detailed seat export and saved assignments retain every individual seat.
+Refresh keeps the list
+open, and Back to chart returns to the seating layout. Opening or sorting the list
+does not create or edit a saved chart.
+Click a seat and type a name, choose a suggested existing person, or copy and paste
+a name into a separate seat for a child. Copying creates a separate person record
+and keeps the original assignment. Choosing an already seated suggestion or list
+name adds a separate copy and keeps the original seat. Reopening and saving the
+same seat keeps its existing record. Each copy can be renamed independently.
+New and edited names automatically lose spaces before and after the name, reduce
+repeated spaces to one, and capitalize lowercase initials in each name part.
+For example, `  yosef   cohen  ` becomes `Yosef Cohen`. Mixed capitalization such
+as McDonald, existing uppercase initials, Hebrew text and lowercase surname
+particles such as van der are retained. The same formatting applies to manual
+lists, uploaded files and saved name-file edits. Opening an old chart does not
+silently change its people or assignments; formatting an entered name keeps its
+person ID and seat, and copies remain separate records.
+Enter saves; Tab saves and advances. Undo and Redo also support
+Ctrl/Cmd+Z, Ctrl+Y, and Ctrl/Cmd+Shift+Z outside text inputs.
+On desktop, Seats opens the chart at the full available width and keeps the list
+beside it. Scroll the website page to reach the back of the room at full width;
+the chart is not confined to a separate vertical scroll box.
+Drag a list name onto a seat to add it, keeping any existing assignment. Drag
+an assigned name directly between chart seats to move it. Ctrl/Option
+drag creates a separate copy for another person, and dropping an assigned name back
+in the list frees its seat. An occupied destination returns its former occupant to
+the waiting list. Undo/Redo also covers these changes. The view selector offers
+Full width, Whole chart, and 100%; plus/minus zoom keeps horizontal panning within
+the chart while the website page scrolls vertically. Whole chart is an optional
+smaller overview. The names panel stays alongside the chart while scrolling.
+Add names stays visible, with manual entry, seat lists and backups under
+Add names & other tools. Phone tap-to-assign and page scrolling are retained.
+The chart's Initials + last name switch shows each given-name initial and the full
+surname, for example Yosef Chuam Cohen becomes Y C Cohen. It applies to the chart
+and printouts, with the choice remembered on this device. Lists, editing, exports,
+backups and shared records keep full names. Switching the display does not edit the chart.
+Names are drawn inside the tables; small chairs are on one side facing the Aron.
+The bimah and pillars stay square on screen and on every supported paper size.
+Their artwork is centered within its saved footprint, preserving stored positions
+and assignments while automatic page fitting adjusts the rest of the room.
+Reserved instead of names sits beside Initials + last name and replaces occupied-seat
+names with Reserved on both the chart and its printout, including the Rav's seat.
+Empty seats keep their numbers. The People list, seat editor, saved chart, backups
+and seating-list exports keep the actual names. This display choice is remembered
+on the device and does not edit the shared chart.
+The Room design switch previews illustrated bookcases with framed shelves and varied
+upright, stacked and leaning books. It applies to the chart and printouts and starts
+off. Bookcases face inward: the back run faces the front of the room, the left run
+faces right and the right run faces left. The choice is remembered on this device
+so more room details can be added to this optional view later.
+The rav's separate, assignable chair faces the room across its square shtender. It sits
+between the Aron Kodesh and C1; an 8-unit gap separates C1 and D1. Both front-right tables sit slightly
+farther left, leaving 24 units beside D1 for the doorway. A plain opening
+beside it has no door leaf or swing. The Aron Kodesh stays centered on
+the front wall, independently of table movement and resizing. Its wider 126-unit
+front leaves B1 farther left, halving the former 43-unit gap beside A1. The Rav's
+shtender keeps its size and clearance beside the Aron. Front tables leave
+room for it and the Rav's seat, with automatic C1/D1 widths fitted to that space
+when extra seats are requested. A small square amud, the size of the Rav's shtender, stands between B2 and the four-seat C2, slightly farther back.
+B2/B5/B6 align with the left edges of their columns, and C2/C5/C6 with the right edges,
+leaving more space beside the amud and bimah.
+The middle columns sit closer together so the three main aisle gaps are equal
+beside standard five-seat tables. The shorter tables retain extra clearance around
+the amud and bimah. The bimah is slightly farther back, clear of the fifth-row
+tables and chairs, while B5 and C5 keep their standard column alignment.
+Tables near the front and side walls have a small visual gap from the wall.
+The back-right tables share the same right edge. The central bimah is 20%
+narrower and shorter, keeping its center at the same position. The amud has a plain surface without a decorative symbol.
+The main walkway separates the front and rear sections, with the rear tables
+meeting its back edge and an entrance in each side wall. These are open passages without door leaves or swings. Two doors
+at the back, between A/B and C/D, remain in the drawing. Sefarim bookcases line
+the back wall between and outside those doors, and continue along both side walls
+to just behind the A9/D9 chairs, with an 8-unit gap. Clear walkways run across the entire back and to the left
+of A8/A9 and D8/D9. A8/A9 align with the right edge of the front A tables; D8 and D9 share the
+right edge with the same small gap from the right wall as the front tables.
+Their chairs stay in front of the shortened side bookcase. The three back-wall cabinets are fixed
+against dragging, resizing, or removal, with wider clearances beside both doors.
+A very small fixed bookcase sits against the left wall beside A9, clear of its table and chairs.
+Two fixed pillars occupy the chair positions at B8 seat 2 and C8 seat 4. Those
+positions show Pillar and cannot receive a new assignment by typing, clicking,
+copying, dragging or the seat list. Tab and Shift+Tab skip them, and they do not
+count toward usable capacity. Existing names on an older blocked position remain
+visible, can be dragged out or cleared, and stay in reports and backups. Loading
+a chart never deletes those names. Front pillars placed before B4 and C4 align
+with the rear pair, touch the table outlines without overlapping them, and leave
+all B4/C4 seats usable. Covered chair symbols are hidden.
+Built-in cabinet, walkway, entrance and door labels are hidden on screen and in
+print. Walkway guide lines are hidden too, and selection outlines are solid.
+The outside front columns have closer row spacing to fit the added A7 and D7
+before the side entrances. The main entrance walkway stays in place. Rear tables
+retain their previous spacing. The back walkway
+is 48 units deep. Side bookcases stay attached to the walls behind the last outside tables.
+The separate Edit layout tab is removed. Table & room settings remain tucked under
+Add names & other tools. Open those settings to add tables, pillars, sefarim cabinets,
+labels, and a bimah. Move them by dragging labels or room objects, or with keyboard
+arrows. Close the settings to keep
+room positions fixed while assigning names. Width, depth,
+and position can also be entered. The page scrolls normally over the sidebar
+and tables; touch dragging is limited to labels and room objects. Pinch with two
+fingers to zoom the chart, or use plus/minus, 100%, and Fit. One finger scrolls
+the page or pans across an enlarged chart.
+
+Seats saves its own versioned plans in `lakewood-commons-seats-v1`, separately from
+schedule settings. Local plans stay on the device. Download a backup to move plans
+between devices. Restore adds plans instead of replacing current ones, and Undo
+can reverse edits and imports. Letter landscape and 17 x 11 inch printing support
+black-and-white or color. Initial setup defaults to Printer paper (auto fit), which
+fills the printable width and height of the paper chosen in the native print dialog,
+including Letter, 11 x 17, Legal, A4 and A5 landscape. Names keep their normal
+lettering proportions and the Rav’s shtender stays square. Auto fit uses a 0.35 inch
+margin. Auto fit anchors the sheet to the printable page instead of the browser
+viewport, preventing an oversized sheet from flowing onto a second page.
+Explicit Letter and 11 x 17 choices retain fixed-size PDF output with
+printer-safe margins of 0.35 and 0.5 inch respectively. Existing paper preferences
+are retained; choose Printer paper (auto fit) to fill a different native paper size.
+Older browsers without print container sizing retain a proportional chart.
+The sheet also shrinks to fit the browser’s available printable area.
+Only the fixed 7:30 Minyan wordmark prints above the chart.
+Congregation seasonal and weekday charts retain the original building picture.
+Special schedule handouts use the current design and fill the screen preview without
+an unused half; printing retains the real half-sheet size, including mixed print runs.
+Match both paper size and Landscape in
+the browser print dialog, including Android's separate native paper-size picker.
+The build stamps `seats/index.html` and includes it in `dist/`, outside public
+routing and the sitemap, with `noindex` and a robots exclusion.
+The current room update keeps the compatible stored layout version 12. Old joined
+C1/D1 tables identify charts that need the new seat counts and front-door clearance.
+Standard side bookcases and the original bimah also receive their revised positions.
+The front-right pair leaves a modest 24-unit doorway gap, with
+custom seat counts and sizes retained.
+C1's displaced fifth-seat name stays in the waiting list; added seats are empty.
+Updates to a shared chart are emitted as ordinary count/geometry changes after its
+server snapshot is registered, preserving online assignments and edit history.
+Version 11 plans receive an 8-unit inset for wall-side tables. The row grid shifts
+back by the same small amount, retaining names, counts, sizes and the equal row gaps.
+Bookcases stay in their existing positions against the walls. Front table labels
+stay above the wall line. Version 10 plans redistribute the standard rows using one common gap, keeping
+names, assignments, sizes and horizontal positions. The main amud and original
+bimah follow their adjacent rows, and side bookcases follow row 8. Version 9 plans
+spread standard rear rows into the reduced back walkway, retaining
+names, assignments, custom sizes, and manually spaced rows. Version 8 plans center
+the Aron, refit its adjacent front tables and Rav's seat,
+and shorten standard tables with matching row gaps, preserving names, assignments,
+and unrelated layout edits. Version 7 plans also
+move rows 8 and 9 forward to match the normal table gaps, retaining
+names, counts, table sizes and horizontal positions. Version 6 plans also
+rebalance the B/C column positions while retaining names, seat
+counts, table sizes, and the outer columns. Plans from version 5 or earlier also
+widen automatic tables while keeping B5/C5's fifth-seat assignments. Manual
+table sizes are retained. Version 4 plans also receive the row 7 and back-cabinet
+updates while retaining names,
+seat counts, and other custom positions. Version 3 plans also receive the table
+alignment changes. Older plans also receive the revised room
+layout and explicitly three-seat and four-seat tables; any excess names return to
+the waiting list. The browser keeps the original pre-update JSON in
+`lakewood-commons-seats-v1-before-room-smaller-bimah-2026-10-27` before changes are saved.
+Original shared snapshots receive a separate backup with their local chart ID. Earlier room
+snapshots are retained when present. Backups and seat-list exports include the rav's seat.
+
+Untouched automatic charts stay in memory and do not create saved files, dates or
+history entries. Names, custom titles and room-layout changes start local saving;
+changing only print size or color does not. Abandoned empty drafts are replaced
+when another chart opens. Existing automatic empty device copies are omitted
+after preserving their original JSON in
+`lakewood-commons-seats-v1-before-empty-drafts-2026-10-26`.
+Previously shared files are retained even if their names have been cleared.
+The Save button and website-save path both prevent publishing a new empty chart.
+Charts with information save locally as they are edited. The main actions are Save and Saved charts,
+beside Print. The chart name is editable inline. Save uploads the current chart to
+the website once; later edits save there automatically. Anyone signed in can open
+the chart from Saved charts and edit it. There is no separate sharing step.
+
+Seats checks for a newer build when opened or returned to the foreground, and
+periodically while connected. A cache-bypassing version request reloads the same
+chart with fresh versioned assets only when no seat editor, name-list draft,
+dialog, upload, drag, print job or shared save is in progress. The current chart
+and sign-in are retained, and a failed local backup prevents the reload. Offline
+or invalid version responses leave the tool working; a stale replacement response
+cannot start a reload loop. The build stamps matching versions into the Seats HTML
+and `/seats/version.json`. An older tab without this checker needs one fresh load
+before it can check subsequent releases automatically.
+
+Saved charts appear as a compact list with chart names, creation dates, last-edit
+dates and the last editor. Open a chart by its name; Copy chart and Delete stay beside it.
+When a website chart is listed, its linked device copy is hidden from On this device.
+Separate local charts stay visible, including ones with the same name. If the website
+list is unavailable, device copies remain available to open locally.
+Copy chart opens an independent copy with its layout, names and seat assignments.
+It gets a unique name ending in (copy) and starts its own dates and edit history.
+Copying a website chart saves the new chart on the website automatically. A device-only
+copy stays on this device until Save is pressed. Changes to a copy keep the original intact.
+New chart inside the folder opens a fresh layout directly. Seats home returns to the
+start page; history and backup downloads are under More.
+The phone or browser Back button returns from a chart, list or folder to Seats home,
+saving any name being typed. Forward reopens that view. Refresh keeps the current chart.
+Log out ends the signed-in session and returns to the name and PIN form.
+The PIN just entered to open Seats is reused in memory for the first server sign-in;
+the organizer supplies their name for history. The PIN is not saved to browser storage.
+Add names opens a shared folder with Upload names and reusable saved lists.
+Name files use the same compact bordered rows as Saved charts. Choose a file's name
+to add its names to the chart, or Edit to rename it and add, correct or remove names
+in the one-name-per-line editor. Save changes updates that shared file in place for
+everyone; existing chart names and seat assignments stay independent. Local file
+drafts survive refresh. Conflicting saves keep the draft and offer Load latest version.
+Editing requires the shared service to report editNameFiles in /api/info.
+Uploading Excel, CSV or text adds its names to the current chart and automatically
+saves a named file on the website, even if the chart itself has not been saved
+online. Other organizers can choose the file to add its names to another chart;
+existing names and assignments stay in place. Uploads waiting for connectivity
+are saved locally and retried with the same ID, so a lost response creates no
+duplicate file. Pending uploads can be deleted too.
+Each name file and chart card has a Delete control. Deleting a shared file removes
+it from everyone's website folder. Deleting a name list keeps names already used
+on charts. A deleted chart stays available as a local copy on devices that had it
+open, including unsynced offline edits; reconnecting does not recreate the file.
+Device copies can be deleted separately.
+Saved charts and Name files have a Trash section at the bottom. Deleted website
+charts and name files can be restored by either signed-in organizer for 60 days.
+Rows show the deletion date, organizer and recovery deadline. Restore retains the
+file ID, contents and creation dates, and records who restored it. Existing device
+copies and unsynced edits stay independent. Website Trash requires trash60Days in
+the shared service; older services refuse new deletions until updated.
+Deleting a device chart first stores its complete chart and metadata in this
+browser's recovery storage. If that write fails, deletion stops. Restored local
+charts retain their creation dates and history. A live chart with the same ID is
+kept, and restoration uses a new ID. Device recovery lasts 60 days in this browser
+and is lost if its browser data is cleared. Files in Trash have a Restore button;
+there is no immediate permanent-delete control.
+Each accepted shared edit records the organizer, time and changed names, seats or
+settings in the server history. History is paginated and Undo adds its own entry.
+Older charts whose creation date was never recorded show Not recorded. Local
+dates and the 200 most recent local changes use a separate browser record; backup
+downloads include those records and restores retain known creation dates.
+Committed edits appear live. Viewing a chart does not announce the organizer's
+presence. Only an active seat editor reserves that seat, with an anonymous highlight
+and busy-seat message for other editors. There is no viewer list or live organizer
+name. Shared seat inputs wait for the service to confirm the reservation, including
+when two organizers open the same seat together. Closing the editor or disconnecting
+releases it. Saved edits still retain their author and time in change history.
+Independent seat changes merge, stale seat drafts require review before replacing
+a newer saved name, Undo affects only that organizer's edits, and conflicting
+offline changes are kept as a separate local copy. Restoring a backup creates
+independent local plans. Shared editing stays disabled until its Cloudflare service
+is deployed and `data/seats-sync.json` points to the verified service. See
+`worker/seats/README.md` for deployment and the activation workflow.
+
+Verify the tool with `node --test tests/seats-model.mjs` and
+`node tests/seats-browser.cjs` after building `dist/`. The browser check generates
+actual one-page Letter and Tabloid PDFs and checks their sizes, names, safe margins,
+and lettering proportions, alongside touch zoom and scrolling.
+`node tests/seats-start.cjs` checks the home page, direct chart actions, name chooser,
+existing drafts, canonical new layouts and return navigation on phone and desktop.
+`node --test tests/seats-name-sort.mjs` and `node tests/seats-name-sort.cjs` check
+first/last-name ordering, unchanged assignments, exports, device preference, focus,
+scroll and the undistorted PIN photo. `tests/seats-room-sharing.cjs` uses local
+Workerd and two browser organizers to verify one real legacy-room migration patch
+and no repeat after reload, with the displaced C1 name retained.
+`node tests/seats-desktop.cjs` checks full-width desktop page scrolling, native drag/drop,
+seat-to-seat moves, copying, returning names to the list, autoscroll and cancel.
+`node tests/seats-print.cjs` checks all page edges and corner-seat names in native
+Letter and Tabloid PDFs, Tabloid fitted to Letter, and larger printer margins,
+from both phone and desktop layouts. It also checks automatic Letter, Tabloid,
+Legal, A4 and A5 page filling, normal and rotated lettering proportions, and the
+square Rav shtender in actual PDFs, including 125% and 150% browser zoom.
+These print checks require Chromium,
+Playwright, Poppler, Pillow and PyMuPDF.
 
 A local web tool that generates printable שבת קיץ / שבת חורף shul zmanim boards,
 ported from `Lakewood Commons Zmanim tables.xlsx`.
@@ -73,20 +438,73 @@ saved in this browser's local storage - nothing is sent anywhere. Use **Export b
 in the header to save a JSON file, and **Import backup** to restore it (e.g. on another
 computer, or after clearing browser data).
 
+## Public schedule API
+
+`GET https://baismedrashoflakewoodcommons.org/api/schedule.json` is a public,
+read-only JSON feed. It needs no API key and supports cross-origin browser fetches.
+It contains exactly ten calendar dates: the build's current day and the following
+nine days, in `America/New_York`. It accepts no date or range parameters. Room names,
+addresses, coordinates, stars, and underline location markings are omitted.
+
+The feed refreshes on every main deployment and daily after New York midnight.
+GitHub's scheduled deployments can be delayed. Consumers must check `generatedAt`
+and require `range.startDate` to match today's date in `timeZone` before displaying
+it as the current ten-day feed. Fetch again when the response is stale; do not
+extend or infer schedules beyond `range.endDate`.
+
+The response has `schemaVersion`, `generatedAt`, `timeZone`, `range`, and `days`.
+Each day includes its ISO `date`, `weekday` (Saturday is named `Shabbos`), `parsha`,
+`hebrewDate`, `occasions`, `status`, and `events`. Hebrew month numbers follow the
+calendar engine: Nissan is 1, Tishrei is 7. Leap-year Adar follows the engine's
+13/14 numbering. Event `time` is local 24-hour `HH:mm`; `displayTime` adds AM/PM.
+`name` is the Hebrew schedule label, `category` is `shacharis`, `mincha`, `maariv`,
+or `other`, and an optional `reckoning` identifies a zman's opinion. Calendar days
+include their full schedule, even after a service has passed. Midnight events are
+filed under their actual calendar date. Identical events in different rooms appear
+once. `unconfirmed` or `unavailable` days must not be treated as ordinary schedules.
+
+```js
+const response = await fetch('https://baismedrashoflakewoodcommons.org/api/schedule.json', {
+  cache: 'no-cache',
+});
+if (!response.ok) throw new Error('Schedule unavailable');
+const schedule = await response.json();
+const parts = new Intl.DateTimeFormat('en-US', {
+  timeZone: schedule.timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+}).formatToParts(new Date());
+const part = type => parts.find(p => p.type === type).value;
+const today = `${part('year')}-${part('month')}-${part('day')}`;
+if (schedule.schemaVersion !== 1 || schedule.range.startDate !== today) {
+  throw new Error('Schedule needs refreshing');
+}
+const days = schedule.days;
+```
+
+Build the API after the ordinary site build with Node.js 24:
+
+```bash
+python build-offline.py
+node scripts/build-schedule-api.mjs
+node --test tests/schedule-feed.mjs
+```
+
+The generated `dist/api/schedule.json` is build output and is not committed. Its
+adapter uses the same weekly reader, holiday posters, and chart calculations as
+the public site.
+
 ## Rules vs. overrides
 
-- **Overrides** (click any cell on a generated sheet to edit it) are one-off and tied
-  to that specific generated sheet.
+- Chart cells are read-only. **Overrides** from older saved sheets and imported backups
+  are still displayed and remain tied to their original sheet.
 - **Rules** (the Rules tab) are reusable and apply automatically every time you
   generate a sheet - use these for recurring exceptions like Shabbos Teshuva / Shabbos
-  HaGadol having a different Mincha time because of the drasha. Two starter rules are
-  seeded with a placeholder value ("לפי הדרשה - ערוך") - edit them with your shul's
-  actual times.
+  HaGadol having a different Mincha time because of the drasha.
 
 ## What's ported from the workbook vs. simplified
 
-- All astronomical zmanim math and both sheets' column formulas are ported directly
-  from the workbook's own formulas.
+- Astronomical zmanim use the workbook's FUNCTIONS sheet, named formulas, SETTINGS
+  and time-zone table. The two chart tabs are schedule/layout examples. The saved
+  calculation reference and independent formula checks are described in [fixtures/README.md](fixtures/README.md).
 - The Hebrew calendar (dates, parsha-of-week, special Shabbosim) is also fully
   self-contained, ported from the workbook's own calendar tables/formulas - no
   external calendar library or internet connection required.

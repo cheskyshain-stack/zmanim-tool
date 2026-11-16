@@ -1,3 +1,4 @@
+import { occasionOptions } from './special-schedule-controls.js';
 // The editor for a sheet the shul writes itself. See posters/own.js for what a sheet is.
 //
 // Pickers rather than a page of empty boxes, which is what was asked for: the block's day,
@@ -12,7 +13,7 @@ import { newId } from '../storage.js';
 import { escAttr } from '../util.js';
 import {
   OWN_MONTHS, OWN_ZMANIM, OWN_ROUNDING, OWN_LABELS, OWN_HEADINGS,
-  ownBlankBlock, ownBlankRow, ownRuleText,
+  ownBlankBlock, ownBlankRow, ownRuleText, ownRoundingFor,
 } from '../posters/own.js';
 
 /** A fresh sheet, under the occasion the picker is on. */
@@ -59,7 +60,7 @@ function rowHtml(row, bi, ri) {
           ${OWN_ZMANIM.map((z) => `<option value="${z.key}" ${row.zman === z.key ? 'selected' : ''}>${escAttr(z.label)}</option>`).join('')}
         </select>
         <select class="own-round" aria-label="Rounding">
-          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${row.round === r.key ? 'selected' : ''}>${escAttr(r.label)}</option>`).join('')}
+          ${OWN_ROUNDING.map((r) => `<option value="${r.key}" ${ownRoundingFor(row).key === r.key ? 'selected' : ''} ${zman && row.zman === 'minchaGedola' && !['up', 'up5'].includes(r.key) ? 'disabled' : ''}>${escAttr(r.label)}</option>`).join('')}
         </select>
       </span>
       <button type="button" class="own-del-row" title="Take this line off">&times;</button>
@@ -104,7 +105,7 @@ export function renderOwnEditor(container, sheet, occasions, { onChange, onDelet
       <div class="own-top">
         <label>What the sheet is called<input class="own-name" value="${escAttr(sheet.name || '')}" placeholder="e.g. חנוכה"></label>
         <label>Where it sits in the year<select class="own-group">
-          ${occasions.map((o) => `<option value="${escAttr(o)}" ${sheet.group === o ? 'selected' : ''}>${escAttr(o)}</option>`).join('')}
+          ${occasionOptions(occasions, sheet.group)}
         </select></label>
       </div>
       <div class="own-blocks">${(sheet.blocks || []).map(blockHtml).join('')}</div>
@@ -163,7 +164,17 @@ export function renderOwnEditor(container, sheet, occasions, { onChange, onDelet
   on('.own-month', 'change', (el) => { at(el).block.month = Number(el.value); soft(); });
   on('.own-mode', 'change', (el) => { at(el).row.mode = el.value; hard(); });
   on('.own-text', 'input', (el) => { at(el).row.text = el.value; soft(); });
-  on('.own-zman', 'change', (el) => { at(el).row.zman = el.value; soft(); });
+  on('.own-zman', 'change', (el) => {
+    const row = at(el).row;
+    row.zman = el.value;
+    row.round = ownRoundingFor(row).key;
+    const rounding = el.closest('.own-rule').querySelector('.own-round');
+    for (const option of rounding.options) {
+      option.disabled = row.zman === 'minchaGedola' && !['up', 'up5'].includes(option.value);
+    }
+    rounding.value = row.round;
+    soft();
+  });
   on('.own-round', 'change', (el) => { at(el).row.round = el.value; soft(); });
   // The minutes and the side of the זמן are one number here and two controls on screen, which
   // is the way round that reads: nobody writes "minus twenty minutes before שקיעה".

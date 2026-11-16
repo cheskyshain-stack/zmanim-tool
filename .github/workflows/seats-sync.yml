@@ -1,0 +1,147 @@
+name: Activate shared seating plans
+
+on:
+  workflow_dispatch:
+    inputs:
+      service_only:
+        description: Deploy the shared chart service without publishing the website
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ${{ inputs.service_only && 'seats-service' || 'pages' }}
+  cancel-in-progress: false
+
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    outputs:
+      endpoint: ${{ steps.deploy.outputs.endpoint }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify shared plan merging and site rules
+        run: node --test tests/seats-reservations.mjs tests/seats-sharing-model.mjs tests/seats-records.mjs tests/seats-name-file-edits.mjs tests/seats-trash.mjs tests/seats-model.mjs tests/yahrzeits.mjs tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
+      - name: Install the tested deployment tool
+        run: npm install --prefix "$RUNNER_TEMP/seats-deploy" --no-package-lock --no-audit --no-fund wrangler@4.152.0
+      - name: Deploy the shared seating service
+        id: deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Add CLOUDFLARE_API_TOKEN in repository Settings, Secrets and variables, Actions, then run this workflow again."
+            exit 1
+          fi
+          set -o pipefail
+          "$RUNNER_TEMP/seats-deploy/node_modules/.bin/wrangler" deploy --config worker/seats/wrangler.jsonc | tee "$RUNNER_TEMP/seats-deploy.log"
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          const log=fs.readFileSync(process.env.RUNNER_TEMP+'/seats-deploy.log','utf8');
+          const endpoint=log.match(/https:\/\/zmanim-seats\.[a-z0-9-]+\.workers\.dev\b/)?.[0];
+          if(!endpoint)throw new Error('The deployment did not return a workers.dev URL. Check the account subdomain before enabling shared plans.');
+          fs.appendFileSync(process.env.GITHUB_ENV,'SEATS_API_URL='+endpoint+'\n');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'endpoint='+endpoint+'\n');
+          JS
+      - name: Verify the live service before enabling it
+        env:
+          SEATS_VERIFICATION_PIN: ${{ secrets.SEATS_VERIFICATION_PIN }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          const headers={Origin:'https://baismedrashoflakewoodcommons.org','Content-Type':'application/json'};
+          const denied=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers});
+          assert.equal(denied.status,401,'The plan list must require the Seats PIN.');
+          const yahrzeitsDenied=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers});
+          assert.equal(yahrzeitsDenied.status,401,'The yahrzeit register must require a Seats session.');
+          const privatePin=process.env.SEATS_VERIFICATION_PIN;
+          const login=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin || '4444'})});
+          assert.equal(login.status,200,'The Seats PIN must open a server session.');
+          const session=await login.json();
+          assert.equal(typeof session.token,'string');
+          const info=await fetch(process.env.SEATS_API_URL+'/api/info',{headers:{...headers,Authorization:'Bearer '+session.token}});
+          assert.equal(info.status,200,'The deployed service must support chart dates and history.');
+          const features=await info.json();
+          assert.equal(features.changeHistory,true);
+          assert.equal(features.sharedNameFiles,true);
+          assert.equal(features.deleteFiles,true);
+          assert.equal(features.editNameFiles,true);
+          assert.equal(features.trash60Days,true);
+          assert.equal(features.seatReservationMinutes,30);
+          if (privatePin) assert.equal(features.yahrzeits,true);
+          assert.equal(features.yahrzeitMemberImport,true);
+          const plans=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:{...headers,Authorization:'Bearer '+session.token}});
+          assert.equal(plans.status,200,'Authenticated plan storage must be available.');
+          assert.ok(Array.isArray((await plans.json()).plans));
+          const yahrzeits=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers:{...headers,Authorization:'Bearer '+session.token}});
+          assert.equal(yahrzeits.status,401,'A Seats session must not unlock the yahrzeit register.');
+          if (privatePin) {
+            const yahrzeitLogin=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin,scope:'yahrzeits'})});
+            assert.equal(yahrzeitLogin.status,200,'The private PIN must open a separate yahrzeit session.');
+            const {token}=await yahrzeitLogin.json();
+            const calendarHeaders={...headers,Authorization:'Bearer '+token};
+            const calendar=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers:calendarHeaders});
+            assert.equal(calendar.status,200,'Authenticated yahrzeit storage must be available.');
+            await calendar.body.cancel();
+            const seats=await fetch(process.env.SEATS_API_URL+'/api/plans',{headers:calendarHeaders});
+            assert.equal(seats.status,401,'A yahrzeit session must not unlock Seats.');
+          }
+          console.log('Verified server PIN protection and authenticated storage.');
+          JS
+  publish:
+    if: ${{ !inputs.service_only }}
+    needs: service
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    env:
+      SEATS_API_URL: ${{ needs.service.outputs.endpoint }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Record the service URL
+        run: |
+          git pull --ff-only origin main
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          fs.writeFileSync('data/seats-sync.json',JSON.stringify({endpoint:process.env.SEATS_API_URL})+'\n');
+          JS
+          if ! git diff --quiet -- data/seats-sync.json; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git add data/seats-sync.json
+            git commit -m "Connect shared seating plans to the verified service"
+            git push origin HEAD:main
+          fi
+      - name: Build the site and schedule API
+        run: |
+          python build-offline.py
+          node scripts/build-schedule-api.mjs
+          node --check offline/bundle.js
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - id: pages
+        uses: actions/deploy-pages@v4

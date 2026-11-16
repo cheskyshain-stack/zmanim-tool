@@ -1,7 +1,7 @@
 // Reading the wall chart on a screen: one stretch of it at a time, with Previous, Today
 // and Next above it.
 //
-// A season chart runs to three pages and there can be two seasons in play at once.
+// A season chart has two parts, or three in a leap-year winter.
 // Showing all of them at once means finding the right one before reading a single time,
 // so this opens on the stretch covering now and pages from there, exactly as the week
 // view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
@@ -10,49 +10,77 @@
 // Shared between the congregation's site and the admin's This week screen, so the two
 // cannot drift apart.
 import { resolveSettings } from '../settings.js';
+import { keepPosition } from './keep-position.js';
 import { weekEndsMins } from '../upcoming.js';
-import { buildSheetPages, syncPageHeights } from './sheet-view.js';
+import { buildSheetPages, buildCombinedChartPages, chartPaperFitter } from './sheet-view.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
+import { wireCombinedChartPrint } from './combined-chart-print.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './print-page.js';
 import { pdfButtonHtml, wirePdfButton } from './pdf-page.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { currentSerial, wireSwipe, wireSecretTaps, navUnlocked, unlockNav } from './nav-helpers.js';
 import { jewishDateString } from '../hebrew-calendar.js';
 import { dateFromSerial } from '../zmanim/solar.js';
+import { useStraightHebrewQuotes } from '../util.js';
+import { wireChartCurrentWeek } from './chart-week-indicator.js';
 
 /** Every stretch of chart there is to look at, in date order: one entry per page of each
  *  season, carrying the שבת page and the Weekday page that go together.
  *
  *  The page breaks of the two charts fall on the same dates (alignPageSizesTo at
  *  generation time), so one index picks the matching pair. Seasons are ordered by the
- *  week they start on, so paging forward runs קיץ into חורף the way the year does. */
+ *  week they start on, so paging forward runs קיץ into חורף the way the year does.
+ *
+ *  `serials` carries both pages' own weeks, not just the שבת side's - the Weekday page can
+ *  run a week or more past it, its trailing-gap or Chol Hamoed row anchored on a Yom Tov
+ *  that has no שבת row of its own (see sheets/weeks.js). Left out, spreadLabel's printed
+ *  date range undersold what was actually on the page: a שבוע של סוכות row hanging off the
+ *  bottom of a page labelled "... to September 19" when that row's own days ran to
+ *  September 26. Math.min (a page's own start) never moves for this, since the Weekday
+ *  page starts on the same date the שבת page does; only Math.max can. */
 export function chartSpreads(state) {
   const spreads = [];
   for (const sheet of state.sheets.filter((s) => s.season !== 'weekday')) {
     const weekday = state.sheets.find((s) => s.season === 'weekday' && s.linkedSheetId === sheet.id) || null;
+    const weekdayPages = weekday ? splitWeeksIntoPages(weekday.weeks, weekday.pageSizes) : [];
     splitWeeksIntoPages(sheet.weeks, sheet.pageSizes).forEach((weeks, index) => {
       if (!weeks.length) return;
-      spreads.push({ sheet, weekday, index, serials: weeks.map((w) => w.serial) });
+      const weekdayWeeks = weekdayPages[index] || [];
+      const serials = [...weeks, ...weekdayWeeks].map((w) => w.serial);
+      spreads.push({ sheet, weekday, index, serials });
     });
   }
   return spreads.sort((a, b) => Math.min(...a.serials) - Math.min(...b.serials));
 }
 
+/** How many days early a chart goes up: a page is "now" from a week before its own first
+ *  week starts. Shared with chartStretchSerials in week-view.js, which the doc comment on
+ *  spreadIndexForNow below explains has to agree with this one. */
+export const CHART_EARLY_DAYS = 7;
+
 /** The spread covering now.
  *
- *  A chart page owns from its own first week until the next page begins, which is the span
- *  chartStretchSerials already gives the week view, and a span rather than a list of rows for
- *  one reason: a Shabbos that is yom tov has no parsha and so no row on either chart, and the
- *  summer chart is what is hanging on the wall through it.
+ *  A chart page owns from seven days before its own first week until seven days before the
+ *  next page's first week, which is the span chartStretchSerials already gives the week
+ *  view (CHART_EARLY_DAYS, shared so the two can't drift). A span rather than a list of
+ *  rows for one reason: a Shabbos that is yom tov has no parsha and so no row on either
+ *  chart, and the summer chart is what is hanging on the wall through it.
  *
- *  So this asks every Shabbos of the year which week it is now, not just the ones that have a
- *  row. Asked of the rows it was three weeks out: after שבת האזינו the next row there is is
- *  שבת בראשית, so the winter chart went up on the congregation's page on מוצאי שבת שובה, while
- *  the week card beside it was still showing סוכות. The shul asked for the chart to wait until
- *  the Sunday of בראשית, which is the end of the Shabbos before it, and this is that: the last
- *  page whose first week has already started.
+ *  So this asks every Shabbos of the year which week it is now, not just the ones that have
+ *  a row, and looks for the last page whose first week starts within the next
+ *  CHART_EARLY_DAYS days (or has already started).
  *
- *  Both views now read the turn the same way, off the same list of page starts, so neither can
- *  be on a different chart from the other.
+ *  The shul asked for a chart to post a week before its own first date, everywhere,
+ *  including the turn into בראשית: asked of the rows it was three weeks out before this,
+ *  since after שבת האזינו the next row there is is שבת בראשית, so the winter chart used to
+ *  wait for the Sunday of בראשית before it would show at all. It now goes up on the
+ *  Shabbos of שובה instead, a week ahead of its own first Shabbos, same as every other
+ *  season boundary - the week card can show סוכות a week longer than the chart does over
+ *  that one transition, which is the accepted cost of one rule holding everywhere rather
+ *  than a special case for this turn alone.
+ *
+ *  Both views now read the turn the same way, off the same list of page starts, so neither
+ *  can be on a different chart from the other.
  *
  *  Exported so the admin's own status panel can say which chart is up without drawing the
  *  page: see js/ui/status-view.js. A third reader of the same number rather than a second
@@ -67,8 +95,34 @@ export function spreadIndexForNow(spreads, state, settings) {
   const target = currentSerial(everyWeek, settings, (s) => weekEndsMins(s, state, settings));
   const starts = spreads.map((s) => Math.min(...s.serials));
   let found = -1;
-  for (let n = 0; n < starts.length; n++) if (starts[n] <= target) found = n;
+  for (let n = 0; n < starts.length; n++) {
+    if (starts[n] - CHART_EARLY_DAYS <= target) found = n;
+  }
   return found === -1 ? 0 : found;
+}
+
+/** The span of weeks the chart that is live right now actually reaches: from
+ *  CHART_EARLY_DAYS before its own first week to CHART_EARLY_DAYS before the next page's
+ *  first week, or forever on the last page there is. Anchored on real now, the same target
+ *  spreadIndexForNow asks, rather than on whatever week a caller happens to be looking at -
+ *  a week browsed away from today must not borrow "is a chart live" from whichever season
+ *  was live back then, which would send someone to today's chart under the belief it was
+ *  showing the week they were reading.
+ *
+ *  See hasChart in weekly-reader.js: a Yom Tov week with no row of its own is still worth
+ *  a live "Zmanim Chart" link once the next chart has come up seven days early and is
+ *  already showing something, rather than staying greyed out on a technicality now that
+ *  the chart itself no longer waits for that week to end. */
+export function liveChartRange(state, settings) {
+  const spreads = chartSpreads(state);
+  if (!spreads.length) return null;
+  const starts = spreads.map((s) => Math.min(...s.serials));
+  const at = spreadIndexForNow(spreads, state, settings);
+  const nextStart = starts[at + 1] ?? Infinity;
+  return {
+    from: starts[at] - CHART_EARLY_DAYS,
+    until: nextStart === Infinity ? Infinity : nextStart - CHART_EARLY_DAYS,
+  };
 }
 
 /** What a spread covers, for the line above the buttons: the first and last Shabbos on
@@ -114,13 +168,16 @@ export function spreadLabel(spread) {
  *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
  *  the next frame for anything else that settles late. Every pass starts by clearing what
  *  the last one set, so re-running it is not cumulative. */
-function fitChartToWindow(pagesEl) {
+let browserBeforePrintHandler;
+function fitChartToWindow(pagesEl, printSize, combinedPrint) {
   const fit = pagesEl.parentElement;
-  const apply = () => {
+  const fitPaper = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
+  const apply = () => keepPosition(pagesEl.parentElement, () => {
     if (!document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
     if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
+    fitPaper();
     const available = fit ? fit.clientWidth : pagesEl.clientWidth;
     const content = pagesEl.scrollWidth;
     if (!available || content <= available) return;
@@ -134,15 +191,19 @@ function fitChartToWindow(pagesEl) {
       fit.style.height = `${Math.ceil(pagesEl.scrollHeight * scale)}px`;
       fit.style.overflow = 'hidden';
     }
-  };
+  }, { panels: false, focus: false });
   apply();
   requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
   window.addEventListener('resize', apply);
+  if (browserBeforePrintHandler) window.removeEventListener('beforeprint', browserBeforePrintHandler);
+  browserBeforePrintHandler = fitPaper;
+  window.addEventListener('beforeprint', browserBeforePrintHandler);
 }
 
 /** @param {object} opts
  *    - empty: what to say when there is no chart to show at all
+ *    - highlightCurrentWeek: screen-only indicators for the congregation page
  *    - swipe: false to leave the gesture off, for an embed sitting inside something that
  *      already swipes - two handlers on nested elements would both fire and the page
  *      would move twice at once.
@@ -153,17 +214,21 @@ function fitChartToWindow(pagesEl) {
  *      sitting there permanently dead, the row goes: nothing on the screen is offering
  *      something it cannot do. Three taps on the chart itself opens it (navUnlocked). */
 export function renderChartBrowser(container, state, opts = {}) {
-  const { empty = 'Nothing has been published yet.', swipe = true, confine = false } = opts;
+  container._chartCurrentWeekCleanup?.();
+  const { empty = 'Nothing has been published yet.', swipe = true, confine = false, highlightCurrentWeek = false } = opts;
+  let stopCurrentWeek = () => {};
+  const cleanup = () => stopCurrentWeek();
+  container._chartCurrentWeekCleanup = cleanup;
   const spreads = chartSpreads(state);
   // Settings for the same reason the week view needs them: which Shabbos is "this" one
   // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
   const settings = resolveSettings(state.settings);
   let at = spreadIndexForNow(spreads, state, settings);
+  let printLayout = chartPrintLayout();
 
-  const draw = () => {
-    // A board is 11in across. See setPrintPage for why the document's one page size is set
-    // from the view rather than from a named page in the stylesheet.
-    setPrintPage('letter landscape');
+  const draw = () => keepPosition(container, () => {
+    stopCurrentWeek();
+    // This view chooses one paper size for the whole print job.
     // Asked every draw rather than once, so the redraw that follows the taps comes out
     // with the navigation on it.
     const held = confine && !navUnlocked();
@@ -172,6 +237,10 @@ export function renderChartBrowser(container, state, opts = {}) {
       container.innerHTML = `<p class="hint">${empty}</p>`;
       return;
     }
+    const activeLayout = spread.weekday ? printLayout : 'separate';
+    const combinedPrint = isCombinedChartLayout(activeLayout);
+    const printSize = chartPrintSize(activeLayout);
+    setPrintPage(printSize.css);
     const label = spreadLabel(spread);
     container.innerHTML = `
       <div class="week-nav no-print">
@@ -188,15 +257,26 @@ export function renderChartBrowser(container, state, opts = {}) {
             <span class="week-nav-word">Next</span><span aria-hidden="true">&rarr;</span>
           </button>
         </div>`}
-        <div class="week-nav-row week-nav-print-one">${printButtonHtml()}${pdfButtonHtml()}</div>
+        <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(activeLayout, Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
+    useStraightHebrewQuotes(container);
     const pagesEl = container.querySelector('.pages');
-    const shabbos = buildSheetPages(spread.sheet, state, () => {}, { readOnly: true });
-    const chol = buildSheetPages(spread.weekday, state, () => {}, { readOnly: true });
+    const shabbos = combinedPrint ? buildCombinedChartPages(spread.sheet, spread.weekday, state, { readOnly: true, printLayout: activeLayout })
+      : buildSheetPages(spread.sheet, state, { readOnly: true });
+    const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
     for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    syncPageHeights(pagesEl);
-    fitChartToWindow(pagesEl);
+    fitChartToWindow(pagesEl, printSize, combinedPrint);
+    if (highlightCurrentWeek) stopCurrentWeek = wireChartCurrentWeek(container, state, settings, () => {
+      const next = spreadIndexForNow(spreads, state, settings);
+      if (confine && !navUnlocked() && next !== at) { at = next; draw(); return true; }
+      return false;
+    });
+    container.querySelector('#chart-print-layout').addEventListener('change', event => {
+      rememberChartPrintLayout(event.target.value);
+      printLayout = chartPrintLayout();
+      draw();
+    });
 
     const go = (next) => {
       if (next < 0 || next >= spreads.length) return;
@@ -212,8 +292,9 @@ export function renderChartBrowser(container, state, opts = {}) {
       name: () => pdfName(label.english),
       sheet: '.page',
       orientation: 'landscape',
-      size: [11, 8.5],
+      size: [printSize.width, printSize.height],
     });
+    wireCombinedChartPrint();
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
     container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
@@ -228,8 +309,9 @@ export function renderChartBrowser(container, state, opts = {}) {
         draw();
       });
     }
-  };
+  });
   draw();
+  return cleanup;
 }
 
 /** A filename from the spread's own dates: "Zmanim July 25 2026 to September 19 2026.pdf".

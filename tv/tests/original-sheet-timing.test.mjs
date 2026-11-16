@@ -64,7 +64,8 @@ test('Sukkos keeps its full printed page but stops displaying it when Simchas To
   assert.equal(sheet.to, dateFromSerial(poster.span.to).toISOString().slice(0, 10));
   assert.deepEqual(sheet.sections, publicPosterSections('sukkos', poster));
   assert.equal(sheet.displayThrough, '2026-10-04');
-  assert.ok(sheet.to > sheet.displayThrough, 'The following-week times remain on the printed page');
+  assert.ok(poster.blocks.some(block => block.lines.some(row => row.calc === 'afterShacharis')),
+    'The following-week times remain in the original printed sections');
   assert.equal(localStamp(sheet.endsAt).slice(0, 10), sheet.displayThrough);
   assert.equal(scheduleSnapshot(before(sheet.endsAt)).specialSheet.sourceId, sheet.sourceId);
   assert.equal(scheduleSnapshot(sheet.endsAt).specialSheet, null);

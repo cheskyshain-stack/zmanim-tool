@@ -1,6 +1,7 @@
 // Per-cell manual overrides, tied to one generated sheet instance (unlike rules,
 // which are reusable across every future year). Stored as sheet.overrides[weekSerial][columnKey].
 import { sanitizeRichText } from './security.js';
+import { enteredTimeTraces } from './zmanim/trace.js';
 
 export function getOverride(sheet, weekSerial, columnKey) {
   return sheet.overrides?.[weekSerial]?.[columnKey];
@@ -25,6 +26,8 @@ export function mergeRow(computedRow, sheet, weekSerial) {
   if (weekOverrides) {
     for (const [key, value] of Object.entries(weekOverrides)) {
       row[key] = sanitizeRichText(value);
+      row.traces = { ...row.traces, [key]: enteredTimeTraces(row[key], 'Entered by hand in this saved chart') };
+      row.traceNotes = { ...row.traceNotes, [key]: 'This cell is a manual edit. Its displayed times replace the calculated schedule.' };
       overriddenKeys.add(key);
     }
   }

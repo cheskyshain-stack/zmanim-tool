@@ -249,7 +249,7 @@ export async function buildPdf(hostEl, opts = {}) {
     const sheets = [...hostEl.querySelectorAll(sheet)];
     if (!sheets.length) throw new Error('there is nothing on the screen to turn into a PDF');
     const { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation, unit: 'in', format: 'letter' });
+    const doc = new jsPDF({ orientation, unit: 'in', format: size });
     const scale = PDF_DPI / CSS_DPI;
     for (let i = 0; i < sheets.length; i++) {
       const canvas = await window.html2canvas(sheets[i], {
@@ -268,8 +268,8 @@ export async function buildPdf(hostEl, opts = {}) {
         logging: false,
         onclone: (_doc, el) => prepareClone(el),
       });
-      if (i > 0) doc.addPage('letter', orientation);
-      // Corner to corner: the sheet on the screen is already letter and so is the PDF
+      if (i > 0) doc.addPage(size, orientation);
+      // Corner to corner: the sheet on the screen and the PDF share the selected size,
       // page, so there is no fitting to do and no margin to add. Anything else would
       // reintroduce the shrink-to-fit this whole file exists to avoid.
       doc.addImage(canvas.toDataURL('image/jpeg', JPEG_QUALITY), 'JPEG', 0, 0, size[0], size[1], undefined, 'FAST');

@@ -772,8 +772,10 @@ export function buildSukkosPoster(year, settings) {
      rather than a ruled box at the foot of a column, which is where it was and which put the
      one part of the sheet that is a week rather than a day into a frame of its own. */
   const hoshana = day(SK_HOSHANA);
+  const hoshanaSunrise = skNetz(hoshana, settings);
+  const hoshanaNetz = formatTime(hoshanaSunrise);
   const hoshanaTimes = [
-    tmT(zman('נץ', skNetz(hoshana, settings), 'הושענא רבה\'s own sunrise')
+    tmT(zman('נץ', hoshanaSunrise, 'הושענא רבה\'s own sunrise')
       .minus(36, 'שחרית starts thirty six minutes in front of it')
       .round('to the minute the sheet prints')
       .underline(), true),
@@ -838,7 +840,7 @@ export function buildSukkosPoster(year, settings) {
       // The first מנין is when שחרית starts, thirty six minutes before נץ, and נץ is printed
       // beside it so the sheet says what it was worked from.
       line(SK_TEXT.shacharis, hoshanaTimes,
-        { calc: 'hoshanaShacharis', note: `(${SK_TEXT.netz} ${formatTime(skNetz(hoshana, settings))})` }),
+        { calc: 'hoshanaShacharis', netz: hoshanaNetz, noteTimes: [{ trace: zman('נץ', hoshanaSunrise) }], note: `(${SK_TEXT.netz} ${hoshanaNetz})` }),
     ],
   });
 
@@ -853,8 +855,8 @@ export function buildSukkosPoster(year, settings) {
        Each יזכור keeps the mark of the מנין it belongs to. The 7:30 is the למטה מנין, so its
        יזכור is underlined too, being said where that מנין is; the 8:15's is in the main בית
        מדרש and stays plain. On Shabbos both run later, the davening being longer: 9:40 and
-       11:05 against 9:10 and 10:25, half an hour on the למטה one and forty minutes
-       on the main one. */
+       11:05 against 9:10 and 10:25 - half an hour on the למטה one, forty minutes on the
+       main one, asked for directly for this one. */
     const yizkor = [
       line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
       line(SK_TEXT.yizkor, [
@@ -950,7 +952,6 @@ export function buildSukkosPoster(year, settings) {
      with times of its own, and these are a week of ordinary days that the wall chart already
      carries in full: adding them here would put the same week in twice, once off the chart
      and once off a poster, with nothing to keep the two the same. */
-  const afterDays = sukkosAfterDays(rh, settings);
   {
     const after = buildSukkosAfter(rh, settings);
     blocks.push({
@@ -972,17 +973,18 @@ export function buildSukkosPoster(year, settings) {
 
   return {
     hebrewYear: year,
-    /* From the afternoon of ערב סוכות to the last day the sheet speaks for.
-       That used to be שמחת תורה, or the שבת בראשית after it in a year that has one, and it is
-       the last day of the week after it now: the sheet carries the schedule that starts the
-       morning after שמחת תורה, and while that block still has days ahead of it the sheet has
-       something to say. Which is what decides how long it stays up on the congregation's own
-       page as well as what the date line under the picker reads. The last day counted rather
-       than the last day of the week: the Friday and the Shabbos after it run on schedules of
-       their own and this sheet does not give them. */
+    /* From the afternoon of ערב סוכות to שמחת תורה, or the שבת בראשית after it in a year that
+       has one - the last day the sheet is actually about. The schedule that starts the morning
+       after שמחת תורה is printed at the foot of the same sheet (blocks.afterTitle above) so
+       whoever kept it on the wall has something to read that week without a new sheet yet, and
+       for a while that block's own last day was let stretch this span and so decide how long
+       the sheet stayed up on the congregation's own page. Reversed for the same reason the
+       יום כיפור sheet's own after-block was: it is the same week the Weekday chart already
+       carries, and a page reading "Special Schedules" through a week that is not special is
+       the wrong answer, whatever the printed sheet still has to say for itself. */
     span: {
       from: day(SK_EREV),
-      to: Math.max(bereishis || day(SK_SIMCHAS), afterDays[afterDays.length - 1] ?? 0),
+      to: bereishis || day(SK_SIMCHAS),
     },
     blocks,
     /* Every מנין on the sheet, already resolved to a day and a minute, the shape every poster

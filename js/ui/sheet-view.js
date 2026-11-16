@@ -1,26 +1,43 @@
 import { safeHeaderImage } from '../security.js';
 import {
-  resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR,
+  resolveSettings, specialShacharisHeading, DEFAULT_ACCENT_COLOR, LEGACY_ACCENT_COLORS,
   WEEKDAY_SHACHARIS, WEEKDAY_SHACHARIS_SPECIAL, WEEKDAY_FOOTER_NOTE,
 } from '../settings.js';
-import { hebrewDateExtended, weekOfLabel, specialShacharisKinds } from '../hebrew-calendar.js';
+import { hebrewDateExtended, weekOfLabel, specialShacharisKinds, hasRoshChodesh, shabbosMevarchimMonth, moladFor, moladLabel, excelWeekday, chanukahYearFor, JEWISH_MONTHS_HE } from '../hebrew-calendar.js';
 import { buildKayitzRow, KAYITZ_COLUMNS } from '../sheets/kayitz.js';
 import { buildChorefRow, CHOREF_COLUMNS } from '../sheets/choref.js';
-import { buildWeekdayRow, WEEKDAY_COLUMNS } from '../sheets/weekday.js';
+import { buildWeekdayRow, WEEKDAY_COLUMNS, chanukahDaysInWeek, chanukahDaysThroughFriday } from '../sheets/weekday.js';
+import { chanukahShabbosLabel, chanukahPanelBlocks, chanukahShacharisDay, chanukahPostedShacharisRows } from '../posters/chanukah.js';
+import { roshChodeshSchedule } from '../posters/rosh-chodesh-schedule.js';
+import { enteredTimeTraces, zman } from '../zmanim/trace.js';
 import { inSpringDstWindow } from '../sheets/common.js';
-import { hebrewLang, escText, escAttr } from '../util.js';
+import { hebrewLang, escText, escAttr, useStraightHebrewQuotes, SLASH } from '../util.js';
 import { splitWeeksIntoPages } from '../pagination.js';
 import { applyRules } from '../rules.js';
-import { mergeRow, setOverride, clearOverride, getOverride } from '../overrides.js';
+import { mergeRow } from '../overrides.js';
 import { announcedWeekCell } from '../announced.js';
 import { shacharisGridHtml } from './shacharis-grid.js';
-import { UL_START, UL_END, normalizeRichText, markHeaderRoom } from '../format.js';
-import { applyTimeShorthand } from './rich-text.js';
+import {
+  UL_START, UL_END, NEW_TAG_START, NEW_TAG_MID, NEW_TAG_END,
+  CHANUKAH_TAG_START, CHANUKAH_TAG_MID, CHANUKAH_TAG_END,
+  SMALL_START, SMALL_END,
+  markHeaderRoom,
+} from '../format.js';
 import { setPrintPage } from './print-page.js';
 import { switchHtml, wireSwitch } from './switch.js';
+import { chartExplanationAttrs, timeExplanationAttrs } from './time-explanations.js';
+import { attachZmanimReference } from './zmanim-references.js';
+import { chartReferenceDates } from '../zmanim/references.js';
+import { chartPrintLayout, chartPrintLayoutHtml, rememberChartPrintLayout, isCombinedChartLayout, chartPrintSize } from './chart-print-layout.js';
+import { wireCombinedChartPrint } from './combined-chart-print.js';
+import { keepPosition } from './keep-position.js';
 
 const chartInk = state => state.settings.chartInk ?? state.settings.sheetStyle?.ink ?? 'colour';
 const CHART_PAD_MIN = 0.15, CHART_PAD_MAX = 0.75;
+const COMBINED_CHART_FONT_SCALE = 1.2;
+// Fractional screen placement can make an 816px DOMRect read 816.00024px.
+// Ignore floating-point noise, while still detecting a real 1/64px layout excess.
+const PAGE_HEIGHT_EPSILON = 1 / 256;
 const chartPad = (value, fallback) => Number.isFinite(Number(value)) && value != null
   ? Math.max(CHART_PAD_MIN, Math.min(CHART_PAD_MAX, Number(value))) : fallback;
 function chartMarginControl(key, label, value, original) {
@@ -32,6 +49,19 @@ function chartMarginControl(key, label, value, original) {
       <button type="button" id="${key}-more" aria-label="Increase ${label}" ${value >= CHART_PAD_MAX ? 'disabled' : ''}>+</button>
       <button type="button" id="${key}-original" class="poster-year-reset" ${Math.abs(value-original)<0.001?'disabled':''}>Original</button>
     </div></div>`;
+}
+
+/** A fixed, made-up molad - Tuesday afternoon, 23 minutes and 7 chalakim after 4 - shown
+ *  in the settings explanation so the two sentences can be compared without opening a
+ *  מברכים week to see one. Not read from any real month (the spec that asked for this is
+ *  explicit: a formatting example, not an actual value), chosen because it exercises both
+ *  a nonzero minutes part and a nonzero חלקים part at once, which is the only shape that
+ *  shows every moving piece of either sentence in one line. The serial is searched for
+ *  rather than hand-picked, so this stays a Tuesday if excelWeekday's own epoch ever moves. */
+function moladFormatExample(format) {
+  let serial = 2;
+  while (excelWeekday(serial) !== 3) serial++;
+  return moladLabel({ serial, hours: 16, minutes: 23, chalakim: 7 }, { moladFormat: format, english: false });
 }
 
 /** You choose the page split for a שבת חורף sheet yourself (as usual, covering every
@@ -78,55 +108,391 @@ export function fontStackFor(fontFamily) {
   return `"${fontFamily}"${standIn ? `, "${standIn}"` : ''}, ${generic}`;
 }
 
-// Undo/redo history per sheet, kept in memory only (module-level, keyed by sheet id) -
-// intentionally not persisted to localStorage; it lives for as long as the app tab is
-// open, same as undo history in most editors.
-const histories = new Map();
-function getHistory(sheetId) {
-  if (!histories.has(sheetId)) histories.set(sheetId, { undo: [], redo: [] });
-  return histories.get(sheetId);
-}
-function applyOverrideValue(sheet, serial, col, value) {
-  if (value === undefined) clearOverride(sheet, serial, col);
-  else setOverride(sheet, serial, col, value);
-}
-
 /** The printed pages of one sheet, built and styled but not yet in the document.
  *
- *  Exported because the congregation's page shows the same chart, and a second renderer
- *  for it would be a second thing to keep in step with the formulas. Pass readOnly for
- *  that use: it is the same markup with the cell editing taken off, rather than a
- *  different rendering path that could quietly diverge.
+ *  All chart cells are read-only, including admin print copies. The readOnly flag selects
+ *  the congregation's announced times; admin copies retain their calculated and saved values.
  *
  *  Row heights still need syncPageHeights() once the pages are in the document, since
  *  nothing can be measured before then. */
-export function buildSheetPages(sheet, state, onChange = () => {}, { readOnly = false } = {}) {
+export function buildSheetPages(sheet, state, { readOnly = false, showMolad = false, splitSpringDst = false, compactFullSeason = true } = {}) {
   if (!sheet) return [];
   const settings = resolveSettings(state.settings);
   if (!sheet.style) sheet.style = { ...state.settings.sheetStyle };
   if (!sheet.columnWidths) sheet.columnWidths = {};
   const wks = sheet.weeks.map((w) => ({ ...w, date: new Date(w.date) }));
   const split = splitWeeksIntoPages(wks, sheet.pageSizes).map((pw) => ({ weeks: pw, effectiveSeason: pageEffectiveSeason(sheet, pw, settings) }));
+  const fullSeason = compactFullSeason && split.length === 1 && split[0].weeks.length === wks.length && wks.length > 0;
   return split.map(({ weeks: pw, effectiveSeason }, i) => {
     const { columns, buildRow } = columnsAndBuilderFor(effectiveSeason);
-    /* A read-only chart is the reading copy, so it quotes what the shul has announced: see
-       js/announced.js. The editable one never does. That is the whole reason the flag is
-       carried this far rather than the swap being done for everybody: a cell in the admin is
-       a box somebody types into, and a swapped time sitting in it would be saved over the
-       board's own the moment that week was edited for any other reason. */
-    const el = renderPage(pw, i, split.length, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced: readOnly });
+    /* The congregation's copy quotes what the shul has announced: see js/announced.js.
+       Admin print layouts keep the chart's calculated times and existing saved overrides.
+       showMolad is carried the same explicit way, defaulting closed, for a stricter reason
+       than that one: the congregation's own /chart/ page (chart-view.js) calls this with
+       readOnly alone and nothing in this parameter's own name to fall back on, and must
+       never show it regardless of what state.settings itself holds - settings.showMolad is
+       carried whole into data/published.json (buildPublishedPayload, publish.js) for the
+       admin's own next session to read back, and that published copy is read by nobody but
+       luach.js, not by this file at all, so there is no path by which this chart's own
+       congregation reader could pick the setting up even by mistake. Only renderSheet's own
+       admin call passes it, read fresh off state.settings.showMolad there. */
+    const springStart = sheet.season === 'choref' && splitSpringDst
+      ? pw.findIndex(week => inSpringDstWindow(week.date, settings)) : -1;
+    // This mixed page already uses summer formulas, rules and override keys. Keep those
+    // keys in both sections: winter's Erev Shabbos I is summer's L, so an existing edit
+    // must stay with the same minyan when its three unused Plag columns are hidden.
+    const winterColumns = springStart > 0
+      ? CHOREF_COLUMNS.map(column => column.key === 'I' ? { ...column, key: 'L' } : column) : columns;
+    const el = renderPage(springStart > 0 ? pw.slice(0, springStart) : pw, i, split.length, winterColumns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad, fullSeason });
+    if (springStart > 0) {
+      const summerPage = renderPage(pw.slice(springStart), i, split.length, columns, buildRow, settings, sheet, state, effectiveSeason, { announced: readOnly, showMolad, fullSeason });
+      const sections = document.createElement('div');
+      sections.className = 'chart-sections';
+      const winterTable = el.querySelector('table');
+      winterTable.replaceWith(sections);
+      sections.append(winterTable, summerPage.querySelector('table'));
+    }
+    fillChartLocationLegend(el);
     el.dataset.sheetLabel = sheetLabel(sheet);
     el.dataset.pageIndex = i;
+    attachZmanimReference(el, { title: `${sheetLabel(sheet)} · Page ${i + 1}`,
+      days: chartReferenceDates(pw, sheet.season === 'weekday'), settings, weeklyLimit: true });
     applyStyle(el, sheet.style, chartInk(state)); // variables only - row heights need the page in the document
-    if (readOnly) el.querySelectorAll('[contenteditable]').forEach((cell) => cell.removeAttribute('contenteditable'));
     return el;
   });
+}
+
+/** Join the existing rendered cells by date, keeping their rules, saved values and
+ * explanation attributes. A weekday-only holiday row keeps an empty Shabbos side. */
+export function buildCombinedChartPages(shabbos, weekday, state, options = {}) {
+  if (!shabbos || !weekday) return [];
+  const primaryPages = buildSheetPages(shabbos, state, { ...options, compactFullSeason: false });
+  const weekdayPages = buildSheetPages(weekday, state, { ...options, compactFullSeason: false });
+  const settings = resolveSettings(state.settings);
+  const fallbackColumns = shabbos.season === 'kayitz' ? KAYITZ_COLUMNS : CHOREF_COLUMNS;
+  return Array.from({ length: Math.max(primaryPages.length, weekdayPages.length) }, (_, index) => {
+    const original = primaryPages[index] || weekdayPages[index];
+    const page = document.createElement('div');
+    page.className = 'page is-combined-chart';
+    page.dataset.chartPrintLayout = options.printLayout === 'combined-letter' ? 'combined-letter' : 'combined';
+    page.classList.toggle('is-combined-letter', page.dataset.chartPrintLayout === 'combined-letter');
+    page.dataset.sheetLabel = sheetLabel(shabbos);
+    page.dataset.pageIndex = index;
+    const primaryTables = [...(primaryPages[index]?.querySelectorAll('table') || [])];
+    const weekdayTable = weekdayPages[index]?.querySelector('table');
+    const weekdayRows = combinedChartRows(weekdayTable);
+    const sections = primaryTables.length ? primaryTables : [null];
+    const summerColumns = sections.some(table => table?.querySelector('col[data-colkey="J"]'))
+      || (!primaryTables.length && shabbos.season === 'kayitz');
+    const rightWidths = summerColumns ? { B: 14.5, C: 11.5, E: 10.5 } : { B: 16, C: 13, E: 13.3 };
+    const parshaWidth = options.showMolad ? 10 : 8;
+    const body = document.createElement('div');
+    body.className = 'combined-chart-body';
+    const allWeeks = new Map();
+    sections.forEach((sourceTable, sectionIndex) => {
+      const primaryRows = combinedChartRows(sourceTable);
+      const next = sections[sectionIndex + 1];
+      const upper = next ? Math.min(...combinedChartRows(next).keys()) : Infinity;
+      const lower = sectionIndex ? Math.min(...primaryRows.keys()) : -Infinity;
+      const dates = [...new Set([...primaryRows.keys(), ...weekdayRows.keys()])]
+        .filter(serial => serial >= lower && serial < upper).sort((a, b) => a - b);
+      if (!dates.length) return;
+      const definitions = sourceTable ? [...sourceTable.querySelectorAll('colgroup col')]
+        .filter(col => col.dataset.colkey !== 'parsha').map(col => {
+          const position = [...sourceTable.querySelectorAll('colgroup col')].indexOf(col);
+          return { key: col.dataset.colkey, head: sourceTable.querySelectorAll('thead tr:last-child th')[position] };
+        }).sort((a, b) => a.key.localeCompare(b.key))
+        : fallbackColumns.map(column => ({ key: column.key, label: column.header, column }));
+      const table = document.createElement('table');
+      table.className = 'combined-chart-table';
+      table.dir = 'ltr';
+      const weights = definitions.some(definition => definition.key === 'J')
+        ? { B: 100, C: 175, D: 100, E: 90, F: 65, G: 100, H: 85, I: 75, J: 75, K: 75, L: 175 }
+        : { B: 90, C: 95, D: 100, E: 90, F: 55, G: 65, H: 80, I: 170, L: 170 };
+      const weightFor = definition => Number(shabbos.columnWidths?.[definition.key]) > 0
+        ? Number(shabbos.columnWidths[definition.key]) : weights[definition.key] || 90;
+      const weightSum = definitions.reduce((sum, definition) => sum + weightFor(definition), 0);
+      const leftWidth = 100 - parshaWidth - Object.values(rightWidths).reduce((sum, width) => sum + width, 0);
+      table.innerHTML = `<colgroup>${definitions.map(definition => `<col data-colkey="${definition.key}" style="width:${leftWidth * weightFor(definition) / weightSum}%">`).join('')}
+        ${['B', 'C', 'E'].map(key => `<col data-colkey="weekday:${key}" style="width:${rightWidths[key]}%">`).join('')}
+        <col data-colkey="parsha" style="width:${parshaWidth}%"></colgroup>
+        <thead><tr class="combined-group-head"><th colspan="${definitions.length}" lang="he">שבת</th>
+          <th colspan="3" lang="he">ימות החול</th><th rowspan="2" lang="he">פרשה</th></tr>
+          <tr class="combined-service-head"></tr></thead><tbody></tbody>`;
+      const header = table.querySelector('.combined-service-head');
+      for (const definition of definitions) {
+        const cell = definition.head?.cloneNode(true) || document.createElement('th');
+        if (!definition.head) cell.innerHTML = markHeaderRoom(headerHtml(definition.column));
+        header.append(cell);
+      }
+      for (const key of ['B', 'C', 'E']) {
+        const colPosition = [...(weekdayTable?.querySelectorAll('colgroup col') || [])]
+          .findIndex(col => col.dataset.colkey === key);
+        const cell = weekdayTable?.querySelectorAll('thead th')[colPosition]?.cloneNode(true) || document.createElement('th');
+        if (colPosition < 0) cell.textContent = WEEKDAY_COLUMNS.find(column => column.key === key).header;
+        cell.classList.add('combined-weekday-head');
+        header.append(cell);
+      }
+      for (const serial of dates) {
+        const primary = primaryRows.get(serial), chol = weekdayRows.get(serial);
+        const row = document.createElement('tr');
+        row.dataset.weekSerial = serial;
+        for (const definition of definitions) row.append(primary?.cells.get(definition.key)?.cloneNode(true) || document.createElement('td'));
+        for (const key of ['B', 'C', 'E']) {
+          const cell = key !== 'E' && chol?.cells.get(key) ? chol.cells.get(key).cloneNode(true) : document.createElement('td');
+          cell.classList.add('combined-weekday-cell');
+          cell.dataset.combinedCol = key;
+          row.append(cell);
+        }
+        const parsha = (primary?.parsha || chol?.parsha)?.cloneNode(true) || document.createElement('td');
+        parsha.classList.add('parsha-cell', 'combined-parsha');
+        parsha.style.minWidth = '0';
+        row.append(parsha);
+        table.tBodies[0].append(row);
+        allWeeks.set(serial, { serial });
+      }
+      body.append(table);
+    });
+    const panel = weekdayPages[index]?.querySelector('.shacharis-panel')?.cloneNode(true);
+    if (panel) {
+      panel.classList.add('combined-morning-panel');
+      body.append(panel);
+    }
+    const footer = (primaryPages[index] || primaryPages[0] || original).querySelector('.page-footer').cloneNode(true);
+    footer.querySelector('.chart-location-legend')?.remove();
+    page.append(original.querySelector('.page-header').cloneNode(true), body, footer);
+    fillChartLocationLegend(page);
+    attachZmanimReference(page, { title: `${sheetLabel(shabbos)} · Weekday · Page ${index + 1}`,
+      days: chartReferenceDates([...allWeeks.values()]), settings, weeklyLimit: true });
+    applyStyle(page, shabbos.style, chartInk(state));
+    useStraightHebrewQuotes(page);
+    return page;
+  });
+}
+
+function combinedChartRows(table) {
+  const result = new Map();
+  if (!table) return result;
+  const columns = [...table.querySelectorAll('colgroup col')].map(col => col.dataset.colkey);
+  for (const row of table.querySelectorAll('tbody tr')) {
+    const cells = new Map(columns.map((key, index) => [key, row.children[index]]));
+    result.set(Number(row.dataset.weekSerial), { cells, parsha: cells.get('parsha') });
+  }
+  return result;
+}
+
+/** The combined paper has two heading rows and may retain the winter/summer split.
+ * Measure it at full size, including actual text bounds, before fitting a preview. */
+function syncCombinedChartHeights(pagesEl) {
+  atPaperSize(pagesEl, pages => {
+    const paperHeight = chartPrintSize(pages[0].dataset.chartPrintLayout).height * 96;
+    const originals = pages.map(page => Number(page.dataset.combinedBaseFont) || 12);
+    let scale = 1;
+    for (;;) {
+      pages.forEach((page, index) => page.style.setProperty('--sheet-font-size', `${originals[index] * scale}pt`));
+      const layouts = pages.map(page => {
+        const header = page.querySelector('.page-header'), footer = page.querySelector('.page-footer');
+        const body = page.querySelector('.combined-chart-body'), tables = [...body.querySelectorAll('table')];
+        [header, footer, body, ...tables].forEach(element => { element.style.height = ''; element.style.flex = 'none'; });
+        page.querySelectorAll('tr').forEach(row => { row.style.height = ''; });
+        page.querySelectorAll('.parsha-cell-name,.parsha-cell-sub').forEach(element => { element.style.marginTop = ''; });
+        const box = page.getBoundingClientRect(), style = getComputedStyle(page);
+        const paddingTop = header.getBoundingClientRect().top - box.top;
+        const paddingBottom = parseFloat(style.paddingBottom) || 0;
+        const headerGap = body.getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+        const footerGap = footer.getBoundingClientRect().top - body.getBoundingClientRect().bottom;
+        return { page, header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap,
+          top: paddingTop + header.getBoundingClientRect().height + headerGap,
+          bottom: paperHeight - paddingBottom - footer.getBoundingClientRect().height - footerGap };
+      });
+      const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
+      const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
+      const available = Math.max(0, bottom - top);
+      for (const layout of layouts) {
+        const { header, footer, body, tables, paddingTop, paddingBottom, headerGap, footerGap } = layout;
+        header.style.height = `${top - paddingTop - headerGap}px`;
+        footer.style.height = `${paperHeight - bottom - paddingBottom - footerGap}px`;
+        const gap = parseFloat(getComputedStyle(body).rowGap) || 0;
+        const heads = tables.map(table => [...table.tHead.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+        const borders = tables.map(table => table.getBoundingClientRect().height
+          - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+        const rows = tables.flatMap(table => [...table.tBodies[0].rows]);
+        const height = Math.max(...rows.map(row => row.getBoundingClientRect().height), 0,
+          (available - gap * (tables.length - 1) - heads.reduce((sum, value) => sum + value, 0)
+            - borders.reduce((sum, value) => sum + value, 0)) / rows.length);
+        rows.forEach(row => { row.style.height = `${height}px`; });
+        tables.forEach((table, index) => {
+          table.style.height = `${heads[index] + height * table.tBodies[0].rows.length + borders[index]}px`;
+        });
+        const used = tables.slice(0, -1).reduce((sum, table) => sum + table.getBoundingClientRect().height, 0);
+        tables.at(-1).style.height = `${Math.max(0, available - used - gap * (tables.length - 1))}px`;
+        body.style.height = `${available}px`;
+        const panel = body.querySelector('.combined-morning-panel');
+        if (panel) {
+          const cell = tables[0].querySelector('td[data-combined-col="E"]');
+          const first = rows[0].getBoundingClientRect(), last = rows.at(-1).getBoundingClientRect();
+          const region = body.getBoundingClientRect(), column = cell.getBoundingClientRect();
+          panel.style.top = `${first.top - region.top + first.height * 0.35}px`;
+          panel.style.height = `${last.bottom - first.top - (first.height + last.height) * 0.35}px`;
+          panel.style.left = `${column.left - region.left + column.width * 0.04}px`;
+          panel.style.width = `${column.width * 0.92}px`;
+        }
+      }
+      centerMoladNotes(pagesEl);
+      const overflow = layouts.some(({ page, body }) => body.scrollHeight > body.clientHeight + 1
+        || page.getBoundingClientRect().height > paperHeight + PAGE_HEIGHT_EPSILON || combinedChartInkOverflows(page));
+      if (!overflow || scale <= 0.1) break;
+      scale = Math.max(0.1, scale - 0.02);
+    }
+    pages.forEach(page => { page.dataset.combinedFitScale = scale; });
+  });
+}
+
+function combinedChartInkOverflows(page) {
+  const holders = [...page.querySelectorAll('table th,table td:not([data-combined-col="E"]),.combined-morning-panel')];
+  return holders.some(holder => {
+    const box = holder.getBoundingClientRect();
+    const walker = document.createTreeWalker(holder, NodeFilter.SHOW_TEXT);
+    for (let node; (node = walker.nextNode());) {
+      if (!node.textContent.trim()) continue;
+      const range = document.createRange();
+      range.selectNodeContents(node);
+      for (const rect of range.getClientRects()) {
+        if (rect.width && (rect.left < box.left - 1 || rect.right > box.right + 1 || rect.top < box.top - 1 || rect.bottom > box.bottom + 1)) return true;
+      }
+    }
+    return false;
+  });
+}
+
+/** Explain the location marks on this physical page, after any DST sections are joined.
+ *  Reading the rendered tables includes rules, saved edits and the weekday morning panel.
+ *  Each Hebrew label is isolated with its own stars so the two meanings stay together. */
+function fillChartLocationLegend(page) {
+  const printed = [...page.querySelectorAll('table,.combined-morning-panel')];
+  const marks = new Set(printed.flatMap(table =>
+    [...table.textContent.matchAll(/\d{1,2}:\d{2}(?::\d{2})?\s*(\*{1,2})(?!\*)/g)].map(match => match[1])));
+  const footer = page.querySelector('.footer-text');
+  const hasDownstairs = printed.some(region => [...region.querySelectorAll('u')].some(time => /\d{1,2}:\d{2}/.test(time.textContent)));
+  // Rebuild standard location keys from this page, including ones in an older custom
+  // footer. Other custom notes stay intact; the full downstairs sentence and only
+  // the room stars this page uses share one line.
+  for (const node of [...footer.childNodes]) {
+    if (node.nodeType !== 3) continue;
+    const text = node.textContent.replace(/\s+/g, ' ').trim();
+    const starKey = /בעזרת נשים|באולם השמחות/.test(text)
+      && !text.replace(/בעזרת נשים|באולם השמחות|\*|\s/g, '');
+    if (!starKey && text !== WEEKDAY_FOOTER_NOTE) continue;
+    if (node.nextSibling?.nodeName === 'BR') node.nextSibling.remove();
+    node.remove();
+  }
+  const existingNote = footer.textContent.replace(/\s+/g, ' ');
+  const locations = [['*', 'בעזרת נשים'], ['**', 'באולם השמחות']].filter(([mark, label]) => {
+    if (!marks.has(mark)) return false;
+    const stars = mark.replace(/\*/g, '\\*');
+    return !new RegExp(`(?:^|[^*])${stars}(?!\\*)\\s*${label}|${label}\\s*${stars}(?!\\*)`).test(existingNote);
+  });
+  if (!hasDownstairs && !locations.length) return;
+  const legend = document.createElement('div');
+  legend.className = 'chart-location-legend';
+  legend.dir = 'rtl';
+  if (hasDownstairs) {
+    const entry = document.createElement('span');
+    entry.className = 'chart-location-downstairs';
+    entry.dir = 'ltr';
+    const minyanim = document.createElement('bdi');
+    minyanim.dir = 'rtl';
+    minyanim.lang = 'he';
+    minyanim.textContent = 'מנינים';
+    const room = document.createElement('bdi');
+    room.dir = 'rtl';
+    room.lang = 'he';
+    room.textContent = 'בבית מדרש למטה';
+    entry.append('All underlined ', minyanim, ' will be ', room);
+    legend.append(entry);
+  }
+  locations.forEach(([mark, label]) => {
+    if (legend.childNodes.length) legend.append(' · ');
+    const entry = document.createElement('bdi');
+    entry.dir = 'rtl';
+    entry.lang = 'he';
+    entry.textContent = `${mark}${label}`;
+    legend.append(entry);
+  });
+  footer.prepend(legend);
 }
 
 /** Makes every row on every page the same height. Must run with the pages in the
  *  document: heights read 0 on a detached element. */
 export function syncPageHeights(pagesEl) {
+  if (pagesEl.querySelector('.is-combined-chart')) {
+    syncCombinedChartHeights(pagesEl);
+    return;
+  }
   syncHeaderRowHeight(pagesEl);
+}
+
+/** Fit the actual paper before scaling its screen preview. Capture the chosen sizes
+ * once so font loading, redraws and beforeprint never shrink an already fitted chart. */
+export function chartPaperFitter(pagesEl, { height = 8.5, combined = false } = {}) {
+  const pageEls = [...pagesEl.querySelectorAll('.page')];
+  const baseFontSizePt = pageEls.map(el => parseFloat(getComputedStyle(el).getPropertyValue('--sheet-font-size')) || 10);
+  const floor = 0.1, step = 0.02, paperHeight = height * 96;
+  const applyScale = scale => {
+    pageEls.forEach((el, i) => el.style.setProperty('--sheet-font-size', (baseFontSizePt[i] * scale) + 'pt'));
+    syncPageHeights(pagesEl);
+  };
+  const overflowing = () => pageEls.filter(el => {
+    if (el.getBoundingClientRect().height > paperHeight + PAGE_HEIGHT_EPSILON) return true;
+    if (el.classList.contains('is-full-season')) {
+      const page = el.getBoundingClientRect(), style = getComputedStyle(el);
+      const left = page.left + parseFloat(style.paddingLeft), right = page.right - parseFloat(style.paddingRight);
+      if ([...el.querySelectorAll('table')].some(table => {
+        const box = table.getBoundingClientRect();
+        return box.left < left - 0.5 || box.right > right + 0.5;
+      })) return true;
+      if ([...el.querySelectorAll('.cell,th,.parsha-cell')].some(cell => {
+        const range = document.createRange(); range.selectNodeContents(cell);
+        const box = cell.closest('td,th').getBoundingClientRect();
+        return [...range.getClientRects()].some(ink => ink.width > 0.1
+          && (ink.left < box.left - 0.5 || ink.right > box.right + 0.5));
+      })) return true;
+    }
+    if (!el.classList.contains('is-flexible-chart') && !el.classList.contains('is-full-season')) return false;
+    return [...el.querySelectorAll('.shacharis-panel')].some(panel => {
+      const box = panel.getBoundingClientRect(), content = panel.firstElementChild.getBoundingClientRect();
+      const style = getComputedStyle(panel);
+      const inset = side => el.classList.contains('is-full-season')
+        ? parseFloat(style['padding' + side]) + parseFloat(style['border' + side + 'Width']) : 0;
+      return content.top < box.top + inset('Top') - 0.5 || content.bottom > box.bottom - inset('Bottom') + 0.5
+        || content.left < box.left + inset('Left') - 0.5 || content.right > box.right - inset('Right') + 0.5;
+    });
+  });
+  return () => {
+    if (!document.body.contains(pagesEl)) return;
+    return atPaperSize(pagesEl, () => {
+      pageEls.forEach(el => el.classList.remove('is-flexible-chart'));
+      applyScale(1);
+      let scale = 1, overflowPages = overflowing();
+      if (overflowPages.length && !combined) {
+        pageEls.forEach(el => el.classList.add('is-flexible-chart'));
+        applyScale(1);
+        overflowPages = overflowing();
+      }
+      while (overflowPages.length && scale > floor) {
+        scale = Math.max(floor, scale - step);
+        applyScale(scale);
+        overflowPages = overflowing();
+      }
+      if (!overflowPages.length && scale < 1 && !combined) {
+        const finerScale = Math.min(1, scale + step / 2);
+        applyScale(finerScale);
+        if (overflowing().length) applyScale(scale);
+        else scale = finerScale;
+      }
+      return { scale, overflowPages };
+    });
+  };
 }
 
 export function renderSheet(container, state, sheet, onChange) {
@@ -153,13 +519,19 @@ export function renderSheet(container, state, sheet, onChange) {
         state.sheets
           .filter((s) => s.season === 'weekday' && s.linkedSeason === sheet.season && s.hebrewYear === sheet.hebrewYear)
           .sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+  const winterSheet = sheet.season === 'choref' ? sheet : companion?.season === 'choref' ? companion : null;
+  if (winterSheet && !winterSheet.style) winterSheet.style = { ...state.settings.sheetStyle };
+  const printLayout = chartPrintLayout(Boolean(companion));
+  const combinedPrint = isCombinedChartLayout(printLayout);
+  const printSize = chartPrintSize(printLayout);
 
   // A board is 11in across. See setPrintPage for why the document's one page size is set
   // from the view rather than from a named page in the stylesheet.
-  setPrintPage('letter landscape');
+  setPrintPage(printSize.css);
   container.innerHTML = `
     <div class="sheet-toolbar no-print">
       <button id="back-btn">&larr; Back</button>
+      ${chartPrintLayoutHtml(printLayout, Boolean(companion))}
       <button id="print-btn" class="btn-primary" title="Opens the print dialog, where the destination can be a printer or Save as PDF">Print / Save as PDF</button>
     </div>
     <div id="chart-layout-panel" class="panel no-print">
@@ -167,20 +539,44 @@ export function renderSheet(container, state, sheet, onChange) {
         <div class="poster-bar">
           ${chartMarginControl('chart-pad-y', 'Top and bottom padding', chartPad(sheet.style.paddingY, 0.35), 0.35)}
           ${chartMarginControl('chart-pad-x', 'Left and right padding', chartPad(sheet.style.paddingX, 0.5), 0.5)}
+          ${winterSheet ? `<div class="poster-bar-switch">${switchHtml('chart-dst-headers', 'Spring clock change', [
+            { value: 'one', label: 'One header', on: !winterSheet.style.splitSpringDst },
+            { value: 'separate', label: 'Separate headers', on: Boolean(winterSheet.style.splitSpringDst) },
+          ])}</div>` : ''}
           <div class="poster-bar-switch">${switchHtml('chart-ink', 'Ink', [
             { value: 'colour', label: 'Colour', on: chartInk(state) !== 'mono' },
             { value: 'mono', label: 'Black and white', on: chartInk(state) === 'mono' },
           ])}</div>
-          <p class="hint">Padding applies to this chart. Ink applies to every chart page, including Shabbos and weekday pages in any view. The picture stays in colour.</p>
+          <div class="poster-bar-switch">${switchHtml('chart-molad', 'Molad', [
+            { value: 'off', label: 'Off', on: !state.settings.showMolad },
+            { value: 'on', label: 'On', on: Boolean(state.settings.showMolad) },
+          ])}</div>
+          ${state.settings.showMolad ? `<div class="poster-bar-switch">${switchHtml('chart-molad-format', 'Molad format', [
+            { value: 'compact', label: 'Compact Hebrew', on: state.settings.moladFormat !== 'yiddish' },
+            { value: 'yiddish', label: 'Yiddish', on: state.settings.moladFormat === 'yiddish' },
+          ])}</div>` : ''}
+          <details id="chart-settings-help" class="chart-settings-help">
+            <summary>Explain settings</summary>
+            ${winterSheet ? '<p class="hint">Separate headers keeps winter columns above the clock change and starts summer columns below it, on the same page. Applies to this print layout.</p>' : ''}
+            <p class="hint">Padding applies to this chart. Ink, Molad and Molad format apply to every Shabbos chart page in any view here - Molad prints the molad under the parsha name on a שבת that is שבת מברכים. None of the three ever reaches the congregation's own copy of the chart, printed or online, whatever this is set to.</p>
+            ${state.settings.showMolad ? `<p class="hint" id="molad-format-example">${moladFormatExample(state.settings.moladFormat === 'yiddish' ? 'yiddish' : 'compact')} (a formatting example, not an actual month's molad)</p>` : ''}
+            <p id="page-fit-notice" class="hint" hidden></p>
+          </details>
         </div>
       </div>
     </div>
+    <div id="page-overflow-warning" class="error no-print" hidden></div>
     <div id="sheet-stack">
       <div id="pages" class="pages"></div>
     </div>
   `;
+  useStraightHebrewQuotes(container);
   container.querySelector('#back-btn').addEventListener('click', () => onChange({ back: true }));
   container.querySelector('#print-btn').addEventListener('click', () => window.print());
+  container.querySelector('#chart-print-layout').addEventListener('change', event => {
+    rememberChartPrintLayout(event.target.value);
+    keepPosition(container, () => renderSheet(container, state, sheet, onChange));
+  });
 
 
   // Both charts go into one container, interleaved: שבת page 1, its Weekday page 1,
@@ -191,29 +587,121 @@ export function renderSheet(container, state, sheet, onChange) {
   // Style variables are set per *page* rather than per container, because the two sheets
   // carry their own font/size/colour and they now share a parent.
   const pagesEl = container.querySelector('#pages');
-  const buildPagesFor = (sh) => buildSheetPages(sh, state, onChange);
+  const buildPagesFor = (sh) => buildSheetPages(sh, state, {
+    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(sh?.style?.splitSpringDst),
+  });
   const shabbosFirst = sheet.season === 'weekday' && companion;
-  const primaryPages = buildPagesFor(shabbosFirst ? companion : sheet);
-  const companionPages = buildPagesFor(shabbosFirst ? sheet : companion);
+  const primarySheet = shabbosFirst ? companion : sheet;
+  const weekdaySheet = shabbosFirst ? sheet : companion;
+  const primaryPages = combinedPrint ? buildCombinedChartPages(primarySheet, weekdaySheet, state, {
+    showMolad: Boolean(state.settings.showMolad), splitSpringDst: Boolean(primarySheet?.style?.splitSpringDst), printLayout,
+  }) : buildPagesFor(primarySheet);
+  const companionPages = combinedPrint ? [] : buildPagesFor(weekdaySheet);
   for (let i = 0; i < Math.max(primaryPages.length, companionPages.length); i++) {
     if (primaryPages[i]) pagesEl.appendChild(primaryPages[i]);
     if (companionPages[i]) pagesEl.appendChild(companionPages[i]);
   }
 
-  // Row heights need the pages in the document to be measured.
-  syncHeaderRowHeight(pagesEl);
+  // A page is supposed to be exactly 816px (11in x 8.5in at 100%, see the layout
+  // invariant) - syncHeaderRowHeight shares that out evenly, but it is a CSS minimum, not
+  // a cap, and a page whose own content genuinely needs more (most often the Weekday
+  // chart's שחרית panel, which has to print every schedule in play - the everyday one,
+  // ר"ח/בה"ב/תענית, and חנוכה's own two more on a week that is all three at once - stacked
+  // in one card, regardless of how many weeks share the page) renders taller anyway. Paper
+  // does not: a page over 11in x 8.5in is not one sheet any more, and the print engine
+  // splits it across two, repeating the header and leaving the שחרית panel's own position
+  // (calculated for the one tall page, not for wherever the split landed) sitting in the
+  // wrong place on whichever physical sheet it ends up on - measured directly, from a real
+  // print preview, as the confusing, overlapping-looking extra page this fits (or, failing
+  // that, warns about) below.
+  //
+  // Try flexible rows and slightly tighter padding before shrinking a crowded job.
+  // A taller holiday row then borrows space from the other rows instead of forcing every
+  // page down to its own minimum font size. Roomy jobs retain their original equal rows.
+  // Asked for directly: shrink the text rather than make the admin rearrange weeks. One
+  // scale for every page in #pages - both this sheet's own and its companion's, since they
+  // print and are read as one job - not a scale per page, so flipping between pages of the
+  // same chart never meets a size change that was not there on the paper itself. Each
+  // page's own *current* font size is the starting point (not the stored sheet.style,
+  // which stays exactly what the admin set - this never writes back to it, so a chart that
+  // needed shrinking once does not quietly ship smaller forever after), stepped down 2% at
+  // a time and re-measured for real after each step (syncHeaderRowHeight has to run again
+  // too, since a smaller font changes what the even share itself comes out to), rather than
+  // computed in one guess - a wall chart's own text does not shrink linearly with page
+  // height the way a block of prose would, between the merged שחרית panel, the different
+  // column counts a קיץ versus a חורף page carries, and rounding in syncHeaderRowHeight
+  // itself.
+  //
+  // Floor is a hard technical one now, not a legibility one: asked for directly, an admin
+  // who picks a page count low enough to need real shrinking (an entire season on its own
+  // one page, among others) wants the result to fit over staying readable from a few feet
+  // away, and picking that page count is itself the deliberate choice, the same as it
+  // always was for 1 through 8. 10% keeps the scale a real, positive, renderable number;
+  // short of even that the warning below still fires, naming which pages still do not fit
+  // - shrinking the text buys room, not an unconditional guarantee for any combination of
+  // weeks on any page count.
+  const pageEls = [...pagesEl.querySelectorAll('.page')];
+  const FIT_TOLERANCE = printSize.height * 96;
+  const fitPages = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
+  const fitPaper = () => {
+    if (!document.body.contains(pagesEl)) return;
+    atPaperSize(pagesEl, () => {
+      const result = fitPages();
+      let fitScale = result.scale;
+      const overflowPages = result.overflowPages;
+
+      const overflowWarningEl = container.querySelector('#page-overflow-warning');
+      if (overflowPages.length) {
+        const items = overflowPages.map((el) => {
+          const height = el.getBoundingClientRect().height;
+          return `${el.dataset.sheetLabel}, page ${Number(el.dataset.pageIndex) + 1} (${Math.round(height)}px, ${Math.ceil(height - FIT_TOLERANCE)}px over one sheet)`;
+        });
+        overflowWarningEl.textContent = `This chart still has content taller than one sheet after fitting: ${items.join('; ')}. Adjust the weeks per page to move some weeks to another page.`;
+        overflowWarningEl.hidden = false;
+      } else {
+        overflowWarningEl.textContent = '';
+        overflowWarningEl.hidden = true;
+      }
+      const fitNoticeEl = container.querySelector('#page-fit-notice');
+      if (combinedPrint) fitScale = Math.min(...pageEls.map(el => Number(el.dataset.combinedFitScale) || 1)) * COMBINED_CHART_FONT_SCALE;
+      if (!overflowPages.length && fitScale < 1) {
+        fitNoticeEl.textContent = `This chart's text is shrunk to ${Math.round(fitScale * 100)}% of the chosen size so every page fits on one sheet.`;
+        fitNoticeEl.hidden = false;
+      } else {
+        fitNoticeEl.textContent = '';
+        fitNoticeEl.hidden = true;
+      }
+    });
+  };
+  fitPaper();
+  document.fonts?.ready?.then(() => {
+    if (!document.body.contains(pagesEl)) return;
+    fitPaper();
+    autoFit(container);
+  });
+  if (chartBeforePrintHandler) window.removeEventListener('beforeprint', chartBeforePrintHandler);
+  chartBeforePrintHandler = () => {
+    if (document.body.contains(pagesEl)) fitPaper();
+  };
+  window.addEventListener('beforeprint', chartBeforePrintHandler);
+  wireCombinedChartPrint();
+
+  // Fit the paper at full size first. Measuring the phone's reduced preview hid an
+  // overflowing mixed-header page and let its address print above the next header.
   autoFit(container);
 
-
   const restyleOwnPages = () => {
-    pagesEl.querySelectorAll(`.page[data-sheet-label="${sheetLabel(sheet)}"]`).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
-    syncHeaderRowHeight(pagesEl);
+    const selector = combinedPrint ? '.page' : `.page[data-sheet-label="${sheetLabel(sheet)}"]`;
+    pagesEl.querySelectorAll(selector).forEach((el) => applyStyle(el, sheet.style, chartInk(state)));
+    syncPageHeights(pagesEl);
   };
 
   // Persists sheet.style as the app's "last used" style too, so the next *newly
   // generated* sheet starts from it (see generate-view.js / settings.js sheetStyle).
   const commit = () => {
-    state.settings.sheetStyle = { ...sheet.style };
+    state.settings.sheetStyle = { ...sheet.style,
+      splitSpringDst: winterSheet ? Boolean(winterSheet.style.splitSpringDst) : Boolean(state.settings.sheetStyle.splitSpringDst),
+    };
     onChange({ save: true });
   };
   for (const [key, field, original] of [['chart-pad-y', 'paddingY', 0.35], ['chart-pad-x', 'paddingX', 0.5]]) {
@@ -233,6 +721,23 @@ export function renderSheet(container, state, sheet, onChange) {
     restyleOwnPages();
     commit();
   });
+  // No restyleOwnPages here: unlike Ink, this changes which lines a row has, not just
+  // their colour, so the existing DOM cannot simply be restyled - commit()'s own
+  // onChange({save:true}) re-renders the whole view, which rebuilds the rows themselves
+  // with the new setting read fresh.
+  wireSwitch(container, 'chart-molad', value => {
+    state.settings.showMolad = value === 'on';
+    commit();
+  });
+  wireSwitch(container, 'chart-molad-format', value => {
+    state.settings.moladFormat = value === 'yiddish' ? 'yiddish' : 'compact';
+    commit();
+  });
+  wireSwitch(container, 'chart-dst-headers', value => {
+    winterSheet.style.splitSpringDst = value === 'separate';
+    state.settings.sheetStyle.splitSpringDst = winterSheet.style.splitSpringDst;
+    onChange({ save: true });
+  });
 
 }
 
@@ -240,8 +745,9 @@ const sheetLabel = (sh) => (sh.season === 'kayitz' ? 'שבת קיץ' : sh.season
 
 
 // --- Fit to screen -----------------------------------------------------------------
-// Module-level, not per-render: the sheet view re-renders on every saved cell edit, and
-// the view shouldn't snap back to full size underneath you each time.
+// Module-level, not per-render: print controls redraw the sheet, and the view should
+// keep the user's chosen preview scale each time.
+let chartBeforePrintHandler;
 let fitOn = false;
 let fitChosenByUser = false;
 let fitResizeHandler = null;
@@ -301,69 +807,240 @@ function headerInkFor(color) {
   const hex = String(color || '').replace('#', '');
   if (hex.length !== 6) return '#fff';
   const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
-  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#1a1a1a' : '#fff';
+  return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#000' : '#fff';
+}
+
+function grayChartAccent(color) {
+  const match = /^#([0-9a-f]{6})$/i.exec(color);
+  if (!match) return DEFAULT_ACCENT_COLOR;
+  const [r, g, b] = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16));
+  const gray = Math.round(0.2126 * r + 0.7152 * g + 0.0722 * b).toString(16).padStart(2, '0');
+  return '#' + gray.repeat(3);
 }
 
 function applyStyle(target, style, ink = style.ink) {
   target.style.padding = chartPad(style.paddingY, 0.35) + 'in ' + chartPad(style.paddingX, 0.5) + 'in';
-  // Filter the chart sections separately so the building picture keeps its colour.
+  // CSS filters rasterize chart text in PDFs. Set neutral colours directly instead.
   target.style.filter = '';
+  target.classList.toggle('is-mono', ink === 'mono');
   target.querySelectorAll('table, .header-center, .header-rabbi, .page-footer').forEach(el => {
-    el.style.filter = ink === 'mono' ? 'grayscale(1)' : '';
+    el.style.filter = '';
   });
+  const savedAccent = String(style.accentColor || DEFAULT_ACCENT_COLOR).toLowerCase();
+  const colour = LEGACY_ACCENT_COLORS.includes(savedAccent) ? DEFAULT_ACCENT_COLOR : savedAccent;
+  const accent = ink === 'mono' ? grayChartAccent(colour) : colour;
   target.style.setProperty('--sheet-font-family', fontStackFor(style.fontFamily));
-  target.style.setProperty('--sheet-font-size', style.fontSizePt + 'pt');
+  const fontSize = (Number(style.fontSizePt) || 10) * (target.classList.contains('is-combined-chart') ? COMBINED_CHART_FONT_SCALE : 1);
+  target.style.setProperty('--sheet-font-size', fontSize + 'pt');
+  if (target.classList.contains('is-combined-chart')) target.dataset.combinedBaseFont = fontSize;
   target.style.setProperty('--sheet-header-scale', style.headerScale);
-  target.style.setProperty('--sheet-accent', style.accentColor);
-  target.style.setProperty('--sheet-head-ink', headerInkFor(style.accentColor));
+  target.style.setProperty('--sheet-accent', accent);
+  target.style.setProperty('--sheet-head-ink', headerInkFor(accent));
 }
 
-/** Makes every row in a table - header included - exactly the same height.
- *
- *  Left alone, the header always comes out shorter: the table stretches to fill the page
- *  (`.page` is a flex column, `table { flex: 1 }`), and the browser hands out that extra
- *  height in proportion to each row's *natural* content height, which for the header is
- *  a single short line. Simply pinning the header to a measured data-row height doesn't
- *  settle it either - the total is fixed, so growing the header shrinks the data rows it
- *  was just matched against.
- *
- *  So instead of measuring one against the other, this splits the table's total height
- *  evenly across all its rows, which is stable in one pass. The floor guards the case
- *  where there are enough rows that an even share would be tighter than the content
- *  actually needs - better to overflow the even split than to clip real text. Re-run on
- *  every applyStyle(), since the font/size controls invalidate the measurements. */
-function syncHeaderRowHeight(pagesEl) {
-  pagesEl.querySelectorAll('table').forEach((table) => {
-    if (!table.getBoundingClientRect().height) return;
-    const headRow = table.querySelector('thead tr');
-    const bodyRows = [...table.querySelectorAll('tbody tr')];
-    if (!headRow || !bodyRows.length) return;
-    const allRows = [headRow, ...bodyRows];
-    allRows.forEach((r) => (r.style.height = '')); // drop previous pins so measurements are fresh
+/** Measure at paper size even when Fit to screen or Side by side is active. */
+function atPaperSize(pagesEl, measure) {
+  const pages = [...pagesEl.querySelectorAll('.page')].filter(page => page.getClientRects().length);
+  if (!pages.length) return;
+  const styles = [
+    [pagesEl, 'zoom', '1'], [pagesEl, 'transform', 'none'],
+    ...pages.flatMap(page => [
+      [page, 'zoom', '1'], [page, 'height', 'auto'], [page, 'min-height', page.classList.contains('is-combined-chart')
+        ? `${chartPrintSize(page.dataset.chartPrintLayout).height}in` : '8.5in'],
+    ]),
+  ].map(([el, name, temporary]) => ({ el, name, temporary,
+    value: el.style.getPropertyValue(name), priority: el.style.getPropertyPriority(name) }));
+  styles.forEach(({ el, name, temporary }) => el.style.setProperty(name, temporary, 'important'));
+  try {
+    return measure(pages);
+  } finally {
+    styles.forEach(({ el, name, value, priority }) => {
+      if (value) el.style.setProperty(name, value, priority);
+      else el.style.removeProperty(name);
+    });
+  }
+}
 
-    // Every row gets an equal share of the table's height. Measuring the tallest row and
-    // pinning to that instead doesn't work here: on the Weekday chart the merged שחרית
-    // cell spans every row, so its height is what the browser divides between them, and
-    // it hands a row with two lines of parsha a bigger slice. That slice is a *result* of
-    // the distribution, not the row's own requirement - pinning to it inflated the whole
-    // table past the 8.5in page. The even share is the real target; the row only stays
-    // taller if its own content genuinely needs more, which the tightened parsha
-    // line-height now avoids.
-    // The header is never shorter than a body row, so there are two cases and the table
-    // has to end up exactly its own height either way:
-    //   header fits in an equal share  -> every row (header included) takes that share
-    //   header needs more than a share -> it keeps its height, the rest split what's left
-    // Using one formula for both overflowed the page: the first case pushed a tall header
-    // down to a share it couldn't fit in, the second handed a short header a share bigger
-    // than it needed.
-    const tableHeight = table.getBoundingClientRect().height;
-    const headNatural = headRow.getBoundingClientRect().height;
-    const evenShare = tableHeight / allRows.length;
-    const target = headNatural <= evenShare ? evenShare : (tableHeight - headNatural) / bodyRows.length;
-    bodyRows.forEach((r) => (r.style.height = target + 'px'));
-    // The header never comes out shorter than a body row, and keeps its own greater
-    // height where its text needs it.
-    headRow.style.height = Math.max(target, headNatural) + 'px';
+function sizeFullSeasonColumns(page) {
+  if (!page.classList.contains('is-full-season')) return;
+  const pageStyle = getComputedStyle(page);
+  const available = page.getBoundingClientRect().width
+    - parseFloat(pageStyle.paddingLeft) - parseFloat(pageStyle.paddingRight)
+    - parseFloat(pageStyle.borderLeftWidth) - parseFloat(pageStyle.borderRightWidth);
+  page.querySelectorAll('table').forEach(table => {
+    // Measure the browser's intrinsic widths with no saved widths, percentage shares
+    // or spare table space. Explicit header lines and the morning panel count too.
+    table.classList.add('is-measuring-columns');
+    const columns = [...table.querySelectorAll('colgroup col')];
+    const minimums = [...table.tHead.rows[0].cells].map(cell => cell.getBoundingClientRect().width);
+    const border = table.getBoundingClientRect().width - minimums.reduce((sum, width) => sum + width, 0);
+    table.classList.remove('is-measuring-columns');
+    const widths = minimums.map((width, index) => Math.max(width, Number(columns[index].dataset.savedWidth) || 0));
+    const automatic = columns.filter(column => !column.dataset.savedWidth).length;
+    const required = widths.reduce((sum, width) => sum + width, 0) + border;
+    const extra = automatic ? Math.max(0, available - required) / automatic : 0;
+    table.style.setProperty('--full-season-column-space', extra + 'px');
+    table.style.tableLayout = 'fixed';
+    // Preserve real overflow so the paper fitter can reduce the font when necessary.
+    table.style.width = Math.max(available, required) + 'px';
+    columns.forEach((column, index) => {
+      column.style.width = (widths[index] + (column.dataset.savedWidth ? 0 : extra)) + 'px';
+    });
+  });
+}
+
+/** Reserve one chart area for the whole print job. Header/footer text and saved
+ *  margins can differ between the two sheets, so use the space every page can hold.
+ *  Rows share that height, with a taller header only where its content needs it. */
+function syncHeaderRowHeight(pagesEl) {
+  atPaperSize(pagesEl, pages => {
+    const layouts = pages.map(page => {
+      const header = page.querySelector('.page-header');
+      const footer = page.querySelector('.page-footer');
+      const sections = page.querySelector('.chart-sections');
+      const tables = [...page.querySelectorAll('table')];
+      [header, footer, sections, ...tables].filter(Boolean).forEach(el => {
+        el.style.height = '';
+        el.style.flex = 'none';
+      });
+      page.querySelectorAll('tr').forEach(row => { row.style.height = ''; });
+      page.querySelectorAll('.parsha-cell-name, .parsha-cell-sub').forEach(el => {
+        el.style.marginTop = '';
+        el.style.position = '';
+        el.style.top = '';
+      });
+      page.querySelectorAll('.shacharis-panel').forEach(panel => {
+        panel.style.top = '';
+        panel.style.height = '';
+      });
+      sizeFullSeasonColumns(page);
+      const style = getComputedStyle(page);
+      const paddingTop = header.getBoundingClientRect().top - page.getBoundingClientRect().top;
+      const paddingBottom = parseFloat(style.paddingBottom) || 0;
+      const headerGap = tables[0].getBoundingClientRect().top - header.getBoundingClientRect().bottom;
+      const footerGap = footer.getBoundingClientRect().top - tables.at(-1).getBoundingClientRect().bottom;
+      return { page, header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap,
+        top: paddingTop + header.getBoundingClientRect().height + headerGap,
+        bottom: 8.5 * 96 - paddingBottom - footer.getBoundingClientRect().height - footerGap };
+    });
+    // Whole CSS pixels keep the shared frame stable through table border rounding.
+    const top = Math.ceil(Math.max(...layouts.map(layout => layout.top)));
+    const bottom = Math.floor(Math.min(...layouts.map(layout => layout.bottom)));
+    const chartHeight = Math.max(0, bottom - top);
+    layouts.forEach(({ page, header, footer, sections, tables, paddingTop, paddingBottom, headerGap, footerGap }) => {
+      header.style.height = (top - paddingTop - headerGap) + 'px';
+      footer.style.height = (8.5 * 96 - bottom - paddingBottom - footerGap) + 'px';
+      const borders = tables.map(table => table.getBoundingClientRect().height
+        - [...table.rows].reduce((sum, row) => sum + row.getBoundingClientRect().height, 0));
+      if (page.classList.contains('is-flexible-chart')) {
+        const rowCount = tables.reduce((sum, table) => sum + table.rows.length, 0);
+        const gap = sections ? tables[1].getBoundingClientRect().top - tables[0].getBoundingClientRect().bottom : 0;
+        const available = Math.max(0, chartHeight - gap * (tables.length - 1));
+        const evenShare = Math.max(0, available - borders.reduce((sum, border) => sum + border, 0)) / rowCount;
+        tables.forEach(table => {
+          const head = table.querySelector('thead tr');
+          if (head) head.style.height = Math.max(evenShare, head.getBoundingClientRect().height) + 'px';
+        });
+        const natural = tables.map(table => table.getBoundingClientRect().height);
+        const extra = Math.max(0, available - natural.reduce((sum, height) => sum + height, 0));
+        // Body rows retain their natural content minimum; the table distributes spare
+        // space without pinning short rows to a height that the tall row must exceed.
+        tables.forEach((table, index) => {
+          table.style.height = (natural[index] + extra * table.rows.length / rowCount) + 'px';
+        });
+        page.querySelectorAll('.shacharis-panel').forEach(panel => {
+          const body = panel.closest('tbody'), cell = panel.parentElement;
+          const box = body.getBoundingClientRect(), anchor = cell.getBoundingClientRect();
+          const inset = box.height / body.rows.length * 0.35;
+          // Flexible rows have different heights, so span their measured column rather
+          // than multiplying the height of whichever row holds the morning panel.
+          panel.style.top = (box.top - anchor.top + inset) + 'px';
+          panel.style.height = Math.max(0, box.height - inset * 2) + 'px';
+        });
+        return;
+      }
+      if (sections) {
+        const rows = tables.flatMap(table => [...table.rows]);
+        const gap = tables[1].getBoundingClientRect().top - tables[0].getBoundingClientRect().bottom;
+        const available = chartHeight - gap * (tables.length - 1)
+          - borders.reduce((sum, border) => sum + border, 0);
+        // Both headers share the body row height. Content remains the floor so an
+        // overflowing page grows and the paper's shrink-to-fit loop can see it.
+        const height = Math.max(available / rows.length, ...rows.map(row => row.getBoundingClientRect().height));
+        rows.forEach(row => { row.style.height = height + 'px'; });
+        tables.forEach((table, index) => {
+          table.style.height = (height * table.rows.length + borders[index]) + 'px';
+        });
+        // Let the last table take the fractional remainder after browser rounding.
+        const used = tables.slice(0, -1).reduce((sum, table) => sum + table.getBoundingClientRect().height, 0);
+        tables.at(-1).style.height = Math.max(0, chartHeight - gap * (tables.length - 1) - used) + 'px';
+      } else {
+        const table = tables[0];
+        const headRow = table.querySelector('thead tr');
+        const bodyRows = [...table.querySelectorAll('tbody tr')];
+        if (!headRow || !bodyRows.length) return;
+        const headNatural = headRow.getBoundingClientRect().height;
+        const available = chartHeight - borders[0];
+        const evenShare = available / (bodyRows.length + 1);
+        const target = headNatural <= evenShare ? evenShare : (available - headNatural) / bodyRows.length;
+        bodyRows.forEach(row => { row.style.height = Math.max(0, target) + 'px'; });
+        headRow.style.height = Math.max(evenShare, headNatural) + 'px';
+        // A table's height is a minimum: real content can still grow it. Account for
+        // its collapsed border so pinned rows do not add half a pixel to every page.
+        table.style.height = chartHeight + 'px';
+      }
+    });
+    centerMoladNotes(pagesEl);
+  });
+}
+
+
+/** Keeps a parsha name at the row's own vertical centre on a week that also carries a
+ *  compact Hebrew molad note (the .parsha-cell-centered cells built in buildRow above),
+ *  with the molad note (and, on the rare week that also carries one, the ערב חנוכה note
+ *  beside it) centred in whatever room is left below the name, rather than letting
+ *  vertical-align: middle on the <td> centre the name and the note as one two-line block.
+ *
+ *  Written by measuring and setting an explicit margin-top rather than attempted in CSS
+ *  alone, same as the row heights just above: a percentage height inside a table cell is
+ *  exactly the kind of thing that does not reliably resolve, and a flex-column version of
+ *  this measured a 0px sub-region in a real browser - the opposite of centred. Needs the
+ *  row's own height to already be final, so it runs last, after every row in this table
+ *  has its real height pinned above. */
+function centerMoladNotes(pagesEl) {
+  pagesEl.querySelectorAll('.parsha-cell-centered').forEach((td) => {
+    const nameEl = td.querySelector('.parsha-cell-name');
+    const subEl = td.querySelector('.parsha-cell-sub');
+    if (!nameEl || !subEl) return;
+    nameEl.style.marginTop = '';
+    subEl.style.marginTop = ''; // drop previous pins so measurements are fresh
+    // margin-top positions against the <td>'s content box, not its border box - the
+    // padding has to come off cellHeight first, or the name lands pushed one padding's
+    // worth below true centre (measured directly: ~1.9px off on a ~17px padding, enough
+    // to see).
+    const cellStyle = getComputedStyle(td);
+    const paddingTop = parseFloat(cellStyle.paddingTop) || 0;
+    const paddingBottom = parseFloat(cellStyle.paddingBottom) || 0;
+    const contentHeight = td.getBoundingClientRect().height - paddingTop - paddingBottom;
+    const nameHeight = nameEl.getBoundingClientRect().height;
+    const subHeight = subEl.getBoundingClientRect().height;
+    const spaceAbove = Math.max(0, (contentHeight - nameHeight) / 2);
+    const spaceBelow = Math.max(0, contentHeight - spaceAbove - nameHeight);
+    if (td.closest('.is-flexible-chart')) {
+      // Keep the name's own center when the note fits below it. A tight row centers
+      // the group instead of growing solely to reserve empty space above the name.
+      if (spaceBelow < subHeight) return;
+      const nameTop = td.getBoundingClientRect().top + paddingTop + spaceAbove;
+      const subTop = nameTop + nameHeight + (spaceBelow - subHeight) / 2;
+      // Relative offsets do not increase a flexible row's intrinsic height or move
+      // the other rows while their notes are being centered.
+      nameEl.style.top = (nameTop - nameEl.getBoundingClientRect().top) + 'px';
+      subEl.style.top = (subTop - subEl.getBoundingClientRect().top) + 'px';
+      nameEl.style.position = subEl.style.position = 'relative';
+      return;
+    }
+    nameEl.style.marginTop = spaceAbove + 'px';
+    subEl.style.marginTop = Math.max(0, (spaceBelow - subHeight) / 2) + 'px';
   });
 }
 
@@ -376,19 +1053,26 @@ function rtlOrdered(columns) {
   return [...columns].reverse();
 }
 
-function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, onChange, effectiveSeason, { announced = false } = {}) {
+function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, settings, sheet, state, effectiveSeason, { announced = false, showMolad = false, fullSeason = false } = {}) {
   const page = document.createElement('div');
-  page.className = 'page';
+  page.className = 'page' + (fullSeason ? ' is-full-season' : '');
   const isEnglish = state.settings.language === 'en';
   const dir = isEnglish ? 'ltr' : 'rtl';
   const footerNote = sheet.season === 'weekday' ? WEEKDAY_FOOTER_NOTE : state.settings.footerNote;
-  const orderedColumns = isEnglish ? columns : rtlOrdered(columns);
+  const sunsetColumn = { key: 'H-sunset', header: 'שקיעה' };
+  // The canonical columns run opposite the Friday reading order. Inserting before G
+  // puts sunset after Mincha/Maariv and before Maariv in both table directions.
+  const splitSunset = fullSeason && columns.some(c => c.key === 'H');
+  const printColumns = splitSunset ? columns.flatMap(c => c.key === 'G' ? [sunsetColumn, c] : [c]) : columns;
+  const orderedColumns = isEnglish ? printColumns : rtlOrdered(printColumns);
   const isWeekday = effectiveSeason === 'weekday';
-
   const colDefs = isEnglish ? [...orderedColumns.map((c) => c.key), 'parsha'] : ['parsha', ...orderedColumns.map((c) => c.key)];
-  const colgroup = '<colgroup>' + colDefs.map((key) => `<col data-colkey="${key}"${sheet.columnWidths[key] ? ` style="width:${Number(sheet.columnWidths[key]) || 0}px"` : ''}>`).join('') + '</colgroup>';
+  const colgroup = '<colgroup>' + colDefs.map((key) => {
+    const width = Number(sheet.columnWidths[key]) || 0;
+    return `<col data-colkey="${key}"${width > 0 ? ` style="width:${width}px"${fullSeason ? ` data-saved-width="${width}"` : ''}` : ''}>`;
+  }).join('') + '</colgroup>';
 
-  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(nl2br(c.header))}</th>`).join('');
+  const theadCols = orderedColumns.map((c) => `<th${hebrewLang(c.header)}>${markHeaderRoom(headerHtml(c))}</th>`).join('');
   // The Weekday chart titles its parsha column, matching the printed board; the Shabbos
   // charts leave that corner blank. (th is white-space: pre-line, so the \n is a break.)
   const parshaHeader = isWeekday ? 'Weekday\nזמנים' : isEnglish ? 'Parsha' : ' ';
@@ -408,8 +1092,72 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
      below carry the same error in opposite directions and it cancels: 6.8px and 6.8px. */
   const panelRow = Math.round((pageWeeks.length - 0.7) / 2);
 
+  /* Every day of חנוכה on this page, through Friday, across every week the page holds - one
+     list, asked once, so the panel and the generic ר"ח ובה"ב heading below can never
+     disagree about which days are חנוכה's. Through Friday (chanukahDaysThroughFriday, not
+     the row-scoped chanukahDaysInWeek), since the panel's own heading already speaks for
+     Sunday through Friday - a Friday that is itself חנוכה, some years also ר"ח טבת, still
+     needs its morning said somewhere, and the panel is the only place that ever does. */
+  const chanukahPageDays = isWeekday
+    ? pageWeeks.flatMap((w) => chanukahDaysThroughFriday(w.serial, settings))
+    : [];
+
+  const roshChodeshBlocks = [];
+  if (isWeekday) {
+    const chanukahSet = new Set(chanukahPageDays);
+    for (const week of pageWeeks) for (let offset = 6; offset >= 1; offset--) {
+      const serial = week.serial - offset;
+      if (!hasRoshChodesh(serial, settings) || chanukahSet.has(serial)) continue;
+      const schedule = roshChodeshSchedule(serial, settings);
+      const block = roshChodeshBlocks.find(block => block.html === schedule.html);
+      if (block) {
+        if (!block.months.includes(schedule.month)) block.months.push(schedule.month);
+        block.traces.push(...schedule.lines.flat().map(cell => cell.trace));
+      } else roshChodeshBlocks.push({ html: schedule.html, months: [schedule.month],
+        traces: schedule.lines.flat().map(cell => cell.trace) });
+    }
+  }
+  const panelHtml = (() => {
+    if (!isWeekday) return '';
+    const kinds = specialShacharisKinds(pageWeeks.map((w) => w.serial), settings);
+    // Rosh Chodesh now has dated, sunrise-aware blocks of its own. BHB and fast
+    // mornings keep their standing schedule; Teves remains in the Chanukah block.
+    kinds.roshChodesh = false;
+    const rcHeading = block => {
+      if (block.months.length > 1) return 'ראש חודש';
+      return `ר"ח ${JEWISH_MONTHS_HE[block.months[0] - 1]}`;
+    };
+    const matchingRoshChodesh = kinds.behab || kinds.taanis
+      ? roshChodeshBlocks.find(block => block.html === WEEKDAY_SHACHARIS_SPECIAL) : null;
+    const heading = [specialShacharisHeading(kinds), matchingRoshChodesh ? rcHeading(matchingRoshChodesh) : '']
+      .filter(Boolean).join(' · ');
+    const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
+    const chanukahBlocks = chanukahPanelBlocks(chanukahPageDays, settings);
+    // Both of חנוכה's own blocks, heading and schedule together, inside one light-background
+    // box of their own (.chanukah-highlight, see shacharis-grid.js's own handling of this one
+    // div) - set apart from the standing ר"ח ובה"ב block beside it rather than carrying a mark
+    // of their own the way the tag on a touching week's own מעריב row does.
+    const chanukahInner = (chanukahBlocks.regular ? `<u>חנוכה</u>\n${chanukahBlocks.regular}` : '')
+      + (chanukahBlocks.roshChodesh ? `${chanukahBlocks.regular ? '\n\n' : ''}<u>ר"ח טבת · חנוכה</u>\n${chanukahBlocks.roshChodesh}` : '');
+    const chanukahHtml = chanukahInner ? `\n\n<div class="chanukah-highlight">${chanukahInner}</div>` : '';
+    const rcHtml = roshChodeshBlocks.filter(block => block !== matchingRoshChodesh)
+      .map(block => `\n\n<u>${escText(rcHeading(block))}</u>\n${block.html}`).join('');
+    return WEEKDAY_SHACHARIS + (special ? `\n\n<u>${escText(heading)}</u>\n${special}` : '') + rcHtml + chanukahHtml;
+  })();
+  const panelLaid = isWeekday ? (shacharisGridHtml(panelHtml) || panelHtml) : '';
+  const panelTraces = isWeekday ? [
+    ...enteredTimeTraces(WEEKDAY_SHACHARIS + WEEKDAY_SHACHARIS_SPECIAL, 'the standing weekday morning schedule'),
+    ...roshChodeshBlocks.flatMap(block => block.traces),
+    ...[...new Set(chanukahPageDays.map(serial => chanukahYearFor(serial, settings)))].flatMap(year =>
+      chanukahPostedShacharisRows(year, settings).map(row => row.vasikin.trace)),
+    ...chanukahPageDays.flatMap(serial => {
+      const day = chanukahShacharisDay(serial, settings);
+      return [...day.lines, zman('נץ', day.netz)];
+    }),
+  ] : [];
+
   const rows = pageWeeks
-    .map((week, rowIndex) => {
+    .map((week, weekIdx) => {
       // The Weekday chart's מנחה/מעריב are computed now (sheets/weekday.js), but the
       // Tisha B'Av note and the Rules engine still don't reach it: both are keyed to the
       // קיץ/חורף columns, and a rule's column key is season-qualified ("kayitz:C"), so
@@ -421,6 +1169,9 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
       // as a real קיץ sheet would for these weeks.
       const ruled = isWeekday ? computed : applyRules(computed, withHebrewDate(week, settings), state.rules, effectiveSeason, appliedColumns);
       const { row, overriddenKeys } = mergeRow(ruled, sheet, week.serial);
+      const candleHtml = fullSeason && !isWeekday
+        ? overriddenKeys.has('H') ? row.H ?? '' : nl2br(row.printOverrides?.H ?? row.H ?? '') : '';
+      const candleParts = fullSeason && !isWeekday ? fullSeasonCandleParts(candleHtml) : null;
       const cellHtml = (c) => {
         /* שחרית on the Weekday chart: one cell a row, like every other column, and the
            schedule on a panel laid over them.
@@ -434,26 +1185,10 @@ function renderPage(pageWeeks, pageIndex, totalPages, columns, buildRow, setting
            nl2br/esc. */
         if (isWeekday && c.key === 'E') {
           // Every row but the one the panel hangs from is an empty cell carrying nothing
-          // but its own row.
-          if (rowIndex !== panelRow) return '<td class="shacharis-through"></td>';
-          /* Both schedules on the printed chart, rebuilt from the two fields with the heading
-             between them, so the wall chart looks the way it always has.
-             The heading names only the kinds of day this page's own weeks actually hold, and
-             where they hold none of the three the second schedule comes off with it: see
-             specialShacharisKinds. It used to read ר"ח בה"ב ותענ"צ on every chart of every
-             season, which named days that were not on the paper, בה"ב being two weeks of the
-             year and a weekday תענית missing from whole seasons. Asked for by the shul, and
-             worked out per page rather than per chart because this cell is a page's cell: a
-             season split over two pages says on each what that page is about. */
-          const heading = specialShacharisHeading(
-            specialShacharisKinds(pageWeeks.map((w) => w.serial), settings));
-          const special = heading ? WEEKDAY_SHACHARIS_SPECIAL : '';
-          const html =
-            WEEKDAY_SHACHARIS +
-            (special ? `
-
-<u>${escText(heading)}</u>
-${special}` : '');
+          // but its own row - a week made entirely of חנוכה included, whose own morning
+          // now shows on that one shared panel too (see chanukahPageDays above), the same
+          // as a week only partly inside חנוכה always has.
+          if (weekIdx !== panelRow) return '<td class="shacharis-through"></td>';
           /* This row's cell is a row like the others and carries the panel, which is laid out
              of it and over the whole column.
              --rows is the page's row count and --above is how many rows sit above this one,
@@ -462,46 +1197,152 @@ ${special}` : '');
              syncHeaderRowHeight), so a length in multiples of 100% of this cell is a length in
              rows, on screen, on paper and under any zoom. See .shacharis-panel in app.css for
              the arithmetic. */
-          /* Set in columns where it can be, so the times stand under each other and the slashes
-             stop wandering from line to line. shacharisGridHtml hands back nothing at all when
-             what it is given is not a block of times, and then this prints it as written. See
-             ui/shacharis-grid.js. */
-          const laid = shacharisGridHtml(html) || html;
           return `<td class="shacharis-through is-panel"
             style="--rows: ${pageWeeks.length}; --above: ${panelRow}">
-            <div class="shacharis-panel"><div class="shacharis-panel-in">${laid}</div></div></td>`;
+            <div class="shacharis-panel"><div class="shacharis-panel-in"${timeExplanationAttrs({ header: 'שחרית', chartName: 'Weekday chart', printed: panelHtml, times: panelTraces })}>${panelLaid}</div></div></td>`;
         }
         // מנחה/מעריב on the Weekday chart: computed from the shul's standing weekday
-        // schedule (see sheets/weekday.js) and still editable on top, so typing over a
-        // week stores an override the same as any other column. An override already
-        // holds real HTML; a computed value is still sentinel/newline text and needs
+        // schedule (see sheets/weekday.js), with any existing saved overrides retained.
+        // An override already holds real HTML; a computed value is still sentinel/newline text and needs
         // nl2br, exactly like the Shabbos columns below.
         if (isWeekday && (c.key === 'B' || c.key === 'C')) {
-          const value = announced ? announcedWeekCell(row[c.key] ?? '', c.key, week.serial) : row[c.key] ?? '';
-          const html = overriddenKeys.has(c.key) ? value : nl2br(value);
-          return `<td><div class="cell" contenteditable="true" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+          // The 11:30 "NEW" tag lives only here: a hand-typed override already wins
+          // outright and is never printed through printOverrides, and every other reader
+          // of this column (the week card, "what is on next", the messages page) reads
+          // row[c.key] directly and never sees the tag either. See sheets/weekday.js.
+          const overridden = overriddenKeys.has(c.key);
+          const computedValue = overridden ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
+          const value = announced ? announcedWeekCell(computedValue, c.key, week.serial, settings) : computedValue;
+          const html = overridden ? value : nl2br(value);
+          return `<td><div class="cell" data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · Weekday chart`, { value, announcedWeek: announced ? { anchor: week.serial, settings } : null })}>${html}</div></td>`;
+        }
+        if (fullSeason && (c.key === 'H' || c.key === 'H-sunset')) {
+          const sunset = c.key === 'H-sunset';
+          const html = candleParts ? candleParts[sunset ? 1 : 0] : sunset ? '' : candleHtml;
+          const flagged = overriddenKeys.has('H') ? 'overridden' : appliedColumns.has('H') ? 'ruled' : '';
+          return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-source-col="H" data-season="${effectiveSeason}"${chartExplanationAttrs(row, 'H', c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`, { value: html })}>${html}</div></td>`;
         }
         const flagged = appliedColumns.has(c.key) && !overriddenKeys.has(c.key) ? 'ruled' : overriddenKeys.has(c.key) ? 'overridden' : '';
-        // Overridden cells already hold real HTML (captured from the editable div,
-        // possibly with manual <u> underlining); computed cells still need nl2br().
-        const html = overriddenKeys.has(c.key) ? row[c.key] ?? '' : nl2br(row[c.key] ?? '');
-        // data-season records which season this *page* rendered as, so a later edit
-        // (see the blur handler below) recomputes its "did this really change?"
-        // baseline the same way, without having to re-derive the page split.
-        return `<td class="${flagged}"><div class="cell" contenteditable="true"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}">${html}</div></td>`;
+        // Saved overrides already hold real HTML, possibly with manual <u> underlining;
+        // computed cells still need nl2br().
+        // printOverrides is read here too, same as the Weekday chart's own B/C above: the
+        // Shabbos chart's own Erev Shabbos מנחה column (I) carries the "חנוכה" tag on its
+        // own extra 12:15 this same way (see choref.js), and every other reader of this
+        // column - a hand-typed override, week.specialParsha, anything that reads row.I
+        // directly - still sees the plain untagged time.
+        const computedValue = overriddenKeys.has(c.key) ? row[c.key] ?? '' : row.printOverrides?.[c.key] ?? row[c.key] ?? '';
+        const html = overriddenKeys.has(c.key) ? computedValue : nl2br(computedValue);
+        return `<td class="${flagged}"><div class="cell"${hebrewLang(html)} data-serial="${Number(week.serial)}" data-col="${c.key}" data-season="${effectiveSeason}"${chartExplanationAttrs(row, c.key, c.header, `${week.parsha || ''} · ${sheet.name || effectiveSeason}`)}>${html}</div></td>`;
       };
       const cells = orderedColumns.map(cellHtml).join('');
       // A week whose Shabbos is Yom Tov has no parsha, so it carries the Yom Tov's own
       // name (see weeks.js). Printed as it stands, "סוכות" reads as though this row held
       // the times for Yom Tov; it holds the ordinary weekdays around it, so it is named
       // for the week: "שבוע של סוכות". A parsha is left exactly as it is.
-      const parshaCell = weekOfLabel(week.parsha, isEnglish) + (week.specialParsha ? '\n' + week.specialParsha : '');
+      // The שבת charts say when the שבת itself is inside חנוכה, or is the שבת right in front
+      // of it (never in a קיץ week, which חנוכה cannot fall in to begin with). The Weekday
+      // chart says the same thing its own way: a week made entirely of חנוכה names it right
+      // in the parsha cell; a week only partly חנוכה keeps its plain name, since it is not
+      // the week the eight days belong to on their own.
+      const chanukahLabel = isWeekday ? null : chanukahShabbosLabel(week.serial, settings);
+      const weekAllChanukah = isWeekday && chanukahDaysInWeek(week.serial, settings).length === 5;
+      // showMolad is closed by default (renderPage's own parameter) regardless of what
+      // this week's own date works out to - see this function's own caller,
+      // buildSheetPages, for why that default is what keeps the congregation's own
+      // reading copy from ever showing it.
+      // Worked out fresh from week.serial rather than read off a stored week.mevarchim /
+      // week.molad: a sheet saved before this feature existed, or before some later fix
+      // to the molad calculation itself, carries neither field, and the switch has no
+      // effect on a sheet that was never regenerated since - caught on a real saved
+      // sheet, where turning Molad on changed nothing. Reading the calendar directly off
+      // the date it is already showing is also what the rest of this project does for
+      // anything that must not go stale in a saved sheet (the Weekday chart's own
+      // schedules, WEEKDAY_SHACHARIS and its kin, are the same pattern): the one place
+      // that is ever asked is the one place that can never disagree with itself.
+      const mevarchimMonth = !isWeekday && showMolad ? shabbosMevarchimMonth(week.serial, settings) : null;
+      const molad = mevarchimMonth ? moladLabel(moladFor(mevarchimMonth.year, mevarchimMonth.month), settings) : null;
+      const hasMevarchim = Boolean(molad);
+      // A special parsha (שקלים, החדש, …) always joins the parsha name's own line, the
+      // same inline "· " join "· חנוכה" already uses below, rather than sitting on a
+      // line of its own under it - asked for directly, in place of the line it used to
+      // get only on a week with no molad, which read as two different conventions for
+      // the same thing depending on what else that week happened to carry. A week that
+      // also has a molad note can come out three lines this way (name · special, then
+      // the molad's own line, now itself sometimes two more under Yiddish) - the
+      // chart's own auto-shrink absorbs that the same way it absorbs any other page that
+      // needs more room than 816px holds, rather than this reaching for a second
+      // convention to dodge it.
+      const parshaCell = weekOfLabel(week.parsha, isEnglish)
+        + (week.specialParsha ? ` · ${week.specialParsha}` : '')
+        + (chanukahLabel === 'chanukah' || weekAllChanukah ? ' · חנוכה' : '');
       // An explicit width from the column-width panel has to beat the CSS min-width
       // floor on .parsha-cell (see app.css) - otherwise setting a narrower one there
       // would silently do nothing. Inline, so it outranks the stylesheet.
       const parshaWidth = sheet.columnWidths.parsha ? ` style="min-width:${Number(sheet.columnWidths.parsha) || 0}px"` : '';
-      const parshaTd = `<td class="parsha-cell"${parshaWidth}${hebrewLang(parshaCell)}>${nl2br(parshaCell)}</td>`;
-      return `<tr>${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
+      // The molad is the same kind of note as ערב חנוכה below it: smaller, on a line of its
+      // own under the parsha rather than beside it at full size, and only on the שבת chart
+      // (isWeekday above keeps it off the Weekday chart's own week list entirely). Already
+      // a complete, language-matched sentence (hebrew-calendar.js's own moladLabel), not
+      // escaped again here any more than specialParsha or parsha are.
+      // The "שבת מברכים" label itself was dropped - asked for directly - so the molad
+      // line, where there is one, is what says this Shabbos is מברכים.
+      //
+      // is-molad sets its own, smaller size and nowrap (see .parsha-note.is-molad in
+      // app.css): the molad sentence is long enough that at the ordinary note size it
+      // wrapped to a second line on a content-squeezed page, measured directly on a real
+      // generated חורף chart - which cannot be let happen, since every row on a page is
+      // pinned to one shared height (syncHeaderRowHeight) and a row whose own content
+      // needs more than that pushes past it, taking the whole 816px page past its own
+      // fixed height with it (and, on a Shabbos chart, misaligns the Weekday chart
+      // printed side by side with it, which lines up pair per row). nowrap on its own,
+      // without the smaller size, makes it worse under table-layout:auto rather than
+      // better: a cell's minimum width becomes the note's own whole width, so the
+      // narrower the note, the narrower table-layout:auto in turn lets the column be -
+      // measured directly, the column kept shrinking in step with the font with nothing
+      // but nowrap, wrap and all. The two together are what breaks that loop.
+      //
+      // A week whose own special parsha (שקלים, החדש, …) also lands here joins the
+      // parsha name's own line (see parshaCell above) rather than taking a line of its
+      // own, which is what let a three-line cell (name, special parsha, molad) overflow
+      // in the first place - except the one double-barrelled parsha name long enough on
+      // its own to still wrap even joined ("ויקהל - פקודי · החדש", measured). Under the
+      // Compact Hebrew molad (one line) that case is no better and no worse than before
+      // the join: still three lines, ~5px past the page's own 816px. Under Yiddish, whose
+      // own sentence is two lines (moladLabelYiddish's own <br>, asked for directly), the
+      // same week is four lines total: tightened with .parsha-note.is-molad's own
+      // line-height (see app.css), down from ~27px past to ~7px, close to Compact
+      // Hebrew's own baseline rather than well past it. Shortening the molad sentence
+      // itself would close the rest of the gap and has not been asked for.
+      const mevarchimNote = hasMevarchim ? `<span class="parsha-note is-molad">${molad}</span>` : '';
+      // ערב חנוכה is written smaller, on a line of its own under the parsha - it names the
+      // week ahead rather than this one, so it does not belong beside the parsha at full
+      // size the way "· חנוכה" does for a שבת that is itself inside the eight days.
+      const erevChanukahNote = chanukahLabel === 'erev' ? '<span class="parsha-note">ערב חנוכה</span>' : '';
+      // A week with a molad note used to have the parsha name pulled up off the row's own
+      // centre, since vertical-align:middle on the <td> centres the name and the note
+      // together as one two-line block - asked to stop: the name should sit exactly where
+      // it sits on a week with no molad, and the molad note should hang under it, centred
+      // in whatever room is left below. parsha-cell-centered (app.css) and
+      // centerMoladNotes below do that by measuring and writing an explicit margin-top on
+      // each of .parsha-cell-name/.parsha-cell-sub, the same technique
+      // syncHeaderRowHeight already uses for the row itself - a flex-column attempt at
+      // this (height: 100% on a wrapper inside the <td>, an empty ::before as the
+      // matching spacer) measured as not reaching the cell's real height at all in a real
+      // browser: percentage heights inside a table cell are exactly the kind of thing
+      // that does not reliably resolve, and the sub region came out 0px, the note centred
+      // on a single point rather than in the space below the name.
+      // Only the compact Hebrew molad gets it, asked for directly: the Yiddish molad is
+      // two lines of its own (moladLabelYiddish's own <br>) and may not leave enough room
+      // below the name to stay centred in it, so that format keeps the plain stacked
+      // layout it already had.
+      const centerMolad = hasMevarchim && settings.moladFormat !== 'yiddish';
+      const parshaClass = centerMolad ? 'parsha-cell parsha-cell-centered' : 'parsha-cell';
+      const parshaHtml = centerMolad
+        ? `<div class="parsha-cell-name">${nl2br(parshaCell)}</div>`
+          + `<div class="parsha-cell-sub">${[mevarchimNote, erevChanukahNote].filter(Boolean).join('<br>')}</div>`
+        : nl2br(parshaCell) + [mevarchimNote, erevChanukahNote].filter(Boolean).map((n) => '<br>' + n).join('');
+      const parshaTd = `<td class="${parshaClass}"${parshaWidth}${hebrewLang(parshaCell)}>${parshaHtml}</td>`;
+      return `<tr data-week-serial="${Number(week.serial)}">${isEnglish ? cells + parshaTd : parshaTd + cells}</tr>`;
     })
     .join('');
   const theadRow = isEnglish ? theadCols + `<th>${parshaHeader}</th>` : `<th>${parshaHeader}</th>` + theadCols;
@@ -509,7 +1350,7 @@ ${special}` : '');
   page.innerHTML = `
     <div class="page-header">
       <div class="header-row">
-        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage)}" alt="">
+        <img class="header-icon" src="${safeHeaderImage(state.settings.headerIconImage, true)}" alt="">
         <div class="header-center">
           <img class="header-logo" src="/assets/logo-text.png" alt="${escAttr(state.settings.shulName)}"${hebrewLang(state.settings.shulName)}>
           ${state.settings.headerSubtitle ? `<div class="header-subtitle"${hebrewLang(state.settings.headerSubtitle)}>${escText(state.settings.headerSubtitle)}</div>` : ''}
@@ -532,51 +1373,52 @@ ${special}` : '');
     </div>
   `;
 
-  /** What this cell would hold with no manual override - what an edit is diffed against
-   *  to decide whether it's a real change worth storing. */
-  const baselineHtmlFor = (cellEl) => {
-    const col = cellEl.dataset.col;
-    const weekSeason = cellEl.dataset.season;
-    const week = sheet.weeks.find((w) => w.serial === Number(cellEl.dataset.serial));
-    const settingsResolved = resolveSettings(state.settings);
-    const builtRow = splitBuild(weekSeason)({ ...week, date: new Date(week.date) }, settingsResolved);
-    const computed = builtRow;
-    const ruled = weekSeason === 'weekday' ? computed : applyRules(computed, withHebrewDate({ ...week, date: new Date(week.date) }, settingsResolved), state.rules, weekSeason);
-    const raw = ruled[col] ?? '';
-    // Every column, Weekday included, is built as plain text with underline sentinels
-    // that nl2br has to mark up first - or the comparison would see markup-vs-none and
-    // store a bogus override on a cell nobody actually edited.
-    return normalizeRichText(nl2br(raw));
-  };
-
-  const commitCell = (cellEl) => {
-    const serial = Number(cellEl.dataset.serial);
-    const col = cellEl.dataset.col;
-    const newHtml = normalizeRichText(cellEl.innerHTML);
-    const before = getOverride(sheet, serial, col); // undefined = "no override"
-    const after = newHtml === baselineHtmlFor(cellEl) ? undefined : newHtml;
-    if (before === after) return; // no real change (e.g. just clicked in and out)
-    applyOverrideValue(sheet, serial, col, after);
-    const hist = getHistory(sheet.id);
-    hist.undo.push({ serial, col, before, after });
-    hist.redo = []; // a fresh edit invalidates any redo history
-    onChange({ save: true });
-  };
-
-  page.querySelectorAll('.cell').forEach((cellEl) => {
-    cellEl.addEventListener('keydown', (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'u') {
-        e.preventDefault();
-        document.execCommand('underline');
-      }
-    });
-    cellEl.addEventListener('blur', () => {
-      applyTimeShorthand(cellEl); // "1220 130" -> "12:20/1:30"
-      commitCell(cellEl);
-    });
+  // SVG artwork prints even when a browser omits CSS backgrounds. Add it after the
+  // schedule grid is built so it cannot affect time parsing, text or row measurements.
+  page.querySelectorAll('.chanukah-highlight').forEach(highlight => {
+    highlight.insertAdjacentHTML('afterbegin', '<svg class="chanukah-highlight-fill" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true" focusable="false"><rect width="1" height="1"/></svg>');
   });
+  useStraightHebrewQuotes(page);
+  if (fullSeason) singleLineSeasonCells(page);
 
   return page;
+}
+
+// Split only the recognized candle/sunset pair. Unusual saved edits stay together
+// in their original cell, retaining all their wording and formatting.
+function fullSeasonCandleParts(html) {
+  const root = document.createElement('div'); root.innerHTML = html;
+  const br = root.querySelector('br');
+  if (!br || !/^\s*\d{1,2}:\d{2}\s*שקיעה\s*\d{1,2}:\d{2}\s*$/.test(root.textContent)) return null;
+  const before = document.createRange(); before.selectNodeContents(root); before.setEndBefore(br);
+  const after = document.createRange(); after.selectNodeContents(root); after.setStartAfter(br);
+  const candle = document.createElement('div'), sunset = document.createElement('div');
+  candle.append(before.cloneContents()); sunset.append(after.cloneContents());
+  if (!/^\s*\d{1,2}:\d{2}\s*$/.test(candle.textContent)
+    || !/^\s*שקיעה\s*\d{1,2}:\d{2}\s*$/.test(sunset.textContent)) return null;
+  const walker = document.createTreeWalker(sunset, NodeFilter.SHOW_TEXT);
+  while (walker.nextNode()) if (walker.currentNode.textContent.includes('שקיעה')) {
+    walker.currentNode.textContent = walker.currentNode.textContent.replace('שקיעה', '').trimStart();
+    break;
+  }
+  return [candle.innerHTML, sunset.innerHTML];
+}
+
+function singleLineSeasonCells(page) {
+  for (const cell of page.querySelectorAll('.cell')) {
+    if (cell.querySelector('.tisha-evening-grid')) continue;
+    cell.querySelectorAll('br').forEach(br => br.replaceWith(document.createTextNode(SLASH)));
+    // Keep rich text and calculation attributes while flattening normal editor blocks.
+    for (const block of [...cell.querySelectorAll('div,p')].reverse()) {
+      if (block.previousSibling?.textContent.trim() && !/\/\s*$/.test(block.previousSibling.textContent)) block.before(document.createTextNode(SLASH));
+      if (block.nextSibling?.textContent.trim() && !/^\s*\//.test(block.nextSibling.textContent)) block.after(document.createTextNode(SLASH));
+      const inline = document.createElement('span');
+      for (const attr of block.attributes) inline.setAttribute(attr.name, attr.value);
+      inline.style.display = 'inline'; inline.append(...block.childNodes); block.replaceWith(inline);
+    }
+    const walker = document.createTreeWalker(cell, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) walker.currentNode.textContent = walker.currentNode.textContent.replace(/\r?\n/g, SLASH);
+  }
 }
 
 /** Attaches the week's Hebrew date so rules can match on it (see rules.js). Computed
@@ -586,9 +1428,30 @@ function withHebrewDate(week, settings) {
   return { ...week, hebrew: hebrewDateExtended(week.serial, settings.useGregorianBefore1582) };
 }
 
-function splitBuild(season) {
-  if (season === 'weekday') return buildWeekdayRow;
-  return season === 'kayitz' ? buildKayitzRow : buildChorefRow;
+/** A column's heading, its first line at the heading's own regular size and, when the
+ *  column is marked headerSub (sheets/kayitz.js, sheets/choref.js), every line after that
+ *  smaller - what the name on the first line is read against, whether that is two opinions,
+ *  a room or the day the מנין falls on. Not every multi-line heading is this
+ *  shape: the Weekday chart's own "מנחה\nמעריב" names two coequal תפילות on two lines, and
+ *  "הדלקת\nנרות" is one phrase broken in two, so headerSub is a flag the column sets rather
+ *  than a pattern guessed from the text, to keep those two from being read the same way.
+ *  Wrapped only for this <th>'s own HTML: c.header itself stays the plain string it always
+ *  was, because rules-view's own checkbox labels, week-view's and weekly-reader's week card,
+ *  and erev-text.js all read that same string apart from this table and do not know
+ *  smallText()'s sentinel - only this function's own call to nl2br does. */
+function headerHtml(c) {
+  if (!c.headerSub) return nl2br(c.header);
+  const [first, ...rest] = String(c.header).split('\n');
+  const isRoom = line => /^\([^()]+\)$/.test(line);
+  if (rest.some(isRoom)) {
+    // Each line uses its own font's line height instead of the heading's full-size strut.
+    // markHeaderRoom wraps the room text as a direct child of this compact group.
+    return '<span class="chart-room-heading"><span>' + nl2br(first) + '</span>'
+      + rest.map(line => isRoom(line) ? nl2br(line)
+        : '<span class="cell-small">' + nl2br(line) + '</span>').join('') + '</span>';
+  }
+  // Other headings keep their standard line breaks and smaller basis text.
+  return nl2br(first) + rest.map(line => '<br><span class="cell-small">' + nl2br(line) + '</span>').join('');
 }
 
 // Converts UL_START/UL_END sentinels (see format.js) into real <u> elements *after*
@@ -614,6 +1477,25 @@ function nl2br(str) {
   // matched as whitespace rather than written out.
   const trimmed = escText(str).replace(new RegExp(UL_START + '\\s+', 'g'), UL_START);
   const escaped = trimmed.split(UL_START).join('<u>').split(UL_END).join('</u>');
-  return escaped.replace(/\n/g, '<br>');
+  // The "NEW" tag (see NEW_TAG_START/MID/END in format.js): same after-escaping swap as
+  // the underline sentinels just above, so a literal "<" typed by the shul can never be
+  // read back as this markup - only the three PUA characters newMinyanTag() itself wrote
+  // in sheets/weekday.js can trigger it.
+  const tagged = escaped
+    .split(NEW_TAG_START).join('<span class="new-minyan-tag">')
+    .split(NEW_TAG_MID).join('<span class="tag-word">')
+    .split(NEW_TAG_END).join('</span></span>');
+  // The "חנוכה" tag (see CHANUKAH_TAG_START/MID/END in format.js, chanukahTag() in
+  // sheets/weekday.js): the same mechanism again, for חנוכה's own extra/different weekday
+  // מנחה/מעריב time sitting right on a touching week's own row.
+  const chanukahTagged = tagged
+    .split(CHANUKAH_TAG_START).join('<span class="chanukah-tag">')
+    .split(CHANUKAH_TAG_MID).join('<span class="tag-word">')
+    .split(CHANUKAH_TAG_END).join('</span></span>');
+  // smallText() (format.js): the stricter/alternate reading beside the main one - פלג under
+  // its מנחה, מ"א beside גר"א - set smaller, same idea as .head-room on a heading.
+  const smalled = chanukahTagged
+    .split(SMALL_START).join('<span class="cell-small">')
+    .split(SMALL_END).join('</span>');
+  return smalled.replace(/\n/g, '<br>');
 }
-

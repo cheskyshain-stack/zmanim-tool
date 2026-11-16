@@ -1,0 +1,22 @@
+{
+  "name": "zmanim-traffic",
+  "main": "traffic-worker.js",
+  "account_id": "04b085d9f19ac1ba6d333e0006fc94c1",
+  "compatibility_date": "2026-09-10",
+  "workers_dev": true,
+  "keep_vars": true,
+  "vars": {
+    "CF_ACCOUNT_ID": "04b085d9f19ac1ba6d333e0006fc94c1",
+    "CF_SITE_TAG": "abd00a69157843b2bb7275c8a265d88f"
+  },
+  "kv_namespaces": [
+    { "binding": "ARCHIVE", "id": "2149d6d4ea604c358453b956aa80901e" }
+  ],
+  "triggers": { "crons": ["0 4,5 * * *"] },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": { "enabled": true, "invocation_logs": true, "persist": true },
+    "traces": { "enabled": false, "persist": true, "head_sampling_rate": 1 }
+  }
+}

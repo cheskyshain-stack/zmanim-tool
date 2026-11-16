@@ -12,14 +12,131 @@ import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
 import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
+import { keepPosition } from './ui/keep-position.js';
 import { wireCopyButton, copyToClipboard } from './ui/copy.js';
 import { showBlocked } from './ui/blocked.js';
 import { renderWeek } from './ui/week-view.js';
-import { renderChartBrowser } from './ui/chart-view.js';
+import { renderChartBrowser, chartSpreads, spreadIndexForNow, CHART_EARLY_DAYS } from './ui/chart-view.js';
 import { currentOnePageSheets, layoutPosters } from './ui/posters-view.js';
 import { printButtonHtml, wirePrintButton, setPrintPage } from './ui/print-page.js';
+import { shulNow, dateFromSerial } from './zmanim/solar.js';
+import { loadTables } from './data-loader.js';
+let congregationScheduleTables = null;
+import { hasParsha } from './hebrew-calendar.js';
+import { wireInstalledSystemBars } from './ui/system-bars.js';
+import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
+import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
+import { wireCandleLightingDialog } from './ui/candle-lighting-dialog.js';
+
+enableWebsitePreview(location.search);
 
 const main = document.getElementById('main');
+/** Which week /week/ is currently showing, moved by Previous/This week/Next - see
+ *  renderWeekPage. Module level rather than a closure inside it so a stale-tab reload
+ *  (watchForStaleTab, saveRestorePoint) can read it without renderWeekPage knowing that
+ *  reloading is a thing that happens. null means "whichever is next", the page's own
+ *  default. */
+let weekShowing = null;
+let candleDialogCleanup = null;
+let chartViewCleanup = null;
+
+/** Reload this tab after it has sat open a full day, so a page left running on a kiosk or a
+ *  phone that is never actually closed eventually picks up fresh data - a republished
+ *  chart, a new season, code from a deploy - rather than running forever on whatever
+ *  loaded whenever it was first opened. http(s) only: the offline copy has nothing newer
+ *  to fetch, and a file:// reload is a page sitting on a USB stick, not a stale tab.
+ *
+ *  Never in the middle of anything. A reload only ever happens at one of two kinds of
+ *  moment: the instant a new page is about to open - a menu tap, back, forward - where the
+ *  reader has already left for somewhere else and reloading there is simply opening that
+ *  page fresh instead of from this old script; or, on the page the reader is already on,
+ *  only once they have stopped touching it for a while (IDLE_BEFORE_REFRESH_MS) or have
+ *  just come back to a tab that sat in the background (visibilitychange, pageshow's own
+ *  bfcache restore, focus) - never mid-scroll, mid-tap, or while they are actively reading.
+ *  A plain interval alone would have reloaded under a thumb mid-swipe; checking idle time
+ *  first is what rules that out.
+ *
+ *  Timed by checking elapsed time rather than a single 24-hour setTimeout, because a
+ *  background tab's timers are throttled or paused by the browser and a long setTimeout is
+ *  not reliable sleep there.
+ *
+ *  Held back while a donation panel is open (see wireDonateFrames): pulling the page out
+ *  from under somebody mid-payment is a worse cost than a day-old price sitting on screen
+ *  a little longer. */
+const REFRESH_AFTER_MS = 24 * 60 * 60 * 1000;
+const IDLE_BEFORE_REFRESH_MS = 5 * 60 * 1000;
+const RELOAD_RESTORE_KEY = 'zmanim-reload-restore';
+
+const openedAt = Date.now();
+let lastInteraction = openedAt;
+const tabIsStale = () => Date.now() - openedAt >= REFRESH_AFTER_MS;
+const donationPanelOpen = () => Boolean(document.querySelector('.luach-give-frame:not([hidden])'));
+const candleDialogOpen = () => Boolean(main.querySelector('.luach-candle-dialog[open]'));
+
+/** What it takes to land back where the reader was. The page itself needs nothing saved -
+ *  reload() repeats the same address - so this is only the scroll position and, on
+ *  /week/, which week was showing: the one piece of this site's own state that Previous,
+ *  This week and Next (see renderWeekPage, weekShowing) keep off the address bar. Read
+ *  once, by takeRestorePoint below, and cleared the moment it is read, so a reader who
+ *  closes this tab and opens a fresh one later is never silently scrolled somewhere old. */
+function saveRestorePoint() {
+  try {
+    sessionStorage.setItem(RELOAD_RESTORE_KEY, JSON.stringify({
+      path: location.pathname, scrollY: window.scrollY, weekShowing,
+    }));
+  } catch { /* no sessionStorage - the reload still happens, just without the memory of it */ }
+}
+
+/** Reload now, on the page the reader is already on: the only one of the two safe moments
+ *  (see watchForStaleTab) that needs saveRestorePoint, since reload() alone would otherwise
+ *  land back at the top of the same page rather than where they actually were. */
+function reloadInPlace() {
+  saveRestorePoint();
+  location.reload();
+}
+
+/** Consumed once, before the very first render on a fresh load: what to put back if this
+ *  load is the other end of reloadInPlace. Null on an ordinary load, or when the saved page
+ *  is not the one this address is actually on - typing a different address, or reloading by
+ *  hand, must never scroll a reader somewhere that page never asked for. */
+function takeRestorePoint() {
+  try {
+    const raw = sessionStorage.getItem(RELOAD_RESTORE_KEY);
+    sessionStorage.removeItem(RELOAD_RESTORE_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    return saved && saved.path === location.pathname ? saved : null;
+  } catch {
+    return null;
+  }
+}
+
+function watchForStaleTab() {
+  if (location.protocol !== 'http:' && location.protocol !== 'https:') return;
+  const markActive = () => { lastInteraction = Date.now(); };
+  for (const type of ['pointerdown', 'touchstart', 'keydown', 'scroll', 'wheel']) {
+    window.addEventListener(type, markActive, { passive: true, capture: true });
+  }
+  // The only trigger that waits rather than acting the moment it is asked: everything
+  // else below is already a safe moment on its own.
+  setInterval(() => {
+    if (!tabIsStale() || donationPanelOpen() || candleDialogOpen()) return;
+    if (Date.now() - lastInteraction < IDLE_BEFORE_REFRESH_MS) return;
+    reloadInPlace();
+  }, 60000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+  });
+  window.addEventListener('pageshow', (ev) => {
+    // persisted: restored from the back-forward cache, i.e. a tab that sat aside for a
+    // while - not the ordinary pageshow every fresh load also fires, which openedAt being
+    // brand new already keeps tabIsStale() from acting on.
+    if (ev.persisted && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+  });
+  window.addEventListener('focus', () => {
+    if (tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+  });
+}
 
 
 /* The two marks on the menu, and the chevron on the end of each. The clock goes on the
@@ -32,6 +149,7 @@ const ICON_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="no
   <rect x="3" y="5" width="18" height="16" rx="2.6"/><path d="M8 2.6v4M16 2.6v4M3 10h18"/>
   <path d="M7.6 13.6h.01M12 13.6h.01M16.4 13.6h.01M7.6 17.4h.01M12 17.4h.01M16.4 17.4h.01" stroke-width="2.3"/>
 </svg>`;
+const ICON_COMMUNITY_CALENDAR = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M8 14h1M15 14h1M8 18h1M15 18h1"/></svg>`;
 const ICON_CALENDAR_CLOCK = `<svg class="luach-item-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">
   <path d="M10.5 21H5.6A2.6 2.6 0 0 1 3 18.4V7.6A2.6 2.6 0 0 1 5.6 5h12.8A2.6 2.6 0 0 1 21 7.6v3M8 2.6v4M16 2.6v4M3 10h18"/>
   <circle cx="17" cy="17" r="5.2"/><path d="M17 14v3l2 1.2"/>
@@ -117,9 +235,9 @@ const giveIcon = (key, cls) =>
  *  than one way to give and more than one thing to give to, so it opens a page of them
  *  instead, and this list is that page. Adding a way, or filling one in, is a line here.
  *
- *  Three ways to give, each a drawer that opens where it stands. Collapsed, a way is its
- *  mark, its name and a line saying what it is, so the whole page is three lines long and
- *  a donor picks before reading anything else. What is inside differs by way:
+ *  The page starts with collapsed campaigns. Each campaign reveals only its accepted
+ *  payment methods; selecting one then reveals the form or recipient details below it.
+ *  What is inside differs by way:
  *
  *  `accounts` is one or more payment pages, which is what the card and ACH way holds: the
  *  shul and the building fund bill through two separate merchant pages, so each is named
@@ -129,12 +247,8 @@ const giveIcon = (key, cls) =>
  *  in a window with no address bar, and a payment page in there would have no URL and no
  *  padlock to check it by, so the frame carries the host name itself.
  *
- *  `funds` are what a payment page carries once it is reached, read off its own menus, so
- *  a donor can see whether what they want is behind a link without opening it and hunting.
- *  All of them are written out on one line and the line scrolls sideways where it does not
- *  fit, so the list is never folded and never has to be asked to open. No count is written
- *  anywhere either: a number saying how many there are would only be one more thing that
- *  could come to disagree with the names beside it.
+ *  `funds` records the designations available inside a merchant's form. `zelle` on an
+ *  account enables the confirmed Zelle recipient only for that campaign.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
  *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
@@ -144,34 +258,8 @@ const giveIcon = (key, cls) =>
  *  its details are to follow, so the page says what exists rather than pretending it does
  *  not.
  */
-/** The shul's name in English, which the wordmark cannot supply because it is a picture and
- *  the Hebrew one cannot because it is Hebrew. Written once here and read from both the
- *  masthead and the donation page's thanks line, so the two can never come to disagree. */
-const SHUL_ENGLISH = 'Bais Medrash of Lakewood Commons';
-
-/** The shul's federal tax ID, in the footer of every page and on the Donors' Fund card.
- *  One constant for both: it is the number somebody types into another app to give money,
- *  and two places to write it is one place for a digit to go wrong. */
+/** One federal tax ID for the donation footer and DAF provider searches. */
 const SHUL_TAX_ID = '26-4527675';
-
-/** The shul, small, in the top left of the cap.
- *
- *  The cap is empty on the menu and carries the back link and the page name on every other
- *  screen, so the left of it is the one place on this page already understood as the corner
- *  where a thing sits. It goes there rather than in the flow, which keeps the wordmark
- *  centred and leaves the next minyan card exactly where it was: on a phone that card is
- *  why the site was opened, and nothing should push it down.
- *
- *  One file at 240px and 11KB. The original is 2454px and 2.4MB, and at this size even a
- *  three times screen only asks for about 174px across, so a single small copy covers every
- *  phone there is with room to spare. width and height are on the tag so the corner is the
- *  right shape before the file lands.
- *
- *  Not a link and not a button: it says whose site this is, the way the wordmark under it
- *  does, and there is nowhere for it to go that the menu does not already offer. */
-const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
-      width="240" height="141" decoding="async"
-      alt="${SHUL_ENGLISH}, 44 Coles Way, Lakewood">`;
 
 /** The footer that ends every page: the address.
  *
@@ -190,6 +278,13 @@ const SHUL_PHOTO = `<img class="luach-cap-photo" src="/assets/shul-240.jpg"
 const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
+
+const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer">
+  ${footHtml(s)}
+  <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
+  ${legal}
+  <p class="luach-calculation-credit no-print">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
+</footer>`;
 
 /** The address, cut so that where it takes two lines the break falls between the shul's name
  *  and its street address.
@@ -245,35 +340,14 @@ document.fonts.ready.then(updateFootDots);
 
 const DONATE = {
   name: 'Donate',
-  heading: 'Donation Options',
-  thanks: `Thank you for supporting ${SHUL_ENGLISH}.`,
-  /* What the shul is, for the donor deciding. Under the ways to give rather than over
-     them: it is not what the page is for, it is the reassurance somebody wants once they
-     have decided to give and before they type a card number.
-   *
-   * The tax ID is in it, and this is now the only place on the site it is written out. It
-   * was in the footer of every page before there was anywhere better for it: a number on
-   * its own with nothing saying what it was. Here it sits with the words it belongs to, so
-   * somebody copying it for an accountant copies it from a sentence that says what it is.
-   * The address is still left out, since the footer says it two lines below and saying it
-   * twice within an inch reads as a form rather than as a sentence.
-   *
-   * The digits are in a bdi. Nothing in this paragraph is Hebrew today, so nothing reorders
-   * today, but a tax ID is two numbers around a hyphen, which is exactly the shape that
-   * comes out backwards if a Hebrew word ever lands beside it. The isolation costs nothing
-   * and travels with the number wherever this line is moved to next.
-   *
-   * "to the extent permitted by law" is the standard wording and is not a hedge invented
-   * here: what a particular donor may actually deduct depends on their own return, not on
-   * the shul, and a flat promise that every donation is deductible is a claim the shul is
-   * not in a position to make for somebody else. */
-  legal: `${SHUL_ENGLISH} is a New Jersey registered not for profit, exempt under section
-    501(c)(3). Tax ID <bdi>${SHUL_TAX_ID}</bdi>. Donations are tax deductible to the extent
-    permitted by law.`,
+  heading: 'Donate',
+  thanks: 'Choose a campaign',
+  legal: 'New Jersey 501(c)(3) nonprofit',
+  deductible: 'Donations are tax deductible to the extent permitted by law.',
   ways: [
     {
-      title: 'Credit/Debit Card \u00b7 ACH',
-      blurb: 'Give securely online using your credit or debit card, or via ACH.',
+      title: 'Card \u00b7 ACH',
+      blurb: 'Credit card, debit card, or bank account',
       icon: 'card',
       accounts: [
         {
@@ -302,17 +376,22 @@ const DONATE = {
           title: 'Eiruv / Building Fund',
           href: 'https://secure.cardknox.com/lckerenhabinyan',
         },
-        { title: 'Neileich', href: 'https://www.neileich.org/', cta: 'Open Neileich' },
+        {
+          title: 'Neileich',
+          zelle: true,
+          href: 'https://secure.cardknox.com/neileich',
+          websiteHref: 'https://www.neileich.org/',
+          websiteLabel: 'Visit Neileich\u2019s full website',
+        },
         { title: 'Keren Zichron Zechariah', href: 'https://secure.cardknox.com/kerenzichronzechariah', cta: 'Donate' },
       ],
     },
     {
       title: 'Zelle',
-      blurb: 'Give quickly and securely with Zelle.',
+      how: 'Send through Zelle in your banking app.',
       icon: 'zelle',
-      // Blank until the address is confirmed. One invented to fill the space would send
-      // somebody's money somewhere, and that is not a thing to guess at.
-      copy: { label: '', value: '' },
+      recipient: 'Bais Medrash of Lakewood Commons',
+      copy: { label: '', value: 'donations@neileich.org', buttonLabel: 'Copy email' },
     },
     {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
@@ -321,19 +400,18 @@ const DONATE = {
       title: 'DAF',
       blurb: 'Donor Advised Fund',
       icon: 'shul',
-      /* Three of the four logos are the provider's own file on the provider's own server.
-         OJC's is a small bitmap (the one WordPress upload their site links) and it arrived
-         on the tile visibly soft, which the user saw on a phone. So that one is ours:
-         assets/daf-ojc.png, built from the mark on OJC's own donor portal, which is the
-         page the tile links to and so the mark a donor sees next. The tile draws it about
-         99 x 40, so it is shipped 330 wide, over 3x for a phone. See the note on
-         .luach-daf-provider img in app.css for how it was made.
-         The other three stay remote until there is artwork to replace them with, and the
-         alt text below is what a tile shows when any of them does not arrive. Each url is
-         the provider's own sign-in, since a donor here already has an account to spend. */
-      providers: [{"name":"The Donors Fund","url":"https://www.thedonorsfund.org/portal/sign-in","logo":"https://www.thedonorsfund.org/assets/img/logo.svg"},{"name":"Pledger","url":"https://pledgercharitable.org/","logo":"https://www.pledgercharitable.org/Content/newdesign/images/logo.svg"},{"name":"OJC Fund","url":"https://portal.ojcfund.org/Account/Login","logo":"/assets/daf-ojc.png"},{"name":"Matbia","url":"https://app.matbia.org/welcomebox","logo":"https://matbia.org/images/Matbia-logo.svg"}],
-      how: 'Choose your DAF provider and find Bais Medrash of Lakewood Commons using Tax ID 26-4527675.',
-      copy: { label: 'Tax ID', value: SHUL_TAX_ID },
+      iconImage: '/assets/daf-providers-transparent.png',
+      // Local provider artwork keeps the complete list available without another host.
+      providers: [
+        { name: 'The Donors Fund', url: 'https://www.thedonorsfund.org/portal/sign-in', logo: '/assets/daf-donors-fund.svg' },
+        { name: 'Pledger', url: 'https://pledgercharitable.org/', logo: '/assets/daf-pledger.svg' },
+        { name: 'OJC Fund', url: 'https://portal.ojcfund.org/Account/Login', logo: '/assets/daf-ojc.png' },
+        { name: 'Matbia', url: 'https://app.matbia.org/welcomebox', logo: '/assets/daf-matbia.svg' },
+        { name: 'iMaaser', url: 'https://app.imaaser.org/donor/login', logo: '/assets/daf-imaaser.svg' },
+      ],
+      how: 'Search using the shul\u2019s EIN.',
+      copy: { label: 'EIN', value: SHUL_TAX_ID, buttonLabel: 'Copy EIN' },
+      taxId: SHUL_TAX_ID,
     },
   ],
 };
@@ -383,7 +461,7 @@ const ICON_WAIT = `<svg class="luach-next-wait" viewBox="0 0 24 24" fill="none" 
 const SHOW_NEXT_MINYAN = true;
 function nextUpState(published, settings) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  const now = new Date();
+  const now = websiteNow();
   // A chart that cannot be read must not take the page down with it: the menu below is
   // the point of this screen and it works whether or not this card has anything to say.
   const safely = (fn) => { try { return fn(); } catch { return null; } };
@@ -395,28 +473,29 @@ function nextUpState(published, settings) {
 
 function nextUpHtml([minyan, candles]) {
   if (!minyan && !candles) return '';
+  const paired = Boolean(minyan && candles);
 
-  // The name, the room and the time are three siblings rather than the name and the room
-  // being one lump, because the row they sit in runs right to left and each of them has to
-  // take its own place in that order: שחרית, then למטה, then the time. The mark is outside
-  // that row, so it keeps the left-hand end whichever way the words run.
+  // Keep the name and its room together when a narrow card puts the time on its own row.
+  // Both Hebrew pieces retain their own direction inside the shared description.
   const box = (kind, icon, item, tone) => {
     if (!item) return '';
     const when = howFar(item);
-    return `<div class="luach-next-box ${tone}">
+    const description = `<bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
+      ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}`;
+    const lookup = tone === 'is-candles' ? ` role="button" tabindex="0" aria-haspopup="dialog" aria-label="Candle lighting, ${escAttr(clock(item.mins))} ${escAttr(meridiem(item.mins))}. Look up another ZIP code" data-candle-date="${escAttr(item.serial)}"` : '';
+    return `<div class="luach-next-box ${tone}"${lookup}>
       <p class="luach-next-head">${escAttr(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
         <div class="luach-next-main">
-          <bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
-          ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}
+          ${paired ? `<div class="luach-next-description">${description}</div>` : description}
           <span class="luach-next-time">${escAttr(clock(item.mins))}<small>${escAttr(meridiem(item.mins))}</small></span>
         </div>
       </div>
-      ${when ? `<p class="luach-next-when">${ICON_WAIT}${escAttr(when)}</p>` : ''}
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}<span class="luach-next-countdown">${escAttr(when).replace(/(\d+) (hours?|minutes?)/g, '$1&nbsp;$2')}</span></p>` : ''}
     </div>`;
   };
-  return `<div class="luach-next" aria-live="polite">
+  return `<div class="luach-next${paired ? ' is-paired' : ''}" aria-live="polite">
     ${box('Next minyan', ICON_MINYAN, minyan, 'is-minyan')}${box('Candle lighting', ICON_CANDLES, candles, 'is-candles')}
   </div>`;
 }
@@ -443,7 +522,7 @@ function nextUpHtml([minyan, candles]) {
 function backBar(where) {
   const schedulePage = where === 'chart' || where === 'schedules';
   return `<div class="luach-bar no-print">
-    <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : 'Menu'}</a>
+    <a class="luach-back" href="${schedulePage ? '/week/' : '/'}" aria-label="${schedulePage ? 'Back to Weekly Zmanim' : where === 'donate' ? 'Back to Home' : 'Back to Menu'}">&larr; ${schedulePage ? 'Zmanim' : where === 'donate' ? 'Home' : 'Menu'}</a>
     <h1 class="luach-bar-title">${escAttr(where === 'week' ? 'Zmanim' : PAGE_NAMES[where] || '')}</h1>
     ${where === 'donate' ? '' : `<a class="luach-bar-give" href="/donate/">${ICON_HEART_SMALL}Donate</a>`}
   </div>`;
@@ -456,31 +535,44 @@ function backBar(where) {
  *  1280. On a phone the two are the same thing, which is how it went unnoticed. */
 function homeHtml(published) {
   const s = published.settings;
-  return `<div class="luach-bar luach-bar-plain no-print">${SHUL_PHOTO}</div>
-    <header class="luach-masthead">
-      <!-- The wordmark is a picture, so on its own it leaves this heading with no words in
-           it. The English name goes in beside it, clipped out of the layout but not out of
-           the page, which is what a crawler and a screen reader read. Hardcoded rather than
-           a setting, the same as the thanks line on the donation page: this repository is
-           this shul's, and a second place to type the name is a second place for it to end
-           up written differently. -->
-      <h1 class="luach-masthead-name"><svg class="luach-approved-name" viewBox="0 0 600 65" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg><span class="luach-sr">${SHUL_ENGLISH}</span></h1>
-      ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
-    </header>
+  // The build copies this same template into the initial HTML, before scripts arrive.
+  return `${document.getElementById('luach-home-header').innerHTML}
+    <div class="luach-home-layout">
     <div class="luach-home">
     ${nextUpHtml(nextUpState(published, resolveSettings(published.settings)))}
     <nav class="luach-menu">
-      <a class="luach-item" href="/week/">
-        ${ICON_CALENDAR_CLOCK}<span class="luach-item-title">Zmanim</span>${CHEVRON}
+      <a class="luach-item luach-home-primary" href="/week/">
+        ${ICON_CALENDAR_CLOCK}<span class="luach-item-copy"><span class="luach-item-title">Zmanim</span><span class="luach-item-description">Daily minyanim &amp; Shabbos times</span></span>${CHEVRON}
       </a>
       <a class="luach-item" href="/donate/">
-        ${ICON_HEART}<span class="luach-item-title">${escAttr(DONATE.name)}</span>${CHEVRON}
+        ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>
+      <button class="luach-item luach-coming-soon-card" type="button" aria-disabled="true" aria-label="Community calendar, coming soon" data-calendar-preview>
+        ${ICON_COMMUNITY_CALENDAR}<span class="luach-item-copy"><span class="luach-item-title">Community calendar</span><span class="luach-coming-soon-tag">Coming soon</span></span>
+      </button>
     </nav>
-    ${rule()}
-    ${footHtml(s)}
-    <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email">info@baismedrashoflakewoodcommons.org</a></p>
-  </div>`;
+    </div>
+    </div>
+    ${siteFooterHtml(s)}`;
+}
+
+/** Read both the date and parsha in the shul's calendar, including after a tab wakes. */
+async function refreshHomeDate(settings) {
+  const label = main.querySelector('.luach-home-date');
+  if (!label) return;
+  const { serial } = shulNow(websiteNow(), settings);
+  const date = dateFromSerial(serial);
+  const text = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long', month: 'long', day: 'numeric', timeZone: 'UTC',
+  }).format(date).replace(/^Saturday,/, 'Shabbos,');
+  label.textContent = text;
+  try {
+    const tables = await loadTables();
+    if (!label.isConnected) return;
+    const shabbos = serial + (6 - date.getUTCDay() + 7) % 7;
+    const parsha = hasParsha(shabbos, { ...settings, english: true }, tables);
+    label.textContent = text + (parsha ? ` · Parshas ${parsha}` : '');
+  } catch { /* The date remains useful if the calendar tables cannot be read. */ }
 }
 
 /** When the card next needs redrawing: the moment the number on it changes.
@@ -590,6 +682,12 @@ function startNextUp(published) {
     // the card could not come back when midnight rolled into a day that has one.
     const home = main.querySelector('.luach-home');
     if (!home) return stopNextUp(); // the page moved on
+    if (candleDialogOpen()) {
+      clearTimeout(nextUpTimer);
+      nextUpTimer = setTimeout(draw, 60000);
+      return;
+    }
+    refreshHomeDate(settings);
     const items = nextUpState(published, settings);
     const html = nextUpHtml(items);
     const card = home.querySelector('.luach-next');
@@ -618,17 +716,126 @@ function startNextUp(published) {
   window.addEventListener('resize', nextUpFit);
 }
 
+/** The one-device flag for the "new chart" pop-up: which chart this browser has already
+ *  been told about. A single value rather than a growing list, since only one chart is
+ *  ever eligible to announce at a time (see chartAnnouncement below) and the one before it
+ *  has nothing left to say once a new one replaces it here. */
+const CHART_ANNOUNCE_KEY = 'zmanim-chart-announced';
+function announcedChartId() {
+  try { return localStorage.getItem(CHART_ANNOUNCE_KEY); } catch { return null; }
+}
+function markChartAnnounced(id) {
+  if (isWebsitePreview()) return;
+  try { localStorage.setItem(CHART_ANNOUNCE_KEY, id); } catch { /* no localStorage, no pop-up either */ }
+}
+
+/** Whether there is a chart worth telling the congregation about right now, and which one.
+ *
+ *  "Right now" is the chart spreadIndexForNow is already showing - the one /chart/ opens
+ *  to - so this can never announce a chart the page itself is not on, and whether it has
+ *  started showing at all (its own CHART_EARLY_DAYS early window) is spreadIndexForNow's
+ *  call entirely, not re-asked here: it answers off the current week, which on a Friday is
+ *  already tomorrow's Shabbos, not literally today's calendar date, and a second, plainer
+ *  "today" computed here could disagree with it by a day or two right at the boundary.
+ *
+ *  What is asked here is the other half: whether it has been showing too long to still be
+ *  news. CHART_EARLY_DAYS again, now counted forward in calendar days in the shul's own
+ *  time zone (shulNow, not a plain new Date() reading) from the chart's own first date, so
+ *  the pop-up survives one more week once that date has actually arrived and then stops -
+ *  the window the shul asked for is seven days on each side of that date, and the early
+ *  side is already given by spreadIndexForNow's own pick.
+ *
+ *  The id is the spread itself (season, Hebrew year, and which of that season's pages),
+ *  so a page turning within the same season is its own announcement, same as a new season
+ *  starting - both are "a new chart" on the question the shul was asked. */
+function chartAnnouncement(published) {
+  try {
+    const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
+    const settings = resolveSettings(published.settings);
+    const spreads = chartSpreads(state);
+    if (!spreads.length) return null;
+    const at = spreadIndexForNow(spreads, state, settings);
+    const spread = spreads[at];
+    const start = Math.min(...spread.serials);
+    const today = shulNow(websiteNow(), settings).serial;
+    if (today > start + CHART_EARLY_DAYS) return null;
+    return { id: `${spread.sheet.season}:${spread.sheet.hebrewYear}:${spread.index}`, season: spread.sheet.season };
+  } catch {
+    return null; // a chart that cannot be read must not take the home page down with it
+  }
+}
+
+function chartAnnouncementHtml(announcement) {
+  const season = announcement.season === 'choref' ? 'Winter Zmanim' : announcement.season === 'kayitz' ? 'Summer Zmanim' : 'Zmanim';
+  return `<dialog class="luach-announce no-print" aria-labelledby="luach-announce-season luach-announce-title">
+    <button type="button" class="luach-announce-close" aria-label="Close">&times;</button>
+    <div class="luach-announce-header">
+      <span class="luach-announce-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="16" rx="2"/><path d="M8 3v4m8-4v4M4 11h16m-12 5 2 2 5-5"/></svg></span>
+      <p id="luach-announce-season" class="luach-announce-season">${escAttr(season)}</p>
+      <h2 id="luach-announce-title" class="luach-announce-title">New chart is up</h2>
+    </div>
+    <div class="luach-announce-footer"><a class="luach-announce-open" href="/chart/">View Chart<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg></a></div>
+  </dialog>`;
+}
+
+/** Wired once, right after the dialog is put on the page. Closing it is the only thing
+ *  this needs to do for itself: the "first time only" rule is already settled by the
+ *  moment it was marked announced, before it was ever shown, and the Open link is a plain
+ *  same-origin link that wireNav already takes over like any other. */
+function wireChartAnnouncement(root) {
+  const dialog = root.querySelector('.luach-announce');
+  if (!dialog) return;
+  dialog.querySelector('.luach-announce-close')?.addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', (e) => { if (e.target === dialog) dialog.close(); });
+  dialog.addEventListener('close', () => dialog.remove());
+  dialog.showModal();
+}
+
 function renderHome(published) {
-  // The menu, and only the menu, is laid out to fill the screen (see is-home in app.css).
-  // The pages behind it are as tall as the board on them and must not be stretched.
+  // Home and Donate use the approved compact design; charts keep their own layout.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
   // The card is drawn here as well as by the ticker, so the row is asked here too rather
   // than waiting for the first tick, which may be an hour off.
   markNextInline(main);
+  candleDialogCleanup = wireCandleLightingDialog(main, resolveSettings(published.settings));
   openTheDoor();
+  wireCalendarPreview(main.querySelector('[data-calendar-preview]'));
   startNextUp(published);
+
+  const toAnnounce = chartAnnouncement(published);
+  if (toAnnounce && announcedChartId() !== toAnnounce.id) {
+    // Marked before it is shown, not after it is dismissed: "the first time" means the
+    // first time it is put on the screen, not the first time somebody closes it.
+    markChartAnnounced(toAnnounce.id);
+    main.insertAdjacentHTML('beforeend', chartAnnouncementHtml(toAnnounce));
+    wireChartAnnouncement(main);
+  }
+}
+
+// Keep ordinary activation inert. Native disabled buttons suppress touch/click events,
+// so this placeholder uses aria-disabled and a deliberate three-click/tap sequence.
+// The destination still requires its existing server-checked calendar account.
+function wireCalendarPreview(button) {
+  if (!button) return;
+  let count = 0, first = 0, last = 0;
+  const reset = () => { count = first = last = 0; };
+  button.addEventListener('click', event => {
+    event.preventDefault();
+    const now = performance.now();
+    if (!count || now - last > 750 || now - first > 1500) { count = 0; first = now; }
+    last = now;
+    if (++count < 3) return;
+    reset();
+    location.assign('/admin/calendar/?preview=congregation');
+  });
+  button.addEventListener('pointercancel', reset);
+  button.addEventListener('blur', reset);
+  button.closest('.luach-home')?.addEventListener('pointerdown', event => {
+    if (!button.contains(event.target)) reset();
+  });
 }
 
 /** Three taps in the navy cap go to the generator. Wired after every render, since each
@@ -640,9 +847,13 @@ function openTheDoor() {
 function renderWeekPage(published) {
   stopNextUp();
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
-  let serial = null;
-  const draw = () => {
+  const draw = () => keepPosition(main, () => {
     clearTimeout(nextUpTimer);
+    // Keep the minute refresh from dismissing room details while someone reads them.
+    if (main.querySelector('.reader-room-dialog[open]')) {
+      nextUpTimer = setTimeout(draw, 60000 - Date.now() % 60000 + 50);
+      return;
+    }
     const expanded = new Map([...main.querySelectorAll('[data-agenda-key]')].map(el=>[el.dataset.agendaKey,el.open]));
     main.className = '';
     main.innerHTML = backBar('week') + '<div id="week-host"></div>';
@@ -651,10 +862,10 @@ function renderWeekPage(published) {
       main.querySelector('#week-host'),
       state,
       (next) => {
-        serial = next;
+        weekShowing = next;
         draw();
       },
-      serial,
+      weekShowing,
       { luach: true }
     );
     /* Previous, Today and Next used to live in a More options dropdown, whose open state had
@@ -664,7 +875,7 @@ function renderWeekPage(published) {
       if (expanded.has(el.dataset.agendaKey)) el.open = expanded.get(el.dataset.agendaKey);
     }
     nextUpTimer = setTimeout(draw, 60000 - Date.now() % 60000 + 50);
-  };
+  });
   draw();
 }
 
@@ -680,7 +891,7 @@ function renderWeekPage(published) {
 function schedulesNow(published) {
   const state = { settings: published.settings, sheets: published.sheets, rules: published.rules || [] };
   try {
-    return currentOnePageSheets(state, resolveSettings(published.settings));
+    return currentOnePageSheets(state, resolveSettings(published.settings), { tables: congregationScheduleTables });
   } catch (err) {
     // A sheet that will not build must not take the whole site down with it. The menu then
     // has one fewer thing on it, which is the same as there being nothing up.
@@ -708,18 +919,27 @@ function schedulesNow(published) {
 function renderSchedulesPage(published) {
   stopNextUp();
   const sheets = schedulesNow(published);
-  // Every sheet here is portrait: a one-page sheet is 8.5in by 11in whatever occasion it
-  // holds. See setPrintPage for why the page size comes from the view.
-  setPrintPage('letter portrait');
+  if (!sheets.length) {
+    if (location.protocol === 'http:' || location.protocol === 'https:') {
+      const home = new URL('/', location.href), target = isWebsitePreview() ? websitePreviewURL(home) : home;
+      history.replaceState(null, '', target.pathname + target.search);
+    }
+    stampPage('');
+    window.scrollTo(0, 0);
+    return renderHome(published);
+  }
+  const allHandouts = sheets.length > 0 && sheets.every(sheet => sheet.handout);
+  const mixedHandouts = !allHandouts && sheets.some(sheet => sheet.handout);
+  setPrintPage(allHandouts ? 'letter landscape' : 'letter portrait');
   main.className = '';
-  main.innerHTML = backBar('schedules') + `<div class="luach-sheets">
+  main.innerHTML = backBar('schedules') + `<div class="luach-sheets${allHandouts ? ' is-half-letter-print' : mixedHandouts ? ' has-mixed-handouts' : ''}">
     ${sheets.length ? `<div class="luach-sheet-print no-print">${printButtonHtml('sheet-print')}</div>` : ''}
     ${sheets.length
       ? sheets.map((sh) => `<section class="luach-sheet">
           <h2 class="luach-sheet-name no-print"${hebrewLang(sh.label)}>${escAttr(sh.label)}</h2>
           <p class="luach-sheet-when-he no-print" lang="he" dir="rtl">${escAttr(sh.when.he)}</p>
           <p class="luach-sheet-when no-print">${escAttr(sh.when.en)}</p>
-          <div class="luach-sheet-page">${sh.html}</div>
+          <div class="luach-sheet-page${sh.handout ? ' is-handout' : ''}">${sh.html}</div>
         </section>`).join('')
         + `<p class="luach-sheet-caveat no-print">Times are subject to change.</p>`
       : `<p class="luach-sheet-none">Nothing extra is up at the moment. The week's times are on
@@ -731,6 +951,15 @@ function renderSchedulesPage(published) {
     layoutPosters(main.querySelector('.luach-sheets'));
     wirePrintButton(main, 'sheet-print');
   }
+  const checkActive = () => {
+    if (!schedulesNow(published).length) return route(published);
+    nextUpTimer = setTimeout(checkActive, 60000 - Date.now() % 60000 + 50);
+  };
+  nextUpTimer = setTimeout(checkActive, 60000 - Date.now() % 60000 + 50);
+  nextUpWake = () => { if (document.visibilityState === 'hidden') return; clearTimeout(nextUpTimer); checkActive(); };
+  document.addEventListener('visibilitychange', nextUpWake);
+  window.addEventListener('pageshow', nextUpWake);
+  window.addEventListener('focus', nextUpWake);
 }
 
 function renderChartPage(published) {
@@ -742,96 +971,189 @@ function renderChartPage(published) {
   // confine: the congregation is shown the chart that is up now and no other. Three taps
   // on the chart itself opens the rest, which is also what lets the week view out of the
   // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
-  renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true });
+  chartViewCleanup = renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true, highlightCurrentWeek: true });
 }
 
-/** The ways to give, one card each.
- *
- *  The same card the menu uses, so the page reads as part of the site rather than as a
- *  form bolted to it: a link carries the outward arrow the menu's own outward link used
- *  to, and something to copy carries no arrow at all, because nothing happens when it is
- *  pressed. A way whose details have not arrived yet says so in the smaller type, which is
- *  the honest thing to put there and disappears the moment the line above it is filled in.
- *
- *  Nothing is rendered from published data here, so this page works whatever is or is not
- *  on the site, which is the point: giving should not depend on there being a chart up. */
-/** One way to give.
- *
- *  The card is a card rather than a link, because more than one thing on it can be
- *  pressed: the funds it covers, the whole list of them, and Donate itself. A card that
- *  was one big link could hold only one of those.
- *
- *  The chips are the funds, named. They are not links and not buttons: the page they lead
- *  to asks which fund in a menu of its own, so a chip that looked pressable would promise
- *  to choose for you and then not. They are there to answer "is the thing I want in here",
- *  which is the question somebody has before they press Donate.
- *
- *  A way with nowhere to go yet carries no Donate button. A button that did nothing would
- *  be worse than the line saying its details are still to come. */
-/** One payment page inside the card and ACH drawer: its name, the funds it carries, and
- *  the button that opens it. Two of them, because the shul and the building fund bill
- *  through separate merchant pages and a donor has to land on the right one. */
-function donateAccountHtml(acc) {
-  const external = acc.href === 'https://www.neileich.org/';
-  return `<div class="luach-give-account">
-    <a class="luach-fund-row${external ? '' : ' luach-give-go'}" href="${escAttr(acc.href)}" target="_blank" rel="noopener noreferrer">
+/** Campaigns come first; each owns its payment choices and recipient details. */
+function donateAccountHtml(acc, index) {
+  const prefix = `campaign-${index}`;
+  const card = DONATE.ways.find(way => way.icon === 'card');
+  const daf = DONATE.ways.find(way => way.providers);
+  const ways = [card, daf, ...(acc.zelle ? [DONATE.ways.find(way => way.icon === 'zelle')] : [])];
+  return `<div class="luach-give-account luach-campaign" data-campaign="${prefix}">
+    <h2 class="luach-campaign-heading"><button type="button" class="luach-fund-row luach-campaign-toggle" id="${prefix}-heading" aria-expanded="false" aria-controls="${prefix}-details">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
-      <span class="luach-fund-action">${external ? 'Visit Neileich' : 'Donate'} <span aria-hidden="true">&rarr;</span></span>
-    </a>
-    ${external ? '' : '<div class="luach-give-frame" hidden></div>'}
+      <span class="luach-fund-action" aria-hidden="true">&#8964;</span>
+    </button></h2>
+    <div class="luach-campaign-details" id="${prefix}-details" role="region" aria-labelledby="${prefix}-heading" hidden>
+      <div class="luach-payment-tabs" role="group" aria-label="Payment method for ${escAttr(acc.title)}" style="--payment-methods:${ways.length}">
+          ${ways.map(way => donateTabHtml(way, prefix)).join('')}
+      </div>
+      ${ways.map(way => donateWayHtml(way, prefix, acc)).join('')}
+    </div>
   </div>`;
 }
 
-/** A way to give, as a drawer.
- *
- *  A native details rather than a div and a click handler: it opens on Enter and Space,
- *  says whether it is open without being told to, and a browser that finds text inside a
- *  closed one opens it by itself. The name attribute is what makes the three exclusive
- *  where it is supported, and where it is not the only cost is two open at once.
- *
- *  Closed, every way is the same three things: mark, name, one line. That is the whole
- *  page, so the choice is made before anything else is read. */
-function donateWayHtml(way) {
-  const copy = way.copy
-    ? (way.copy.value || way.copy.label
-        ? `<p class="luach-copy">
-            ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}:</span>` : ''}
-            <span class="luach-copy-value">${escAttr(way.copy.value)}</span>
-            ${way.copy.value ? `<button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}">Copy</button>` : ''}
-          </p>`
-        : '<p class="luach-copy luach-copy-soon">Details to follow</p>')
+function donateCardHtml(acc) {
+  const website = acc.websiteHref
+    ? ` data-website-href="${escAttr(acc.websiteHref)}" data-website-label="${escAttr(acc.websiteLabel || 'Visit website')}"`
     : '';
-  const how = way.how ? `<p class="luach-give-how">${escAttr(way.how)}</p>` : '';
-  /* The four logos are the providers' own files on the providers' own servers, so the one
-     thing that cannot be assumed is that they arrive: a filter that blocks one of those
-     four hosts, a provider that moves its artwork, a phone on a bad signal. The label was
-     taken off these tiles once the logos were drawing them, and with alt="" a tile that
-     loses its picture is an empty box with nothing in it to click with confidence. This is
-     the shul's donation page, so the name is the alt text: the logo when it comes, the
-     provider's name when it does not, and never a blank tile. */
-  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.copy?.value || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"></a>`).join('');
-  const providerGrid = providers ? `<div class="luach-daf-providers">${providers}</div>` : '';
-  const accounts = (way.accounts || []).map(donateAccountHtml).join('');
-  const soon = !accounts && !way.copy ? '<p class="luach-give-soon">Details to follow</p>' : '';
-  /* Zelle and The Donors' Fund carry their own marks rather than a drawing of the idea, so
-     a donor recognises the service before reading the title. Zelle keeps its purple, the
-     one colour on this page that is not the site's own. Both are set larger than the line
-     icons beside them: a logo drawn to fill its roundel looks shrunken at the size that
-     suits a line drawing. */
-  const brand = way.icon === 'zelle' || way.icon === 'swirl';
-  const markClass = `luach-give-mark${way.icon === 'zelle' ? ' is-zelle' : ''}${brand ? ' is-brand' : ''}`;
-  const mark = giveIcon(way.icon, `luach-give-mark-svg${brand ? ' is-brand' : ''}`);
-  return `<details class="luach-give-card" name="luach-give">
-    <summary class="luach-give-head">
-      <span class="${markClass}" aria-hidden="true">${mark}</span>
-      <div class="luach-give-body">
-        <h3 class="luach-give-title">${escAttr(way.title)}</h3>
-        <p class="luach-give-blurb">${escAttr(way.blurb)}</p>
-      </div>
-      ${giveIcon('chev', 'luach-give-chev')}
-    </summary>
-    <div class="luach-give-open">${how}${copy}${providerGrid}${soon}${accounts}</div>
-  </details>`;
+  return `<a class="luach-give-go luach-reopen-form" href="${escAttr(acc.href)}"${website} target="_blank" rel="noopener noreferrer">Open secure card or bank form</a>
+    <div class="luach-give-frame" hidden></div>`;
+}
+
+/** One payment method, kept mounted so switching tabs preserves an entered form. */
+function donateWayHtml(way, prefix, account) {
+  const copy = way.copy?.value
+    ? `<div class="luach-copy">
+        <span class="luach-copy-info">
+          ${way.copy.label ? `<span class="luach-copy-label">${escAttr(way.copy.label)}</span>` : ''}
+          <bdi class="luach-copy-value">${escAttr(way.copy.value)}</bdi>
+        </span>
+        <button type="button" class="luach-copy-btn" data-copy="${escAttr(way.copy.value)}" aria-live="polite">${escAttr(way.copy.buttonLabel || 'Copy')}</button>
+      </div>`
+    : '';
+  const providers = (way.providers || []).map(p => `<a class="luach-daf-provider" data-tax-id="${escAttr(way.taxId || '')}" href="${escAttr(p.url)}" target="_blank" rel="noopener noreferrer"><img src="${escAttr(p.logo)}" alt="${escAttr(p.name)}" loading="lazy" referrerpolicy="no-referrer"><svg class="luach-daf-arrow" viewBox="0 0 24 24" aria-hidden="true" focusable="false" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>`).join('');
+  const card = way.icon === 'card';
+  const heading = providers ? 'Choose a provider' : `Give with ${way.title}`;
+  const intro = providers ? `${way.how} Designate your gift for ${account.title}.` : way.how || way.blurb;
+  return `<div class="luach-payment-panel${way.icon === 'zelle' ? ' is-zelle' : card ? ' is-card' : ''}" role="region" id="${prefix}-panel-${way.icon}" aria-labelledby="${prefix}-tab-${way.icon}" tabindex="-1" hidden>
+    ${card ? donateCardHtml(account) : `
+    ${way.icon === 'zelle' ? `<span class="luach-zelle-roundel" aria-hidden="true">${giveIcon('zelle', 'luach-zelle-logo')}</span>` : ''}
+    <h2 class="luach-payment-heading">${escAttr(heading)}</h2>
+    <p class="luach-payment-intro">${escAttr(intro)}</p>
+    ${way.recipient ? `<p class="luach-zelle-recipient">${escAttr(way.recipient)}</p>` : ''}
+    ${copy}
+    ${providers ? `<div class="luach-daf-providers">${providers}</div>` : ''}
+    `}
+  </div>`;
+}
+
+function donateTabHtml(way, prefix) {
+  const mark = way.icon === 'card' || way.icon === 'zelle'
+    ? giveIcon(way.icon, `luach-payment-icon${way.icon === 'zelle' ? ' is-zelle' : ''}`)
+    : '';
+  return `<button type="button" class="luach-payment-tab" data-method="${way.icon}" id="${prefix}-tab-${way.icon}" aria-expanded="false" aria-controls="${prefix}-panel-${way.icon}">${mark}${escAttr(way.title)}</button>`;
+}
+
+/** Payment choices reveal one method, without replacing an entered payment form. */
+function wireDonateTabs(root) {
+  const tabs = [...root.querySelectorAll('.luach-payment-tab')];
+  const select = (tab, focus = false) => {
+    donationScrollCleanup?.();
+    donationOpeningCleanup?.();
+    keepPosition(root, () => {
+      for (const item of tabs) {
+        const active = item === tab;
+        item.setAttribute('aria-expanded', String(active));
+        root.querySelector(`#${item.getAttribute('aria-controls')}`).hidden = !active;
+      }
+      if (focus) tab.focus({ preventScroll: true });
+      if (tab.dataset.method === 'card' && !root.querySelector('.luach-frame')) root.querySelector('.luach-give-go').click();
+      fitDonationScrollRoom(root.closest('main'), root.querySelector('.luach-campaign-toggle'));
+    }, { focus: false });
+    revealDonationCampaign(root.querySelector('.luach-campaign-toggle'));
+  };
+  for (const tab of tabs) {
+    tab.addEventListener('click', () => select(tab));
+    tab.addEventListener('keydown', event => {
+      const at = tabs.indexOf(tab);
+      let next;
+      if (event.key === 'ArrowRight') next = (at + 1) % tabs.length;
+      if (event.key === 'ArrowLeft') next = (at + tabs.length - 1) % tabs.length;
+      if (event.key === 'Home') next = 0;
+      if (event.key === 'End') next = tabs.length - 1;
+      if (next !== undefined) {
+        event.preventDefault();
+        select(tabs[next], true);
+      }
+    });
+  }
+}
+
+let donationScrollCleanup = null;
+let donationOpeningCleanup = null;
+
+/** Unfold the payment choices in place, keeping their final height automatic. */
+function animateDonationOpening(panel) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const height = panel.getBoundingClientRect().height;
+  panel.classList.add('is-opening');
+  const animation = panel.animate([
+    { height: '0px', opacity: 0 },
+    { height: `${height}px`, opacity: 1 },
+  ], { duration: 200, easing: 'cubic-bezier(.2,.7,.2,1)' });
+  const finish = () => {
+    animation.cancel();
+    panel.classList.remove('is-opening');
+    if (donationOpeningCleanup === finish) donationOpeningCleanup = null;
+  };
+  donationOpeningCleanup = finish;
+  animation.onfinish = finish;
+}
+
+function fitDonationScrollRoom(root, target) {
+  root.style.removeProperty('--donation-scroll-room');
+  if (!target || target.getAttribute('aria-expanded') !== 'true') return;
+  const offset = document.querySelector('.luach-bar')?.getBoundingClientRect().bottom || 0;
+  const destination = Math.max(0, scrollY + target.getBoundingClientRect().top - offset - 8);
+  const needed = Math.max(0, destination - (document.scrollingElement.scrollHeight - innerHeight));
+  root.style.setProperty('--donation-scroll-room', `${Math.ceil(needed)}px`);
+}
+
+/** A short, cancellable reveal puts the campaign immediately below the fixed cap. */
+function revealDonationCampaign(target) {
+  donationScrollCleanup?.();
+  const offset = document.querySelector('.luach-bar')?.getBoundingClientRect().bottom || 0;
+  const destination = Math.max(0, scrollY + target.getBoundingClientRect().top - offset - 8);
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    window.scrollTo({ top: destination, behavior: 'instant' });
+    return;
+  }
+  const from = scrollY, started = performance.now();
+  const controller = new AbortController();
+  let animation;
+  const finish = () => {
+    cancelAnimationFrame(animation);
+    controller.abort();
+    if (donationScrollCleanup === finish) donationScrollCleanup = null;
+  };
+  donationScrollCleanup = finish;
+  for (const event of ['wheel', 'touchmove', 'pointerdown', 'keydown', 'resize', 'pagehide']) {
+    window.addEventListener(event, finish, { capture: true, passive: true, signal: controller.signal });
+  }
+  const move = now => {
+    if (!target.isConnected) return finish();
+    const progress = Math.min(1, (now - started) / 360);
+    window.scrollTo({ top: from + (destination - from) * (1 - (1 - progress) ** 3), behavior: 'instant' });
+    if (progress < 1) animation = requestAnimationFrame(move);
+    else finish();
+  };
+  animation = requestAnimationFrame(move);
+}
+
+function wireDonateCampaigns(root) {
+  const campaigns = [...root.querySelectorAll('.luach-campaign')];
+  for (const campaign of campaigns) {
+    wireDonateTabs(campaign);
+    const toggle = campaign.querySelector('.luach-campaign-toggle');
+    toggle.addEventListener('click', () => {
+      donationScrollCleanup?.();
+      donationOpeningCleanup?.();
+      const opening = toggle.getAttribute('aria-expanded') !== 'true';
+      keepPosition(root, () => {
+        for (const item of campaigns) {
+          const active = item === campaign && opening;
+          item.querySelector('.luach-campaign-toggle').setAttribute('aria-expanded', String(active));
+          item.querySelector('.luach-campaign-details').hidden = !active;
+        }
+        if (opening && campaign.querySelector('[data-method="card"]').getAttribute('aria-expanded') === 'true'
+          && !campaign.querySelector('.luach-frame')) campaign.querySelector('.luach-give-go').click();
+        fitDonationScrollRoom(root, opening ? toggle : null);
+      });
+      if (opening) animateDonationOpening(campaign.querySelector('.luach-campaign-details'));
+    });
+  }
 }
 
 /** Put a card's detail on the clipboard, since the app it is wanted in is a tap away.
@@ -879,17 +1201,20 @@ function wireDonateCopy(root) {
  *  card into. It names the host, and it keeps a way out to a real tab, which is also the
  *  answer if the form will not frame at all: a payment page is entitled to refuse to be
  *  embedded, and when one does the frame comes up blank with nothing to catch from here. */
-function donateFrameHtml(href, label) {
+function donateFrameHtml(href, label, websiteHref = '', websiteLabel = 'Visit website') {
   let host = '';
   try { host = new URL(href, location.href).host; } catch (err) { host = ''; }
   const out = `href="${escAttr(href)}" target="_blank" rel="noopener noreferrer"`;
+  const barOut = websiteHref
+    ? `<a class="luach-frame-out luach-frame-website" href="${escAttr(websiteHref)}" target="_blank" rel="noopener noreferrer">${escAttr(websiteLabel)} <span aria-hidden="true">&#8599;</span></a>`
+    : `<a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>`;
   // The waiting state sits over the frame rather than in place of it, so the frame is
   // loading underneath the whole time and there is nothing to swap in when it arrives: the
   // cover is simply taken away. It is opaque because a form paints itself in pieces, and
   // half a form showing through would look broken rather than unfinished.
   return `<div class="luach-frame-bar">
       <span class="luach-frame-where">${giveIcon('lock', 'luach-frame-lock')}${escAttr(host)}</span>
-      <a class="luach-frame-out" ${out}>New tab <span aria-hidden="true">&#8599;</span></a>
+      ${barOut}
       <button type="button" class="luach-frame-shut" aria-label="Close the donation form">&times;</button>
     </div>
     <div class="luach-frame-wrap">
@@ -910,86 +1235,94 @@ function donateFrameHtml(href, label) {
  *  a card's form is not sitting live behind another card's. */
 function wireDonateFrames(root) {
   const panels = [...root.querySelectorAll('.luach-give-frame')];
+  const frameFits = new Map();
   // Scoped to the account and not to the card, which is the whole of a bug this had: the
-  // card and ACH way holds two payment pages, so asking the card for "the" frame handed
-  // both Donate buttons the first one. Pressing Building Fund opened its form in the panel
+  // card and ACH way holds multiple payment pages, so asking the card for "the" frame
+  // handed every Donate button the first one. Pressing Building Fund opened its form in the panel
   // belonging to Give to the Shul, under that heading, which on a page about money is not a
   // cosmetic mix-up.
-  const accountOf = (el) => el.closest('.luach-give-account') || el.closest('.luach-give-card');
+  const accountOf = (el) => el.closest('.luach-give-account');
   const shut = (panel) => {
+    frameFits.get(panel)?.disconnect();
+    frameFits.delete(panel);
     panel.hidden = true;
     panel.innerHTML = '';
     const go = accountOf(panel).querySelector('.luach-give-go');
     if (go) go.setAttribute('aria-expanded', 'false');
   };
   for (const go of root.querySelectorAll('.luach-give-go')) {
-    const card = go.closest('.luach-give-card');
+    const card = go.closest('.luach-payment-panel');
     const panel = accountOf(go).querySelector('.luach-give-frame');
     if (!panel) continue;
     go.setAttribute('aria-expanded', 'false');
     go.addEventListener('click', (e) => {
       if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
       e.preventDefault();
-      const opening = panel.hidden;
-      for (const other of panels) if (other !== panel && !other.hidden) shut(other);
-      if (!opening) { shut(panel); return; }
-      // The account's own name where there is one, so two forms in one card are told apart
-      // by anything reading the frame's title out.
-      const title = accountOf(go).querySelector('.luach-account-title')
-        || card.querySelector('.luach-give-title');
-      panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`);
-      panel.hidden = false;
-      go.setAttribute('aria-expanded', 'true');
-      panel.querySelector('.luach-frame-shut').addEventListener('click', () => { shut(panel); go.focus(); });
-      // Uncover the form once it is there. A cross-origin frame tells us nothing about what
-      // it holds, but load still fires on the element, which is all this needs to know.
-      // The timer is for the case where it never does: better a blank frame under the help
-      // line asking whether anything is showing than a spinner turning for ever, which
-      // claims something is still on its way when nothing is.
-      const frame = panel.querySelector('.luach-frame');
-      const cover = panel.querySelector('.luach-frame-load');
-      const uncover = () => cover.remove();
-      frame.addEventListener('load', uncover, { once: true });
-      setTimeout(uncover, 20000);
-      panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      keepPosition(root, () => {
+        const opening = panel.hidden;
+        for (const other of panels) if (other !== panel && !other.hidden) shut(other);
+        if (!opening) { shut(panel); return; }
+        // The account's own name where there is one, so the merchant forms are told apart
+        // by anything reading the frame's title out.
+        const title = accountOf(go).querySelector('.luach-account-title')
+          || card.querySelector('.luach-payment-heading');
+        panel.innerHTML = donateFrameHtml(go.href, `${title ? title.textContent.trim() : DONATE.name} donation form`, go.dataset.websiteHref, go.dataset.websiteLabel);
+        panel.hidden = false;
+        go.setAttribute('aria-expanded', 'true');
+        // Cardknox's narrow layouts still need 360px for their fixed-width sections.
+        // Resize the viewport rather than touching cross-origin payment content, and
+        // keep the same live frame when the phone rotates so entered fields survive.
+        const wrap = panel.querySelector('.luach-frame-wrap');
+        const fit = (width) => {
+          if (width > 0) wrap.style.setProperty('--luach-frame-scale', Math.min(1, width / 360));
+        };
+        fit(wrap.clientWidth);
+        const observer = new ResizeObserver(([entry]) => {
+          if (!panel.isConnected) { observer.disconnect(); return; }
+          fit(entry.contentRect.width);
+        });
+        observer.observe(wrap);
+        frameFits.set(panel, observer);
+        panel.querySelector('.luach-frame-shut').addEventListener('click', () => keepPosition(root, () => {
+          shut(panel); go.focus({ preventScroll: true });
+        }));
+        // Uncover the form once it is there. A cross-origin frame tells us nothing about what
+        // it holds, but load still fires on the element, which is all this needs to know.
+        // The timer is for the case where it never does: better a blank frame under the help
+        // line asking whether anything is showing than a spinner turning for ever, which
+        // claims something is still on its way when nothing is.
+        const frame = panel.querySelector('.luach-frame');
+        const cover = panel.querySelector('.luach-frame-load');
+        const uncover = () => cover.remove();
+        frame.addEventListener('load', uncover, { once: true });
+        setTimeout(uncover, 20000);
+      });
     });
   }
 }
 
 function renderDonatePage(published) {
   stopNextUp();
+  main.style.removeProperty('--donation-scroll-room');
   const s = resolveSettings(published.settings);
-  // is-give only trims the room under the address, which the page has no use for: it ends
-  // at the footer and there is nothing below to scroll to. See app.css.
+  const campaigns = DONATE.ways.find(way => way.accounts).accounts;
   main.className = 'is-give';
-  /* The shul's own masthead and address, the same two the menu carries, so a donor who
-     lands here from a message rather than from the menu is looking at the shul's page and
-     not at an anonymous list of payment links. Written out rather than shared with
-     homeHtml: the menu's masthead sits under an empty navy cap and this one sits under the
-     back bar, and the two want different room above them.
-
-     One rule, in the masthead, exactly as on the menu. The heading below it carried its own
-     before, and with the masthead in front that read as two lines ruled off from nothing. */
   main.innerHTML = `${backBar('donate')}
     <div class="luach-home luach-give-page">
-      <header class="luach-masthead luach-give-masthead">
-        <!-- The wordmark is not a heading here, the way it is on the menu: the bar above
-             already carries this page's h1 and names it "Donate". Two h1s on one page is
-             one too many, and the shul's name is the site's mark rather than the title of
-             what is on the page. The alt text still says whose site it is. -->
-        <svg class="luach-approved-name" viewBox="0 0 600 65" role="img" aria-label="בית מדרש דליקוואוד קאמענס" style="display:block;width:100%;max-width:600px;height:auto;margin:0 auto;overflow:visible"><defs><path id="shul-name-arch" d="M10 72 Q300 12 590 72"/></defs><text fill="#12274f" font-family="Frank Ruhl Libre,David,serif" font-size="32" font-weight="800" text-anchor="middle" direction="rtl" lang="he"><textPath href="#shul-name-arch" startOffset="50%">בית מדרש דליקוואוד קאמענס</textPath></text></svg>
-        ${rule()}<p class="luach-place" lang="he" dir="rtl" style="font-size:1rem">קהל לב מנחם</p>
-      </header>
       <header class="luach-give-head-block">
-        <h2 class="luach-give-heading">${escAttr(DONATE.heading)}</h2>
+        <h1 class="luach-give-heading">${escAttr(DONATE.heading)}</h1>
         <p class="luach-give-thanks">${escAttr(DONATE.thanks)}</p>
       </header>
-      ${DONATE.ways.filter(way => way.icon !== 'zelle' || way.copy?.value).map(donateWayHtml).join('')}
-      <p class="luach-give-legal">${DONATE.legal}</p>
-      ${rule()}
-      ${footHtml(s)}
+      <section class="luach-payments luach-campaigns" aria-label="Donation campaigns">
+        ${campaigns.map(donateAccountHtml).join('')}
+      </section>
+      ${siteFooterHtml(s, `<div class="luach-give-legal">
+        <p>${escAttr(DONATE.legal)} <span class="luach-give-ein">· EIN: <bdi>${SHUL_TAX_ID}</bdi></span></p>
+        <p>${escAttr(DONATE.deductible)}</p>
+      </div>`)}
     </div>`;
   wireDonateFrames(main);
+  wireDonateCampaigns(main);
   wireDonateCopy(main);
   openTheDoor();
 }
@@ -1045,16 +1378,28 @@ function stampPage(where) {
   if (canon) canon.href = new URL(where ? `/${where}/` : '/', location.href).href;
 }
 
-function route(published) {
+function route(published, { preserveWeekShowing = false } = {}) {
+  chartViewCleanup?.(); chartViewCleanup = null;
+  donationScrollCleanup?.();
+  donationOpeningCleanup?.();
+  candleDialogCleanup?.();
+  candleDialogCleanup = null;
   const where = whereAmI();
+  setPrintPage('letter landscape');
   // One address per page. Arriving on /#week leaves the bar reading /#week, which is a
   // second way of writing an address that already has a first one: replaceState rather
   // than pushState, so the back button still goes back where it came from rather than
   // to the same page written the other way.
   if (location.protocol.startsWith('http') && location.hash) {
-    history.replaceState(null, '', where ? `/${where}/` : '/');
+    const path = where ? `/${where}/` : '/';
+    history.replaceState(null, '', isWebsitePreview() ? websitePreviewURL(new URL(path, location.href)).href : path);
   }
   stampPage(where);
+  // Every ordinary way of arriving here - a menu tap, back, forward, a #week link from
+  // outside - opens /week/ fresh, on whichever week is next, the same as it always has.
+  // Only a stale-tab reload asks to be put back on the week it already had open (see
+  // takeRestorePoint), which is the one caller that passes preserveWeekShowing.
+  if (!preserveWeekShowing) weekShowing = null;
   if (where === 'week') return renderWeekPage(published);
   if (where === 'chart') return renderChartPage(published);
   if (where === 'schedules') return renderSchedulesPage(published);
@@ -1074,6 +1419,7 @@ function wireNav(published) {
     if (ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
     const a = ev.target.closest && ev.target.closest('a[href]');
     if (!a || a.target || a.hasAttribute('download')) return;
+    if (a.dataset.websiteLive) return;
     let url;
     try { url = new URL(a.getAttribute('href'), location.href); } catch (err) { return; }
     if (url.origin !== location.origin) return;
@@ -1083,7 +1429,12 @@ function wireNav(published) {
     if (first !== '' && !ROUTES.includes(first)) return;
     ev.preventDefault();
     if (url.pathname === location.pathname) return;
-    history.pushState(null, '', url.pathname);
+    const destination = isWebsitePreview() ? websitePreviewURL(url) : url;
+    history.pushState(null, '', url.pathname + (isWebsitePreview() ? destination.search : ''));
+    // The reader has already left for a new page - the address now says so - so a stale
+    // tab reloads right here rather than rendering the old script's idea of that page.
+    // See watchForStaleTab: this is one of the moments nothing is ever interrupted.
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
     route(published);
     // A tap that swaps the page but leaves the scroll where it was reads as a page that
     // did not answer: on a long week list the new page opens halfway down itself.
@@ -1097,11 +1448,17 @@ function wireNav(published) {
       ], { duration: 360, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' });
     }
   });
-  window.addEventListener('popstate', () => route(published));
+  window.addEventListener('popstate', () => {
+    // Back or forward is the same "already left for a new page" moment a menu tap is.
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
+    route(published);
+  });
 }
 
 
 (async () => {
+  wireInstalledSystemBars();
+  watchForStaleTab();
   let published;
   try {
     for (let attempt=0; attempt<2; attempt++) {
@@ -1127,11 +1484,30 @@ function wireNav(published) {
     home.append(retry);
     return;
   }
+  try { congregationScheduleTables = await loadTables(); } catch { /* Existing full-page schedules remain available without the calendar tables. */ }
+  installWebsitePreviewBanner(resolveSettings(published.settings).timezone.id, ROUTES);
   wireNav(published);
-  route(published);
+  // Consumed once, before the first render: the other end of a stale-tab reload (see
+  // watchForStaleTab) names the week /week/ had open and the scroll position to put back,
+  // both otherwise lost the moment the old script is gone. Null on every ordinary load.
+  const restore = takeRestorePoint();
+  if (restore && Number.isFinite(restore.weekShowing)) weekShowing = restore.weekShowing;
+  route(published, { preserveWeekShowing: Boolean(restore) });
+  if (restore && Number.isFinite(restore.scrollY)) {
+    // Applied now and again once layout has actually settled: a webfont or an image
+    // landing after the first paint can still grow the page under a scroll position
+    // asked for before that happened.
+    const applyScroll = () => window.scrollTo(0, restore.scrollY);
+    applyScroll();
+    requestAnimationFrame(() => requestAnimationFrame(applyScroll));
+    document.fonts?.ready?.then(applyScroll);
+  }
   // Still listened for: a link with a hash in it can come from outside the page, and the
   // click handler above never sees those.
-  window.addEventListener('hashchange', () => route(published));
+  window.addEventListener('hashchange', () => {
+    if (tabIsStale() && !donationPanelOpen()) return void location.reload();
+    route(published);
+  });
 })();
 
 
@@ -1163,7 +1539,6 @@ function fitContactEmail() {
   document.fonts.ready.then(fit);
   fit();
 }
-
 
 
 

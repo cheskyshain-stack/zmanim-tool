@@ -41,15 +41,19 @@
 import { erevTimes, erevWhereMark } from './erev-text.js';
 import { weekdayMornings } from './posters/day.js';
 import { SLICHOS_TEXT } from './posters/slichos.js';
-import { hebrewDateExtended, dateFromHebrew, excelWeekday } from './hebrew-calendar.js';
+import { hebrewDateExtended, dateFromHebrew, excelWeekday, hasRoshChodesh } from './hebrew-calendar.js';
+import { chanukahSundayMincha, chanukahScheduleLines } from './posters/chanukah.js';
+import { chanukahDaysThroughFriday } from './sheets/weekday.js';
+import { DAY_NAMES } from './util.js';
 
 /** The wording, as the shul writes it. The colons are theirs: the morning line has none and the
  *  other two do, in every one of the forty sent messages. */
 export const WK_TEXT = {
   title: 'Week of',
   /** In front of a parsha name and not in front of anything else. The sent messages read
-   *  "Week of P' Ki Seitzei" but "Week of Rosh Hashana", "Week of Shavuos", "Week of Chanuka":
-   *  a week named for the yom tov in it is not a week named for a parsha. */
+   *  "Week of P' Ki Seitzei" but "Week of Rosh Hashana" and "Week of Shavuos":
+   *  a week named for the yom tov in it is not a week named for a parsha.
+   *  Chanuka keeps its parsha, as in "Week of P' Miketz - Chanuka". */
   parsha: "P'",
   shacharis: 'Shacharis',
   selichos: 'Selichos',
@@ -135,6 +139,21 @@ function wkRow(cell) {
  *  ר"ח and בה"ב days are deliberately not here, though the card draws them: ROSH CHODESH is its
  *  own message on this page, and no sent weekly message has ever named one. */
 function wkMornings(shacharisCell, shabbosSerial, settings) {
+  const chanukah = chanukahDaysThroughFriday(shabbosSerial, settings);
+  if (chanukah.length) {
+    const sunday = shabbosSerial - (excelWeekday(shabbosSerial) - 1);
+    const ordinary = Array.from({ length: 6 }, (_, offset) => sunday + offset).filter(day => !chanukah.includes(day));
+    const names = days => days.map(day => DAY_NAMES[excelWeekday(day) - 1]).join(', ');
+    const lines = [];
+    if (ordinary.length) lines.push(`${WK_TEXT.shacharis} (${names(ordinary)}) ${wkRow(shacharisCell)}`);
+    const days = chanukah.filter(day => !hasRoshChodesh(day, settings));
+    if (days.length) {
+      const times = wkRow(chanukahScheduleLines(days, settings, { mergeAll: true }));
+      const label = ordinary.length ? ` (Chanuka; ${names(days)})` : '';
+      if (times) lines.push(`${WK_TEXT.shacharis}${label} ${times}`);
+    }
+    return lines;
+  }
   let block = null;
   try {
     block = weekdayMornings(shabbosSerial, settings, shacharisCell, null);
@@ -187,7 +206,9 @@ export function weekText(shacharisCell, row, name, shabbosSerial, settings, afte
 
   const lines = [`${WK_TEXT.title} ${name}`.trim()];
   lines.push(...wkMornings(shacharisCell, shabbosSerial, settings));
-  if (mincha) lines.push(`${WK_TEXT.mincha} ${mincha}`);
+  const sundayMincha = chanukahSundayMincha(shabbosSerial - 6, settings);
+  const sundayNote = sundayMincha ? `(Sunday: ${wkRow(sundayMincha.text())})` : '';
+  if (mincha || sundayNote) lines.push(`${WK_TEXT.mincha} ${[sundayNote, mincha].filter(Boolean).join(' ')}`);
   if (maariv) lines.push(`${WK_TEXT.maariv} ${maariv}`);
   if (afterYomKippurLine) lines.push(afterYomKippurLine);
   return lines.join('\n');

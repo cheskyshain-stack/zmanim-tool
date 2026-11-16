@@ -1,18 +1,36 @@
+import { websiteNow } from '../website-clock.js';
 import { currentOnePageSheets } from './posters-view.js';
 import { weeklyAgenda, agendaDayKind } from './weekly-agenda.js';
 import { minyanimForDay, clock, candleLightingForDay } from '../upcoming.js';
 import { specialMinyanim } from '../posters/day.js';
 import { buildPesachPoster } from '../posters/pesach.js';
-import { hebrewDateExtended, hasTaanis, hasRoshChodesh, excelWeekday } from '../hebrew-calendar.js';
+import { hebrewDateExtended, hasTaanis, hasRoshChodesh, hasBehab, excelWeekday } from '../hebrew-calendar.js';
 import { rowFor, weekIndex } from '../sheets/rows.js';
 import { dateFromSerial, shulNow } from '../zmanim/solar.js';
-import { escAttr, DAY_NAMES } from '../util.js';
+import { escAttr, DAY_NAMES, useStraightHebrewQuotes } from '../util.js';
 import { UL_START, UL_END } from '../format.js';
 import { sanitizeRichText } from '../security.js';
+import { liveChartRange } from './chart-view.js';
 
 const readerEventKey = e => JSON.stringify([e.name, e.mins, e.place || '']);
 const readerCategory = e => e.name.includes('מנחה') ? 'mincha' : e.name.includes('מעריב') ? 'maariv' : e.mins < 720 ? 'morning' : 'other';
 const READER_LABELS = { morning: 'שחרית / סליחות', mincha: 'מנחה', maariv: 'מעריב', other: 'Additional times' };
+const READER_ROOMS = {
+  '': { name: 'Main Bais Medrash', hebrew: 'בית מדרש' },
+  'למטה': { name: 'Downstairs', hebrew: 'בית מדרש למטה' },
+  'בעזר״נ': { name: 'Ezras Nashim', hebrew: 'עזרת נשים' },
+  'באולם השמחות': { name: 'Simcha hall', hebrew: 'אולם השמחות' },
+};
+let readerRoomBeforePrint;
+
+function readerRoomFor(event) {
+  if (event.auxiliary) return null;
+  const place = event.place || '';
+  // An unmarked minyan is in the main Bais Medrash. Other entries such as Kiddush
+  // Levana do not acquire an indoor location just because their room field is empty.
+  if (!place && !/שחרית|סליחות|מנחה|מעריב|כל נדרי|קול נדרי|מוסף|נעילה|ותיקין/.test(event.name)) return null;
+  return READER_ROOMS[place] || { name: place, hebrew: '' };
+}
 
 /** Holiday chart rows can be dated midweek. The reader always means Sunday to
  * Shabbos, including weeks whose only schedule is a special poster. */
@@ -72,6 +90,17 @@ function readerDayTitle(serial, settings) {
   if (j.month === 1 && j.dayOfMonth >= 14 && j.dayOfMonth <= 22) return 'פסח';
   if (j.month === 3 && [5,6,7].includes(j.dayOfMonth)) return j.dayOfMonth === 5 ? 'ערב שבועות' : 'שבועות';
   return hasRoshChodesh(serial, settings) ? 'ראש חודש' : 'Special schedule';
+}
+
+function readerDayHeading(serial, title, settings) {
+  // Public weekday headings are English, regardless of the printed chart's language.
+  const english = { ...settings, english: true };
+  const occasion = [
+    hasRoshChodesh(serial, english),
+    hasBehab(serial, english) ? 'BHB' : '',
+    hasTaanis(serial, english),
+  ].filter(label => label && !title.includes(label)).join(' · ');
+  return `${escAttr(title)}${occasion ? ` <span class="reader-day-occasion">· ${escAttr(occasion)}</span>` : ''}`;
 }
 
 /** Shared poster event lists take priority over the ordinary chart for that day.
@@ -157,7 +186,43 @@ function readerTimeHtml(e) {
      to it cannot be read against the wrong one, and the shul asked for it set the way the פלג
      under a מנחה is: the times one to a line, each name on its right. */
   const reckoning = e.reckoning ? `<small class="reader-reckoning" lang="he">${escAttr(e.reckoning)}</small>` : '';
-  return `<span class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(place)}"><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}${e.started?'<small>Just started</small>':''}</span>`;
+  const location = readerRoomFor(e);
+  const tag = location ? 'button' : 'span';
+  const attrs = location ? ` type="button" aria-haspopup="dialog" aria-label="${escAttr(`${e.name}, ${label}, ${location.name}. Show room`)}" data-reader-room="${escAttr(location.name)}" data-reader-room-hebrew="${escAttr(location.hebrew)}" data-reader-service="${escAttr(e.name)}" data-reader-clock="${escAttr(label)}"` : '';
+  return `<${tag} class="reader-time${e.next ? ' reader-next-time' : ''}" dir="ltr" title="${escAttr(location?.name || place)}"${attrs}><span class="reader-digits">${marked}<sup class="reader-room-mark">${star}</sup></span>${reckoning}${room}</${tag}>`;
+}
+
+function wireReaderRooms(root) {
+  const dialog = document.createElement('dialog');
+  dialog.className = 'reader-room-dialog no-print';
+  dialog.setAttribute('aria-labelledby', 'reader-room-title');
+  dialog.innerHTML = `<button type="button" class="reader-room-close" aria-label="Close room details">&times;</button>
+    <p class="reader-room-service"><bdi lang="he"></bdi></p>
+    <p class="reader-room-clock" dir="ltr"></p>
+    <h2 id="reader-room-title"></h2>
+    <p class="reader-room-hebrew" lang="he" dir="rtl"></p>`;
+  root.appendChild(dialog);
+  root.addEventListener('click', event => {
+    const time = event.target.closest('[data-reader-room]');
+    if (!time || !root.contains(time)) return;
+    dialog.querySelector('.reader-room-service bdi').textContent = time.dataset.readerService;
+    dialog.querySelector('.reader-room-clock').textContent = time.dataset.readerClock;
+    dialog.querySelector('h2').textContent = time.dataset.readerRoom;
+    const hebrew = dialog.querySelector('.reader-room-hebrew');
+    hebrew.textContent = time.dataset.readerRoomHebrew;
+    hebrew.hidden = !hebrew.textContent;
+    time.focus({ preventScroll: true });
+    dialog.showModal();
+  });
+  dialog.querySelector('.reader-room-close').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('click', event => {
+    if (event.target !== dialog) return;
+    const box = dialog.getBoundingClientRect();
+    if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
+  });
+  if (readerRoomBeforePrint) window.removeEventListener('beforeprint', readerRoomBeforePrint);
+  readerRoomBeforePrint = () => { if (dialog.isConnected && dialog.open) dialog.close(); };
+  window.addEventListener('beforeprint', readerRoomBeforePrint);
 }
 
 /** The פלג under its own מנחה: the second line of one cell of the board, set small under the
@@ -202,7 +267,7 @@ function readerCellHtml(row) {
     .replace(/((?:\s|&nbsp;)*)<\/u>/g, '</u>$1');
 }
 
-export function remainingReaderDays(data, showing, settings, now = new Date()) {
+export function remainingReaderDays(data, showing, settings, now = websiteNow()) {
   const today = shulNow(now, settings).serial;
   return {
     regular: data.regular.filter(d => d.serial >= today),
@@ -253,12 +318,12 @@ export function weeklyAgendaData(showing,index,state,settings) {
  *  a week that has something on it rather than draw an empty one and tell the reader to press
  *  Next. Built the same way and out of the same call, so the two cannot come to different
  *  answers about the same week. */
-export function readerWeekHasTimes(showing, index, state, settings, now = new Date()) {
+export function readerWeekHasTimes(showing, index, state, settings, now = websiteNow()) {
   const agenda = weeklyAgenda(weeklyAgendaData(showing, index, state, settings), showing, state, settings, now);
   return agenda.sections.length > 0 || agenda.notices.length > 0;
 }
 
-export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = new Date() }) {
+export function renderWeeklyReader(container, { showing, index, state, settings, serials, onSerialChange, title, now = websiteNow() }) {
   const data = weeklyAgendaData(showing,index,state,settings);
   const agenda = weeklyAgenda(data,showing,state,settings,now);
   const at = serials.indexOf(showing);
@@ -293,6 +358,16 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
   }
   for(const section of displaySections) {
     if(section.combined && section.dayTitles.length===1) section.title=section.dayTitles[0];
+    /* A combined card's events were appended one whole agenda-section at a time, not
+       merged by clock time - so a candle-lighting זמן, deliberately filed under the
+       day it opens (agendaSection's own holy-${serial+1} rule, matching the "what is on
+       next" card's own convention) rather than under Erev, could still land after a
+       later Erev event that stayed in Erev's own bucket: הדלקת נרות 6:31 printed under
+       Sukkos's own heading, below a 6:34 ערב סוכות מנחה that is chronologically three
+       minutes earlier. Sorted back into real order here; which heading a row falls
+       under is unaffected; that is still whatever agendaSection said each event's day
+       is called. */
+    if(section.combined) section.events.sort((a,b)=>a.serial-b.serial || a.mins-b.mins);
   }
   const sectionHtml = displaySections.map((section,i)=>{
     const rows=[];
@@ -318,14 +393,27 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
          sitting between them they were kept apart only by that accident: with it gone, 5:29
          and 6:05 ran into one row carrying one of the two פלג. */
       if (!sameWhere(row,event) || row.name!==rowName(event) || (row.cell!==(event.cell||'') && !(row.name==='מעריב' && /^מעריב\s+ג['׳’]?$/.test(event.name)))) row=null;
-      if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[]};rows.push(row);}
+      if(!row){row={name:rowName(event),serial:event.serial,sectionTitle:event.sectionTitle,dayPart:event.dayPart,cell:event.cell||'',events:[],auxiliary:!!event.auxiliary};rows.push(row);}
       row.events.push(event);
     }
     const hasNext=section.events.some(e=>e.next);
     const dates=(section.combined ? [...new Set(section.events.map(e=>e.serial))].sort((a,b)=>a-b) : [section.serial]).map(serial=>dateFromSerial(serial).toLocaleDateString('en-US',{timeZone:'UTC',weekday:'short',month:'short',day:'numeric'})).join(' / ');
+    /* A heading names a real day's own minyanim, so a lone זמן like הדלקת נרות - sorted back
+       into its true clock position just above, ahead of a real event still counted as the
+       day before it - never starts one on its own. It prints under whichever heading is
+       already showing and lets the next real event decide if that heading has changed. */
+    let lastRealTitle=null;
+    const rowsHtml=rows.map((row)=>{
+      let heading='';
+      if(!row.auxiliary){
+        if(row.sectionTitle && row.sectionTitle!==lastRealTitle) heading=`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`;
+        lastRealTitle=row.sectionTitle;
+      }
+      return `${heading}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span></div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`;
+    }).join('');
     return `<details class="reader-agenda-day" name="weekly-agenda" data-agenda-key="${section.key}" ${hasNext || (!agenda.sections.some(s=>s.events.some(e=>e.next)) && i===0)?'open':''}>
-      <summary><span><strong>${escAttr(section.title)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
-      <div class="reader-agenda-rows">${rows.map((row,ri)=>`${row.sectionTitle && row.sectionTitle!==rows[ri-1]?.sectionTitle?`<h3 class="reader-agenda-subheading">${escAttr(row.sectionTitle)}</h3>`:''}<div class="reader-agenda-row"><div class="reader-agenda-label"><span lang="he" dir="rtl">${escAttr(row.name)}</span></div><div class="reader-times">${row.events.map(readerTimeHtml).join('')}</div>${readerSubHtml(row.subs)}</div>`).join('')}</div>
+      <summary><span><strong>${readerDayHeading(section.serial, section.title, settings)}</strong></span><span class="reader-date-line">${hasNext?'<span class="reader-next-badge">Next minyan</span>':''}<small>${escAttr(dates)}</small></span><span class="reader-agenda-chevron" aria-hidden="true">⌄</span></summary>
+      <div class="reader-agenda-rows">${rowsHtml}</div>
     </details>`;
   }).join('');
   /* Previous is live only where there is a week behind this one worth opening: not simply one
@@ -341,20 +429,38 @@ export function renderWeeklyReader(container, { showing, index, state, settings,
   const canNext = at >= 0 && at < serials.length - 1;
   let hasSpecialSchedules = false;
   try { hasSpecialSchedules = currentOnePageSheets(state, settings).length > 0; } catch { /* Keep the weekly schedule available if a poster cannot be built. */ }
+  /* Whether /chart/ has anything worth sending this reader to - a row on the Shabbos
+     season chart (entry.sheet) or, failing that, a row of its own on the Weekday chart
+     (readerWeekIndex still carries that week's real parsha/label even with sheet:null;
+     see weekIndex in sheets/rows.js), or, lacking either, a week the chart that is live
+     right now already reaches: the chart posts CHART_EARLY_DAYS before its own first date
+     (see liveChartRange in chart-view.js), so a Yom Tov week just ahead of a season's turn
+     can have the next chart already up even with no row of its own. Anchored on real now,
+     not on the week being read, so a week browsed away from today does not borrow "is a
+     chart live" from whichever season was live back then. */
+  const showingEntry = index.get(showing);
+  const live = liveChartRange(state, settings);
+  const hasChart = !!(showingEntry && (showingEntry.sheet || showingEntry.week?.parsha))
+    || !!(live && showing >= live.from && showing < live.until);
   container.innerHTML=`<div class="weekly-reader">
     <header class="reader-heading"><h2 lang="he">${escAttr(title)}</h2><p>Week of ${escAttr(date)}</p></header>
     <nav class="reader-schedule-links no-print" aria-label="Other schedules">
-      <a href="/chart/">Zmanim Chart <span aria-hidden="true">&rsaquo;</span></a>
-      ${hasSpecialSchedules ? '<a href="/schedules/">Special Schedules <span aria-hidden="true">&rsaquo;</span></a>' : ''}
+      ${hasChart
+        ? '<a class="schedule-link" href="/chart/">Zmanim Chart <span class="chevron" aria-hidden="true">&rsaquo;</span></a>'
+        : '<span class="schedule-link is-disabled" aria-disabled="true">Zmanim Chart <span class="chevron" aria-hidden="true">&rsaquo;</span></span>'}
+      ${hasSpecialSchedules ? '<a class="schedule-link" href="/schedules/">Special Schedules <span class="chevron" aria-hidden="true">&rsaquo;</span></a>' : ''}
     </nav>
     <nav class="reader-nav no-print" aria-label="Other weeks">
-      <button id="reader-prev" ${canPrev?'':'disabled'}>← Previous</button><button id="reader-today">Today</button><button id="reader-next" ${canNext?'':'disabled'}>Next →</button>
+      <button id="reader-prev" ${canPrev?'':'disabled'}>← Previous</button><button id="reader-today">This week</button><button id="reader-next" ${canNext?'':'disabled'}>Next →</button>
     </nav>
+    ${displaySections.some(section => section.events.some(readerRoomFor)) ? '<p class="reader-room-hint no-print">Tap a minyan time to see its room.</p>' : ''}
     ${sectionHtml || '<p class="reader-note">No remaining minyanim this week. Select Next for the coming week.</p>'}
-    ${agenda.notices.map(d=>`<p class="reader-note">${escAttr(d.label)}: Check with the shul for this day’s full schedule.</p>`).join('')}
+    ${agenda.notices.map(d=>`<p class="reader-note">${readerDayHeading(d.serial, d.label, settings)}: Check with the shul for this day’s full schedule.</p>`).join('')}
     <p class="reader-legend"><span><u>Underlined</u>: downstairs</span><span>* Ezras Nashim</span><span>** Simcha hall</span></p>
   </div>`;
+  useStraightHebrewQuotes(container);
   container.querySelector('#reader-prev').addEventListener('click',()=>onSerialChange(serials[at-1]));
   container.querySelector('#reader-next').addEventListener('click',()=>onSerialChange(serials[at+1]));
   container.querySelector('#reader-today').addEventListener('click',()=>onSerialChange(null));
+  wireReaderRooms(container.querySelector('.weekly-reader'));
 }

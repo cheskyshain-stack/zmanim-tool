@@ -21,6 +21,7 @@ explains:
     two ** after it   באולם השמחות
 """
 import math
+from datetime import datetime, time
 
 from .. import zmanim as Z
 from ..fmt import format_time, underline_time
@@ -127,9 +128,8 @@ def _mincha_times(week, s):
     days = _sunday_through_thursday(week.serial)
     dates = [date_from_serial(d) for d in days]
 
-    # 12:45 and 1:15 run on standard time only. DST always flips on a Sunday, so all five
-    # days agree; all() is just being explicit about which way a split week would go.
-    standard_time = all(not Z.dst_local(d, s) for d in dates)
+    # Read the afternoon's clock, not midnight before the transition Sunday's change.
+    standard_time = all(not Z.dst_local(datetime.combine(d, time(13)), s) for d in dates)
     bmg = _is_bmg_week(week.serial, s)
 
     # 1:35 unless מנחה גדולה is too late for it anywhere in the week, in which case 1:40.

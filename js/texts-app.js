@@ -2,8 +2,8 @@
 //
 // A second, much smaller program than the admin: it loads the same state, the same settings and
 // the same calendar tables, and then draws one screen. No tabs, no routing, and above all no way
-// back into the admin or out to the congregation's site, because the address is meant to be
-// handed to whoever sends the messages and to nobody else's job.
+// into the main admin. Its Back to calendar link returns to the separately authenticated
+// calendar editor; sending schedule messages still needs no calendar account.
 //
 // **No PIN here, deliberately, and not by omission.** The admin asks for four digits because
 // somebody wandering into the generator can change the shul's boards. Nothing on this page

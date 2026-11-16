@@ -1,7 +1,7 @@
 // Named zman functions, ported 1:1 from the workbook's defined names.
 // Every function returns a fractional day (0-1) representing local time-of-day,
 // exactly like the Excel formulas do (add to a date's serial to get a date+time).
-import { excelSerial, dateFromSerial, calcJD, calcJDToJCent, equationOfTime, sunEvent, timezoneOffset } from './solar.js';
+import { excelSerial, dateFromSerial, calcJD, calcJDToJCent, equationOfTime, sunEvent, timezoneOffset, timezoneOffsetUTC } from './solar.js';
 
 const MIN = 1 / 1440; // one minute, as a fraction of a day
 
@@ -33,7 +33,7 @@ export function solarNoon(date, settings) {
   const tNew = calcJDToJCent(jDay - lon - eot1);
   const eot2 = equationOfTime(tNew);
   const noonUTC = 0.5 - lon - eot2;
-  const { offsetHours } = timezoneOffset(dateFromSerial(serial + noonUTC), settings.timezone);
+  const { offsetHours } = timezoneOffsetUTC(new Date(dateFromSerial(serial).getTime() + (0.5 - lon) * 86400000), settings.timezone);
   return noonUTC + offsetHours / 24;
 }
 
@@ -44,15 +44,17 @@ export function dstLocal(date, settings) {
   return timezoneOffset(date, settings.timezone).isDst;
 }
 
-// Alos / Misheyakir (degree-based, off plain SUNRISE)
-export const alos16_1 = (date, settings) => sunrise(date, settings, 16.1);
-export const misheyakir10_2 = (date, settings) => sunrise(date, settings, 10.2);
+// The workbook's degree-based functions explicitly pass zero elevation to SUNRISE.
+export const alos16_1 = (date, settings) => sunEvent(true, date, 16.1, settings, false);
+export const misheyakir10_2 = (date, settings) => sunEvent(true, date, 10.2, settings, false);
 
 // Tzais (minute/degree-based, off SUNSET/SUNSET_elev)
 export const tzais50 = (date, settings) => sunsetElev(date, settings) + 50 * MIN;
 export const tzais60 = (date, settings) => sunsetElev(date, settings) + 60 * MIN;
 export const tzais72 = (date, settings) => sunsetElev(date, settings) + 72 * MIN;
-export const tzaisGeonim8_5 = (date, settings) => sunset(date, settings, 8.5);
+// These degree-based ends of day also explicitly use zero elevation in the workbook.
+export const tzaisGeonim8_5 = (date, settings) => sunEvent(false, date, 8.5, settings, false);
+export const tzais16_1 = (date, settings) => sunEvent(false, date, 16.1, settings, false);
 
 // ALOS_72 (used by SOF_ZMAN_SHMA_MGA_72)
 export const alos72 = (date, settings) => sunriseElev(date, settings) - 72 * MIN;
@@ -77,6 +79,12 @@ export function minchaGedola30MinAfterChatzos(date, settings) {
 /** MINCHA_GEDOLA_LECHUMRA: __ZMAN_LECHUMRA(latest=TRUE, ...) i.e. the later of the two. */
 export function minchaGedolaLechumra(date, settings) {
   return Math.max(minchaGedola(date, settings), minchaGedola30MinAfterChatzos(date, settings));
+}
+/** מנחה גדולה, the day measured alos ט״ז.1° to שקיעה ט״ז.1° (the מ"א day) rather than
+ *  minchaGedola's own sunrise/sunset - same half-a-proportional-hour-past-חצות formula,
+ *  a wider day under it. */
+export function minchaGedolaMGA16_1(date, settings) {
+  return fromEndOfDay(tzais16_1(date, settings), solarNoon(date, settings), alos16_1(date, settings), 5.5 / 12, 5.5 / 6, settings.useAstronomicalChatzos);
 }
 export function minchaKetana(date, settings) {
   return fromEndOfDay(sunsetElev(date, settings), solarNoon(date, settings), sunriseElev(date, settings), 2.5 / 12, 2.5 / 6, settings.useAstronomicalChatzos);
@@ -104,7 +112,8 @@ export function sofZmanShmaMGA72(date, settings) {
 export function sofZmanTfilaGRA(date, settings) {
   return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
 }
-// The same 72-minute MGA day as Shema, at its fourth proportional hour.
+
+// Fourth proportional hour of the same MGA day used for Shema.
 export function sofZmanTfilaMGA72(date, settings) {
   return fromStartOfDay(alos72(date, settings), solarNoon(date, settings), tzais72(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
 }

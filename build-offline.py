@@ -93,18 +93,17 @@ SITE_URL_MARKER = "<!-- site address: stamped by build-offline.py from SITE_URL,
 # at all: the tag is not written, and a tag written by an earlier run is taken out again, so
 # turning it off is emptying this line.
 #
-# The congregation's page only. It is stamped into index.html before the route pages are
-# written, so /week/, /chart/, /schedules/ and /donate/ carry it too; /admin/ is a different
-# file and never gets it, and the offline copy is built out of /admin, so a USB stick has
-# nothing in it that would try to phone home from a shul's laptop.
+# Stamped into the public pages and the online admin. Admin starts the beacon only after
+# the PIN is accepted or remembered; changing its tabs does not count another page open.
+# The offline copy has the loader removed, and local previews never start the beacon.
 #
-# Three things are kept out of the count, which matter because most of the traffic to a shul's
+# These things are kept out of the count, which matter because most of the traffic to a shul's
 # new site in its first month is the person building it:
 #
 #   - Anywhere that is not the live address. The beacon is only asked for when the page is
 #     being read at SITE_URL's own host, so a local `python -m http.server`, a preview, or
 #     somebody's fork of the repository counts nothing.
-#   - The admin, which never carries the tag at all.
+#   - The admin PIN screen, until the admin actually opens.
 #   - A device that has asked not to be counted. Opening the site once with ?count=off marks
 #     that browser and it is not counted again; ?count=on undoes it. See ANALYTICS_OPT_OUT.
 ANALYTICS_TOKEN = "e96217102b81416db30f31a0c105fece"
@@ -186,7 +185,7 @@ ROUTES = {
         "heading": "Donate",
         "blurb": (
             "Ways to support Bais Medrash of Lakewood Commons: by card, ACH or donor advised fund. "
-            "DAF providers include The Donors Fund, Pledger, OJC and Matbia. Tax ID 26-4527675."
+            "DAF providers include The Donors Fund, Pledger, OJC, Matbia and iMaaser. Tax ID 26-4527675."
         ),
     },
 }
@@ -594,7 +593,7 @@ def stamp_css_versions(page: Path, prefix: str):
         digest = hashlib.md5((ROOT / "css" / name).read_bytes()).hexdigest()[:8]
         return f'href="{prefix}css/{name}?v={digest}"'
 
-    stamped = re.sub(r'href="(?:\.\./)?css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
+    stamped = re.sub(r'href="(?:\.\./)*css/([\w.-]+\.css)(?:\?v=[0-9a-f]+)?"', stamp, html)
     if stamped != html:
         page.write_text(stamped, encoding="utf-8", newline="\n")
 
@@ -645,7 +644,7 @@ def stamp_site_url(page: Path):
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
-def stamp_analytics(page: Path):
+def stamp_analytics(page: Path, *, admin=False, ready_event=None, spa=True, exclude_account_links=False):
     """Write the analytics loader into the page head, or take it out again.
 
     Between markers like everything else stamped here, so a second run replaces rather than
@@ -660,7 +659,8 @@ def stamp_analytics(page: Path):
       - not a browser that has asked not to be counted, which is how the shul keeps its own
         testing out of its own numbers.
 
-    The third, the admin, is handled by not stamping that file at all.
+    The admin waits for the application's unlocked start event and disables SPA tracking.
+    A tab change in the same admin document is not another admin page open.
 
     The script it writes is a module, which is what Cloudflare's own snippet asks for and is
     also deferred by definition, so nothing on the page ever waits for a counter. It is the
@@ -672,13 +672,17 @@ def stamp_analytics(page: Path):
     """
     html = page.read_text(encoding="utf-8")
     host = SITE_URL.split("//", 1)[-1].split("/", 1)[0]
-    # Written on one line on purpose: it is inline in the head of five pages, and the comment
+    # Written on one line on purpose: it is inline in the page head, and the comment
     # stripper that keeps this repository's reasoning out of the browser would have to be
     # taught about it otherwise. The reasoning is above, where it belongs.
+    beacon_config = {"token": ANALYTICS_TOKEN}
+    if admin or ready_event or not spa:
+        beacon_config["spa"] = False
     loader = (
-        "<script>(function(){try{"
+        "function(){try{"
         f'if(location.hostname!=="{host}")return;'
         f'var p=new URLSearchParams(location.search),k="{ANALYTICS_OPT_OUT}";'
+        'if(p.has("website-preview"))return;'
         f'if(p.has("{ANALYTICS_OPT_PARAM}")){{'
         f'var off=p.get("{ANALYTICS_OPT_PARAM}")!=="on";'
         "try{off?localStorage.setItem(k,'1'):localStorage.removeItem(k);"
@@ -688,9 +692,14 @@ def stamp_analytics(page: Path):
         "try{if(localStorage.getItem(k))return;}catch(e){}"
         'var s=document.createElement("script");s.type="module";'
         's.src="https://static.cloudflareinsights.com/beacon.min.js";'
-        f"s.setAttribute(\"data-cf-beacon\",'{{\"token\": \"{ANALYTICS_TOKEN}\"}}');"
-        "document.head.appendChild(s);}catch(e){}})();</script>"
+        f"s.setAttribute(\"data-cf-beacon\",'{json.dumps(beacon_config)}');"
+        "document.head.appendChild(s);}catch(e){}}"
     )
+    event = "zmanim-admin-open" if admin else ready_event
+    loader = (f'<script>window.addEventListener("{event}",{loader},{{once:true}});</script>'
+              if event else f"<script>({loader})();</script>")
+    if exclude_account_links:
+        loader = loader.replace('<script>', '<script>if(!new URLSearchParams(location.hash.slice(1)).has("setup")&&!new URLSearchParams(location.hash.slice(1)).has("invite"))', 1)
     block = f"{ANALYTICS_MARKER}\n{loader}" if ANALYTICS_TOKEN else ""
     pattern = re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n"
     if ANALYTICS_MARKER in html:
@@ -730,6 +739,24 @@ def stamp_google_verification(page: Path):
         html = re.sub(pattern, lambda _: (block + "\n") if block else "", html, flags=re.S)
     elif block:
         html = html.replace("</head>", block + "\n</head>")
+    page.write_text(html, encoding="utf-8", newline="\n")
+
+
+def stamp_home_header(page: Path):
+    """Keep the initial homepage header identical to the template the app renders."""
+    html = page.read_text(encoding="utf-8")
+    template = re.search(r'<template id="luach-home-header">(.*?)</template>', html, re.S)
+    if not template:
+        raise RuntimeError("Homepage header template is missing")
+    start = "<!-- home header: generated from luach-home-header by build-offline.py -->"
+    end = "<!-- /home header -->"
+    html, count = re.subn(
+        re.escape(start) + r".*?" + re.escape(end),
+        lambda _: start + "\n" + template.group(1).strip() + "\n  " + end,
+        html, flags=re.S,
+    )
+    if count != 1:
+        raise RuntimeError("Homepage header markers are missing or repeated")
     page.write_text(html, encoding="utf-8", newline="\n")
 
 
@@ -783,7 +810,7 @@ def write_route_pages():
             r'<script type="application/ld\+json">.*?</script>\n', "", html, flags=re.S
         )
         html = re.sub(
-            r"<main id=\"main\">.*?</main>", route_shell(name, meta), html, flags=re.S
+            r'<main id="main"(?: class="[^"]*")?>.*?</main>', route_shell(name, meta), html, flags=re.S
         )
         # Every one of the substitutions above is a regex against a file this script does
         # not own, and a regex that matches nothing fails quietly: the page would still be
@@ -849,9 +876,14 @@ def route_shell(name: str, meta: dict) -> str:
         '<path d="M12 20.3s-7.6-4.6-7.6-9.7A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.6 3c0 5.1-7.6 9.7-7.6 9.7z"/>'
         '</svg>Donate</a>'
     )
-    return f"""<main id="main">
+    schedule_page = name in ("chart", "schedules")
+    back_href = "/week/" if schedule_page else "/"
+    back_label = "Zmanim" if schedule_page else "Home" if name == "donate" else "Menu"
+    back_name = "Back to Weekly Zmanim" if schedule_page else "Back to Home" if name == "donate" else "Back to Menu"
+    main_class = ' class="is-give"' if name == "donate" else ""
+    return f"""<main id="main"{main_class}>
   <div class="luach-bar no-print">
-    <a class="luach-back" href="/">&larr; Menu</a>
+    <a class="luach-back" href="{back_href}" aria-label="{back_name}">&larr; {back_label}</a>
     <h1 class="luach-bar-title">{meta['heading']}</h1>{give}
   </div>
   <noscript class="preapp">
@@ -869,6 +901,28 @@ def route_shell(name: str, meta: dict) -> str:
   </div>
   </noscript>
 </main>"""
+
+
+def write_not_found_page():
+    """GitHub Pages serves this document for unknown paths at any nesting depth."""
+    html = f"""<!doctype html>
+<!-- Generated by build-offline.py, do not edit by hand. -->
+<html lang="en" translate="no">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Opening the homepage | Bais Medrash of Lakewood Commons</title>
+<link rel="canonical" href="{SITE_URL}/">
+<meta http-equiv="refresh" content="0; url=/">
+<script>window.location.replace('/');</script>
+</head>
+<body>
+<p>Opening the homepage. <a href="/">Go to the homepage</a>.</p>
+</body>
+</html>
+"""
+    (ROOT / "404.html").write_text(html, encoding="utf-8", newline="\n")
 
 
 def write_sitemap():
@@ -902,6 +956,19 @@ def write_sitemap():
     (ROOT / "robots.txt").write_text(robots, encoding="utf-8", newline="\n")
 
 
+def stamp_seats_build():
+    page = ROOT / "seats" / "index.html"
+    html = re.sub(r'<meta name="seats-build" content="[a-f0-9]+">\n?', "", page.read_text(encoding="utf-8"))
+    digest = hashlib.sha256(html.encode("utf-8"))
+    dependencies = [ROOT / "data" / "seats-sync.json", ROOT / "vendor" / "xlsx-0.20.3.min.js",
+                    ROOT / "assets" / "shul-240.jpg", *sorted((ROOT / "assets" / "fonts").glob("*.woff2"))]
+    for path in dependencies:
+        digest.update(str(path.relative_to(ROOT)).encode("utf-8") + b"\0" + path.read_bytes())
+    version = digest.hexdigest()[:16]
+    html = html.replace("</head>", f'<meta name="seats-build" content="{version}">\n</head>')
+    page.write_text(html, encoding="utf-8", newline="\n")
+
+
 def stamp_js_versions(page: Path, prefix: str, entry: str):
     """Give every JS module a content hash in its URL, via an import map.
 
@@ -931,7 +998,7 @@ def stamp_js_versions(page: Path, prefix: str, entry: str):
     else:
         html = html.replace("</head>", block + "\n</head>")
     html = re.sub(
-        r'src="(?:\.\./)?js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
+        r'src="(?:\.\./)*js/' + re.escape(entry) + r'(?:\?v=[0-9a-f]+)?"',
         lambda m: f'src="{prefix}js/{entry}?v={digest(JS_DIR / entry)}"',
         html,
     )
@@ -954,8 +1021,8 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "offline"]
-DIST_FILES = ["index.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "yahrzeits", "offline"]
+DIST_FILES = ["index.html", "404.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
 # byte: there is nothing of ours in it to take out, and re-emitting somebody else's MIT code
@@ -1002,6 +1069,11 @@ def write_dist():
         for f in sorted(base.rglob("*")):
             if f.is_file():
                 put(f.relative_to(ROOT))
+
+    seats_build = re.search(r'<meta name="seats-build" content="([a-f0-9]{16})">', (ROOT / "seats" / "index.html").read_text(encoding="utf-8"))
+    if not seats_build:
+        raise RuntimeError("Seats build version was not stamped before publishing.")
+    (DIST_DIR / "seats" / "version.json").write_text(json.dumps({"version": seats_build.group(1)}) + "\n", encoding="utf-8")
 
     # Nothing of ours may reach dist with a comment still in it. Asked of the same
     # scanners that did the stripping rather than by searching for "/*": a substring search
@@ -1059,6 +1131,7 @@ def main():
     (OUT_DIR / "bundle.js").write_text(bundle, encoding="utf-8")
 
     # The congregation's page at the root, and the app under /admin.
+    stamp_home_header(ROOT / "index.html")
     stamp_css_versions(ROOT / "index.html", "")
     stamp_js_versions(ROOT / "index.html", "", "luach.js")
     # Only the congregation's page: /admin is asked out of search, so an address for it in
@@ -1073,19 +1146,35 @@ def main():
     # After the routes, so only the root carries it. See GOOGLE_SITE_VERIFICATION.
     stamp_google_verification(ROOT / "index.html")
     write_sitemap()
+    write_not_found_page()
     stamp_css_versions(ROOT / "admin" / "index.html", "../")
     stamp_js_versions(ROOT / "admin" / "index.html", "../", "app.js")
+    stamp_analytics(ROOT / "admin" / "index.html", admin=True)
     # The messages page, stamped the same way and for the same reason: it imports the same
     # modules, so it needs the same map or it would run new code against ten minute old
     # modules. Its own entry, since it is a much smaller program than the admin.
     stamp_css_versions(ROOT / "texts" / "index.html", "../")
     stamp_js_versions(ROOT / "texts" / "index.html", "../", "texts-app.js")
+    stamp_analytics(ROOT / "texts" / "index.html", spa=False)
+    # Seats is a separate browser-local tool, with its own PIN and no public route.
+    stamp_css_versions(ROOT / "seats" / "index.html", "../")
+    stamp_js_versions(ROOT / "seats" / "index.html", "../", "seats-app.js")
+    stamp_analytics(ROOT / "seats" / "index.html", ready_event="zmanim-seats-open")
+    stamp_seats_build()
+    stamp_css_versions(ROOT / "yahrzeits" / "index.html", "../")
+    stamp_js_versions(ROOT / "yahrzeits" / "index.html", "../", "yahrzeits-app.js")
+    stamp_css_versions(ROOT / "admin" / "calendar" / "index.html", "../../")
+    stamp_js_versions(ROOT / "admin" / "calendar" / "index.html", "../../", "calendar-app.js")
+    stamp_analytics(ROOT / "admin" / "calendar" / "index.html", ready_event="zmanim-calendar-open", exclude_account_links=True)
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain
     # script off the filesystem, so the import map and the ?v= come straight back out,
     # and the site-absolute asset paths go back to relative ones.
     html = (ROOT / "admin" / "index.html").read_text(encoding="utf-8")
+    html = re.sub(re.escape(ANALYTICS_MARKER) + r"\n<script.*?</script>\n", "", html, flags=re.S)
+    if "static.cloudflareinsights.com" in html:
+        raise RuntimeError("offline build: the analytics loader was left in")
     html = html.replace('href="../css/', 'href="css/').replace('src="/assets/', 'src="assets/')
     # The block admin/index.html marks off with <!-- icons --> ... <!-- /icons -->.
     html = re.sub(r"[ \t]*<!-- icons -->.*?<!-- /icons -->\n", "", html, flags=re.S)
@@ -1113,7 +1202,12 @@ def main():
     # copied only top-level files and choked the moment a folder appeared.
     assets_out = OUT_DIR / "assets"
     assets_out.mkdir(exist_ok=True)
+    import shutil
+    shutil.rmtree(assets_out / "location-data", ignore_errors=True)
     for f in (ROOT / "assets").rglob("*"):
+        # ZIP/GPS lookup belongs to the public website, not the USB admin app.
+        if "location-data" in f.relative_to(ROOT / "assets").parts:
+            continue
         if not f.is_file():
             continue
         dest = assets_out / f.relative_to(ROOT / "assets")
@@ -1122,7 +1216,11 @@ def main():
 
     css_out = OUT_DIR / "css"
     css_out.mkdir(exist_ok=True)
+    # The yahrzeit register requires the shared Seats service.
+    (css_out / "yahrzeits.css").unlink(missing_ok=True)
     for f in (ROOT / "css").glob("*.css"):
+        if f.name == "yahrzeits.css":
+            continue
         (css_out / f.name).write_text(inline_fonts(f.read_text(encoding="utf-8")), encoding="utf-8")
 
     print(f"Built {OUT_DIR} ({len(order)} modules, {len(bundle.splitlines())} lines)")
