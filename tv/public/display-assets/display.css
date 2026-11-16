@@ -1060,7 +1060,7 @@ button {
 .quarter-board .next-countdown {font:26px/1.2 David,serif;color:var(--screen-gold);margin:0}
 .quarter-board .next-empty {font:30px/1.4 David,serif;text-align:center;max-width:600px}
 .quarter-board .board-dedication {position:static;inset:auto;width:auto;height:auto;min-height:0;min-width:0;border:1.5px solid var(--screen-border);border-radius:26px;background:var(--screen-card);padding:32px 40px;display:flex;flex-direction:column;justify-content:center}
-.quarter-board .board-dedication .tv-card {display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--screen-text);text-align:center;height:auto}
+.tv-stage.quarter-board .board-dedication .tv-card {display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:0;padding:0;border:0;border-radius:0;background:transparent;color:var(--screen-text);text-align:center;height:auto}
 .quarter-board .board-dedication .tv-card h2 {font:700 47px/1.12 David,serif;color:var(--screen-gold);margin:0 0 10px;overflow-wrap:normal}
 .quarter-board .board-dedication .tv-card p {display:block;margin:0;font:inherit;overflow-wrap:normal}
 .quarter-board .dedication-copy {display:flex;flex-direction:column;justify-content:center;gap:12px;min-height:0;font:48px/1.18 David,serif;overflow-wrap:normal}
