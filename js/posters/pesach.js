@@ -167,11 +167,23 @@ function pesachDayMincha(serial, settings) {
     { text: trace.plain(), underlined: false, mark: '', trace }];
 }
 
-/** The חול המועד days that keep the everyday schedule: not Shabbos, and not a Friday, which
- *  runs on an ערב שבת one. They are what the block's own times are set by. */
+/** The dates used to calculate the printed חול המועד clocks. Keep this range
+ *  unchanged: actual morning and afternoon ownership is narrower or wider below. */
 export function pesachChmDays(rh) {
   return PS_CHM.map((n) => psSerial(rh, n))
     .filter((s) => excelWeekday(s) !== PS_SHABBOS && excelWeekday(s) !== PS_FRIDAY);
+}
+
+/** The printed חול המועד morning applies on every ordinary morning, including
+ *  Friday and ערב שביעי. Shabbos has the separate morning on its own block. */
+export function pesachChmMorningDays(rh) {
+  return PS_CHM.map((n) => psSerial(rh, n))
+    .filter((s) => excelWeekday(s) !== PS_SHABBOS);
+}
+/** Friday belongs to the ערב שבת block; 20 ניסן belongs to the ערב שביעי
+ *  block. Neither may also offer the ordinary חול המועד afternoon and night. */
+export function pesachChmAfternoonDays(rh) {
+  return pesachChmDays(rh).filter((s) => s < psSerial(rh, PS_SHVII - 1));
 }
 
 /** The חול המועד מנחה run.
@@ -466,8 +478,10 @@ export function buildPesachPoster(year, settings) {
         line(PS_TEXT.maariv, list(pesachChmMaariv(chmDays, settings)), { calc: 'chmMaariv' }),
       ],
     });
-    for (const s of chmDays) {
+    for (const s of pesachChmMorningDays(rh)) {
       M.list(s, PS_TEXT.shacharis, parseTimes(PS_TEXT.chmShacharis), MORNING);
+    }
+    for (const s of pesachChmAfternoonDays(rh)) {
       M.list(s, PS_TEXT.mincha, list(pesachChmMincha(chmDays, settings)), AFTERNOON);
       M.list(s, PS_TEXT.maariv, list(pesachChmMaariv(chmDays, settings)), AFTERNOON);
     }

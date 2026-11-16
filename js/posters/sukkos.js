@@ -263,11 +263,17 @@ function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false, ea
   return out;
 }
 
-/** The days of חול המועד that keep the ordinary weekday schedule: not Shabbos, and not the
- *  Friday, which runs on an ערב שבת one. They are what the box's own times are set by. */
+/** The dates used to calculate the printed חול המועד clocks. Their range stays fixed
+ *  even when an afternoon belongs to the separate ערב יום טוב block. */
 export function sukkosChmDays(rh) {
   return SK_CHM.map((n) => skSerial(rh, n))
     .filter((s) => excelWeekday(s) !== SK_SHABBOS && excelWeekday(s) !== SK_FRIDAY);
+}
+
+/** הושענא רבה's afternoon and night are ערב שמיני עצרת. That block owns them,
+ *  so the ordinary חול המועד run must not add another set of מנינים there. */
+export function sukkosChmAfternoonDays(rh) {
+  return sukkosChmDays(rh).filter((s) => s < skSerial(rh, SK_HOSHANA));
 }
 
 /** The חול המועד מנחה run.
@@ -801,14 +807,15 @@ export function buildSukkosPoster(year, settings) {
   /* The mornings run on every day of חול המועד that is not Shabbos, the Friday included: the
      sheet's שחרית line covers all of them and only Shabbos has a morning of its own. The
      afternoon and the evening are the weekdays' alone, since the Friday's belong to the
-     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning either way. */
+     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning, and its
+     afternoon and night belong to the שמיני עצרת block. */
   for (const n of SK_CHM) {
     const on = day(n);
     if (excelWeekday(on) === SK_SHABBOS) continue;
     if (n === SK_HOSHANA) M.list(on, SK_TEXT.shacharis, hoshanaTimes, MORNING);
     else M.list(on, SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), MORNING);
   }
-  for (const s of chmDays) {
+  for (const s of sukkosChmAfternoonDays(rh)) {
     M.list(s, SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), AFTERNOON);
     M.list(s, SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), AFTERNOON);
   }

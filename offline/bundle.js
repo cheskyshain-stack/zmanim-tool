@@ -8359,11 +8359,23 @@ function pesachDayMincha(serial, settings) {
     { text: trace.plain(), underlined: false, mark: '', trace }];
 }
 
-/** The חול המועד days that keep the everyday schedule: not Shabbos, and not a Friday, which
- *  runs on an ערב שבת one. They are what the block's own times are set by. */
+/** The dates used to calculate the printed חול המועד clocks. Keep this range
+ *  unchanged: actual morning and afternoon ownership is narrower or wider below. */
 function pesachChmDays(rh) {
   return PS_CHM.map((n) => psSerial(rh, n))
     .filter((s) => excelWeekday(s) !== PS_SHABBOS && excelWeekday(s) !== PS_FRIDAY);
+}
+
+/** The printed חול המועד morning applies on every ordinary morning, including
+ *  Friday and ערב שביעי. Shabbos has the separate morning on its own block. */
+function pesachChmMorningDays(rh) {
+  return PS_CHM.map((n) => psSerial(rh, n))
+    .filter((s) => excelWeekday(s) !== PS_SHABBOS);
+}
+/** Friday belongs to the ערב שבת block; 20 ניסן belongs to the ערב שביעי
+ *  block. Neither may also offer the ordinary חול המועד afternoon and night. */
+function pesachChmAfternoonDays(rh) {
+  return pesachChmDays(rh).filter((s) => s < psSerial(rh, PS_SHVII - 1));
 }
 
 /** The חול המועד מנחה run.
@@ -8658,8 +8670,10 @@ function buildPesachPoster(year, settings) {
         line(PS_TEXT.maariv, list(pesachChmMaariv(chmDays, settings)), { calc: 'chmMaariv' }),
       ],
     });
-    for (const s of chmDays) {
+    for (const s of pesachChmMorningDays(rh)) {
       M.list(s, PS_TEXT.shacharis, parseTimes(PS_TEXT.chmShacharis), MORNING);
+    }
+    for (const s of pesachChmAfternoonDays(rh)) {
       M.list(s, PS_TEXT.mincha, list(pesachChmMincha(chmDays, settings)), AFTERNOON);
       M.list(s, PS_TEXT.maariv, list(pesachChmMaariv(chmDays, settings)), AFTERNOON);
     }
@@ -9398,11 +9412,17 @@ function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false, ea
   return out;
 }
 
-/** The days of חול המועד that keep the ordinary weekday schedule: not Shabbos, and not the
- *  Friday, which runs on an ערב שבת one. They are what the box's own times are set by. */
+/** The dates used to calculate the printed חול המועד clocks. Their range stays fixed
+ *  even when an afternoon belongs to the separate ערב יום טוב block. */
 function sukkosChmDays(rh) {
   return SK_CHM.map((n) => skSerial(rh, n))
     .filter((s) => excelWeekday(s) !== SK_SHABBOS && excelWeekday(s) !== SK_FRIDAY);
+}
+
+/** הושענא רבה's afternoon and night are ערב שמיני עצרת. That block owns them,
+ *  so the ordinary חול המועד run must not add another set of מנינים there. */
+function sukkosChmAfternoonDays(rh) {
+  return sukkosChmDays(rh).filter((s) => s < skSerial(rh, SK_HOSHANA));
 }
 
 /** The חול המועד מנחה run.
@@ -9936,14 +9956,15 @@ function buildSukkosPoster(year, settings) {
   /* The mornings run on every day of חול המועד that is not Shabbos, the Friday included: the
      sheet's שחרית line covers all of them and only Shabbos has a morning of its own. The
      afternoon and the evening are the weekdays' alone, since the Friday's belong to the
-     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning either way. */
+     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning, and its
+     afternoon and night belong to the שמיני עצרת block. */
   for (const n of SK_CHM) {
     const on = day(n);
     if (excelWeekday(on) === SK_SHABBOS) continue;
     if (n === SK_HOSHANA) M.list(on, SK_TEXT.shacharis, hoshanaTimes, MORNING);
     else M.list(on, SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), MORNING);
   }
-  for (const s of chmDays) {
+  for (const s of sukkosChmAfternoonDays(rh)) {
     M.list(s, SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), AFTERNOON);
     M.list(s, SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), AFTERNOON);
   }
