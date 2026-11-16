@@ -24,7 +24,7 @@ function layoutTop(node, ancestor) {
 const layoutBottom = (node, ancestor) => layoutTop(node, ancestor) + node.offsetHeight;
 
 function timeHTML(event) {
-  return `<span class="quarter-time" data-time="${esc(event.at)}" data-minyan="${esc(minyanKey(event))}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span>`;
+  return `<span class="quarter-time" data-time="${esc(event.at)}" data-minyan="${esc(minyanKey(event))}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-clock"><span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span></span>`;
 }
 
 /** Keep source-date rows mounted. Only expired content leaves the frame. */

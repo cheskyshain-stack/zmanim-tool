@@ -14,15 +14,20 @@ const viewAt=at=>quarterSchedule(scheduleSnapshot(at),at);
 const flattened=view=>view.groups.flatMap(group=>group.events);
 const times=group=>group.events.map(event=>event.time);
 
-test('each of nine source dates has unchanged zmanim clocks with exact instants across winter, summer and DST transitions',()=>{
+test('source dates keep eleven unchanged zmanim while the TV omits only three-star nightfall across seasons and DST',()=>{
   for(const date of ['2026-11-15','2027-07-07','2027-03-14','2026-11-01']) {
-    const schedule=scheduleSnapshot(localToISO(date+'T00:00'));
+    const at=localToISO(date+'T00:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
     assert.equal(schedule.displayDays.length,9);
     assert.equal(schedule.displayDays[1].date,date);
     for(const day of schedule.displayDays) {
       assert.ok(day.hebrewTitle);
       assert.ok(day.hebrewDate);
       assert.equal(day.zmanim.length,11);
+      assert.ok(day.zmanim.some(zman=>zman.key==='tzaisGeonim8_5'),'The source calculation is preserved');
+      const panel=view.allZmanDays.find(candidate=>candidate.date===day.date);
+      assert.equal(panel.allZmanim.length,10);
+      assert.ok(!panel.allZmanim.some(zman=>zman.sourceKey==='tzaisGeonim8_5'),'Three-star nightfall is omitted from the TV panel');
+      assert.ok(panel.allZmanim.some(zman=>zman.sourceKey==='tzais72'&&zman.label==='צאת 72'),'72-minute nightfall remains on the TV');
       assert.equal(new Set(day.zmanim.map(zman=>zman.key)).size,11);
       for(const zman of day.zmanim) {
         assert.equal(localStamp(zman.at).slice(0,10),day.date);
@@ -38,19 +43,19 @@ test('each of nine source dates has unchanged zmanim clocks with exact instants 
 test('every zman stays for thirty minutes, then later dates remain in chronological order',()=>{
   const at=localToISO('2026-11-15T00:00'),schedule=scheduleSnapshot(at);
   const dawn=schedule.zmanim[0],noon=schedule.zmanim.find(zman=>zman.key==='solarNoon'),last=schedule.zmanim.at(-1);
-  assert.equal(quarterSchedule(schedule,at).zmanim.length,11);
+  assert.equal(quarterSchedule(schedule,at).zmanim.length,10);
   for(const elapsed of [0,ZMAN_HOLD_MS-1,ZMAN_HOLD_MS])
     assert.ok(quarterSchedule(schedule,atOffset(dawn.at,elapsed)).zmanim.some(zman=>zman.sourceKey===dawn.key));
   const afterDawn=quarterSchedule(schedule,atOffset(dawn.at,ZMAN_HOLD_MS+1));
-  assert.equal(afterDawn.zmanim.length,10);
+  assert.equal(afterDawn.zmanim.length,9);
   assert.ok(!afterDawn.zmanim.some(zman=>zman.sourceKey===dawn.key));
   const afterNoon=quarterSchedule(schedule,atOffset(noon.at,ZMAN_HOLD_MS+1));
-  assert.deepEqual(afterNoon.zmanim.map(zman=>zman.sourceKey),['sunset','tzaisGeonim8_5','tzais72']);
+  assert.deepEqual(afterNoon.zmanim.map(zman=>zman.sourceKey),['sunset','tzais72']);
   const late=quarterSchedule(schedule,atOffset(last.at,ZMAN_HOLD_MS+1));
   assert.equal(late.zmanimState,'finished');
   assert.equal(late.zmanDays[0].date,'2026-11-16');
   assert.equal(late.zmanDays[0].relativeLabel,'מחר');
-  assert.equal(late.zmanDays[0].zmanim.length,11);
+  assert.equal(late.zmanDays[0].zmanim.length,10);
   assert.deepEqual(late.zmanDays.map(day=>day.date),[...late.zmanDays.map(day=>day.date)].sort());
 });
 

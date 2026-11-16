@@ -67,7 +67,9 @@ function prayerDay(day,currentDate,now) {
 }
 
 function zmanDay(day,currentDate,now) {
-  const allZmanim=(day.zmanim || []).map((zman,index)=>{
+  // Only this TV panel omits three-star nightfall. The source calendar keeps
+  // every calculation for congregation pages, schedules and other consumers.
+  const allZmanim=(day.zmanim || []).filter(zman=>zman.key!=='tzaisGeonim8_5').map((zman,index)=>{
     const expiresAt=expiresAfter(zman.at,ZMAN_HOLD_MS);
     // An older cached snapshot may lack absolute instants. Keep its printed
     // times rather than guess AM/PM or remove a row at an invented boundary.
