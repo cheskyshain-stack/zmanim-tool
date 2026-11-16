@@ -1042,8 +1042,8 @@ button {
 .quarter-focus {min-height:0;display:flex;flex-direction:column;gap:24px}
 .quarter-board .quarter-brandbar {display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);align-items:center;gap:20px;padding:14px 20px;border:1.5px solid var(--screen-border);border-radius:26px;background:var(--screen-card);flex:none}
 .quarter-board .tv-brand {text-align:center;font:700 26px/1.12 David,serif;color:var(--screen-text)}
-.quarter-board .brand-english {display:block;font:700 25px/1.1 David,serif}
-.quarter-board .brand-english,.quarter-board .brand-hebrew {font-weight:700;-webkit-text-stroke:.35px currentColor;paint-order:stroke fill}
+.quarter-board .brand-title {display:block;font:700 25px/1.1 David,serif}
+.quarter-board .brand-title,.quarter-board .brand-hebrew {font-weight:700;-webkit-text-stroke:.35px currentColor;paint-order:stroke fill}
 .quarter-board .brand-hebrew {display:block;color:var(--screen-gold);font:700 28px/1.2 David,serif;margin-top:6px}
 .quarter-board .tv-current {text-align:center;border-left:1px solid var(--quarter-rule);padding-left:20px}
 .quarter-board .tv-clock {font:700 40px/1.1 David,serif;letter-spacing:-1px}

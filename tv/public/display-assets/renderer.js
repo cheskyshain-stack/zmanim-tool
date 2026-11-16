@@ -101,7 +101,7 @@ export class DisplayView {
     this.stage.dataset.theme = theme || themeAt(snapshot.appearance, instant);
     this.stage.querySelector('.tv-preview-label').hidden = !preview;
     const items = (snapshot.items || []).filter(i => i.startsAt <= instant && (!i.endsAt || instant < i.endsAt));
-    setHTML(this.brand, `<span class="brand-english" lang="en" dir="ltr">Bais Medrash of<br>Lakewood Commons</span><span class="brand-hebrew" lang="he" dir="rtl">${esc(s.shulName)}</span>`);
+    setHTML(this.brand, `<span class="brand-title" lang="he" dir="rtl">בית מדרש<br>דליקוואוד קאמענס</span><span class="brand-hebrew" lang="he" dir="rtl">${esc(s.shulName)}</span>`);
     setHTML(this.date, `<b dir="rtl">${esc(s.hebrewDate)}</b><span>${dateLabel(s.date)}</span>`);
     const clock = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',minute:'2-digit'}).format(new Date(instant));
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
