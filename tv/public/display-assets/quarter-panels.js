@@ -1,4 +1,5 @@
 import { minyanKey, nextMinyanKey } from './minyan-timing.js';
+const isShemaDeadline = group => group.auxiliary && /^(?:סזק(?:ר)?ש|סוףזמן(?:קריאתשמע|ק(?:ר)?ש))/.test(String(group.label).replace(/[^\p{L}\p{N}]/gu,''));
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function clockHTML(time) {
   const parts = String(time).match(/^(\d{1,2}):(\d{2})(:\d{2})?$/);
@@ -43,14 +44,20 @@ export class QuarterPanel {
     const days = this.kind === 'zmanim' ? data.zmanDays || [] : data.prayerDays || [];
     const rows = [];
     for (const day of days) {
-      const entries = this.kind === 'zmanim' ? day.zmanim : day.groups;
+      const entries = this.kind === 'zmanim' ? day.zmanim : day.groups?.filter(group => !isShemaDeadline(group));
       if (!entries?.length && !day.note) continue;
-      const heading = ['היום','אתמול'].includes(day.relativeLabel) ? day.relativeLabel : day.displayTitle || day.title;
+      const heading = day.relativeLabel === 'אתמול' ? day.relativeLabel : day.displayTitle || day.title;
       const fullDate = [day.relativeLabel,day.title,day.hebrewDate].filter(Boolean).join(' · ');
       rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
       if (!entries?.length) rows.push({key:`note:${day.date}`,day:day.date,type:'note',html:esc(day.note)});
       else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
-      else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),long:String(group.label).length>13||!group.printed&&group.events.length!==1&&String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
+      else for (const group of entries) {
+        const label = /^מנחה\s+ערב\s+שבת$/.test(group.label) ? 'מנחה' : group.label;
+        rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),
+          columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),
+          long:String(label).length>13||!group.printed&&group.events.length!==1&&String(label).trim().split(/\s+/).length>1,
+          html:`<h4 lang="he" dir="rtl">${esc(label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
+      }
     }
     return rows;
   }
