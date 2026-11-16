@@ -87,6 +87,23 @@ npx wrangler deploy --config wrangler.production.jsonc
 
 Ensure that this hostname's Cloudflare zone is accessible to the deployment account before adding the routes. Zone/account access is a deployment prerequisite, not something this implementation changes. Review Worker CPU limits against the shared schedule calculations as part of staging; the local functional checks are not a Cloudflare production load test.
 
+## Automatic deployments for the existing TV Worker
+
+In Cloudflare, open Workers & Pages, choose `shul-tv-display`, and open Settings > Builds.
+Connect only the `cheskyshain-stack/zmanim-tool` repository and use these build settings.
+
+| Setting | Value |
+| --- | --- |
+| Production branch | `feature/tv-display` |
+| Root directory | `tv` |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy --config wrangler.builds.jsonc` |
+| Preview builds | Disabled |
+
+Keep the existing Worker routes and Access settings in Cloudflare. The build configuration binds the existing D1 database. Database migrations are a separate operation.
+
+After the first build, confirm `/tv/` loads and `/api/display/offline` contains the published congregation schedule. Future pushes to the TV branch use the same connection.
+
 ## Data and permissions
 
 D1 migrations:
@@ -115,7 +132,7 @@ A display schedule control stores its name, source, applicable civil dates, opti
 
 The existing code does not provide complete Tisha B'Av-day or Shavuos schedules. Those days show an explicit confirmation notice rather than inferred weekday times. Add accurate information to the shared source before extending those schedules; the display does not invent it.
 
-The Worker bundles the shared source at build time. Rebuild/redeploy the TV Worker alongside changes to `data/published.json`, schedule formulas, overrides or location settings so the website and TV use the same release. New TV announcements/dedications and their scheduling do not require deployments.
+The Worker reads the congregation site's published settings and saves them with the TV's offline schedule. The code bundles the shared calculations, so deploy a fresh TV build for formula changes. Published schedule settings and new TV announcements and dedications reach the display without a deployment.
 
 ## Timing and display behavior
 
