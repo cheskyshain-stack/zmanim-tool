@@ -89,20 +89,9 @@ Ensure that this hostname's Cloudflare zone is accessible to the deployment acco
 
 ## Automatic deployments for the existing TV Worker
 
-In Cloudflare, open Workers & Pages, choose `shul-tv-display`, and open Settings > Builds.
-Connect only the `cheskyshain-stack/zmanim-tool` repository and use these build settings.
+GitHub Actions runs `Deploy Shul View` on pushes to `feature/tv-display`. The workflow uses the `SHUL_VIEW_DEPLOY_TOKEN` repository secret. To set up or rotate that secret, open Cloudflare Workers & Pages > `shul-tv-display` > Settings > Builds and create an external CI/CD token scoped to this Worker. Save the value in GitHub under Settings > Secrets and variables > Actions.
 
-| Setting | Value |
-| --- | --- |
-| Production branch | `feature/tv-display` |
-| Root directory | `tv` |
-| Build command | `npm run build` |
-| Deploy command | `npx wrangler deploy --config wrangler.builds.jsonc` |
-| Preview builds | Disabled |
-
-Keep the existing Worker routes and Access settings in Cloudflare. The build configuration binds the existing D1 database. Database migrations are a separate operation.
-
-After the first build, confirm `/tv/` loads and `/api/display/offline` contains the published congregation schedule. Future pushes to the TV branch use the same connection.
+The deploy uses the existing Worker routes, Access settings, and D1 database. Database migrations are a separate operation. After each deploy, the workflow checks that `/tv/` loads and the TV receives the congregation's published schedule.
 
 ## Data and permissions
 
