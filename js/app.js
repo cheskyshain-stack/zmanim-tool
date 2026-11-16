@@ -187,8 +187,8 @@ function renderNav() {
       ${link({ tab: 'home' })}
       ${ADMIN_NAV_SECTIONS.map(section => `<section class="admin-nav-group" aria-label="${section.title}"><h2 class="admin-nav-label">${section.title}</h2>${section.items.map(link).join('')}</section>`).join('')}
       <div class="admin-nav-public-links">
-        <a class="nav-btn" href="/tv/" target="_blank" rel="noopener">${icon('screen')}<span>Open Shul View <small>(new tab)</small></span></a>
-        <a class="nav-btn" href="/" target="_blank" rel="noopener">${icon('site')}<span>Open website <small>(new tab)</small></span></a>
+        <a class="nav-btn" href="/tv/">${icon('screen')}<span>Open Shul View</span></a>
+        <a class="nav-btn" href="/">${icon('site')}<span>Open website</span></a>
       </div>
     </div>`;
   const toggle = nav.querySelector('.admin-nav-toggle');

@@ -43,8 +43,8 @@ export function renderAdminHome(container, onOpenTab) {
       <p>Schedules, announcements, and the tools that keep the shul informed.</p>
       <div class="admin-home-quick-links">
         <a class="admin-home-primary" href="/admin/display/">Shul View controls <span aria-hidden="true">&rarr;</span></a>
-        <a href="/tv/" target="_blank" rel="noopener">Open Shul View <span class="admin-home-new-tab">(new tab)</span></a>
-        <a href="/" target="_blank" rel="noopener">Open website <span class="admin-home-new-tab">(new tab)</span></a>
+        <a href="/tv/">Open Shul View</a>
+        <a href="/">Open website</a>
       </div>
     </header>
     <div class="admin-home-grid">${ADMIN_NAV_SECTIONS.map((section) => `<section class="admin-home-section">

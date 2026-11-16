@@ -3637,8 +3637,8 @@ function renderAdminHome(container, onOpenTab) {
       <p>Schedules, announcements, and the tools that keep the shul informed.</p>
       <div class="admin-home-quick-links">
         <a class="admin-home-primary" href="/admin/display/">Shul View controls <span aria-hidden="true">&rarr;</span></a>
-        <a href="/tv/" target="_blank" rel="noopener">Open Shul View <span class="admin-home-new-tab">(new tab)</span></a>
-        <a href="/" target="_blank" rel="noopener">Open website <span class="admin-home-new-tab">(new tab)</span></a>
+        <a href="/tv/">Open Shul View</a>
+        <a href="/">Open website</a>
       </div>
     </header>
     <div class="admin-home-grid">${ADMIN_NAV_SECTIONS.map((section) => `<section class="admin-home-section">
@@ -26072,8 +26072,8 @@ function renderNav() {
       ${link({ tab: 'home' })}
       ${ADMIN_NAV_SECTIONS.map(section => `<section class="admin-nav-group" aria-label="${section.title}"><h2 class="admin-nav-label">${section.title}</h2>${section.items.map(link).join('')}</section>`).join('')}
       <div class="admin-nav-public-links">
-        <a class="nav-btn" href="/tv/" target="_blank" rel="noopener">${icon('screen')}<span>Open Shul View <small>(new tab)</small></span></a>
-        <a class="nav-btn" href="/" target="_blank" rel="noopener">${icon('site')}<span>Open website <small>(new tab)</small></span></a>
+        <a class="nav-btn" href="/tv/">${icon('screen')}<span>Open Shul View</span></a>
+        <a class="nav-btn" href="/">${icon('site')}<span>Open website</span></a>
       </div>
     </div>`;
   const toggle = nav.querySelector('.admin-nav-toggle');
