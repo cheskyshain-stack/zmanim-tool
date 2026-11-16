@@ -24,6 +24,7 @@ function layoutTop(node, ancestor) {
 const layoutBottom = (node, ancestor) => layoutTop(node, ancestor) + node.offsetHeight;
 
 function timeHTML(event) {
+  if(event.isText)return `<span class="quarter-relative-time" lang="he" dir="rtl">${esc(event.time)}</span>`;
   return `<span class="quarter-time" data-time="${esc(event.at)}" data-minyan="${esc(minyanKey(event))}" title="${esc(event.place)}">${event.reckoning ? `<small class="quarter-reckoning" lang="he" dir="rtl">${esc(event.reckoning)}</small>` : ''}<span class="quarter-time-clock"><span class="quarter-time-value${event.underlined ? ' is-downstairs' : ''}">${esc(event.time)}</span>${event.mark ? `<sup>${esc(event.mark)}</sup>` : ''}</span></span>`;
 }
 
@@ -49,7 +50,7 @@ export class QuarterPanel {
       rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
       if (!entries?.length) rows.push({key:`note:${day.date}`,day:day.date,type:'note',html:esc(day.note)});
       else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
-      else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',long:String(group.label).length>13||String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>`});
+      else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),long:String(group.label).length>13||!group.printed&&String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
     }
     return rows;
   }
@@ -80,6 +81,8 @@ export class QuarterPanel {
       const node = existing.get(row.key) || document.createElement(row.type === 'heading' ? 'header' : row.type === 'prayer' ? 'section' : 'div');
       node.className = row.type === 'heading' ? 'quarter-day-heading' : row.type === 'prayer' ? 'quarter-prayer-group' : row.type === 'zman' ? 'quarter-zman-row' : 'quarter-empty';
       node.classList.toggle('quarter-long-name',Boolean(row.long));
+      node.classList.toggle('quarter-printed-row',Boolean(row.printed));
+      if(row.printed)node.dataset.timeColumns=String(row.columns);else delete node.dataset.timeColumns;
       node.dataset.motion = row.key;
       node.dataset.day = row.day;
       node.dataset.rowType = row.type;
@@ -155,6 +158,12 @@ export class QuarterPanel {
     for (const node of this.flow.children) {
       if (node.dataset.rowType === 'heading') { node.hidden = ended; continue; }
       const times = node.matches('[data-time]') ? [node] : [...node.querySelectorAll('[data-time]')];
+      if(node.classList.contains('quarter-printed-row')) {
+        node.hidden=ended || layoutBottom(node,this.viewport)>bottom+.5;
+        total+=times.length;
+        if(node.hidden){ended=true;hidden+=times.length;}else visibleDays.add(node.dataset.day);
+        continue;
+      }
       if (!times.length) {
         node.hidden = ended || layoutBottom(node, this.viewport) > bottom + .5;
         if (!node.hidden && node.dataset.day) visibleDays.add(node.dataset.day);

@@ -1,4 +1,5 @@
 import { zman, clockTime } from '../zmanim/trace.js';
+import { ceilToMinute } from '../format.js';
 // The מנין a יום טוב afternoon opens with, and the one rule that decides whether it is 1:15.
 //
 // Every one of these sheets opens its afternoon at 1:15, and 1:15 is not always late enough.
@@ -21,15 +22,8 @@ import { zman, clockTime } from '../zmanim/trace.js';
 // shul asked for the same rule on both and one rule in one place is the only way that holds.
 
 const EM_MIN = 1 / 1440;
-/** A day fraction snapped to the minute it prints as.
- *
- *  Both the move and the quarter of an hour are measured on the printed minute rather than on
- *  the raw זמן, and that is not a nicety. מנחה גדולה is a fraction of a second as well as a
- *  minute: in תשפ"ז it falls at 1:20 and 24 seconds, which prints as 1:20 and is a clean
- *  fifteen minutes in front of the 1:35, while the unrounded number is 14 minutes 36 and was
- *  dropping the מנין the shul asked to keep. Rounded to the same minute formatTime would show,
- *  the arithmetic on the paper and the arithmetic here are one thing. */
-const emPrinted = (t) => Math.round(t * 1440) / 1440;
+/** Round the lower limit up so a printed opening never precedes the exact zman. */
+const emPrinted = (t) => ceilToMinute(t);
 
 /** The two times an afternoon is allowed to open at, earliest first. */
 const EM_FIRST = (13 * 60 + 15) * EM_MIN;
@@ -56,8 +50,9 @@ export function openingMincha(minchaGedola, next) {
  *  The same three comparisons in the same order as above, so the two cannot come apart. */
 export function openingMinchaTrace(minchaGedola, next) {
   const gedola = emPrinted(minchaGedola);
-  const held = 'a מנין is never offered before מנחה גדולה, measured on the minute it prints as rather than on the raw זמן';
-  const mg = () => zman('מנחה גדולה לחומרא', gedola, 'the latest of every day this one printed list has to hold for');
+  const held = 'a מנין is never offered before the exact מנחה גדולה לחומרא, including its seconds';
+  const mg = () => zman('מנחה גדולה לחומרא', minchaGedola, 'the latest of every day this one printed list has to hold for')
+    .ceil('round up to the whole minute so the opening never precedes the exact zman');
 
   if (EM_FIRST >= gedola - 1e-9) {
     return clockTime(13, 15, 'the earlier of the two times an afternoon may open at').laterOf(mg(), held);

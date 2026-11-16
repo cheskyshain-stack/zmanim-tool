@@ -21,6 +21,8 @@ import { buildPesachPoster } from "../../js/posters/pesach.js";
 import { buildTzomGedaliaPoster } from "../../js/posters/tzomgedalia.js";
 import { localToISO, localStamp, visible } from "../public/display-assets/time.js";
 import { MINYAN_HOLD_MS } from '../public/display-assets/minyan-timing.js';
+import { holidayDisplayRows } from './holiday-display.js';
+import { normalizeShabbosDisplayEvents } from './shabbos-display.js';
 export const settings = resolveSettings({ ...DEFAULT_SETTINGS, ...config.settings, timezoneId: "America/New_York" });
 const tables = { parshaChutz, parshaEY, parshaNames, specialDays };
 const builders = { rh: ["Rosh Hashana", buildRoshHashanaPoster], yk: ["Yom Kippur", buildYomKippurPoster], sukkos: ["Sukkos", buildSukkosPoster], pesach: ["Pesach", buildPesachPoster], gedalia: ["Tzom Gedalia", buildTzomGedaliaPoster] };
@@ -70,8 +72,46 @@ function ordinaryAgendaDay(serial,state) {
   const agenda=weeklyAgenda({regular:[],special:[],shabbos:source.shabbos},showing,state,settings,new Date(civil(serial)+'T00:00:00Z'));
   const events=agenda.sections.flatMap(section=>section.events).filter(event=>event.serial===serial)
     .map(({next,started,...event})=>event);
-  ordinaryAgendaDays.set(serial,events);
-  return events;
+  const normalized=normalizeShabbosDisplayEvents(source.shabbos,showing,serial,events);
+  ordinaryAgendaDays.set(serial,normalized);
+  return normalized;
+}
+
+const printedHolidayCache = new Map();
+function printedRows(sourceKey,year,serial) {
+  const key=sourceKey+':'+year;
+  if(!printedHolidayCache.has(key)) {
+    const rows=holidayDisplayRows(sourceKey,builders[sourceKey][1](year,settings),year,settings);
+    if(printedHolidayCache.size>=12)printedHolidayCache.delete(printedHolidayCache.keys().next().value);
+    printedHolidayCache.set(key,rows);
+  }
+  return printedHolidayCache.get(key).filter(row=>row.serial===serial);
+}
+function printedRowsForDay(serial,controls,instant,byEventTime) {
+  const h=hebrewDateExtended(serial),m=h.month,d=h.dayOfMonth;
+  let key=m===6&&d===29?'rh':m===7&&d<=2?'rh':m===7&&d<=4?'gedalia':m===7&&d>=9&&d<=11?'yk':m===7&&d>=14?'sukkos':m===1?'pesach':null;
+  let rows=key?printedRows(key,h.year+(m===6?1:0),serial):[];
+  const covered=new Set();
+  const rowCategory=row=>row.family==='mincha'?'mincha':row.family==='maariv'?'maariv':row.atMinutes<720?'morning':'other';
+  for(const control of controls) {
+    if(civil(serial)<control.data.appliesFrom||civil(serial)>control.data.appliesTo)continue;
+    const [sourceKey,year]=control.data.source.split(':');
+    const replacement=printedRows(sourceKey,+year,serial);
+    const selected=row=>{
+      const portion=control.data.portion;
+      if(portion!=='all'&&rowCategory(row)!==portion)return false;
+      const at=Number.isFinite(row.atMinutes)?eventInstant({serial,mins:row.atMinutes}):instant;
+      return !byEventTime||visible(control,at);
+    };
+    const take=replacement.filter(row=>selected(row)&&!covered.has(rowCategory(row)));
+    if(!take.length)continue;
+    const categories=new Set(take.map(rowCategory));
+    rows=rows.filter(row=>!categories.has(rowCategory(row))||!selected(row));
+    rows.push(...take);categories.forEach(category=>covered.add(category));
+  }
+  // A Friday second day of RH continues into the saved Shabbos schedule.
+  if(m===7&&d===2&&excelWeekday(serial)===6)rows=rows.filter(row=>!['motzeiMaariv','shabbosMotzei'].includes(row.sourceCalc));
+  return rows;
 }
 
 const dayZmanimCache = new Map();
@@ -330,7 +370,9 @@ export function scheduleSnapshot(instant, controls = []) {
       unique.add(key);
       return true;
     }).sort((a, b) => a.mins - b.mins);
-    const result = { date: d, hebrewTitle: hebrewDay(s,settings), hebrewDate: jewishDateString(s,false), title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.place || "בית מדרש", at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
+    const result = { date: d, hebrewTitle: hebrewDay(s,settings), hebrewDate: jewishDateString(s,false), title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.auxiliary ? (e.place || "") : (e.place || "בית מדרש"), at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
+    const displayRows=printedRowsForDay(s,datedControls,instant,byEventTime);
+    if(displayRows.length)result.displayRows=displayRows;
     if (dayCache.size >= 100) dayCache.delete(dayCache.keys().next().value);
     dayCache.set(cacheKey, result);
     return result;

@@ -115,7 +115,7 @@ test('special-day early Mincha and later Mincha keep their original labels and o
   const at=localToISO('2026-10-02T04:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
   assert.equal(view.title,'הושענא רבה');
   assert.equal(view.sourceTitle,'Hoshana Rabbah');
-  assert.deepEqual(view.groups.map(group=>group.label),['שחרית','מנחה עיו"ט','הדלקת נרות','מנחה','מעריב']);
+  assert.deepEqual(view.groups.map(group=>group.label),['שחרית','מנחה עיו"ט','הדלקת נרות','מנחה','שקיעה','דרשה מאת הרב שליט"א','מעריב']);
   assert.equal(view.groups[0].events.at(-1).mark,'**');
   const minchas=view.groups.filter(group=>group.family==='mincha');
   assert.equal(new Set(minchas.map(group=>group.expiresAt)).size,1);
@@ -235,15 +235,16 @@ test('yesterday keeps its published source control through the retained midnight
   assert.equal(yesterday.groups[0].expiresAt,localToISO('2026-09-29T00:05'));
 });
 
-test('combined Mincha and Maariv remains through the later expiry of both prayer families',()=>{
-  const at=localToISO('2026-11-13T05:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
-  const combined=view.groups.find(group=>/מנחה/.test(group.label)&&/מעריב/.test(group.label));
-  assert.ok(combined);
-  assert.deepEqual(combined.families,['mincha','maariv']);
-  const maarivEnd=Math.max(...schedule.today.events.filter(event=>!event.auxiliary&&/מעריב/.test(event.name)).map(event=>Date.parse(event.at)))+PRAYER_HOLD_MS;
-  assert.equal(Date.parse(combined.expiresAt),maarivEnd);
-  assert.ok(quarterSchedule(schedule,new Date(maarivEnd).toISOString()).groups.some(group=>group.key===combined.key));
-  assert.ok(!quarterSchedule(schedule,new Date(maarivEnd+1).toISOString()).groups.some(group=>group.key===combined.key));
+test('Friday Mincha and Maariv have separate source labels and retain their own families',()=>{
+  const at=localToISO('2026-12-04T05:00'),schedule=scheduleSnapshot(at),view=quarterSchedule(schedule,at);
+  assert.ok(!view.groups.some(group=>/מנחה/.test(group.label)&&/מעריב/.test(group.label)));
+  const mincha=view.groups.find(group=>group.label==='מנחה'),maariv=view.groups.find(group=>group.label==='מעריב');
+  assert.deepEqual(times(mincha),['4:16']);
+  assert.deepEqual(times(maariv),['5:21']);
+  const afterMincha=quarterSchedule(schedule,atOffset(mincha.expiresAt,1));
+  assert.ok(!afterMincha.groups.some(group=>group.family==='mincha'));
+  assert.ok(afterMincha.groups.some(group=>group.key===maariv.key));
+  assert.equal(scheduleSnapshot(localToISO('2026-12-04T16:15')).next.name,'מנחה');
 });
 
 test('offline seed retains only recent ended schedule controls needed for source-day carryover',()=>{

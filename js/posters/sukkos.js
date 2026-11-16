@@ -13,7 +13,7 @@
 // already make, so somebody holding this and the board is reading one set of marks.
 import { roshHashana, excelWeekday } from '../hebrew-calendar.js';
 import { eiruvMade, EIRUV_LABEL } from './eiruv.js';
-import { dateFromSerial } from '../zmanim/solar.js';
+import { dateFromSerial, excelSerial, shulNow } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, floorToMinute, ceilToMinute, roundToMinute, UL_START } from '../format.js';
 import { SLASH } from '../util.js';
@@ -140,12 +140,13 @@ export const SK_TEXT = {
   yomTovShacharis: '<u>7:30</u>, 8:15',
   simchasShacharis: '8:15',
   /* יזכור, which is announced rather than worked out. One per שחרית: the למטה מנין's and the
-     main בית מדרש's. Both move later when שמיני עצרת is Shabbos, the davening running longer:
-     the למטה one by half an hour and the main one by the same. */
+     main בית מדרש's. Both move later when שמיני עצרת is Shabbos, the davening running longer -
+     the למטה one by half an hour, the main one by forty minutes, asked for directly for
+     this one. */
   yizkorEarly: '9:10',
   yizkorLate: '10:25',
   yizkorShabbosEarly: '9:40',
-  yizkorShabbos: '10:55',
+  yizkorShabbos: '11:05',
 };
 
 /** The שמחת בית השואבה sheet, which is a sheet of its own rather than a block of the
@@ -262,11 +263,17 @@ function sukkosDayMincha(serial, settings, { five = true, fiveIfRoom = false, ea
   return out;
 }
 
-/** The days of חול המועד that keep the ordinary weekday schedule: not Shabbos, and not the
- *  Friday, which runs on an ערב שבת one. They are what the box's own times are set by. */
+/** The dates used to calculate the printed חול המועד clocks. Their range stays fixed
+ *  even when an afternoon belongs to the separate ערב יום טוב block. */
 export function sukkosChmDays(rh) {
   return SK_CHM.map((n) => skSerial(rh, n))
     .filter((s) => excelWeekday(s) !== SK_SHABBOS && excelWeekday(s) !== SK_FRIDAY);
+}
+
+/** הושענא רבה's afternoon and night are ערב שמיני עצרת. That block owns them,
+ *  so the ordinary חול המועד run must not add another set of מנינים there. */
+export function sukkosChmAfternoonDays(rh) {
+  return sukkosChmDays(rh).filter((s) => s < skSerial(rh, SK_HOSHANA));
 }
 
 /** The חול המועד מנחה run.
@@ -390,6 +397,9 @@ export function sukkosChmMaariv(days, settings) {
    יו"כ ones do, and all this decides is which days they have to hold for. */
 const SK_AFTER_FIRST = 24;  // the morning after שמחת תורה
 const SK_THURSDAY = 5;      // excelWeekday: 1 = Sunday .. 7 = Shabbos
+// The extra 9:00 מעריב ends after this Thursday in Lakewood. Future after-Sukkos
+// schedules omit it even when previewed before the cutoff.
+const SK_AFTER_NINE_LAST_DAY = excelSerial(new Date('2026-10-08T00:00:00Z'));
 
 /** The days the after סוכות schedule is set by: from the first weekday after שמחת תורה to the
  *  Thursday of that same week.
@@ -417,18 +427,21 @@ export function sukkosAfterDays(rh, settings) {
   let first = skSerial(rh, SK_AFTER_FIRST);
   while (excelWeekday(first) > SK_THURSDAY) first += 1;
   const days = [];
-  const clock = Z.dstLocal(dateFromSerial(first), settings);
+  // This groups afternoon schedules. Midnight still has the previous clock on a
+  // DST transition Sunday, so compare each day's afternoon instead.
+  const afternoon = serial => new Date(dateFromSerial(serial).getTime() + 13 * 3600000);
+  const clock = Z.dstLocal(afternoon(first), settings);
   for (let serial = first; excelWeekday(serial) <= SK_THURSDAY; serial += 1) {
-    if (Z.dstLocal(dateFromSerial(serial), settings) !== clock) break;
+    if (Z.dstLocal(afternoon(serial), settings) !== clock) break;
     days.push(serial);
   }
   return days;
 }
 
 /** The after סוכות schedule: the same three lists as after יו"כ, bound by that week's own days. */
-export function buildSukkosAfter(rh, settings) {
+export function buildSukkosAfter(rh, settings, { now = new Date() } = {}) {
   const days = sukkosAfterDays(rh, settings);
-  return afterSchedule(
+  const after = afterSchedule(
     Math.min(...days.map((s) => skShkia(s, settings))),
     Math.max(...days.map((s) => skMinchaGedola(s, settings))),
     settings,
@@ -438,6 +451,10 @@ export function buildSukkosAfter(rh, settings) {
     // prints today.
     { lastFifteen: true }
   );
+  if (days[days.length - 1] > SK_AFTER_NINE_LAST_DAY || shulNow(now, settings).serial > SK_AFTER_NINE_LAST_DAY) {
+    after.maariv = after.maariv.filter(time => time.text !== '9:00');
+  }
+  return after;
 }
 
 /** A Shabbos that falls inside this sheet, worked the way an ordinary Shabbos of the year is.
@@ -788,14 +805,15 @@ export function buildSukkosPoster(year, settings) {
   /* The mornings run on every day of חול המועד that is not Shabbos, the Friday included: the
      sheet's שחרית line covers all of them and only Shabbos has a morning of its own. The
      afternoon and the evening are the weekdays' alone, since the Friday's belong to the
-     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning either way. */
+     ערב שבת run in the Shabbos block above. הושענא רבה keeps its own morning, and its
+     afternoon and night belong to the שמיני עצרת block. */
   for (const n of SK_CHM) {
     const on = day(n);
     if (excelWeekday(on) === SK_SHABBOS) continue;
     if (n === SK_HOSHANA) M.list(on, SK_TEXT.shacharis, hoshanaTimes, MORNING);
     else M.list(on, SK_TEXT.shacharis, parseTimes(SK_TEXT.chmShacharis), MORNING);
   }
-  for (const s of chmDays) {
+  for (const s of sukkosChmAfternoonDays(rh)) {
     M.list(s, SK_TEXT.mincha, list(sukkosChmMincha(chmDays, settings)), AFTERNOON);
     M.list(s, SK_TEXT.maariv, list(sukkosChmMaariv(chmDays, settings)), AFTERNOON);
   }
@@ -835,7 +853,8 @@ export function buildSukkosPoster(year, settings) {
        Each יזכור keeps the mark of the מנין it belongs to. The 7:30 is the למטה מנין, so its
        יזכור is underlined too, being said where that מנין is; the 8:15's is in the main בית
        מדרש and stays plain. On Shabbos both run later, the davening being longer: 9:40 and
-       10:55 against 9:10 and 10:25. */
+       11:05 against 9:10 and 10:25, half an hour on the למטה one and forty minutes
+       on the main one. */
     const yizkor = [
       line(SK_TEXT.shacharis, parseTimes(SK_TEXT.yomTovShacharis), { calc: 'shacharis' }),
       line(SK_TEXT.yizkor, [
@@ -846,7 +865,7 @@ export function buildSukkosPoster(year, settings) {
           { am: true, underlined: true }),
         txtT(isShabbos(n) ? SK_TEXT.yizkorShabbos : SK_TEXT.yizkorLate,
           isShabbos(n)
-            ? 'the same for the later שחרית, likewise half an hour on'
+            ? 'the same for the later שחרית, running forty minutes on instead'
             : 'the same for the later שחרית', { am: true }),
       ], { calc: 'yizkor' }),
     ];

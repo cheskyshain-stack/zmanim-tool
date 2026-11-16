@@ -1,5 +1,6 @@
 import { addDays, localStamp } from './time.js';
 import { MINYAN_HOLD_MS } from './minyan-timing.js';
+import { printedPrayerGroups } from './quarter-display-rows.js';
 
 export const PRAYER_HOLD_MS = MINYAN_HOLD_MS;
 export const ZMAN_HOLD_MS = 30 * 60000;
@@ -37,7 +38,8 @@ function prayerDay(day,currentDate,now) {
     const at=Date.parse(event.at);
     if(Number.isFinite(at))for(const family of prayerFamilies(event))familyEnds.set(family,Math.max(familyEnds.get(family) || -Infinity,at));
   }
-  const allGroups=[],seen=new Set(),occurrences=new Map();
+  let allGroups=[];
+  const seen=new Set(),occurrences=new Map();
   for(const event of source) {
     const key=eventKey(day.date,event);
     if(seen.has(key))continue;
@@ -59,7 +61,8 @@ function prayerDay(day,currentDate,now) {
     if(expiresAt && (!group.expiresAt || expiresAt>group.expiresAt))group.expiresAt=expiresAt;
     group.events.push({...event,...eventMarks(event),key,started:Number.isFinite(at)&&at<=now,expired,expiresAt});
   }
-  const groups=allGroups.map(group=>({...group,events:group.events.filter(event=>!event.expired)})).filter(group=>group.events.length);
+  allGroups=printedPrayerGroups(day,allGroups,now);
+  const groups=allGroups.map(group=>({...group,events:group.events.filter(event=>!event.expired)})).filter(group=>group.events.length || group.printed&&!group.rowExpired&&(group.note||group.untimed));
   const eventCount=allGroups.reduce((count,group)=>count+group.events.length,0);
   const remainingCount=groups.reduce((count,group)=>count+group.events.length,0);
   return {...dayMetadata(day,currentDate),groups,allGroups,eventCount,remainingCount,expiredCount:eventCount-remainingCount,
