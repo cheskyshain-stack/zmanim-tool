@@ -6,7 +6,7 @@ import parshaEY from '../../data/parsha_ey.json' with { type: 'json' };
 import parshaNames from '../../data/parsha_names.json' with { type: 'json' };
 import specialDays from '../../data/special_days.json' with { type: 'json' };
 import { buildScheduleFeed } from '../../scripts/schedule-feed.mjs';
-import { scheduleSnapshot } from '../src/schedules.js';
+import { scheduleSnapshot, scheduleCalendar } from '../src/schedules.js';
 import worker from '../src/worker.js';
 import { offlineSnapshot } from '../public/display-assets/offline-engine.js';
 
@@ -59,9 +59,15 @@ test('live and offline TV schedules follow the congregation’s published settin
   assert.deepEqual(offlineSnapshot(seed, now).schedule, live.schedule);
 
   latest.settings.shulName = 'Updated congregation source';
+  latest.settings.elevation = 1500;
+  latest.settings.useElevation = false;
   timers.tick(61_000);
   const refreshed = await read('offline');
-  assert.equal(offlineSnapshot(refreshed, Date.now()).schedule.shulName, latest.settings.shulName);
+  const updated = offlineSnapshot(refreshed, Date.now()).schedule;
+  assert.equal(updated.shulName, latest.settings.shulName);
+  assert.deepEqual(updated.zmanim, live.schedule.zmanim, 'Sunrise and sunset honor the congregation elevation toggle');
+  const withElevation = scheduleCalendar({ ...latest, settings: { ...latest.settings, useElevation: true } }).scheduleSnapshot(Date.now());
+  assert.notDeepEqual(updated.zmanim, withElevation.zmanim);
 
   available = false;
   timers.tick(61_000);

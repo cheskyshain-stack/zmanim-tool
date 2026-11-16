@@ -61,8 +61,8 @@ test('a visible control applying to unrelated dates does not suppress the Sukkos
 });
 
 test('the daily zmanim retain seconds and use the existing source calculations', () => {
-  const functions = ['alos72', 'misheyakir10_2', 'sunrise', 'sofZmanShmaMGA72', 'sofZmanShmaGRA',
-    'sofZmanTfilaMGA72', 'sofZmanTfilaGRA', 'solarNoon', 'sunset', 'tzaisGeonim8_5', 'tzais72'];
+  const functions = ['alos72', 'misheyakir10_2', 'sunriseElev', 'sofZmanShmaMGA72', 'sofZmanShmaGRA',
+    'sofZmanTfilaMGA72', 'sofZmanTfilaGRA', 'solarNoon', 'sunsetElev', 'tzaisGeonim8_5', 'tzais72'];
   const labels = ['עלות', 'טלית ותפילין', 'נץ', 'סזק"ש מ"א', 'סזק"ש גר"א',
     'סז"ת מ"א', 'סז"ת גר"א', 'חצות', 'שקיעה', "צאת ג' כוכבים", 'צאת 72'];
   // Include both sides of New York's spring and fall daylight-saving changes.

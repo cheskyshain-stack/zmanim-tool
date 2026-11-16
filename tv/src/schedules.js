@@ -61,7 +61,8 @@ function createScheduleCalendar(config) {
   const ordinaryAgendaDays = new Map();
 
   // Read ordinary Friday/Shabbos details with the same parser as the congregation
-  // day cards. It knows that a drasha printed inside a Mincha cell is a separat// event, and retains the named Plag/reckoning information from the chart.
+  // day cards. It knows that a drasha printed inside a Mincha cell is a separate
+  // event, and retains the named Plag/reckoning information from the chart.
   function ordinaryAgendaDay(serial,state) {
     if(ordinaryAgendaDays.has(serial))return ordinaryAgendaDays.get(serial);
     const weekday=excelWeekday(serial),kind=agendaDayKind(serial,settings);
@@ -121,20 +122,21 @@ function createScheduleCalendar(config) {
     const zmanim = [
       ['עלות','alos72'],
       [agendaDayKind(serial, settings).holy ? 'טלית' : 'טלית ותפילין','misheyakir10_2'],
-      ['נץ','sunrise'],
+      ['נץ','sunrise','sunriseElev'],
       ['סזק"ש מ"א','sofZmanShmaMGA72'],
       ['סזק"ש גר"א','sofZmanShmaGRA'],
       ['סז"ת מ"א','sofZmanTfilaMGA72'],
       ['סז"ת גר"א','sofZmanTfilaGRA'],
       ['חצות','solarNoon'],
-      ['שקיעה','sunset'],
+      ['שקיעה','sunset','sunsetElev'],
       ["צאת ג' כוכבים",'tzaisGeonim8_5'],
       ['צאת 72','tzais72'],
-    ].map(([label,key])=>{
-      const f=dailyZmanim[key](dateFromSerial(serial),settings);
+    ].map(([label,key,calculation = key])=>{
+      const f=dailyZmanim[calculation](dateFromSerial(serial),settings);
       const total=Math.round((((f%1)+1)%1)*86400);
       const hour=Math.floor(total/3600),minute=Math.floor(total/60)%60,second=total%60;
-      // Keep the published clock text unchanged. An absolute instant lets th    // screen expire a time without guessing AM or PM from that printed text.
+      // Keep the published clock text unchanged. An absolute instant lets the
+      // screen expire a time without guessing AM or PM from that printed text.
       const minuteAt=localToISO(`${civil(serial)}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}`);
       return {key,label,time:(hour%12||12)+':'+String(minute).padStart(2,'0')+':'+String(second).padStart(2,'0'),at:new Date(Date.parse(minuteAt)+second*1000).toISOString()};
     });
@@ -222,7 +224,8 @@ function createScheduleCalendar(config) {
       if(sheetTimelines.size>=8)sheetTimelines.delete(sheetTimelines.keys().next().value);
       sheetTimelines.set(timelineKey,candidates);
     }
-    // Keep an earlier active source until its closing events finish; advertising th  // next holiday must not take an active holy-day page off the screen.
+    // Keep an earlier active source until its closing events finish; advertising the
+    // next holiday must not take an active holy-day page off the screen.
     const selected=candidates.find(s=>instantMs>=s.preview&&instantMs<s.end);
     const future=candidates.flatMap(s=>[s.preview,s.both,s.end]).filter(t=>t>instantMs);
     for(const c of controls)if(c.status==='published')for(const at of [c.startsAt,c.endsAt,c.data.previewAt])if(at&&Date.parse(at)>instantMs)future.push(Date.parse(at));
@@ -377,7 +380,8 @@ function createScheduleCalendar(config) {
       return result;
     };
     const days = Array.from({ length: 9 }, (_, i) => day(serial + i, i !== 0));
-    // Yesterday can own a midnight Maariv. Its hold continues across the dat  // change without changing today's schedule or any resolved special overrides.
+    // Yesterday can own a midnight Maariv. Its hold continues across the date
+    // change without changing today's schedule or any resolved special overrides.
     const earliest = Date.parse(instant) - MINYAN_HOLD_MS;
     const next = [day(serial - 1, true), ...days].flatMap((d) => d.events).filter((e) => !e.auxiliary && Date.parse(e.at) >= earliest).sort((a, b) => a.at.localeCompare(b.at))[0] || null;
     // Keep the full civil week and extend each sacred block across week boundaries.
