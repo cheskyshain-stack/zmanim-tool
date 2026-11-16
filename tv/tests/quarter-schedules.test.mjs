@@ -78,7 +78,7 @@ test('all published prayer times and room marks remain until five minutes after 
   assert.deepEqual(eventMarks({place:'באולם השמחות'}),{underlined:false,mark:'**'});
 });
 
-test('ordinary and midnight prayer groups expire together at the congregation agenda boundary',()=>{
+test('ordinary and midnight prayer groups match the congregation until the TV grace period ends',()=>{
   for(const date of ['2026-11-15','2026-09-28']) {
     const at=localToISO(date+'T05:00'),schedule=scheduleSnapshot(at),serial=excelSerial(new Date(date+'T12:00:00Z'));
     const showing=serial+7-excelWeekday(serial);
@@ -86,15 +86,18 @@ test('ordinary and midnight prayer groups expire together at the congregation ag
     const identity=event=>[event.name,event.mins%1440,event.place || ''];
     for(const group of quarterSchedule(schedule,at).groups.filter(group=>!group.auxiliary)) {
       const last=group.events.at(-1);
-      for(const elapsed of [5*60000-1,5*60000,5*60000+1]) {
+      for(const elapsed of [PRAYER_HOLD_MS-1,PRAYER_HOLD_MS]) {
         const instant=atOffset(last.at,elapsed);
         const congregation=weeklyAgenda(agendaData,showing,{},settings,new Date(instant)).sections
           .flatMap(section=>section.events).filter(event=>event.name===group.label);
         const tv=quarterSchedule(schedule,instant).prayerDays.find(day=>day.date===date)?.groups
           .filter(candidate=>candidate.label===group.label).flatMap(candidate=>candidate.events) || [];
         assert.deepEqual(tv.map(identity),congregation.map(identity),date+' '+group.label+' '+elapsed);
-        assert.equal(tv.length,elapsed<=5*60000?group.events.length:0,'The full group uses the same five-minute grace as the congregation');
+        assert.equal(tv.length,group.events.length,'The TV retains the full group through its grace period');
       }
+      const after=quarterSchedule(schedule,atOffset(last.at,PRAYER_HOLD_MS+1));
+      const day=after.prayerDays.find(candidate=>candidate.date===date);
+      assert.ok(!day?.groups.some(candidate=>candidate.key===group.key));
     }
   }
 });
