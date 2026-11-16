@@ -1,5 +1,5 @@
 import * as dailyZmanim from '../../js/zmanim/zmanim.js';
-import { schedulePresentation, ordinaryShabbos, hebrewDay } from './presentation.js';
+import { schedulePresentation, ordinaryShabbos, hebrewDay, hebrewPanelDay } from './presentation.js';
 import { publicPosterSections, publicOccasionSheet } from '../../js/ui/posters-view.js';
 import config from "../../data/published.json" with { type: "json" };
 import parshaChutz from "../../data/parsha_chutz.json" with { type: "json" };
@@ -370,7 +370,7 @@ export function scheduleSnapshot(instant, controls = []) {
       unique.add(key);
       return true;
     }).sort((a, b) => a.mins - b.mins);
-    const result = { date: d, hebrewTitle: hebrewDay(s,settings), hebrewDate: jewishDateString(s,false), title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.auxiliary ? (e.place || "") : (e.place || "בית מדרש"), at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
+    const result = { date: d, hebrewTitle: hebrewDay(s,settings), displayTitle: hebrewPanelDay(s,settings), hebrewDate: jewishDateString(s,false), title: names.join(" / ") || kind.holyDay || kind.label || new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" }).format(dateFromSerial(s)), note, events: events.map((e) => ({ ...e, name: /^מעריב\s+ג/.test(e.name) ? "מעריב" : e.name, time: clock(e.mins), place: e.auxiliary ? (e.place || "") : (e.place || "בית מדרש"), at: localToISO(`${civil(s + Math.floor(e.mins / 1440))}T${String(Math.floor(e.mins % 1440 / 60)).padStart(2, "0")}:${String(e.mins % 60).padStart(2, "0")}`) })) };
     const displayRows=printedRowsForDay(s,datedControls,instant,byEventTime);
     if(displayRows.length)result.displayRows=displayRows;
     if (dayCache.size >= 100) dayCache.delete(dayCache.keys().next().value);

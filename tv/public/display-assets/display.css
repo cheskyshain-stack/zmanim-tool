@@ -1033,9 +1033,9 @@ button {
 .quarter-relative-time {grid-column:1/-1;font:700 var(--quarter-text-size)/1.18 David,serif;text-align:left;white-space:normal}
 .quarter-row-note {grid-column:1/-1;margin:calc(8px * var(--quarter-density)) 0 0;font:400 var(--quarter-text-size)/1.18 David,serif;white-space:pre-line;text-align:right}
 .quarter-printed-row .quarter-times:empty {display:none}
-.quarter-printed-row[data-time-columns="1"]:not(.quarter-long-name) {grid-template-columns:minmax(0,1fr) minmax(0,65%)}
+.quarter-prayer-group[data-time-columns="1"]:not(.quarter-long-name) {grid-template-columns:minmax(0,1fr) minmax(0,65%)}
 .quarter-printed-row[data-time-columns="2"]:not(.quarter-long-name) {grid-template-columns:minmax(0,1fr) minmax(0,34%)}
-.quarter-printed-row[data-time-columns="1"] .quarter-times {grid-template-columns:minmax(0,1fr)}
+.quarter-prayer-group[data-time-columns="1"] .quarter-times {grid-template-columns:minmax(0,1fr)}
 .quarter-printed-row[data-time-columns="2"] .quarter-times {grid-template-columns:repeat(2,minmax(0,1fr))}
 .quarter-empty {margin:45px 18px;text-align:center;font:26px/1.5 David,serif;color:var(--quarter-muted)}
 .quarter-center {min-width:0;min-height:0;display:grid;grid-template-rows:minmax(0,1fr) minmax(0,1fr);gap:20px}

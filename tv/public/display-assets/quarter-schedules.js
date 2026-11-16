@@ -25,7 +25,7 @@ export function eventMarks(event) {
 }
 
 function dayMetadata(day,currentDate) {
-  return {date:day.date,title:day.hebrewTitle || day.title || '',hebrewDate:day.hebrewDate || '',
+  return {date:day.date,title:day.hebrewTitle || day.title || '',displayTitle:day.displayTitle || day.hebrewTitle || day.title || '',hebrewDate:day.hebrewDate || '',
     sourceTitle:day.title || '',relativeLabel:day.date===currentDate?'היום':day.date===addDays(currentDate,1)?'מחר':day.date===addDays(currentDate,-1)?'אתמול':'',
     note:day.note || ''};
 }

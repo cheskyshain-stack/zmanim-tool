@@ -23,6 +23,18 @@ export function hebrewDay(s,settings) {
  if(excelWeekday(s)===7)return name?'שבת קודש · '+name:'שבת קודש';
  return name || [hasRoshChodesh(s,{...settings,english:false}),hasBehab(s,{...settings,english:false}),hasTaanis(s,{...settings,english:false}),weekdays[excelWeekday(s)-1]].filter(Boolean).join(' · ');
 }
+/** Concise date headings for the TV side panels, separate from poster titles. */
+export function hebrewPanelDay(s,settings) {
+ const kind=agendaDayKind(s,settings),next=agendaDayKind(s+1,settings),weekday=excelWeekday(s);
+ const name=hebrewDay(s,settings).replace(/^שבת קודש(?= · |$)/,'שבת');
+ // The current festival keeps its own identity even before its second day.
+ // Chol Hamoed and Hoshana Rabba also retain their specific source names.
+ if(kind.chol || kind.holy&&kind.holy!=='Shabbos')return name;
+ const base=weekday===6?name.replace(/יום ו׳$/,'ערב שבת'):name;
+ if(!next.holy || next.holy==='Shabbos' || next.chol)return base;
+ const erev=next.holy.includes('Rosh Hashana')?'ערב ראש השנה':next.holy.includes('Yom Kippur')?'ערב יום כיפור':'ערב יום טוב';
+ return weekday>=6?base+' · '+erev:erev;
+}
 const cleanText=value=>String(value??'').replace(/<u\b[^>]*>/gi,'\uE000').replace(/<\/u>/gi,'\uE001').replace(/<br\s*\/?>|<\/(div|p)>/gi,'\n').replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/&quot;/g,'"').replace(/&#39;/g,"'");
 const publicTime=t=>({text:cleanText(t.text),underlined:!!t.underlined,mark:t.mark||'',name:t.name||''});
 export function posterRows(lines,prefix) {

@@ -45,12 +45,12 @@ export class QuarterPanel {
     for (const day of days) {
       const entries = this.kind === 'zmanim' ? day.zmanim : day.groups;
       if (!entries?.length && !day.note) continue;
-      const heading = day.relativeLabel || [day.title,day.hebrewDate.split(',')[0].trim()].filter(Boolean).join(' · ');
+      const heading = ['היום','אתמול'].includes(day.relativeLabel) ? day.relativeLabel : day.displayTitle || day.title;
       const fullDate = [day.relativeLabel,day.title,day.hebrewDate].filter(Boolean).join(' · ');
       rows.push({key:`day:${day.date}`,day:day.date,type:'heading',html:`<h3 lang="he" dir="rtl" aria-label="${esc(fullDate)}">${esc(heading)}</h3>`});
       if (!entries?.length) rows.push({key:`note:${day.date}`,day:day.date,type:'note',html:esc(day.note)});
       else if (this.kind === 'zmanim') for (const zman of entries) rows.push({key:`z:${day.date}:${zman.key}`,day:day.date,type:'zman',at:zman.at,html:`<bdi class="quarter-zman-clock" dir="ltr">${clockHTML(zman.time)}</bdi><span class="quarter-zman-name" lang="he" dir="rtl">${esc(zman.label)}</span>`});
-      else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),long:String(group.label).length>13||!group.printed&&String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
+      else for (const group of entries) rows.push({key:`p:${group.key}`,day:day.date,type:'prayer',printed:Boolean(group.printed),columns:Math.max(1,Math.min(3,group.events.filter(event=>!event.isText).length)),long:String(group.label).length>13||!group.printed&&group.events.length!==1&&String(group.label).trim().split(/\s+/).length>1,html:`<h4 lang="he" dir="rtl">${esc(group.label)}</h4><div class="quarter-times" dir="ltr">${group.events.map(timeHTML).join('')}</div>${group.note?`<p class="quarter-row-note" lang="he" dir="rtl">${esc(group.note)}</p>`:''}`});
     }
     return rows;
   }
@@ -82,7 +82,7 @@ export class QuarterPanel {
       node.className = row.type === 'heading' ? 'quarter-day-heading' : row.type === 'prayer' ? 'quarter-prayer-group' : row.type === 'zman' ? 'quarter-zman-row' : 'quarter-empty';
       node.classList.toggle('quarter-long-name',Boolean(row.long));
       node.classList.toggle('quarter-printed-row',Boolean(row.printed));
-      if(row.printed)node.dataset.timeColumns=String(row.columns);else delete node.dataset.timeColumns;
+      if(row.printed||row.type==='prayer'&&row.columns===1)node.dataset.timeColumns=String(row.columns);else delete node.dataset.timeColumns;
       node.dataset.motion = row.key;
       node.dataset.day = row.day;
       node.dataset.rowType = row.type;
