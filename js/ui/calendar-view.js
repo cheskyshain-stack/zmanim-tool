@@ -12,6 +12,7 @@ import { createCalendarAnnouncements } from './calendar-announcements.js';
 import { openCalendarActivity } from './calendar-activity.js';
 import { openCalendarEmailImport } from './calendar-email-import.js';
 import { openCalendarSmsImport } from './calendar-sms-import.js';
+import { openCalendarMessageFeeds } from './calendar-message-feeds.js';
 import { openCalendarPhoneReminders, turnOffCalendarPhoneReminders } from './calendar-phone-reminders.js';
 
 let calendarAnalyticsOpened = false;
@@ -558,6 +559,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
       inboxButton.after(smsButton);
       smsButton.addEventListener('click', () => { view.close(); openCalendarSmsImport({ dialog, timeZone: settings.timezone.id }); });
+      const feedsButton = document.createElement('button'); feedsButton.type = 'button'; feedsButton.textContent = 'Share messages'; feedsButton.dataset.calMessageFeeds = '';
+      smsButton.after(feedsButton);
+      feedsButton.addEventListener('click', () => { view.close(); openCalendarMessageFeeds({ dialog, timeZone: settings.timezone.id }); });
     }
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {

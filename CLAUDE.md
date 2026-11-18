@@ -1281,6 +1281,25 @@ records and production verification must not create announcements or accounts.
 cover date grids across 51 years, actual phone/desktop layouts, event persistence,
 safe text rendering, keyboard viewport, private accounts and server role boundaries.
 
+The owner also has Share messages under Calendar access. `messageFeeds:true`
+gates its setup UI. Owner-only `/api/message-feeds` creates separate revocable
+read keys, stored only as hashes. Exact GET `/api/v1/messages` and
+`/api/v1/messages.txt` routes accept a Bearer key or private `?key=` share link
+without Origin, with read-only CORS. This is an explicitly requested exception
+to the older calendar origin restrictions. Other routes keep their original
+origin, account and role checks. Return only posted announcements for the current
+Sunday-through-Shabbos week in America/New_York, selected by Added date, oldest
+first. Never return events, source metadata, account identifiers, read markers
+or admin credentials. Use explicit output fields, plain UTF-8 text and no-store,
+no-referrer/noindex responses. Reads do not mark messages read, count opens or
+write calendar activity. Revoking a key preserves all calendar content. Keep
+keys out of source, logs and screenshots. Generated download instructions may
+contain the owner's newly created key, shown only until the dialog closes.
+`CALENDAR-MESSAGES-API.txt` documents the integration; the isolated local
+`tests/calendar-message-feeds.cjs` covers authentication, exact wording, DST
+week boundaries, full paging, edits, deletion and phone/desktop owner controls.
+Deploy the matching Worker before enabling sharing on the website.
+
 ## Public schedule API
 
 Admin **Website preview** (`/admin/#preview`) embeds the real congregation pages with

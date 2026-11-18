@@ -1,0 +1,82 @@
+LAKEWOOD COMMONS: POSTED MESSAGES API
+
+Create a private share link
+1. Sign in as the main calendar admin at:
+   https://baismedrashoflakewoodcommons.org/admin/calendar/
+2. Choose Calendar access, then Share messages.
+3. Enter a name for the receiving website and choose Create private link.
+4. Copy the text-only link or download API instructions for that website.
+   The generated instructions include its actual link and API key.
+
+Each website can have its own link. The key is shown only when created.
+If you lose it, revoke that link and create another one.
+Only the main calendar admin can create or revoke links.
+
+What is shared
+- Only posted Messages. No calendar events, account details or source metadata.
+- The current Sunday-through-Shabbos week, in America/New_York.
+- The message's Added date determines its week. The link moves to the new week
+  automatically each Sunday. Past weeks cannot be requested.
+- Original text, including Hebrew, punctuation and line breaks, oldest first.
+- Edits and deletions are reflected on the next successful fetch.
+- Reading the API does not mark messages read or increase calendar activity counts.
+
+Endpoint base: https://zmanim-calendar.cheskyshain.workers.dev
+
+Text link, with YOUR_KEY replaced by the generated key:
+https://zmanim-calendar.cheskyshain.workers.dev/api/v1/messages.txt?key=YOUR_KEY
+
+JSON API:
+GET /api/v1/messages
+Authorization: Bearer YOUR_KEY
+
+Text API:
+GET /api/v1/messages.txt
+Authorization: Bearer YOUR_KEY
+
+Successful JSON response:
+{
+  "schemaVersion": 1,
+  "timezone": "America/New_York",
+  "week": { "start": "2026-11-15", "end": "2026-11-21" },
+  "generatedAt": "2026-11-18T12:00:00.000Z",
+  "messages": [
+    {
+      "id": "example-message-id",
+      "text": "Message wording\nSecond line",
+      "postedAt": "2026-11-17T18:00:00.000Z",
+      "updatedAt": "2026-11-17T18:00:00.000Z",
+      "revision": 1
+    }
+  ]
+}
+
+Text responses are UTF-8, with a blank line between messages.
+An empty week returns an empty text body or a JSON messages array of [].
+
+Example for a website backend, with the key in a server environment variable:
+
+const response = await fetch(
+  'https://zmanim-calendar.cheskyshain.workers.dev/api/v1/messages',
+  { headers: { Authorization: `Bearer ${process.env.LC_MESSAGES_API_KEY}` } }
+);
+if (!response.ok) throw new Error(`Messages API: ${response.status}`);
+const feed = await response.json();
+const wording = feed.messages.map(message => message.text).join('\n\n');
+
+Poll about once per minute. Replace your saved weekly list only after a
+successful response, so deleted posts and the new week do not remain visible.
+On a temporary failure keep the last successful list, mark it stale, and retry
+with increasing delays. A 401 means the key is missing, invalid or revoked;
+400 means unsupported query parameters; 405 means the method is not GET.
+
+The API supports browser CORS requests, but a key embedded in browser code is
+visible to visitors. A backend can keep the key private. Anyone with a share
+link or its key can read this week's posted messages. Links have no fixed
+expiry. They grant no editing, calendar events or account access.
+Keep private links out of public source and analytics. Render text as text,
+never as HTML. Store the receiving website's key as a secret.
+
+To stop access: Calendar access > Share messages > Revoke.
+Revocation takes effect for the next request. It cannot erase copies already
+retrieved by the receiving website.
