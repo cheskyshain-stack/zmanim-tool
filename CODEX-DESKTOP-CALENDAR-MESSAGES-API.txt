@@ -1,0 +1,76 @@
+TASK FOR CODEX DESKTOP: ACTIVATE WEEKLY POSTED-MESSAGE SHARING
+
+Website: https://baismedrashoflakewoodcommons.org
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Change: PR #396, weekly posted-message API and owner Share messages screen.
+
+The code is built and tested. The cloud attempt to deploy the existing calendar
+Worker failed because GitHub has no CLOUDFLARE_API_TOKEN deployment credential.
+This computer's authorized Cloudflare login can complete the deployment.
+Do not ask the user to paste their Cloudflare token or calendar password.
+
+Scope
+- Only POSTED MESSAGES, never calendar events or accounts.
+- Current Sunday-through-Shabbos week in America/New_York, selected by Added date.
+- Plain-text link and JSON API, original Hebrew and line breaks, oldest first.
+- Separate owner-created keys, revocable individually, read-only.
+- No changes to schedules, printing, Seats, email bridges, account permissions,
+  existing calendar content, push subscriptions or reminder configuration.
+
+Steps
+1. Locate the existing zmanim-tool checkout. Preserve any local work. Fetch main
+   and use a clean checkout containing PR #396. Do not reset someone else's work.
+   If the PR is not merged, inspect it before proceeding.
+
+2. Use Node.js 24. From that checkout run:
+
+   npm ci --prefix worker/calendar --no-audit --no-fund
+   node tests/calendar-message-feeds.cjs
+   node tests/calendar-announcement-dates.cjs
+   node --test tests/calendar-simcha-reminders.cjs
+
+   These tests use isolated synthetic local records. Do not run write tests
+   against the production calendar.
+
+3. Confirm this computer is authorized for Cloudflare account
+   04b085d9f19ac1ba6d333e0006fc94c1. If a login is needed, let the user sign in
+   through Wrangler's normal browser login. Never copy credentials into chat.
+
+   node worker/calendar/node_modules/wrangler/bin/wrangler.js whoami
+
+4. Deploy ONLY the existing calendar Worker:
+
+   node worker/calendar/node_modules/wrangler/bin/wrangler.js deploy --config worker/calendar/wrangler.jsonc
+
+   Preserve name zmanim-calendar, binding CALENDAR, class CommunityCalendar,
+   object lakewood-commons and the existing v1 migration. Preserve all existing
+   Worker secrets, including reminder keys. Do not run bootstrap/reset-owner
+   commands, create another Durable Object or change any other Cloudflare service.
+
+5. Verify read-only, without creating keys, accounts, events or announcements:
+
+   GET https://zmanim-calendar.cheskyshain.workers.dev/api/info
+   Header: Origin: https://baismedrashoflakewoodcommons.org
+   Expect 200 with ready:true, private:true, messageFeeds:true, smsImport:true,
+   emailImport:true and the existing calendar capabilities retained.
+
+   GET https://zmanim-calendar.cheskyshain.workers.dev/api/v1/messages
+   GET https://zmanim-calendar.cheskyshain.workers.dev/api/v1/messages.txt
+   Neither request needs Origin. Without a private key both must return 401,
+   Cache-Control: private, no-store and Referrer-Policy: no-referrer.
+
+   GET /api/message-feeds with the shul Origin but no calendar session must
+   return 401. Calendar events and accounts must still require sign-in.
+   Other unrelated origins must still be rejected on existing calendar routes.
+
+6. The website setup screen checks messageFeeds:true automatically. The owner
+   can open https://baismedrashoflakewoodcommons.org/admin/calendar/, sign in,
+   then choose Calendar access > Share messages > Create private link.
+   It provides Copy link and Download API instructions. That download contains
+   the receiving website's actual key and URL. It can be handed to its developer.
+   Do not create a production integration without the owner's normal login.
+   Do not publish private keys in source, commits, logs or screenshots.
+
+The API contract without secrets is in CALENDAR-MESSAGES-API.txt. If desktop
+activation succeeds, report the deployed version and verification result.
+The GitHub credential can remain absent if Desktop deploys this Worker.

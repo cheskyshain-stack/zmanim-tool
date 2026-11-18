@@ -104,7 +104,11 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
     assert.deepEqual(errors,[]);console.log('Browser verified at 320, 393 and 1440px. Screenshots: '+output);
    }finally{await browser.close();}
   }
-  assert.equal((await call('/api/message-feeds/'+id,'DELETE',null,owner.token)).status,200);assert.equal((await feed()).status,401);assert.equal((await feed('/api/v1/messages.txt?key='+key,null)).status,401);
+  const other=(await call('/api/message-feeds','POST',{name:'Independent website'},owner.token)).body;
+  for(let i=0;i<18;i++)assert.equal((await call('/api/message-feeds','POST',{name:'Synthetic link '+i},owner.token)).status,201);
+  assert.equal((await call('/api/message-feeds','POST',{name:'Over the link limit'},owner.token)).status,409);
+  assert.equal((await call('/api/message-feeds/'+id,'DELETE',null,owner.token)).status,200);
+  assert.equal((await feed('/api/v1/messages',other.key)).status,200,'Revoking one site preserves another site’s access');assert.equal((await feed()).status,401);assert.equal((await feed('/api/v1/messages.txt?key='+key,null)).status,401);
   console.log('Weekly posted-message API: permissions, revocation, exact text, DST, pagination, edits, deletion and read-only behavior passed.');
  }finally{await backend.dispose();if(server)await new Promise(resolve=>server.close(resolve));}
 })().catch(error=>{console.error(error);process.exitCode=1;});

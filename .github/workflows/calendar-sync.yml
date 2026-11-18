@@ -34,7 +34,7 @@ jobs:
           WRANGLER_SEND_METRICS: 'false'
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::The repository has no Cloudflare deployment credential. Use CODEX-DESKTOP-LC-TEXT-CONNECTION.txt on the authorized computer."
+            echo "::error::The repository has no Cloudflare deployment credential. Use CODEX-DESKTOP-CALENDAR-MESSAGES-API.txt on the authorized computer."
             exit 1
           fi
           worker/calendar/node_modules/.bin/wrangler deploy --config worker/calendar/wrangler.jsonc
