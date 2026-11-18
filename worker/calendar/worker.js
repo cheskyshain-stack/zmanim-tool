@@ -8,6 +8,7 @@ import { calendarSessionExpiration } from './session-expiration.js';
 import { calendarReminderSchedule, calendarSupportsReminderSchedule, DEFAULT_CALENDAR_REMINDER_SCHEDULE } from '../../js/calendar/reminder-date.js';
 import { nextSimchaReminder, pushEndpoint, pushSubscription, reminderDeviceKey, reminderKeys, reminderRegistrationExpired, runSimchaReminders, scheduleCalendarAlarm, sendCalendarPush } from './simcha-reminders.js';
 import { queueCalendarMessageAlert, runCalendarMessageAlerts } from './message-alerts.js';
+import { MESSAGE_FEED_PATHS, messageFeedHeaders, manageMessageFeeds, readMessageFeed } from './message-feed.js';
 
 const json = (value, status = 200) => Response.json(value, { status, headers: { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' } });
 const fail = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
@@ -33,15 +34,17 @@ async function passwordHash(password, salt) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
+    const messageFeed = MESSAGE_FEED_PATHS.includes(new URL(request.url).pathname);
     const incoming = !origin && request.method === 'POST' && ['/api/email-import/receive', '/api/sms-import/receive'].includes(new URL(request.url).pathname);
-    if (origin !== env.ALLOWED_ORIGIN && !incoming) return json({ error: 'Open the calendar from the shul website.' }, 403);
-    const cors = { 'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN, 'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
+    if (origin !== env.ALLOWED_ORIGIN && !incoming && !messageFeed) return json({ error: 'Open the calendar from the shul website.' }, 403);
+    const cors = { 'Access-Control-Allow-Origin': messageFeed ? '*' : env.ALLOWED_ORIGIN, 'Access-Control-Allow-Methods': messageFeed ? 'GET,OPTIONS' : 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization,Content-Type', Vary: 'Origin' };
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
     let result;
     try { result = await env.CALENDAR.get(env.CALENDAR.idFromName('lakewood-commons')).fetch(request); }
     catch { result = json({ error: 'The calendar is temporarily unavailable. Please try again.' }, 503); }
     const headers = new Headers(result.headers);
+    if (messageFeed) Object.entries(messageFeedHeaders).forEach(([key, value]) => headers.set(key, value));
     if (!incoming) Object.entries(cors).forEach(([key, value]) => headers.set(key, value));
     return new Response(result.body, { status: result.status, headers });
   },
@@ -519,7 +522,8 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
+    if (MESSAGE_FEED_PATHS.includes(path)) return readMessageFeed(this.ctx.storage, request, url);
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -564,7 +568,8 @@ export class CommunityCalendar extends DurableObject {
       await this.ctx.storage.put('user:' + user.id, next); await this.ctx.storage.delete(key);
       return json(await this.session(next, 'invitation-claimed'));
     }
-    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/activity' || path === '/api/sms-import' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/message-feeds' || path.startsWith('/api/message-feeds/') || path === '/api/activity' || path === '/api/sms-import' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    if (path === '/api/message-feeds' || path.startsWith('/api/message-feeds/')) return manageMessageFeeds(this.ctx.storage, request, url, request => this.body(request));
     if (path === '/api/sms-import') return this.manageSms(request, url);
     if (path === '/api/email-import' || path.startsWith('/api/email-import/')) return this.manageEmail(request, url);
     if (path === '/api/activity' && method === 'GET') return this.activityReport(url);

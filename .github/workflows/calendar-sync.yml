@@ -26,13 +26,15 @@ jobs:
         run: node tests/calendar-announcement-dates.cjs
       - name: Verify phone reminder scheduling and permissions with synthetic devices
         run: node --test tests/calendar-simcha-reminders.cjs
+      - name: Verify read-only weekly message links with synthetic records
+        run: node tests/calendar-message-feeds.cjs
       - name: Deploy only the existing calendar service
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_SEND_METRICS: 'false'
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::The repository has no Cloudflare deployment credential. Use CODEX-DESKTOP-LC-TEXT-CONNECTION.txt on the authorized computer."
+            echo "::error::The repository has no Cloudflare deployment credential. Use CODEX-DESKTOP-CALENDAR-MESSAGES-API.txt on the authorized computer."
             exit 1
           fi
           worker/calendar/node_modules/.bin/wrangler deploy --config worker/calendar/wrangler.jsonc
@@ -46,16 +48,19 @@ jobs:
           let response;
           for(let attempt=0;attempt<5;attempt++){
             response=await fetch(endpoint+'/api/info',{headers});
-            if(response.ok&&(await response.clone().json()).emailImport||attempt===4)break;
+            if(response.ok&&(await response.clone().json()).messageFeeds||attempt===4)break;
             await response.body?.cancel();
             await new Promise(resolve=>setTimeout(resolve,2000));
           }
           assert.equal(response.status,200);
           const info=await response.json();
-          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','announcementDateEditing','loginHistory','selfRegistration','activityStatistics','emailImport'])assert.equal(info[field],true,field);
+          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','announcementDateEditing','loginHistory','selfRegistration','activityStatistics','emailImport','messageFeeds'])assert.equal(info[field],true,field);
           assert.equal(info.announcementHistoryDays,10);
           for(const path of ['/api/events?from=2026-11-01&to=2026-11-30','/api/announcements','/api/email-import','/api/email-import/review']){
             const denied=await fetch(endpoint+path,{headers});assert.equal(denied.status,401,path);await denied.body?.cancel();
+          }
+          for(const path of ['/api/v1/messages','/api/v1/messages.txt']){
+            const denied=await fetch(endpoint+path);assert.equal(denied.status,401,path);assert.equal(denied.headers.get('Cache-Control'),'private, no-store');await denied.body?.cancel();
           }
           const receipt=await fetch(endpoint+'/api/email-import/receive',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({heartbeat:true})});
           assert.equal(receipt.status,401,'Inbox requests need their separate private key');await receipt.body?.cancel();
