@@ -11733,14 +11733,15 @@ function nextMinyan(now, state, settings) {
 }
 /** הדלקת נרות for today, and only when today is an Erev Shabbos.
  *
- *  Not "the next one": it is the day's own number and stays on the card all Friday, after
- *  the time itself has gone by as much as before it. Rolling on to next week's the moment
+ *  Not "the next one": it is the day's own number and stays on the card until 25 minutes after
+ *  the time itself has gone by. Rolling on to next week's the moment
  *  candles are lit would replace the one figure anybody is still checking that evening
  *  with one that is a week away. */
 function todaysCandleLighting(now, state, settings) {
   const { serial, mins } = shulNow(now, settings);
   const one = candleLightingForDay(serial, state, settings);
-  return one ? { ...one, serial, daysOff: 0, in: one.mins - mins } : null;
+  return one && Math.round((one.mins - mins) * 60000) > -25 * 60000
+    ? { ...one, serial, daysOff: 0, in: one.mins - mins } : null;
 }
 
 /** "1:50" for a time held as minutes after midnight, on the same 12-hour clock the boards
@@ -11788,6 +11789,20 @@ function howFar(item) {
   }
   if (item.daysOff === 1) return 'tomorrow';
   return DAY_NAMES[excelWeekday(item.serial) - 1];
+}
+
+/** Candle warning window: ten minutes before through 25 minutes after.
+ * Round wall-clock arithmetic back to milliseconds before selecting a second. */
+function candleCountdown(item) {
+  if (!item) return { text: '', urgent: false };
+  const ms = Math.round(item.in * 60000);
+  if (ms <= -25 * 60000) return { text: '', urgent: false };
+  if (ms > 10 * 60000) return { text: howFar(item), urgent: false };
+  const total = ms > 0 ? Math.ceil(ms / 1000) : Math.floor(-ms / 1000);
+  if (!total) return { text: 'now', urgent: true };
+  const minutes = Math.floor(total / 60), seconds = total % 60;
+  const duration = `${minutes}:${String(seconds).padStart(2, '0')}`;
+  return { text: ms > 0 ? duration : `${duration} ago`, urgent: true };
 }
 
 // ==== ui/chart-week-indicator.js ====

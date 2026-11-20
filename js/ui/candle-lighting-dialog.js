@@ -1,6 +1,6 @@
 import { candleZipLocation, candleTimeAtLocation } from '../candle-lighting-lookup.js';
 import { dateFromSerial } from '../zmanim/solar.js';
-import { clock, meridiem, howFar } from '../upcoming.js';
+import { clock, meridiem, candleCountdown } from '../upcoming.js';
 import { websiteNow } from '../website-clock.js';
 import { candleDeviceLocation } from '../location-data.js';
 
@@ -13,8 +13,13 @@ export function wireCandleLightingDialog(root, settings) {
     if (!dialog?.open || candleInstant === null) return;
     clearTimeout(countdownTimer);
     const remaining = (candleInstant - websiteNow().getTime()) / 60000;
-    dialog.querySelector('.luach-candle-countdown').textContent = howFar({ in: remaining, daysOff: 0 }) || 'Candle lighting has passed';
-    countdownTimer = setTimeout(updateCountdown, 60025 - Date.now() % 60000);
+    const countdown = candleCountdown({ in: remaining, daysOff: 0 });
+    const label = dialog.querySelector('.luach-candle-countdown');
+    label.textContent = countdown.text || 'Candle lighting has passed';
+    label.classList.toggle('is-urgent', countdown.urgent);
+    const ms = Math.round(remaining * 60000);
+    const wait = countdown.urgent ? (((ms % 1000) + 1000) % 1000 || 1000) : 60000 - Date.now() % 60000;
+    countdownTimer = setTimeout(updateCountdown, Math.max(25, wait));
   };
   const refreshCountdown = () => { if (document.visibilityState !== 'hidden') updateCountdown(); };
   const stopCountdown = () => {

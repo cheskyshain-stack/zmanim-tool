@@ -95,6 +95,9 @@ async function fixtures() {
     add('clock-boundary', item, null);
     add('clock-boundary-pair', item, { ...candle, in: 0 });
   }
+  for (const seconds of [600,599,61,1,0,-1,-62,-1499]) {
+    add('candle-second-boundary', wide, {...candle,in:seconds/60});
+  }
   add('empty', null, null);
   return { cases, coverage: {
     dateRange: [dateFromSerial(from).toISOString().slice(0, 10), dateFromSerial(to).toISOString().slice(0, 10)],
@@ -124,12 +127,12 @@ async function fixtures() {
     await page.evaluate(async () => {
       await document.fonts.ready;
       const { testNextHtml, testNextFit, testNextStop } = await import('/js/luach.js');
-      const { clock, meridiem, howFar } = await import('/js/upcoming.js');
+      const { clock, meridiem, howFar, candleCountdown } = await import('/js/upcoming.js');
       testNextStop();
       const host = document.createElement('div');
       host.id = 'home-next-layout-test';
       document.querySelector('.luach-next').replaceWith(host);
-      window.testNext = { host, html: testNextHtml, fit: testNextFit, clock, meridiem, howFar };
+      window.testNext = { host, html: testNextHtml, fit: testNextFit, clock, meridiem, howFar, candleCountdown };
     });
     for (const width of widths) {
       await page.setViewportSize({ width, height: width < 760 ? 900 : 1000 });
@@ -137,7 +140,7 @@ async function fixtures() {
       let checked = 0, failureCount = 0;
       for (let start = 0; start < cases.length; start += 250) {
         const batch = await page.evaluate(fixtures => {
-          const { host, html, fit, clock, meridiem, howFar } = window.testNext;
+          const { host, html, fit, clock, meridiem, howFar, candleCountdown } = window.testNext;
           const failures = [], tallest = {};
           const box = el => {
             const r = el.getBoundingClientRect();
@@ -168,7 +171,7 @@ async function fixtures() {
                 const actualClock = time.childNodes[0].textContent;
                 if (actualClock !== clock(item.mins) || time.querySelector('small').textContent !== meridiem(item.mins)) problems.push('clock text changed');
                 if (what.textContent !== item.name || (where?.textContent || '') !== (item.place || '')) problems.push('name or room text changed');
-                if ((when?.textContent || '').replace(/\u00a0/g, ' ') !== howFar(item)) problems.push('countdown text changed');
+                if ((when?.textContent || '').replace(/\u00a0/g, ' ') !== (column.classList.contains('is-candles') ? candleCountdown(item).text : howFar(item))) problems.push('countdown text changed');
                 if (paired) {
                   const description = box(column.querySelector('.luach-next-description'));
                   if (description.bottom > box(time).top + 1) problems.push('event description is not above its time');

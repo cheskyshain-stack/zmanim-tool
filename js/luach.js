@@ -10,7 +10,7 @@
 import { loadPublished } from './publish.js';
 import { hebrewLang, escAttr } from './util.js';
 import { resolveSettings } from './settings.js';
-import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar } from './upcoming.js';
+import { nextMinyan, todaysCandleLighting, clock, meridiem, howFar, candleCountdown } from './upcoming.js';
 import { wireSecretDoor } from './ui/nav-helpers.js';
 import { keepPosition } from './ui/keep-position.js';
 import { wireCopyButton, copyToClipboard } from './ui/copy.js';
@@ -479,11 +479,12 @@ function nextUpHtml([minyan, candles]) {
   // Both Hebrew pieces retain their own direction inside the shared description.
   const box = (kind, icon, item, tone) => {
     if (!item) return '';
-    const when = howFar(item);
+    const candle = tone === 'is-candles' ? candleCountdown(item) : null;
+    const when = candle ? candle.text : howFar(item);
     const description = `<bdi class="luach-next-what"${hebrewLang(item.name)}>${escAttr(item.name)}</bdi>
       ${item.place ? `<bdi class="luach-next-where"${hebrewLang(item.place)}>${escAttr(item.place)}</bdi>` : ''}`;
     const lookup = tone === 'is-candles' ? ` role="button" tabindex="0" aria-haspopup="dialog" aria-label="Candle lighting, ${escAttr(clock(item.mins))} ${escAttr(meridiem(item.mins))}. Look up another ZIP code" data-candle-date="${escAttr(item.serial)}"` : '';
-    return `<div class="luach-next-box ${tone}"${lookup}>
+    return `<div class="luach-next-box ${tone}${candle?.urgent ? ' is-urgent' : ''}"${lookup}>
       <p class="luach-next-head">${escAttr(kind)}</p>
       <div class="luach-next-body">
         <span class="luach-next-mark" aria-hidden="true">${icon}</span>
@@ -492,7 +493,7 @@ function nextUpHtml([minyan, candles]) {
           <span class="luach-next-time">${escAttr(clock(item.mins))}<small>${escAttr(meridiem(item.mins))}</small></span>
         </div>
       </div>
-      ${when ? `<p class="luach-next-when">${ICON_WAIT}<span class="luach-next-countdown">${escAttr(when).replace(/(\d+) (hours?|minutes?)/g, '$1&nbsp;$2')}</span></p>` : ''}
+      ${when ? `<p class="luach-next-when">${ICON_WAIT}<span class="luach-next-countdown">${escAttr(when).replace(/(\d+) (hours?|minutes?|seconds?)/g, '$1&nbsp;$2')}</span></p>` : ''}
     </div>`;
   };
   return `<div class="luach-next${paired ? ' is-paired' : ''}" aria-live="polite">
@@ -590,11 +591,16 @@ async function refreshHomeDate(settings) {
  *  hair early: rather than redraw in three milliseconds and again straight after, it
  *  waits a moment and lands the far side of the boundary. */
 function untilNextChange(items) {
-  const waits = items.filter(Boolean).map((item) => {
+  const waits = items.map((item, index) => {
+    if (!item) return 60000;
+    if (index === 1 && candleCountdown(item).urgent) {
+      const ms = Math.round(item.in * 60000);
+      return ((ms % 1000) + 1000) % 1000 || 1000;
+    }
     const left = item.in - Math.floor(item.in);
     return (left === 0 ? 1 : left) * 60000;
   });
-  return waits.length ? Math.max(250, Math.min(...waits)) : 60000;
+  return waits.length ? Math.max(items[1] && candleCountdown(items[1]).urgent ? 25 : 250, Math.min(...waits)) : 60000;
 }
 
 /** Keeps the "what is on next" card honest on a page nobody has closed.

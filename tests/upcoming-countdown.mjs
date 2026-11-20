@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { howFar } from '../js/upcoming.js';
+import { howFar, candleCountdown } from '../js/upcoming.js';
 import { excelSerial } from '../js/zmanim/solar.js';
 
 const today = minutes => howFar({ in: minutes, daysOff: 0 });
@@ -34,4 +34,20 @@ test('later dates keep their day labels and near-midnight times keep minutes', (
   assert.equal(howFar({ in: 10, daysOff: 1 }), 'in 10 minutes');
   assert.equal(howFar({ in: 3000, daysOff: 2,
     serial: excelSerial(new Date('2026-10-12T00:00:00Z')) }), 'Monday');
+});
+
+
+test('candle warning switches to seconds at ten minutes and keeps counting after arrival', () => {
+  for (const [ms, text, urgent] of [
+    [600001, 'in 11 minutes', false],
+    [600000, '10:00', true],
+    [599000, '9:59', true],
+    [1001, '0:02', true], [1000, '0:01', true],
+    [1, '0:01', true], [0, 'now', true], [-999, 'now', true],
+    [-1000, '0:01 ago', true], [-2000, '0:02 ago', true],
+    [-60000, '1:00 ago', true], [-62000, '1:02 ago', true],
+    [-1499999, '24:59 ago', true], [-1500000, '', false],
+  ]) assert.deepEqual(candleCountdown({ in: ms / 60000, daysOff: 0 }), { text, urgent });
+  assert.deepEqual(candleCountdown(null), { text: '', urgent: false });
+  assert.equal(today(-1), 'now', 'The minyan grace wording is unchanged');
 });

@@ -6042,3 +6042,9 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
   .special-add-page select { width: 100%; min-width: 0; display: block; margin-top: 0.3rem; }
   .special-add-all { border-top: 1px solid var(--border); padding-top: 0.7rem; }
 }
+
+/* Candle lighting warns in seconds from ten minutes before until 25 minutes after. */
+.luach-next-box.is-candles.is-urgent .luach-next-when,
+.luach-next-box.is-candles.is-urgent .luach-next-time,
+.luach-candle-result .luach-candle-countdown.is-urgent { color: #b42318; }
+.luach-next-box.is-candles.is-urgent .luach-next-countdown { font-variant-numeric: tabular-nums; }
