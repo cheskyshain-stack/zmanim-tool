@@ -1,3 +1,4 @@
+import { openCalendarSimchaImport } from './calendar-simcha-import.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, CALENDAR_EVENT_DETAILS_MAX, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarCompactDayFacts, fitCalendarDayFacts } from './calendar-day-facts.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../calendar/storage.js';
@@ -555,6 +556,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (!previewing()) {
       const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
       historyButton.after(inboxButton);
+      const simchaButton = document.createElement('button'); simchaButton.type = 'button'; simchaButton.textContent = 'Simchos from messages'; simchaButton.dataset.calSimchaImport = '';
+      inboxButton.after(simchaButton);
+      simchaButton.addEventListener('click', () => { view.close(); openCalendarSimchaImport({dialog,onSaved:loadEvents}); });
       inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
       const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
       inboxButton.after(smsButton);

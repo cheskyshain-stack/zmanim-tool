@@ -1,3 +1,4 @@
+import { syncSimchaMessage, reviewSimchaMessage } from './simcha-import.js';
 import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
 import { calendarAnnouncementText, calendarAnnouncementView, calendarAnnouncementDate, calendarAnnouncementAddedAt, CALENDAR_ANNOUNCEMENT_HISTORY_DAYS } from '../../js/calendar/announcement-model.js';
@@ -311,6 +312,7 @@ export class CommunityCalendar extends DurableObject {
         await transaction.delete(announcementDateKey(old));
         await transaction.put({ [key]: message, [announcementDateKey(message)]: id, 'announcement-edit-count': editSequence,
           ['announcement-edit-order:' + String(editSequence).padStart(16, '0')]: id, ...activityFields(['announcementsEdited'], now) });
+        await syncSimchaMessage(transaction, message, now);
       });
       return json({ message: calendarAnnouncementView(message), ...await status() });
     }
@@ -354,10 +356,13 @@ export class CommunityCalendar extends DurableObject {
       await this.limited(request, 'announcement-write', 60);
       const sequence = (await storage.get('announcement-count') || 0) + 1;
       const message = { id: body.id, sequence, text, authorId: user.id, authorName: 'Shul', revision: 1, createdAt: new Date().toISOString(), ...(addedAt ? { addedAt } : {}) };
-      await storage.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
+      await storage.transaction(async transaction => {
+        await transaction.put({ [key]: message, ['announcement-order:' + String(sequence).padStart(16, '0')]: body.id,
         [announcementDateKey(message)]: body.id,
         ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt),
-        ...await this.messageAlertEntry(storage, message) });
+        ...await this.messageAlertEntry(transaction, message) });
+        await syncSimchaMessage(transaction, message);
+      });
       return json({ message: calendarAnnouncementView(message), ...await status() }, 201);
     }
     if (method === 'GET') {
@@ -439,6 +444,7 @@ export class CommunityCalendar extends DurableObject {
         'announcement-count': sequence, [receiptKey]: { bodyHash, announcementId: id, receivedAt: now },
         'config:sms-import': { ...config, importedCount: (config.importedCount || 0) + 1, lastCheckedAt: now, lastImportedAt: now },
         ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
+      await syncSimchaMessage(transaction, message, now);
     });
     return json({ accepted: true, posted: true, duplicate: false, announcementId: id }, 201);
   }
@@ -452,6 +458,7 @@ export class CommunityCalendar extends DurableObject {
         [announcementDateKey(message)]: id,
         'announcement-count': sequence, ['lc-receipt:' + receipt.digest]: { digest: receipt.digest, receivedAt: receipt.receivedAt, status: 'posted', announcementId: id },
         'config:email-import': next, ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
+      await syncSimchaMessage(transaction, message, now);
       await transaction.delete('lc-review:' + receipt.digest);
     });
     return { accepted: true, posted: true };
@@ -523,7 +530,7 @@ export class CommunityCalendar extends DurableObject {
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
     if (MESSAGE_FEED_PATHS.includes(path)) return readMessageFeed(this.ctx.storage, request, url);
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, simchaImport: true, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -617,6 +624,31 @@ export class CommunityCalendar extends DurableObject {
       const token = random();
       await this.ctx.storage.put({ ['user:' + next.id]: next, ['invite:' + await hash(token)]: { userId: next.id, version: next.version, expires: Date.now() + 7 * 86400000 } });
       return json({ user: userView(next), token });
+    }
+    if (path === '/api/simcha-import' || path.startsWith('/api/simcha-import/')) {
+      if (user.role !== 'owner') fail('Only the calendar owner can review automatic simcha events.', 403);
+      if (path === '/api/simcha-import' && method === 'GET') {
+        const records = [...(await this.ctx.storage.list({prefix:'simcha-source:'})).values()];
+        return json({review:records.filter(item=>item.status==='review').slice(0,30),reviewCount:records.filter(item=>item.status==='review').length,added:records.filter(item=>item.status==='added').length,duplicates:records.filter(item=>item.status==='duplicate').length});
+      }
+      if (path === '/api/simcha-import/scan' && method === 'POST') {
+        const body=await this.body(request);
+        if(body.after != null && !/^announcement-order:\d{16}$/.test(body.after))fail('Choose a valid scan cursor.');
+        const rows=await this.ctx.storage.list({prefix:'announcement-order:',limit:51,...(body.after?{startAfter:body.after}:{})});
+        const batch=[...rows].slice(0,50);
+        for(const [,id] of batch){
+          const message=await this.ctx.storage.get('announcement:'+id);
+          if(message&&!message.deletedAt)await this.ctx.storage.transaction(transaction=>syncSimchaMessage(transaction,message));
+        }
+        return json({processed:batch.length,next:rows.size>50?batch.at(-1)[0]:null});
+      }
+      const review=/^\/api\/simcha-import\/([a-zA-Z0-9_-]{8,120})$/.exec(path);
+      if(review&&method==='POST'){
+        const body=await this.body(request);
+        const event=await this.ctx.storage.transaction(transaction=>reviewSimchaMessage(transaction,review[1],body.decision,body.event,user.id,body.revision,{operationId:body.operationId,keepReview:body.keepReview===true}));
+        return json({event});
+      }
+      return json({error:'Simcha review page not found.'},404);
     }
     if (path === '/api/events' && method === 'GET') {
       const from = url.searchParams.get('from'), to = url.searchParams.get('to');
