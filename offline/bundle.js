@@ -3977,6 +3977,147 @@ function calendarReminderSlot(event, schedule = DEFAULT_CALENDAR_REMINDER_SCHEDU
   return date ? { date, time } : null;
 }
 
+// ==== calendar/announcement-model.js ====
+const CALENDAR_ANNOUNCEMENT_LENGTH = 4000;
+const CALENDAR_ANNOUNCEMENT_HISTORY_DAYS = 10;
+
+const calendarAnnouncementDate = message => message.addedAt || message.createdAt;
+const calendarAnnouncementOrder = (a, b) => calendarAnnouncementDate(b).localeCompare(calendarAnnouncementDate(a)) || b.sequence - a.sequence;
+
+function calendarAnnouncementAddedAt(value, now = Date.now()) {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value || Date.parse(value) < 0 || Date.parse(value) > now + 300000) throw new Error('Choose a valid added date and time that is not in the future.');
+  return value;
+}
+
+function calendarAnnouncementLocalTime(value, timeZone) {
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value)).map(({ type, value }) => [type, value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function calendarAnnouncementInstant(value, timeZone, original = '') {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) throw new Error('Choose an added date and time.');
+  if (original && calendarAnnouncementLocalTime(original, timeZone) === value) return original;
+  const wall = Date.parse(value + ':00.000Z');
+  if (!Number.isFinite(wall) || new Date(wall).toISOString().slice(0, 16) !== value) throw new Error('Choose a valid added date and time.');
+  const matches = new Set();
+  for (const hours of [-36, -12, 0, 12, 36]) {
+    const probe = wall + hours * 3600000;
+    const offset = Date.parse(calendarAnnouncementLocalTime(probe, timeZone) + ':00.000Z') - probe;
+    const candidate = new Date(wall - offset).toISOString();
+    if (calendarAnnouncementLocalTime(candidate, timeZone) === value) matches.add(candidate);
+  }
+  if (matches.size !== 1) throw new Error(matches.size ? 'This time occurs twice when the clocks change. Choose a time outside that repeated hour.' : 'This time does not exist when the clocks change. Choose another time.');
+  return calendarAnnouncementAddedAt([...matches][0]);
+}
+
+function calendarAnnouncementView(message) {
+  const { lastEditId, ...record } = message;
+  return { ...record, authorName: 'Shul', revision: message.revision || 1 };
+}
+
+function calendarAnnouncementText(value, maximum = CALENDAR_ANNOUNCEMENT_LENGTH) {
+  if (typeof value !== 'string' || !value.trim()) throw new Error('Enter an announcement.');
+  if (value.length > maximum) throw new Error('Use up to ' + maximum.toLocaleString('en-US') + ' characters for an announcement.');
+  return value.replace(/\r\n?/g, '\n').trim();
+}
+
+// ==== calendar/simcha-message.js ====
+const types = [
+  ['shalom-zachor', /\bsh[ao]l[oa]m\s+z[ao]ch[oa]r\b|שלום\s+זכ[ו]?ר/iu],
+  ['kiddush', /\bkidd?ush\b|קידוש/iu],
+  ['vort', /\bvort\b|ווארט|אירוסין/iu],
+  ['aufruf', /\b[ao]ufruf\b|אויפרוף|עליה\s+לתורה/iu],
+  ['wedding', /\b(?:wedding|chas[su]?na[h]?|ch[au]s[su]?neh)\b|חתונה/iu],
+  ['bar-mitzva-dessert', /\bbar\s*mitzva[h]?\s+dessert\b/iu],
+  ['bar-mitzva-shabbos', /\bbar\s*mitzva[h]?\s+shabb[oa][st]\b/iu],
+  ['bar-mitzvah', /\bbar\s*mitzva[h]?\b|בר\s+מצוה|בר\s+מצווה/iu],
+  ['custom', /\bbris\b|ברית|\bpidyon\s+haben\b|פדיון\s+הבן|\bbas\s*mitzva[h]?\b|בת\s+מצוה|בת\s+מצווה|\bsheva\s+brach[oa][st]\b|שבע\s+ברכות/iu],
+];
+const days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+const dateISO = value => new Date(value).toISOString().slice(0, 10);
+const shifted = (date, days) => dateISO(Date.parse(date + 'T12:00:00Z') + days * 86400000);
+const pad = n => String(n).padStart(2, '0');
+const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, ' ').trim();
+
+/** Conservative, local extraction. No message is sent to an external AI service.
+ * Dates are civil New York dates, anchored to the original message timestamp. */
+function simchaFromMessage(message) {
+  const text = String(message.text || '').trim();
+  if (/kidd?ush\s+lev[ao]n[ao]h?|קידוש\s+לבנה/iu.test(text)) return null;
+  const matches = types.filter(([, pattern]) => pattern.test(text));
+  if (!matches.length) return null;
+  const type = matches.some(([id]) => id.startsWith('bar-mitzva-'))
+    ? matches.find(([id]) => id.startsWith('bar-mitzva-'))[0] : matches[0][0];
+  const distinct = matches.filter(([id]) => !(id === 'bar-mitzvah' && type.startsWith('bar-mitzva-')));
+  const result = { text, type, reason: '', event: null };
+  if (distinct.length > 1) return { ...result, reason: 'This message mentions multiple simchos. Review each event separately.' };
+  if (/\b(?:cancelled|canceled|postponed|correction|rescheduled|not|no|maybe|possibly|tentative)\b|נדחה|בוטל/iu.test(text))
+    return { ...result, reason: 'Cancellation or correction. Check the existing calendar event before changing it.' };
+  if (text.includes('?')) return {...result,reason:'This message asks a question. Confirm that the simcha is scheduled.'};
+  if (text.length > 4364) return { ...result, reason: 'The message is too long for one calendar event. Review the complete original text.' };
+  const received = calendarAnnouncementDate(message);
+  if (!Number.isFinite(Date.parse(received))) return { ...result, reason: 'The original message date is unavailable.' };
+  const base = new Intl.DateTimeFormat('en-CA', { timeZone:'America/New_York',year:'numeric',month:'2-digit',day:'2-digit' }).format(new Date(received));
+  const day = new Date(base + 'T12:00:00Z').getUTCDay();
+  const dates = new Set();
+  if (/\b(?:every|weekly|monthly)\b|כל\s+(?:שבוע|שבת)/iu.test(text)) return {...result,reason:'Recurring simcha. Confirm its individual dates.'};
+  if (/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.?\s+\d/iu.test(text)) return {...result,reason:'Confirm the written month and day before adding this simcha.'};
+  for (const match of text.matchAll(/\b(20\d{2}-\d{2}-\d{2})\b/g)) {
+    if (!Number.isFinite(calendarSerial(match[1]))) return { ...result, reason: 'Invalid calendar date.' };
+    dates.add(match[1]);
+  }
+  for (const match of text.matchAll(/\b(\d{1,2})\/(\d{1,2})(?:\/(20\d{2}))?\b/g)) {
+    if (!match[3]) return { ...result, reason: 'Confirm the year for the numeric date.' };
+    const date = `${match[3]}-${pad(match[1])}-${pad(match[2])}`;
+    if (!Number.isFinite(calendarSerial(date))) return { ...result, reason: 'Invalid calendar date.' };
+    dates.add(date);
+  }
+  // An explicit numeric date takes precedence over supporting weekday wording.
+  if (!dates.size) {
+    if (/\btoday\b|\btonight\b|היום|הערב/iu.test(text)) dates.add(base);
+    if (/\btomorrow\b|מחר/iu.test(text)) dates.add(shifted(base, 1));
+    const normalized = text.toLowerCase().replace(/motz[aei' ]*\s*shabb[oa][st]/g,'saturday night').replace(/shabb[oa][st]/g,'saturday');
+    for (const [index, name] of days.entries()) {
+      if (!new RegExp('\\b'+name+'\\b','i').test(normalized)) continue;
+      let offset = (index-day+7)%7;
+      if (new RegExp('\\bnext\\s+'+name+'\\b','i').test(normalized) && offset === 0) offset=7;
+      dates.add(shifted(base, offset));
+    }
+  }
+  if (dates.size !== 1) return { ...result, reason: dates.size ? 'Multiple possible event dates. Confirm the date.' : 'No clear event date. Choose the date before adding this simcha.' };
+  const date = [...dates][0];
+  // Do not invent a clock time from an ambiguous bare 8:30 or a relative prayer time.
+  let time = '', endTime = '';
+  const clocks = [...text.matchAll(/\b(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?m\.?\b/gi)];
+  if (clocks.length > 1 || /\d\s*[-–]\s*\d/.test(text.replace(/20\d{2}-\d{2}-\d{2}/g,''))) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
+  if (clocks.length) {
+    const [, hour, minute = '00', period] = clocks[0];
+    if (+hour < 1 || +hour > 12) return { ...result, reason:'Invalid event time.' };
+    time = pad((+hour%12)+(period.toLowerCase()==='p'?12:0))+':'+minute;
+  } else if (/(?:\bat\s+|@)\d|\b\d{1,2}:[0-5]\d\b|\b(?:after|before)\b.*(?:maariv|shacharis|mincha|davening)|אחרי|לאחר/iu.test(text))
+    return { ...result, reason: 'The clock time is unclear. Confirm it before adding this simcha.' };
+  if(time && +time.slice(0,2)<6 && /\b(?:tonight|night|motzai)\b/iu.test(text)) return {...result,reason:'After midnight wording. Confirm the civil calendar date.'};
+  const customCategory = type === 'custom' ? (/\bbris\b|ברית/iu.test(text)?'Bris':/pidyon|פדיון/iu.test(text)?'Pidyon Haben':/sheva|שבע/iu.test(text)?'Sheva Brachos':'Bas Mitzvah') : '';
+  const fields = {title:text.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:text,description:'',location:''};
+  return { ...result, event: calendarEvent(fields) };
+}
+
+/** Device preview built only from messages this account may already read. */
+function simchaMessagePreview(messages, existing = []) {
+  const events = [], review = [];
+  for (const message of messages) {
+    const parsed = simchaFromMessage(message);
+    if (!parsed) continue;
+    if (!parsed.event) { review.push({id:message.id,text:message.text,reason:parsed.reason}); continue; }
+    const matches = [...existing,...events].filter(event=>event.date===parsed.event.date && event.type===parsed.event.type
+      && (event.type!=='custom'||event.customCategory===parsed.event.customCategory));
+    if (matches.some(event=>simchaTextKey(event.details||event.title)===simchaTextKey(parsed.text))) continue;
+    if (matches.length) { review.push({id:message.id,text:message.text,reason:'Possible duplicate. Check the existing event.'}); continue; }
+    events.push({...parsed.event,id:'message-preview-'+message.id,simchaPreview:true,revision:0});
+  }
+  return {events,review};
+}
+
 // ==== calendar/storage.js ====
 const CALENDAR_STORAGE_KEY = 'lakewood-commons-calendar-preview-v1';
 
@@ -4036,50 +4177,6 @@ async function openCalendarActivity({ dialog, timeZone }) {
     finally { if (view.el.isConnected) retry.disabled = false; }
   }
   retry.addEventListener('click', load); await load();
-}
-
-// ==== calendar/announcement-model.js ====
-const CALENDAR_ANNOUNCEMENT_LENGTH = 4000;
-const CALENDAR_ANNOUNCEMENT_HISTORY_DAYS = 10;
-
-const calendarAnnouncementDate = message => message.addedAt || message.createdAt;
-const calendarAnnouncementOrder = (a, b) => calendarAnnouncementDate(b).localeCompare(calendarAnnouncementDate(a)) || b.sequence - a.sequence;
-
-function calendarAnnouncementAddedAt(value, now = Date.now()) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value || Date.parse(value) < 0 || Date.parse(value) > now + 300000) throw new Error('Choose a valid added date and time that is not in the future.');
-  return value;
-}
-
-function calendarAnnouncementLocalTime(value, timeZone) {
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(value)).map(({ type, value }) => [type, value]));
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
-}
-
-function calendarAnnouncementInstant(value, timeZone, original = '') {
-  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) throw new Error('Choose an added date and time.');
-  if (original && calendarAnnouncementLocalTime(original, timeZone) === value) return original;
-  const wall = Date.parse(value + ':00.000Z');
-  if (!Number.isFinite(wall) || new Date(wall).toISOString().slice(0, 16) !== value) throw new Error('Choose a valid added date and time.');
-  const matches = new Set();
-  for (const hours of [-36, -12, 0, 12, 36]) {
-    const probe = wall + hours * 3600000;
-    const offset = Date.parse(calendarAnnouncementLocalTime(probe, timeZone) + ':00.000Z') - probe;
-    const candidate = new Date(wall - offset).toISOString();
-    if (calendarAnnouncementLocalTime(candidate, timeZone) === value) matches.add(candidate);
-  }
-  if (matches.size !== 1) throw new Error(matches.size ? 'This time occurs twice when the clocks change. Choose a time outside that repeated hour.' : 'This time does not exist when the clocks change. Choose another time.');
-  return calendarAnnouncementAddedAt([...matches][0]);
-}
-
-function calendarAnnouncementView(message) {
-  const { lastEditId, ...record } = message;
-  return { ...record, authorName: 'Shul', revision: message.revision || 1 };
-}
-
-function calendarAnnouncementText(value, maximum = CALENDAR_ANNOUNCEMENT_LENGTH) {
-  if (typeof value !== 'string' || !value.trim()) throw new Error('Enter an announcement.');
-  if (value.length > maximum) throw new Error('Use up to ' + maximum.toLocaleString('en-US') + ' characters for an announcement.');
-  return value.replace(/\r\n?/g, '\n').trim();
 }
 
 // ==== ui/calendar-announcements.js ====
@@ -4998,6 +5095,58 @@ async function openCalendarPhoneReminders(dialog, publicKey, schedules = false, 
   } catch (error) { status.textContent = error.message; }
 }
 
+// ==== ui/calendar-simcha-import.js ====
+async function openCalendarSimchaImport({dialog,onSaved}) {
+  let busy=false;
+  const view=dialog('<p>New simcha messages with clear dates become calendar events automatically. Dates use the original message time in New York. Unclear information and possible duplicates appear here for review.</p><button type="button" data-simcha-scan>Process existing messages</button><p role="status" aria-live="polite"></p><div data-simcha-reviews></div>',{onClose:()=>!busy});
+  view.title('Simchos from messages');
+  const status=view.el.querySelector('[role=status]'),host=view.el.querySelector('[data-simcha-reviews]'),scan=view.el.querySelector('[data-simcha-scan]');
+  const active=()=>view.el.isConnected;
+  async function load(){
+    const data=await calendarRequest('/api/simcha-import');if(!active())return;
+    status.textContent=`${data.added} messages added to the calendar. ${data.duplicates} duplicates avoided. ${data.reviewCount ?? data.review.length} to review.`;
+    host.innerHTML=data.review.map(record=>{
+      const proposed=record.proposal||{},type=proposed.type||record.type;
+      return `<section class="cal-announcement-message" data-simcha-source="${escAttr(record.messageId)}"><p><strong>Needs review</strong>: ${escText(record.reason)}</p><p dir="auto" style="white-space:pre-wrap">${escText(record.text)}</p>${record.eventId?'<p>This message is linked to an existing event. Correct that event on the calendar, then mark this review done.</p>':`<form class="cal-form"><label>Event title<input name="title" required maxlength="160" value="${escAttr(proposed.title||record.text.split('\n')[0].slice(0,160))}"></label><label>Type<select name="type">${[...CALENDAR_TYPES,...CALENDAR_LEGACY_TYPES].map(item=>`<option value="${item.id}" ${type===item.id?'selected':''}>${escText(item.label)}</option>`).join('')}</select></label><label>Custom category<input name="customCategory" maxlength="60" value="${escAttr(proposed.customCategory||'')}"></label><label>Date<input name="date" type="date" required value="${escAttr(proposed.date||'')}"></label><label>Time, if known<input name="time" type="time" value="${escAttr(proposed.time||'')}"></label><label>Details<textarea name="details" rows="5" maxlength="4364" required>${escText(proposed.details||record.text)}</textarea></label><label><input type="checkbox" name="keepReview">This message has more simchos to add</label><button class="cal-primary" type="submit">Add event</button></form>`}<button type="button" data-simcha-skip>Mark reviewed without adding</button><p role="status" data-simcha-status></p></section>`;
+    }).join('')||'<p>No simcha messages need review.</p>';
+    for(const record of data.review){
+      const row=[...host.querySelectorAll('[data-simcha-source]')].find(el=>el.dataset.simchaSource===record.messageId);
+      let operationId=crypto.randomUUID();
+      const save=async(decision,event,keepReview=false)=>{
+        if(busy)return;busy=true;
+        row.querySelectorAll('button').forEach(button=>button.disabled=true);
+        try{
+          await calendarRequest('/api/simcha-import/'+encodeURIComponent(record.messageId),{method:'POST',body:{decision,event,revision:record.revision,operationId,keepReview}});
+          operationId=crypto.randomUUID();await onSaved?.();await load();
+        }catch(error){if(active())row.querySelector('[data-simcha-status]').textContent=error.message;}
+        finally{busy=false;if(active())row.querySelectorAll('button').forEach(button=>button.disabled=false);}
+      };
+      row.querySelector('[data-simcha-skip]').addEventListener('click',()=>save('skip'));
+      row.querySelector('form')?.addEventListener('submit',e=>{
+        e.preventDefault();const form=e.currentTarget,f=new FormData(form);
+        save('add',{title:f.get('title'),type:f.get('type'),customCategory:f.get('customCategory'),date:f.get('date'),time:f.get('time'),details:f.get('details')},f.get('keepReview')==='on');
+      });
+    }
+  }
+  scan.addEventListener('click',async()=>{
+    if(busy)return;busy=true;scan.disabled=true;
+    try{
+      let after=null,total=0;
+      do{
+        const result=await calendarRequest('/api/simcha-import/scan',{method:'POST',body:{after}});total+=result.processed;after=result.next;
+        if(!active())return;status.textContent=`Checked ${total} messages…`;
+      }while(after);
+      await onSaved?.();await load();
+    }catch(error){if(active())status.textContent=error.message;}
+    finally{busy=false;scan.disabled=false;}
+  });
+  try{
+    const info=await calendarRequest('/api/info');if(!active())return;
+    if(!info.simchaImport){scan.disabled=true;status.textContent='Automatic simcha events need a calendar service update before they can be activated.';return;}
+    await load();
+  }catch(error){if(active())status.textContent=error.message;}
+}
+
 // ==== ui/calendar-sms-import.js ====
 async function openCalendarSmsImport({ dialog, timeZone }) {
   let connection, key = '', saving = false;
@@ -5060,6 +5209,33 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
+  let simchaPreview = new URLSearchParams(location.search).get('simcha-preview') === '1';
+  let messageEvents = [], simchaReview = [], simchaPreviewError = '';
+  const previewToggle = () => `<button type="button" data-cal-simcha-preview>${simchaPreview ? 'Turn off simcha preview' : 'Preview simchos from messages'}</button>`;
+  function toggleSimchaPreview() {
+    simchaPreview = !simchaPreview; messageEvents = []; simchaReview = []; simchaPreviewError = '';
+    const url = new URL(location.href);
+    simchaPreview ? url.searchParams.set('simcha-preview','1') : url.searchParams.delete('simcha-preview');
+    history.replaceState(null,'',url.pathname+url.search+url.hash);
+    loadEvents();
+  }
+  async function loadSimchaPreview(number) {
+    if(!simchaPreview || !endpoint || !user) return;
+    const messages = [], seen = new Set(); let cursor = null;
+    try {
+      for(let page=0;page<50;page++){
+        const value = await calendarRequest('/api/announcements?view=congregation'+(cursor?'&cursor='+encodeURIComponent(cursor):''));
+        if(disposed || number !== requestNumber || !simchaPreview) return;
+        for(const message of value.messages || []) if(!seen.has(message.id)){seen.add(message.id);messages.push(message);}
+        if(!value.nextCursor) break;
+        if(value.nextCursor===cursor) throw Error('The message list changed. Refresh the calendar.');
+        cursor=value.nextCursor;
+        if(page===49) throw Error('There are too many messages for one preview.');
+      }
+      const result=simchaMessagePreview(messages,events);
+      messageEvents=result.events;simchaReview=result.review;simchaPreviewError='';
+    }catch(error){if(disposed||number!==requestNumber)return;messageEvents=[];simchaReview=[];if(error.status===401)throw error;simchaPreviewError=error.message;}
+  }
   let today = calendarISO(shulNow(new Date(), settings).serial);
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
   let reminderPublicKey = '', reminderSchedules = false, eventAudienceDetails = false, messageAlerts = false;
@@ -5072,7 +5248,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     messageAlertsAvailable: () => phoneRemindersAvailable() && messageAlerts && !previewing(),
     openMessageAlerts: () => openCalendarPhoneReminders(dialog, reminderPublicKey, false, 'messages'),
     onSessionExpired: message => {
-      calendarSession(null); user = null; events = []; signIn(message);
+      calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn(message);
     },
   });
 
@@ -5140,19 +5316,19 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
-  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents()];
+  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents(), ...(simchaPreview ? messageEvents : [])];
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
   const monthAllowed = value => !reader() || value >= calendarReaderMonths(today).first && value <= calendarReaderMonths(today).last;
   const dateAllowed = value => value >= '1900-01-01' && value <= '2299-12-31' && monthAllowed(value.slice(0, 7));
   const canAdd = () => !endpoint || ['owner', 'editor'].includes(role());
-  const canEdit = event => !event.example && (!endpoint || role() === 'owner' || role() === 'editor' && event.createdBy === user.id);
+  const canEdit = event => !event.example && !event.simchaPreview && (!endpoint || role() === 'owner' || role() === 'editor' && event.createdBy === user.id);
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
     const type = calendarEventCategory(event), adminsOnly = event.visibility === 'admins', editable = canEdit(event);
     const shared = calendarCongregationDetails(event), admin = reader() ? '' : calendarAdminDetails(event);
-    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
+    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">Message preview</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
       ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
       ${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
@@ -5203,17 +5379,18 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function signOut() {
     try { await turnOffCalendarPhoneReminders(); } catch { /* Sign-out still ends the session. */ }
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
-    calendarSession(null); user = null; events = []; signIn();
+    calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
   const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey, reminderSchedules);
   const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
-  const eventReminderButton = items => items.some(item => calendarReminderSlot(item)) ? phoneReminderButton() : '';
+  const eventReminderButton = items => items.some(item => !item.simchaPreview && calendarReminderSlot(item)) ? phoneReminderButton() : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton());
+    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+previewToggle());
+    view.el.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',()=>{view.close();toggleSimchaPreview();});
     view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
@@ -5301,6 +5478,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" title="Open Schedule messages">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
       ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
       ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
+      ${simchaPreview ? `<div class="cal-preview-banner" data-cal-simcha-banner><strong>Simchos from messages: preview</strong><span>Only on this device. No calendar events are saved. ${simchaPreviewError ? calEscape(simchaPreviewError) : `${messageEvents.length} suggested events. ${simchaReview.length} messages need review.`}</span><button type="button" data-cal-simcha-preview>Exit preview</button>${simchaReview.length ? '<button type="button" data-cal-simcha-unclear>Review unclear messages</button>' : ''}</div>` : ''}
       <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><button type="button" class="cal-reader-refresh" data-cal-refresh aria-label="Refresh calendar" title="Refresh calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>${announcements.markup({ label: 'Messages', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
@@ -5319,8 +5497,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
+    container.querySelectorAll('[data-cal-simcha-preview]').forEach(button=>button.addEventListener('click',toggleSimchaPreview));
+    container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
-    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton());
+    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+previewToggle());
+    adminActions?.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',toggleSimchaPreview);
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
@@ -5364,7 +5545,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       try { await readerMonth(next); }
       catch (error) {
         if (disposed || number !== requestNumber) return;
-        if (error.status === 401) { calendarSession(null); user = null; events = []; signIn(error.message); return; }
+        if (error.status === 401) { calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn(error.message); return; }
         note = error.message; busy = false; redraw(); return;
       }
       if (disposed || number !== requestNumber) return;
@@ -5396,7 +5577,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const range = calendarReaderMonths(today), allowed = new Set([range.first, today.slice(0, 7), range.last]), epoch = cacheEpoch;
     for (const value of readerCache.keys()) if (!allowed.has(value)) readerCache.delete(value);
     for (const value of allowed) if (value !== month) readerMonth(value).catch(error => {
-      if (!disposed && epoch === cacheEpoch && error.status === 401) { calendarSession(null); user = null; events = []; signIn(error.message); }
+      if (!disposed && epoch === cacheEpoch && error.status === 401) { calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn(error.message); }
     });
   }
   function wireMonthGestures(grid) {
@@ -5448,11 +5629,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
-    if (saved && performance.now() - saved.at < 30000) { prefetchMonths(); return; }
+    if (saved && performance.now() - saved.at < 30000 && !simchaPreview) { prefetchMonths(); return; }
     try {
       const values = await (isReader ? readerMonth(month) : monthEvents(month));
       if (disposed || number !== requestNumber) return;
       events = values;
+      messageEvents=[];simchaReview=[];
+      await loadSimchaPreview(number);
       if (isReader) prefetchMonths();
     } catch (error) {
       if (disposed || number !== requestNumber) return;
@@ -5588,6 +5771,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     if (!previewing()) {
       const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
       historyButton.after(inboxButton);
+      const simchaButton = document.createElement('button'); simchaButton.type = 'button'; simchaButton.textContent = 'Simchos from messages'; simchaButton.dataset.calSimchaImport = '';
+      inboxButton.after(simchaButton);
+      simchaButton.addEventListener('click', () => { view.close(); openCalendarSimchaImport({dialog,onSaved:loadEvents}); });
       inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
       const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
       inboxButton.after(smsButton);
@@ -5660,7 +5846,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const storageListener = event => {
     if (disposed) return;
     if (endpoint) {
-      if (calendarSessionWasCleared(event)) { calendarSession(null); user = null; events = []; signIn(); }
+      if (calendarSessionWasCleared(event)) { calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn(); }
       return;
     }
     if (event.key !== 'lakewood-commons-calendar-preview-v1') return;

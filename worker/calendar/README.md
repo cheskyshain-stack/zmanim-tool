@@ -347,3 +347,53 @@ page. Any signed-in account can open its feed. The id makes retries count once;
 read markers remain separate. This endpoint accepts no client-supplied count/type.
 Public analytics cannot read these private totals. Deploy activityStatistics:true
 before its client. Keep existing bindings, accounts, events, posts and login history.
+
+## Simchos from messages
+
+Prepared automatic imports use the existing calendar Worker and Durable Object.
+New manual posts, LC Text emails and Shul SMS announcements with one clearly dated
+simcha create ordinary congregation-visible events in the same transaction.
+The original message wording is retained. No external AI service, new Worker,
+database, sender connection or phone notification is introduced.
+
+Dates use the original message timestamp in America/New_York, including edited
+added dates. Explicit ISO or US numeric dates with a year and clear weekday,
+today, tonight or tomorrow wording are recognized. Unclear dates and times,
+written month dates needing confirmation, cancellations, multiple simchos and
+possible duplicates wait for owner review. Bris, Pidyon Haben, Sheva Brachos and
+Bas Mitzvah use existing custom categories. Shiurim, hespedim and ordinary notices
+are excluded. Supported categories and original wording are never guessed from
+an unrelated announcement.
+
+Calendar access > Simchos from messages shows pending reviews and offers
+Process existing messages. This scans stored announcements in bounded batches;
+repeating a scan does not duplicate events or restore removed events. Review
+supports adding multiple separate simchos from one message. Linked manual edits
+are protected: correct an existing event on the calendar and mark its review done.
+Deleting an announcement does not delete an independently useful calendar event.
+Existing event access rules remain in effect; the owner manages imported events.
+Automatic events do not enable new push reminders.
+
+Activation requires deploying the existing calendar service with its existing
+credentials, then publishing the main website. The client checks simchaImport
+before enabling review. Publishing only the frontend does not activate imports.
+The existing calendar-sync workflow includes the new pure and real local-service
+tests and read-only capability checks. No production fixtures should be created.
+Local validation: node --test tests/simcha-messages.mjs and
+node tests/calendar-simcha-import.cjs after npm ci --prefix worker/calendar.
+
+### Private browser preview before service activation
+
+Signed-in accounts can try `/admin/calendar/?preview=congregation&simcha-preview=1`
+or choose Preview simchos from messages under Calendar options. This uses the
+existing authenticated message reads with the congregation history restriction.
+It derives suggested events in memory and labels them Message preview. Unknown
+or duplicate information appears under Review unclear messages. No calendar
+records or message read markers are written. Exit preview restores the saved
+calendar; derived text is cleared on sign-out. This does not require the new
+Worker capability or change who can access messages. Automatic server imports
+still require the separate calendar service deployment described above.
+
+`node tests/simcha-preview-browser.cjs` checks the actual calendar date cell,
+original text, clear preview labels, review/exit behavior, phone and desktop
+bounds and zero API writes, using only synthetic messages and an isolated login.
