@@ -2040,3 +2040,8 @@ The congregation month heading is plain text with no month chooser, since only t
 three allowed months are available. Arrows, swipes and horizontal scrolling retain
 the selected day number and clamp short months; keep the preferred day when moving
 back to a longer month. An explicit date selection or Today resets that preference.
+
+Calendar phone reminder buttons are removed from day details, individual events,
+the admin toolbar and Calendar options. Keep the separate Messages alerts control
+and the optional Google Calendar connection. Existing server registrations and
+message alert delivery are not changed by this interface removal.

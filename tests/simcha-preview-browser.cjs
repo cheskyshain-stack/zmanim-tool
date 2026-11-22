@@ -13,7 +13,7 @@ const server=http.createServer((req,res)=>{
  if(url.pathname==='/data/calendar.json')return json({endpoint:origin});
  if(url.pathname.startsWith('/api/')){
   if(req.method!=='GET'){writes.push(req.url);return res.writeHead(405).end();}
-  if(url.pathname==='/api/session')return json({user,eventAudienceDetails:true});
+  if(url.pathname==='/api/session')return json({user,eventAudienceDetails:true,reminderPublicKey:'synthetic-reminder-key',reminderSchedules:true,messageAlerts:true});
   if(url.pathname==='/api/events')return json({events:storedEvents});
   if(url.pathname==='/api/announcements')return json({messages,nextCursor:null,total:2,unread:2,canPost:true});
   if(url.pathname==='/api/announcements/status')return json({total:2,unread:2,canPost:true,canEdit:true,canDelete:true,editCount:0,deletedCount:0});
@@ -50,12 +50,16 @@ const server=http.createServer((req,res)=>{
    await page.locator('[data-cal-day="2026-11-27"]').click();
    const dialog=page.getByRole('dialog');await dialog.getByText('From message',{exact:true}).waitFor();
    assert.equal(await dialog.locator('[data-cal-edit]').count(),0);
+   assert.equal(await dialog.getByRole('button',{name:'Phone reminders',exact:true}).count(),0,'No calendar reminder shortcut');
    assert.equal(await dialog.getByText(messages[0].text,{exact:true}).count(),1);
    await page.evaluate(()=>document.fonts.ready);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No page overflow');
    await page.screenshot({path:path.join(out,'event-'+width+'.png')});
    await dialog.locator('[data-cal-close]').click();
    assert.equal(await page.locator('[data-cal-simcha-preview]').count(),0,'No preview toggle');
+   await page.getByRole('button',{name:'Calendar options',exact:true}).click();
+   assert.equal(await page.getByRole('dialog').getByRole('button',{name:'Phone reminders',exact:true}).count(),0,'Calendar options have no reminder control');
+   await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
    await page.reload();
    await page.locator('[data-cal-day="2026-11-27"]').filter({hasText:'Example family'}).waitFor();
    await page.close();

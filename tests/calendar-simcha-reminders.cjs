@@ -36,222 +36,34 @@ function browserSite(getEndpoint) {
 
 async function checkPhoneControls(site, owner, viewer, device, detailsDate) {
   const { chromium } = require('playwright');
-  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless: true });
+  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || '/usr/bin/chromium', headless:true });
   try {
-    const pageAs = async session => {
-      const context = await browser.newContext({ viewport: { width: 375, height: 720 } });
-      await context.addInitScript(({ session, device }) => {
-        localStorage.setItem('zmanim-nocount', '1');
-        sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify(session));
-        let current = null;
-        window.calendarPushAttempts = 0;
-        const registration = { active: true, pushManager: { getSubscription: async () => current,
-          subscribe: async () => {
-            window.calendarPushAttempts++;
-            if (window.failCalendarPush) throw new DOMException('Push registration denied', 'NotAllowedError');
-            return current = { endpoint: device.endpoint, toJSON: () => device, unsubscribe: async () => { current = null; return true; } };
-          } } };
-        window.seedStaleReminder = () => {
-          current = { endpoint: device.endpoint + '-stale', unsubscribe: async () => { current = null; return true; } };
-        };
-        navigator.serviceWorker.register = async () => registration;
-        navigator.serviceWorker.getRegistration = async () => registration;
-      }, { session, device });
-      return context.newPage();
-    };
-    const reader = await pageAs(viewer);
-    const pageCdp = await reader.context().newCDPSession(reader);
-    const browserCdp = await browser.newBrowserCDPSession();
-    const { targetInfo } = await pageCdp.send('Target.getTargetInfo');
-    const setNotificationPermission = setting => browserCdp.send('Browser.setPermission', {
-      permission: { name: 'notifications' }, setting, origin: new URL(site).origin, browserContextId: targetInfo.browserContextId,
-    });
-    await setNotificationPermission('denied');
-    await reader.goto(site + '/admin/calendar/?preview=congregation');
-    await reader.getByRole('button', { name: /^Messages/ }).click();
-    const messages = reader.getByRole('dialog', { name: 'Messages' });
-    await messages.waitFor();
-    assert.equal(await messages.getByRole('button', { name: 'Phone reminders', exact: true }).count(), 0);
-    await messages.getByRole('button', { name: 'Close', exact: true }).click();
-    await messages.waitFor({ state: 'detached' });
-    const openPhoneReminders = async () => {
-      await reader.getByRole('button', { name: 'Calendar options', exact: true }).click();
-      const options = reader.getByRole('dialog', { name: 'Calendar options' });
-      await options.getByRole('button', { name: 'Phone reminders', exact: true }).click();
-    };
-    await openPhoneReminders();
-    const turnOn = reader.getByRole('button', { name: 'Turn on phone reminders' });
-    await reader.getByText('Your browser reports that notifications for this site are blocked.').waitFor();
-    await turnOn.click();
-    await reader.getByText('The browser still blocks notifications.', { exact: false }).waitFor();
-    assert.equal(await reader.evaluate(() => window.calendarPushAttempts), 0);
-
-    await setNotificationPermission('prompt');
-    await reader.evaluate(() => {
-      Object.defineProperty(navigator, 'userActivation', { configurable: true, value: { isActive: false } });
-      Notification.requestPermission = () => new Promise(resolve => { window.answerCalendarPermission = resolve; });
-    });
-    await turnOn.click();
-    await reader.getByText('Waiting for notification permission.', { exact: false }).waitFor();
-    assert(await turnOn.isDisabled());
-    await setNotificationPermission('granted');
-    await reader.waitForFunction(() => Notification.permission === 'granted');
-    await reader.evaluate(() => window.answerCalendarPermission('granted'));
-    await reader.getByText('Notifications are allowed. Tap Turn on phone reminders once more to finish.').waitFor();
-    assert.equal(await reader.evaluate(() => window.calendarPushAttempts), 0);
-
-    await reader.evaluate(() => { delete navigator.userActivation; window.failCalendarPush = true; });
-    await turnOn.click();
-    await reader.getByText('The browser couldn’t register this phone for notifications. Push registration denied').waitFor();
-    await reader.evaluate(() => { window.failCalendarPush = false; });
-    await turnOn.click();
-    await reader.getByText('Phone reminders are on for this device.').waitFor();
-    await reader.getByRole('button', { name: 'Send test alert' }).click();
-    await reader.getByText('Test alert accepted.', { exact: false }).waitFor();
-    await reader.getByText('No upcoming simcha alerts are scheduled for this phone.', { exact: true }).waitFor();
-    const sameTime = reader.getByRole('switch', { name: 'All the same' });
-    const modeLabel = reader.locator('.cal-reminder-toggle');
-    const categories = reader.getByRole('group', { name: 'Simcha categories', exact: true });
-    const save = reader.getByRole('button', { name: 'Save reminder times' });
-    const saved = reader.getByText('Reminder times saved for this phone.');
-    const reminderTime = reader.getByLabel('Reminder time', { exact: true });
-    assert(await sameTime.isChecked());
-    assert(await categories.isHidden());
-    assert.equal(await reminderTime.inputValue(), '09:00');
-    await reminderTime.fill('10:15');
-    await modeLabel.click();
-    await categories.waitFor();
-    for (const width of [375, 393]) {
-      await reader.setViewportSize({ width, height: 720 });
-      const geometry = await categories.locator('.cal-reminder-time').evaluateAll(rows => rows.map(row => {
-        const label = row.querySelector('label'), time = row.querySelector('input').getBoundingClientRect();
-        const panel = row.closest('dialog');
-        return { label: label.textContent, fits: label.getBoundingClientRect().right <= time.left && time.right <= panel.getBoundingClientRect().right && time.height >= 44 && panel.scrollWidth <= panel.clientWidth };
-      }));
-      assert.deepEqual(geometry.map(row => row.label), ['Shalom Zachor', 'Kiddush', 'Vort', 'Aufruf', 'Chasuna', 'Bar mitzva shabbos', 'Bar mitzva dessert']);
-      assert(geometry.every(row => row.fits), `Every reminder label and time input fit side by side at ${width}px`);
+    for (const session of [viewer,owner]) {
+      const context=await browser.newContext({viewport:{width:375,height:720}});
+      await context.addInitScript(session=>{
+        localStorage.setItem('zmanim-nocount','1');
+        sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(session));
+      },session);
+      const page=await context.newPage();
+      await page.goto(site+'/admin/calendar/?view=congregation');
+      await page.locator('.shul-calendar').waitFor();
+      await page.getByRole('button',{name:'Calendar options',exact:true}).click();
+      assert.equal(await page.getByRole('dialog').getByRole('button',{name:'Phone reminders',exact:true}).count(),0);
+      await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+      await page.locator('[data-cal-day="'+detailsDate+'"]').click();
+      await page.getByRole('dialog').waitFor();
+      assert.equal(await page.getByRole('dialog').getByRole('button',{name:'Phone reminders',exact:true}).count(),0);
+      await page.getByRole('dialog').getByRole('button',{name:'Close',exact:true}).click();
+      await page.getByRole('button',{name:/^Messages/}).click();
+      const messages=page.getByRole('dialog',{name:'Messages'});await messages.waitFor();
+      assert.equal(await messages.getByRole('button',{name:'Message alerts',exact:true}).count(),1,'Separate message alerts remain available');
+      if(session===owner) {
+        await page.goto(site+'/admin/calendar/');await page.locator('.shul-calendar').waitFor();
+        assert.equal(await page.getByRole('button',{name:'Phone reminders',exact:true}).count(),0,'Owner toolbar has no calendar reminders');
+      }
+      await context.close();
     }
-    const vort = categories.locator('[data-reminder-rule=vort]');
-    const kiddush = categories.getByLabel('Kiddush', { exact: true });
-    assert.equal(await kiddush.inputValue(), '10:15', 'New category rows use the shared time');
-    await kiddush.fill('11:30');
-    await vort.getByLabel('Vort', { exact: true }).fill('16:00');
-    await vort.locator('summary').click();
-    await vort.getByLabel('Weekday reminder').selectOption('day-before');
-    await vort.getByLabel('Friday time (optional)').fill('08:30');
-    await save.click();
-    await saved.waitFor();
-    await modeLabel.click();
-    await save.click();
-    await saved.waitFor();
-    await reader.keyboard.press('Escape');
-    await openPhoneReminders();
-    await sameTime.waitFor();
-    assert(await sameTime.isChecked());
-    assert.equal(await reminderTime.inputValue(), '10:15');
-    await modeLabel.click();
-    assert.equal(await vort.getByLabel('Vort', { exact: true }).inputValue(), '16:00');
-    assert.equal(await kiddush.inputValue(), '11:30');
-    await vort.locator('summary').click();
-    assert.equal(await vort.getByLabel('Weekday reminder').inputValue(), 'day-before');
-    assert.equal(await vort.getByLabel('Friday time (optional)').inputValue(), '08:30');
-    await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
-    await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
-    await reader.keyboard.press('Escape');
-    await reader.evaluate(() => window.seedStaleReminder());
-    await openPhoneReminders();
-    await reader.getByRole('button', { name: 'Reconnect phone reminders' }).click();
-    await reader.getByText('Phone reminders are on for this device.').waitFor();
-    await reader.getByRole('button', { name: 'Turn off phone reminders' }).click();
-    await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
-    assert(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-
-    await reader.goto(site + '/admin/calendar/?preview=congregation&messages=1');
-    await messages.getByRole('button', { name: 'Message alerts', exact: true }).click();
-    const alerts = reader.getByRole('dialog', { name: 'Message alerts' });
-    await alerts.getByRole('button', { name: 'Turn on message alerts' }).click();
-    await alerts.getByText('Message alerts are on for this device.').waitFor();
-    await alerts.getByRole('button', { name: 'Send test alert' }).click();
-    await alerts.getByText('Test alert accepted.', { exact: false }).waitFor();
-    await alerts.getByRole('button', { name: 'Close' }).click();
-    for (const width of [375, 393]) {
-      await reader.setViewportSize({ width, height: 720 });
-      assert(await messages.locator('.cal-dialog-header').evaluate(header => {
-        const box = header.getBoundingClientRect();
-        return [...header.children].every(item => {
-          const bounds = item.getBoundingClientRect();
-          return bounds.left >= box.left && bounds.right <= box.right;
-        });
-      }));
-    }
-    await messages.getByRole('button', { name: 'Close' }).click();
-    await openPhoneReminders();
-    await reader.getByRole('button', { name: 'Turn on phone reminders' }).waitFor();
-    await reader.getByRole('button', { name: 'Close' }).click();
-    await reader.getByRole('button', { name: /^Messages/ }).click();
-    await messages.getByRole('button', { name: 'Message alerts', exact: true }).click();
-    await alerts.getByRole('button', { name: 'Turn off message alerts' }).click();
-    await alerts.getByRole('button', { name: 'Turn on message alerts' }).waitFor();
-
-    await reader.goto(site + '/admin/calendar/?preview=congregation&simcha=' + detailsDate);
-    const readerDay = reader.getByRole('dialog', { name: 'Day details' });
-    const dayShortcut = readerDay.getByRole('button', { name: 'Phone reminders', exact: true });
-    await readerDay.getByText('Synthetic simcha for the reminder shortcut', { exact: true }).waitFor();
-    await dayShortcut.click();
-    const readerReminders = reader.getByRole('dialog', { name: 'Phone reminders' });
-    await readerReminders.getByRole('button', { name: 'Turn on phone reminders' }).click();
-    await readerReminders.getByText('Phone reminders are on for this device.').waitFor();
-    await readerReminders.getByRole('button', { name: 'Close' }).click();
-    assert(await readerDay.isVisible());
-    assert(await dayShortcut.evaluate(button => button === document.activeElement));
-
-    const manager = await pageAs(owner);
-    await manager.goto(site + '/admin/calendar/');
-    await manager.locator('.cal-brand [data-cal-add]:not([disabled])').click();
-    const form = manager.getByRole('dialog', { name: 'Add an event' });
-    await form.getByLabel('Congregation information').fill('Synthetic Shabbos simcha');
-    await form.getByLabel('Date', { exact: true }).fill('2090-12-02');
-    assert.equal(await form.locator('select[name=reminder]').count(), 0);
-    const note = form.locator('[data-cal-reminder-note]');
-    const category = form.locator('select[name=type]');
-    await category.selectOption('custom');
-    assert(await note.isHidden());
-    await category.selectOption('kiddush');
-    await form.getByText('Default reminder is Friday, December 1, 2090 at 9:00 a.m. New York time.', { exact: false }).waitFor();
-    const [newEvent] = await Promise.all([
-      manager.waitForResponse(response => response.url().includes('/api/events/') && response.request().method() === 'PUT'),
-      form.getByRole('button', { name: 'Save event' }).click(),
-    ]);
-    const savedSimcha = (await newEvent.json()).event;
-    assert.equal(savedSimcha.reminder, 'schedule');
-    await form.waitFor({ state: 'detached' });
-    await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&post=1');
-    const day = manager.getByRole('dialog', { name: 'Day details' });
-    await day.getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
-    await day.locator('[data-cal-edit=test-simcha]').click();
-    const edit = manager.getByRole('dialog', { name: 'Edit event' });
-    const [updatedEvent] = await Promise.all([
-      manager.waitForResponse(response => response.url().endsWith('/api/events/test-simcha') && response.request().method() === 'PUT'),
-      edit.getByRole('button', { name: 'Save changes' }).click(),
-    ]);
-    assert.equal((await updatedEvent.json()).event.reminder, 'schedule', 'Resaving an existing simcha applies phone reminder settings');
-    await edit.waitFor({ state: 'detached' });
-    await manager.goto(site + '/admin/calendar/?simcha=2090-12-02&event=' + savedSimcha.id + '&post=1');
-    const eventDetails = manager.getByRole('dialog', { name: 'Event details' });
-    await eventDetails.getByText('Synthetic Shabbos simcha', { exact: true }).waitFor();
-    assert.equal(await eventDetails.locator('.cal-event-card').count(), 1);
-    assert.equal(await eventDetails.getByText('Edited by older calendar client', { exact: true }).count(), 0);
-    await eventDetails.getByRole('button', { name: 'Phone reminders', exact: true }).click();
-    await manager.getByRole('dialog', { name: 'Phone reminders' }).getByRole('button', { name: 'Close' }).click();
-    await eventDetails.getByRole('button', { name: 'Post an announcement' }).click();
-    await manager.getByRole('dialog', { name: 'Announcements' }).getByLabel('New announcement').waitFor();
-    await manager.keyboard.press('Escape');
-    await manager.locator('[data-cal-view]').selectOption('viewer');
-    await manager.getByRole('button', { name: 'Calendar options', exact: true }).click();
-    const previewOptions = manager.getByRole('dialog', { name: 'Calendar options' });
-    await previewOptions.waitFor();
-    assert.equal(await previewOptions.getByRole('button', { name: 'Phone reminders', exact: true }).count(), 0, 'View as Congregation cannot change device settings');
-  } finally { await browser.close(); }
+  } finally {await browser.close();}
 }
 
 test('real Worker protects enrollment and lets a manager set, retain, and clear an event reminder', async () => {

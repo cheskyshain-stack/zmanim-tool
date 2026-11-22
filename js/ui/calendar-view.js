@@ -155,11 +155,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
     return `<div class="cal-day-heading"><p class="cal-eyebrow">${date === today ? 'Today' : 'Selected day'}</p><h3>${calEscape(calFullDate(date))}</h3><p lang="he" dir="rtl">${calEscape(day.hebrewLabel)}</p></div>
       ${day.facts.length || day.parsha || day.specialLabel || day.mevarchim ? `<div class="cal-day-facts" lang="he" dir="rtl">${day.specialLabel ? `<p>${calEscape(day.specialLabel)}</p>` : ''}${day.facts.map(fact => `<p>${calEscape(fact)}</p>`).join('')}${day.parsha ? `<p>פרשת ${calEscape(day.parsha)}</p>` : ''}${day.mevarchim ? '<p>מברכים</p>' : ''}</div>` : ''}
       <div class="cal-day-events">${busy ? '<p class="cal-empty">Loading events…</p>' : loadError ? `<p class="cal-error">${calEscape(loadError)}</p><button type="button" data-cal-reload>Try again</button>` : list.length ? list.map(eventCard).join('') : `<p class="cal-empty">${canAdd() ? 'Nothing added yet.<br>Add a simcha, schedule or announcement.' : 'No events for this day.'}</p>`}</div>
-      ${!busy && !loadError ? eventReminderButton(list) : ''}
       <p class="cal-error cal-day-status" role="status"></p>${canAdd() ? `<button type="button" class="cal-primary cal-day-add" data-cal-add="${date}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add an event</button>` : ''}`;
   }
   function wireDay(scope, close = () => {}) {
-    scope.querySelectorAll('[data-cal-phone-reminders]').forEach(button => button.addEventListener('click', showPhoneReminders));
     scope.querySelectorAll('[data-cal-copy-event]').forEach(button => {
       const item = events.find(event => event.id === button.dataset.calCopyEvent);
       if (item) wireCopyButton(button, () => calendarAdminDetails(item));
@@ -196,22 +194,18 @@ export function renderCalendar(container, settings, tables, { standalone = false
     calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
-  const showPhoneReminders = () => openCalendarPhoneReminders(dialog, reminderPublicKey, reminderSchedules);
-  const phoneReminderButton = () => phoneRemindersAvailable() && !previewing() ? '<button type="button" data-cal-phone-reminders>Phone reminders</button>' : '';
-  const eventReminderButton = items => items.some(item => !item.simchaPreview && calendarReminderSlot(item)) ? phoneReminderButton() : '';
   function readerOptions() {
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+googleButton());
-    view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
+    signOutButton.insertAdjacentHTML('beforebegin', googleButton());
     view.el.querySelector('[data-cal-google]')?.addEventListener('click',()=>{view.close();openCalendarGoogle(dialog);});
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
     const content = event
       ? `<div class="cal-day-heading"><h3>${calEscape(calFullDate(event.date))}</h3><p lang="he" dir="rtl">${calEscape(hebrewLabel(event.date))}</p></div>
-        <div class="cal-day-events">${eventCard(event)}</div>${eventReminderButton([event])}<p class="cal-error cal-day-status" role="status"></p>`
+        <div class="cal-day-events">${eventCard(event)}</div><p class="cal-error cal-day-status" role="status"></p>`
       : (missingEvent ? '<p class="cal-form-note">The event in this reminder is unavailable.</p>' : '') + dayHtml(date);
     const view = dialog(content); view.title(event ? 'Event details' : 'Day details'); wireDay(view.el, view.close);
     if (remindToPost && !reader() && canAdd()) {
@@ -321,7 +315,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
     container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
-    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+googleButton());
+    adminActions?.insertAdjacentHTML('beforeend', googleButton());
     adminActions?.querySelector('[data-cal-google]')?.addEventListener('click',()=>openCalendarGoogle(dialog));
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
