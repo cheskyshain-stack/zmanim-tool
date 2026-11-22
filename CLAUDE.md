@@ -968,13 +968,13 @@ Export/Import in Settings moves it between devices.
   overlaps, retained text, paired row alignment, navigation bounds and the divider
   at responsive widths.
   Longer descriptions may wrap and increase card height; do not clip them to 88px.
-- The congregation chart page keeps the chart needed this week on top. When the
-  next part or season is released one week early, show its Shabbos/weekday pair
-  below, with Current chart and New chart screen headings. Remove the old pair
+- The congregation chart page puts the newest chart on top. When the
+  next part or season is released one week early, keep the previous Shabbos/weekday
+  pair below it, with New chart and Previous chart screen headings. Remove the old pair
   only when its final week finishes at the existing Motzaei Shabbos rollover.
   `chartDisplayForNow` separates the current part from the early release selected
   by `spreadIndexForNow`. Keep the release rule and homepage announcement window.
-  Each pair has its own Print control and separately scoped PDF export when enabled. Native printing defaults to the current
+  Each pair has its own Print control and separately scoped PDF export when enabled. Native printing defaults to the newest
   pair and prints only the pair whose Print button was selected. PDF uses that
   pair's own pages and date filename. Headings, dividers and current-week markers
   stay off paper. Never change the sheet renderers or time calculations for this.

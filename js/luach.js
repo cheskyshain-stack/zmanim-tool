@@ -738,7 +738,7 @@ function markChartAnnounced(id) {
 /** Whether there is a chart worth telling the congregation about right now, and which one.
  *
  *  "Right now" is the chart spreadIndexForNow has released. During the early week,
- *  /chart/ shows it below the chart still needed. Whether it has
+ *  /chart/ shows it above the previous chart. Whether it has
  *  started showing at all (its own CHART_EARLY_DAYS early window) is spreadIndexForNow's
  *  call entirely, not re-asked here: it answers off the current week, which on a Friday is
  *  already tomorrow's Shabbos, not literally today's calendar date, and a second, plainer
@@ -950,7 +950,7 @@ function renderChartPage(published) {
   main.className = '';
   main.innerHTML = backBar('chart') + '<div id="chart-host"></div>';
   openTheDoor();
-  // Keep the chart still needed above the part released early. Three taps open
+  // Put the newly released part above the previous chart. Three taps open
   // browsing the remaining parts without changing either chart’s release dates.
   chartViewCleanup = renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true, highlightCurrentWeek: true, showUpcoming: true });
 }
