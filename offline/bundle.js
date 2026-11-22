@@ -15068,9 +15068,8 @@ function nl2br(str) {
 // and Next above it.
 //
 // A season chart has two parts, or three in a leap-year winter.
-// Showing all of them at once means finding the right one before reading a single time,
-// so this opens on the stretch covering now and pages from there, exactly as the week
-// view does. It is the same rendering the printed chart uses (buildSheetPages), read-only
+// Open on the relevant stretch, with optional early-release charts below it.
+// It is the same rendering the printed chart uses (buildSheetPages), read-only
 // - a second renderer would be a second thing to keep in step with the formulas.
 //
 // Shared between the congregation's site and the admin's This week screen, so the two
@@ -15123,7 +15122,7 @@ function chartSpreads(state) {
  *  spreadIndexForNow below explains has to agree with this one. */
 const CHART_EARLY_DAYS = 7;
 
-/** The spread covering now.
+/** The latest spread released, including its early-release week.
  *
  *  A chart page owns from seven days before its own first week until seven days before the
  *  next page's first week, which is the span chartStretchSerials already gives the week
@@ -15150,7 +15149,7 @@ const CHART_EARLY_DAYS = 7;
  *  Exported so the admin's own status panel can say which chart is up without drawing the
  *  page: see js/ui/status-view.js. A third reader of the same number rather than a second
  *  way of asking it. */
-function spreadIndexForNow(spreads, state, settings) {
+function spreadIndexForNow(spreads, state, settings, earlyDays = CHART_EARLY_DAYS) {
   if (!spreads.length) return 0;
   const all = spreads.flatMap((s) => s.serials);
   /* Every Shabbos from the first charted one to the last. They are seven days apart, so
@@ -15161,9 +15160,16 @@ function spreadIndexForNow(spreads, state, settings) {
   const starts = spreads.map((s) => Math.min(...s.serials));
   let found = -1;
   for (let n = 0; n < starts.length; n++) {
-    if (starts[n] - CHART_EARLY_DAYS <= target) found = n;
+    if (starts[n] - earlyDays <= target) found = n;
   }
   return found === -1 ? 0 : found;
+}
+
+/** Keep the chart still needed this week above the part released early. */
+function chartDisplayForNow(spreads, state, settings) {
+  const current = spreadIndexForNow(spreads, state, settings, 0);
+  const available = spreadIndexForNow(spreads, state, settings);
+  return { current, upcoming: available > current ? available : null };
 }
 
 /** The span of weeks the chart that is live right now actually reaches: from
@@ -15233,12 +15239,12 @@ function spreadLabel(spread) {
  *  then a frame too early and stayed wrong. Re-fit when the fonts land, and once more on
  *  the next frame for anything else that settles late. Every pass starts by clearing what
  *  the last one set, so re-running it is not cumulative. */
-let browserBeforePrintHandler;
 function fitChartToWindow(pagesEl, printSize, combinedPrint) {
+  let disposed = false, frame;
   const fit = pagesEl.parentElement;
   const fitPaper = chartPaperFitter(pagesEl, { height: printSize.height, combined: combinedPrint });
   const apply = () => keepPosition(pagesEl.parentElement, () => {
-    if (!document.body.contains(pagesEl)) return;
+    if (disposed || !document.body.contains(pagesEl)) return;
     pagesEl.style.transform = '';
     pagesEl.style.width = '';
     if (fit) { fit.style.height = ''; fit.style.overflow = ''; }
@@ -15258,56 +15264,54 @@ function fitChartToWindow(pagesEl, printSize, combinedPrint) {
     }
   }, { panels: false, focus: false });
   apply();
-  requestAnimationFrame(apply);
+  frame = requestAnimationFrame(apply);
   document.fonts?.ready?.then(apply);
+  const beforePrint = () => { if (!disposed && pagesEl.getClientRects().length) fitPaper(); };
   window.addEventListener('resize', apply);
-  if (browserBeforePrintHandler) window.removeEventListener('beforeprint', browserBeforePrintHandler);
-  browserBeforePrintHandler = fitPaper;
-  window.addEventListener('beforeprint', browserBeforePrintHandler);
+  window.addEventListener('beforeprint', beforePrint);
+  window.addEventListener('afterprint', apply);
+  return () => {
+    disposed = true; cancelAnimationFrame(frame);
+    window.removeEventListener('resize', apply);
+    window.removeEventListener('beforeprint', beforePrint);
+    window.removeEventListener('afterprint', apply);
+  };
 }
 
 /** @param {object} opts
  *    - empty: what to say when there is no chart to show at all
  *    - highlightCurrentWeek: screen-only indicators for the congregation page
- *    - swipe: false to leave the gesture off, for an embed sitting inside something that
- *      already swipes - two handlers on nested elements would both fire and the page
- *      would move twice at once.
- *    - confine: hold this to the one chart covering now, which is what the congregation's
- *      site asks for. A chart is a season's worth of weeks and the sheet on the wall is
- *      one of them; paging off it to a chart from two months ago is not what that page is
- *      for. There is exactly one chart to look at, so rather than leave Previous and Next
- *      sitting there permanently dead, the row goes: nothing on the screen is offering
- *      something it cannot do. Three taps on the chart itself opens it (navUnlocked). */
+ *    - showUpcoming: keep the current pair above the newly released pair
+ *    - swipe: false for an embed that already has its own swipe handler
+ *    - confine: hide browsing until the reader uses the three-tap gesture */
 function renderChartBrowser(container, state, opts = {}) {
   container._chartCurrentWeekCleanup?.();
-  const { empty = 'Nothing has been published yet.', swipe = true, confine = false, highlightCurrentWeek = false } = opts;
-  let stopCurrentWeek = () => {};
-  const cleanup = () => stopCurrentWeek();
+  const { empty = 'Nothing has been published yet.', swipe = true, confine = false, highlightCurrentWeek = false, showUpcoming = false } = opts;
+  const disposers = [];
+  const clearDraw = () => { disposers.splice(0).forEach(dispose => dispose()); container._weekSwipeOff?.(); };
+  const cleanup = () => clearDraw();
   container._chartCurrentWeekCleanup = cleanup;
   const spreads = chartSpreads(state);
-  // Settings for the same reason the week view needs them: which Shabbos is "this" one
-  // turns over 72 minutes after שקיעה, and that is not a question a date alone can answer.
   const settings = resolveSettings(state.settings);
-  let at = spreadIndexForNow(spreads, state, settings);
+  const liveSelection = () => showUpcoming ? chartDisplayForNow(spreads, state, settings)
+    : { current: spreadIndexForNow(spreads, state, settings), upcoming: null };
+  const liveKey = selection => `${selection.current}:${selection.upcoming}`;
+  let at = liveSelection().current;
   let printLayout = chartPrintLayout();
 
   const draw = () => keepPosition(container, () => {
-    stopCurrentWeek();
-    // This view chooses one paper size for the whole print job.
-    // Asked every draw rather than once, so the redraw that follows the taps comes out
-    // with the navigation on it.
+    clearDraw();
     const held = confine && !navUnlocked();
+    const selection = liveSelection(), displayedKey = liveKey(selection);
     const spread = spreads[at];
-    if (!spread) {
-      container.innerHTML = `<p class="hint">${empty}</p>`;
-      return;
-    }
+    if (!spread) { container.innerHTML = `<p class="hint">${empty}</p>`; return; }
+    const upcoming = at === selection.current && selection.upcoming !== null ? spreads[selection.upcoming] : null;
     const activeLayout = spread.weekday ? printLayout : 'separate';
     const combinedPrint = isCombinedChartLayout(activeLayout);
     const printSize = chartPrintSize(activeLayout);
     setPrintPage(printSize.css);
     const label = spreadLabel(spread);
-    container.innerHTML = `
+    const nav = `
       <div class="week-nav no-print">
         <div class="week-nav-when">
           ${chartEsc(label.english)}
@@ -15325,55 +15329,53 @@ function renderChartBrowser(container, state, opts = {}) {
         <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(activeLayout, Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
+    container.innerHTML = showUpcoming ? `<section class="chart-spread" data-chart-current>${upcoming ? '<h2 class="chart-spread-title no-print">Current chart</h2>' : ''}${nav}</section>` : nav;
+    const primary = container.querySelector('[data-chart-current]') || container;
+    if (upcoming) {
+      const nextLabel = spreadLabel(upcoming);
+      container.insertAdjacentHTML('beforeend', `<section class="chart-spread is-chart-print-hidden" data-chart-upcoming aria-label="New chart">
+        <h2 class="chart-spread-title no-print">New chart</h2>
+        <div class="week-nav no-print"><div class="week-nav-when">${chartEsc(nextLabel.english)}<bdi class="week-nav-hebrew" lang="he">${chartEsc(nextLabel.hebrew)}</bdi></div>
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml('chart-upcoming-print')}${pdfButtonHtml('chart-upcoming-pdf')}</div>
+        </div><div class="pages-fit"><div class="pages"></div></div>
+      </section>`);
+    }
     useStraightHebrewQuotes(container);
-    const pagesEl = container.querySelector('.pages');
-    const shabbos = combinedPrint ? buildCombinedChartPages(spread.sheet, spread.weekday, state, { readOnly: true, printLayout: activeLayout })
-      : buildSheetPages(spread.sheet, state, { readOnly: true });
-    const chol = combinedPrint ? [] : buildSheetPages(spread.weekday, state, { readOnly: true });
-    for (const page of [shabbos[spread.index], chol[spread.index]]) if (page) pagesEl.appendChild(page);
-    fitChartToWindow(pagesEl, printSize, combinedPrint);
-    if (highlightCurrentWeek) stopCurrentWeek = wireChartCurrentWeek(container, state, settings, () => {
-      const next = spreadIndexForNow(spreads, state, settings);
-      if (confine && !navUnlocked() && next !== at) { at = next; draw(); return true; }
+    // Keep the selection until the next print or redraw: Android can return from
+    // window.print before its preview has finished reading the document.
+    const selectPrint = scope => container.querySelectorAll('.chart-spread').forEach(section => section.classList.toggle('is-chart-print-hidden', section !== scope));
+    const watchWeek = () => {
+      const next = liveSelection();
+      if (confine && !navUnlocked() && (next.current !== at || liveKey(next) !== displayedKey)) {
+        at = next.current; draw(); return true;
+      }
       return false;
-    });
-    container.querySelector('#chart-print-layout').addEventListener('change', event => {
-      rememberChartPrintLayout(event.target.value);
-      printLayout = chartPrintLayout();
-      draw();
-    });
-
-    const go = (next) => {
-      if (next < 0 || next >= spreads.length) return;
-      at = next;
-      draw();
     };
-    wirePrintButton(container);
-    // The container is rebuilt on every Previous/Next, so the pages are looked up when the
-    // button is pressed rather than captured here. The file is named for the stretch it
-    // covers, since these get saved and mailed on and "zmanim.pdf" twice over is no help.
-    wirePdfButton(container, {
-      host: () => container.querySelector('.pages'),
-      name: () => pdfName(label.english),
-      sheet: '.page',
-      orientation: 'landscape',
-      size: [printSize.width, printSize.height],
+    function fill(scope, entry, printId, pdfId, watch) {
+      const pagesEl = scope.querySelector('.pages');
+      const shabbos = combinedPrint ? buildCombinedChartPages(entry.sheet, entry.weekday, state, { readOnly: true, printLayout: activeLayout })
+        : buildSheetPages(entry.sheet, state, { readOnly: true });
+      const chol = combinedPrint ? [] : buildSheetPages(entry.weekday, state, { readOnly: true });
+      for (const page of [shabbos[entry.index], chol[entry.index]]) if (page) pagesEl.appendChild(page);
+      disposers.push(fitChartToWindow(pagesEl, printSize, combinedPrint));
+      if (highlightCurrentWeek) disposers.push(wireChartCurrentWeek(scope, state, settings, watch));
+      scope.querySelector(`#${printId}`)?.addEventListener('click', () => selectPrint(scope));
+      wirePrintButton(scope, printId);
+      wirePdfButton(scope, { id: pdfId, host: () => pagesEl, name: () => pdfName(spreadLabel(entry).english),
+        sheet: '.page', orientation: 'landscape', size: [printSize.width, printSize.height] });
+      if (held) wireSecretTaps(pagesEl, () => { unlockNav(); draw(); });
+    }
+    fill(primary, spread, 'print-btn', 'pdf-btn', watchWeek);
+    if (upcoming) fill(container.querySelector('[data-chart-upcoming]'), upcoming, 'chart-upcoming-print', 'chart-upcoming-pdf');
+    container.querySelector('#chart-print-layout').addEventListener('change', event => {
+      rememberChartPrintLayout(event.target.value); printLayout = chartPrintLayout(); draw();
     });
     wireCombinedChartPrint();
+    const go = next => { if (next >= 0 && next < spreads.length) { at = next; draw(); } };
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
-    container.querySelector('.chart-today')?.addEventListener('click', () => go(spreadIndexForNow(spreads, state, settings)));
-    // Swiping is the same journey as the buttons, so it goes with them.
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(liveSelection().current));
     if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
-    // Three taps on the chart itself lets the rest of the season out. On the pages rather
-    // than the whole screen, so the buttons above are not part of the gesture, and the
-    // redraw is what puts the navigation on the page.
-    if (held) {
-      wireSecretTaps(pagesEl, () => {
-        unlockNav();
-        draw();
-      });
-    }
   });
   draw();
   return cleanup;
@@ -25535,7 +25537,7 @@ function weekEsc(str) {
 //
 // Nothing here is worked out a second time. Which week, which chart page and which occasions
 // are showing are the exact functions the congregation's own pages call - currentReaderWeek,
-// spreadIndexForNow, onePageOccasionSpans - so this cannot describe a calendar the site itself
+// chartDisplayForNow, onePageOccasionSpans - so this cannot describe a calendar the site itself
 // does not agree with.
 
 
@@ -25600,19 +25602,18 @@ function statusBody(published) {
 
   // Zmanim Chart, /chart/.
   const spreads = chartSpreads(published);
-  const at = spreadIndexForNow(spreads, published, settings);
+  const display = chartDisplayForNow(spreads, published, settings);
+  const at = display.current;
   const spread = spreads[at];
   const chartBlock = !spread
     ? '<p class="hint">Nothing published yet, so the chart page has nothing to show.</p>'
     : (() => {
         const label = spreadLabel(spread);
-        const next = spreads[at + 1];
-        const turn = next ? statusDate(Math.min(...next.serials)) : null;
+        const upcoming = display.upcoming === null ? null : spreads[display.upcoming];
         return `<p><bdi lang="he">${escAttr(spread.sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi>
           chart, ${escAttr(label.english)}.</p>
-          <p class="hint">Always shows the one page covering the current week; no lead time and nothing
-          comes down.${next ? ` Turns to the next page, ${escAttr(spreadLabel(next).english)}, on the
-          Sunday it starts: ${escAttr(turn)}.` : ' This is the last page there is.'}</p>`;
+          <p class="hint">The current chart stays on top until its final week is finished. The next chart appears below it one week early, with separate print controls.</p>
+          ${upcoming ? `<p>New chart available below: ${escAttr(spreadLabel(upcoming).english)}.</p>` : ''}`;
       })();
 
   // Special Schedules, /schedules/.

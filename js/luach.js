@@ -737,8 +737,8 @@ function markChartAnnounced(id) {
 
 /** Whether there is a chart worth telling the congregation about right now, and which one.
  *
- *  "Right now" is the chart spreadIndexForNow is already showing - the one /chart/ opens
- *  to - so this can never announce a chart the page itself is not on, and whether it has
+ *  "Right now" is the chart spreadIndexForNow has released. During the early week,
+ *  /chart/ shows it below the chart still needed. Whether it has
  *  started showing at all (its own CHART_EARLY_DAYS early window) is spreadIndexForNow's
  *  call entirely, not re-asked here: it answers off the current week, which on a Friday is
  *  already tomorrow's Shabbos, not literally today's calendar date, and a second, plainer
@@ -950,10 +950,9 @@ function renderChartPage(published) {
   main.className = '';
   main.innerHTML = backBar('chart') + '<div id="chart-host"></div>';
   openTheDoor();
-  // confine: the congregation is shown the chart that is up now and no other. Three taps
-  // on the chart itself opens the rest, which is also what lets the week view out of the
-  // weeks printed on this one. See navUnlocked in ui/nav-helpers.js.
-  chartViewCleanup = renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true, highlightCurrentWeek: true });
+  // Keep the chart still needed above the part released early. Three taps open
+  // browsing the remaining parts without changing either chart’s release dates.
+  chartViewCleanup = renderChartBrowser(main.querySelector('#chart-host'), state, { confine: true, highlightCurrentWeek: true, showUpcoming: true });
 }
 
 /** Campaigns come first; each owns its payment choices and recipient details. */

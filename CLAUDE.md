@@ -968,6 +968,21 @@ Export/Import in Settings moves it between devices.
   overlaps, retained text, paired row alignment, navigation bounds and the divider
   at responsive widths.
   Longer descriptions may wrap and increase card height; do not clip them to 88px.
+- The congregation chart page keeps the chart needed this week on top. When the
+  next part or season is released one week early, show its Shabbos/weekday pair
+  below, with Current chart and New chart screen headings. Remove the old pair
+  only when its final week finishes at the existing Motzaei Shabbos rollover.
+  `chartDisplayForNow` separates the current part from the early release selected
+  by `spreadIndexForNow`. Keep the release rule and homepage announcement window.
+  Each pair has its own Print control and separately scoped PDF export when enabled. Native printing defaults to the current
+  pair and prints only the pair whose Print button was selected. PDF uses that
+  pair's own pages and date filename. Headings, dividers and current-week markers
+  stay off paper. Never change the sheet renderers or time calculations for this.
+  Fit and observe both pairs independently; dispose listeners/timers on redraw
+  and navigation. The current-week refresh also notices release/retirement, while
+  ordinary weekly marker updates retain the existing chart DOM. Secret browsing
+  and Today remain available, with the overlap restored on Today. Admin embeds
+  retain their existing single-pair view unless they opt into `showUpcoming`.
 - New-chart pop-ups use the approved navy-and-gold design: gold calendar badge,
   Winter Zmanim or Summer Zmanim label from the announced chart, cream serif
   "New chart is up" heading and a gold View Chart button on a cream footer.

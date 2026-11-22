@@ -410,3 +410,8 @@
     position: static; transform: none;
   }
 }
+
+@media print {
+  .chart-spread.is-chart-print-hidden { display:none !important; }
+  .chart-spread + .chart-spread { margin:0; padding:0; border:0; }
+}

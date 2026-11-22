@@ -12,14 +12,14 @@
 //
 // Nothing here is worked out a second time. Which week, which chart page and which occasions
 // are showing are the exact functions the congregation's own pages call - currentReaderWeek,
-// spreadIndexForNow, onePageOccasionSpans - so this cannot describe a calendar the site itself
+// chartDisplayForNow, onePageOccasionSpans - so this cannot describe a calendar the site itself
 // does not agree with.
 
 import { loadPublished } from '../publish.js';
 import { resolveSettings } from '../settings.js';
 import { readerWeekIndex } from './weekly-reader.js';
 import { currentReaderWeek, weekTitle } from './week-view.js';
-import { chartSpreads, spreadIndexForNow, spreadLabel } from './chart-view.js';
+import { chartSpreads, chartDisplayForNow, spreadLabel } from './chart-view.js';
 import { onePageOccasionSpans, ONEPAGE_LEAD_DAYS } from './posters-view.js';
 import { weekEndsMins } from '../upcoming.js';
 import { dateFromSerial, shulNow } from '../zmanim/solar.js';
@@ -78,19 +78,18 @@ function statusBody(published) {
 
   // Zmanim Chart, /chart/.
   const spreads = chartSpreads(published);
-  const at = spreadIndexForNow(spreads, published, settings);
+  const display = chartDisplayForNow(spreads, published, settings);
+  const at = display.current;
   const spread = spreads[at];
   const chartBlock = !spread
     ? '<p class="hint">Nothing published yet, so the chart page has nothing to show.</p>'
     : (() => {
         const label = spreadLabel(spread);
-        const next = spreads[at + 1];
-        const turn = next ? statusDate(Math.min(...next.serials)) : null;
+        const upcoming = display.upcoming === null ? null : spreads[display.upcoming];
         return `<p><bdi lang="he">${escAttr(spread.sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi>
           chart, ${escAttr(label.english)}.</p>
-          <p class="hint">Always shows the one page covering the current week; no lead time and nothing
-          comes down.${next ? ` Turns to the next page, ${escAttr(spreadLabel(next).english)}, on the
-          Sunday it starts: ${escAttr(turn)}.` : ' This is the last page there is.'}</p>`;
+          <p class="hint">The current chart stays on top until its final week is finished. The next chart appears below it one week early, with separate print controls.</p>
+          ${upcoming ? `<p>New chart available below: ${escAttr(spreadLabel(upcoming).english)}.</p>` : ''}`;
       })();
 
   // Special Schedules, /schedules/.
