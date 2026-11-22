@@ -61,3 +61,14 @@ test('skipped and stale reviews cannot overwrite a decision or create events',as
  await assert.rejects(()=>reviewSimchaMessage(db,source.id,'skip',null,'owner',2),/changed/);
  await reviewSimchaMessage(db,source.id,'skip',null,'owner',1);assert.equal((await syncSimchaMessage(db,source)).status,'skipped');assert.equal((await db.list({prefix:'event:'})).size,0);
 });
+
+test('private browser preview derives events without changing saved events or source messages',async()=>{
+ const {simchaMessagePreview}=await import('../js/calendar/simcha-message.js');
+ const source=message('Shalom Zachor Friday night at 9pm');
+ const unknown=message('Bris for Example',{id:'unknown-preview'});
+ const before=JSON.stringify([source,unknown]);
+ const preview=simchaMessagePreview([source,source,unknown]);
+ assert.equal(preview.events.length,1);assert.equal(preview.review.length,1);assert.equal(preview.events[0].simchaPreview,true);assert.equal(preview.events[0].date,'2026-11-20');
+ assert.equal(JSON.stringify([source,unknown]),before);
+ assert.equal(simchaMessagePreview([source],[{...preview.events[0],id:'saved-original'}]).events.length,0);
+});

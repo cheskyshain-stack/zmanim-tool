@@ -80,3 +80,19 @@ export function simchaFromMessage(message) {
   const fields = {title:text.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:text,description:'',location:''};
   return { ...result, event: calendarEvent(fields) };
 }
+
+/** Device preview built only from messages this account may already read. */
+export function simchaMessagePreview(messages, existing = []) {
+  const events = [], review = [];
+  for (const message of messages) {
+    const parsed = simchaFromMessage(message);
+    if (!parsed) continue;
+    if (!parsed.event) { review.push({id:message.id,text:message.text,reason:parsed.reason}); continue; }
+    const matches = [...existing,...events].filter(event=>event.date===parsed.event.date && event.type===parsed.event.type
+      && (event.type!=='custom'||event.customCategory===parsed.event.customCategory));
+    if (matches.some(event=>simchaTextKey(event.details||event.title)===simchaTextKey(parsed.text))) continue;
+    if (matches.length) { review.push({id:message.id,text:message.text,reason:'Possible duplicate. Check the existing event.'}); continue; }
+    events.push({...parsed.event,id:'message-preview-'+message.id,simchaPreview:true,revision:0});
+  }
+  return {events,review};
+}

@@ -381,3 +381,19 @@ The existing calendar-sync workflow includes the new pure and real local-service
 tests and read-only capability checks. No production fixtures should be created.
 Local validation: node --test tests/simcha-messages.mjs and
 node tests/calendar-simcha-import.cjs after npm ci --prefix worker/calendar.
+
+### Private browser preview before service activation
+
+Signed-in accounts can try `/admin/calendar/?preview=congregation&simcha-preview=1`
+or choose Preview simchos from messages under Calendar options. This uses the
+existing authenticated message reads with the congregation history restriction.
+It derives suggested events in memory and labels them Message preview. Unknown
+or duplicate information appears under Review unclear messages. No calendar
+records or message read markers are written. Exit preview restores the saved
+calendar; derived text is cleared on sign-out. This does not require the new
+Worker capability or change who can access messages. Automatic server imports
+still require the separate calendar service deployment described above.
+
+`node tests/simcha-preview-browser.cjs` checks the actual calendar date cell,
+original text, clear preview labels, review/exit behavior, phone and desktop
+bounds and zero API writes, using only synthetic messages and an isolated login.
