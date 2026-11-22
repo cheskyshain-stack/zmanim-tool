@@ -15068,7 +15068,7 @@ function nl2br(str) {
 // and Next above it.
 //
 // A season chart has two parts, or three in a leap-year winter.
-// Open on the relevant stretch, with optional early-release charts below it.
+// Open on the newest released stretch, retaining the previous chart below it.
 // It is the same rendering the printed chart uses (buildSheetPages), read-only
 // - a second renderer would be a second thing to keep in step with the formulas.
 //
@@ -15165,7 +15165,7 @@ function spreadIndexForNow(spreads, state, settings, earlyDays = CHART_EARLY_DAY
   return found === -1 ? 0 : found;
 }
 
-/** Keep the chart still needed this week above the part released early. */
+/** Identify the part needed this week and the next part released early. */
 function chartDisplayForNow(spreads, state, settings) {
   const current = spreadIndexForNow(spreads, state, settings, 0);
   const available = spreadIndexForNow(spreads, state, settings);
@@ -15281,7 +15281,7 @@ function fitChartToWindow(pagesEl, printSize, combinedPrint) {
 /** @param {object} opts
  *    - empty: what to say when there is no chart to show at all
  *    - highlightCurrentWeek: screen-only indicators for the congregation page
- *    - showUpcoming: keep the current pair above the newly released pair
+ *    - showUpcoming: show the newly released pair above the previous pair
  *    - swipe: false for an embed that already has its own swipe handler
  *    - confine: hide browsing until the reader uses the three-tap gesture */
 function renderChartBrowser(container, state, opts = {}) {
@@ -15296,7 +15296,8 @@ function renderChartBrowser(container, state, opts = {}) {
   const liveSelection = () => showUpcoming ? chartDisplayForNow(spreads, state, settings)
     : { current: spreadIndexForNow(spreads, state, settings), upcoming: null };
   const liveKey = selection => `${selection.current}:${selection.upcoming}`;
-  let at = liveSelection().current;
+  const defaultIndex = selection => selection.upcoming ?? selection.current;
+  let at = defaultIndex(liveSelection());
   let printLayout = chartPrintLayout();
 
   const draw = () => keepPosition(container, () => {
@@ -15305,7 +15306,7 @@ function renderChartBrowser(container, state, opts = {}) {
     const selection = liveSelection(), displayedKey = liveKey(selection);
     const spread = spreads[at];
     if (!spread) { container.innerHTML = `<p class="hint">${empty}</p>`; return; }
-    const upcoming = at === selection.current && selection.upcoming !== null ? spreads[selection.upcoming] : null;
+    const previous = at === defaultIndex(selection) && selection.upcoming !== null ? spreads[selection.current] : null;
     const activeLayout = spread.weekday ? printLayout : 'separate';
     const combinedPrint = isCombinedChartLayout(activeLayout);
     const printSize = chartPrintSize(activeLayout);
@@ -15329,14 +15330,14 @@ function renderChartBrowser(container, state, opts = {}) {
         <div class="week-nav-row week-nav-print-one">${chartPrintLayoutHtml(activeLayout, Boolean(spread.weekday))}${printButtonHtml()}${pdfButtonHtml()}</div>
       </div>
       <div class="pages-fit"><div class="pages"></div></div>`;
-    container.innerHTML = showUpcoming ? `<section class="chart-spread" data-chart-current>${upcoming ? '<h2 class="chart-spread-title no-print">Current chart</h2>' : ''}${nav}</section>` : nav;
+    container.innerHTML = showUpcoming ? `<section class="chart-spread" data-chart-current>${previous ? '<h2 class="chart-spread-title no-print">New chart</h2>' : ''}${nav}</section>` : nav;
     const primary = container.querySelector('[data-chart-current]') || container;
-    if (upcoming) {
-      const nextLabel = spreadLabel(upcoming);
-      container.insertAdjacentHTML('beforeend', `<section class="chart-spread is-chart-print-hidden" data-chart-upcoming aria-label="New chart">
-        <h2 class="chart-spread-title no-print">New chart</h2>
-        <div class="week-nav no-print"><div class="week-nav-when">${chartEsc(nextLabel.english)}<bdi class="week-nav-hebrew" lang="he">${chartEsc(nextLabel.hebrew)}</bdi></div>
-          <div class="week-nav-row week-nav-print-one">${printButtonHtml('chart-upcoming-print')}${pdfButtonHtml('chart-upcoming-pdf')}</div>
+    if (previous) {
+      const previousLabel = spreadLabel(previous);
+      container.insertAdjacentHTML('beforeend', `<section class="chart-spread is-chart-print-hidden" data-chart-previous aria-label="Previous chart">
+        <h2 class="chart-spread-title no-print">Previous chart</h2>
+        <div class="week-nav no-print"><div class="week-nav-when">${chartEsc(previousLabel.english)}<bdi class="week-nav-hebrew" lang="he">${chartEsc(previousLabel.hebrew)}</bdi></div>
+          <div class="week-nav-row week-nav-print-one">${printButtonHtml('chart-previous-print')}${pdfButtonHtml('chart-previous-pdf')}</div>
         </div><div class="pages-fit"><div class="pages"></div></div>
       </section>`);
     }
@@ -15346,8 +15347,8 @@ function renderChartBrowser(container, state, opts = {}) {
     const selectPrint = scope => container.querySelectorAll('.chart-spread').forEach(section => section.classList.toggle('is-chart-print-hidden', section !== scope));
     const watchWeek = () => {
       const next = liveSelection();
-      if (confine && !navUnlocked() && (next.current !== at || liveKey(next) !== displayedKey)) {
-        at = next.current; draw(); return true;
+      if (confine && !navUnlocked() && (defaultIndex(next) !== at || liveKey(next) !== displayedKey)) {
+        at = defaultIndex(next); draw(); return true;
       }
       return false;
     };
@@ -15366,7 +15367,7 @@ function renderChartBrowser(container, state, opts = {}) {
       if (held) wireSecretTaps(pagesEl, () => { unlockNav(); draw(); });
     }
     fill(primary, spread, 'print-btn', 'pdf-btn', watchWeek);
-    if (upcoming) fill(container.querySelector('[data-chart-upcoming]'), upcoming, 'chart-upcoming-print', 'chart-upcoming-pdf');
+    if (previous) fill(container.querySelector('[data-chart-previous]'), previous, 'chart-previous-print', 'chart-previous-pdf');
     container.querySelector('#chart-print-layout').addEventListener('change', event => {
       rememberChartPrintLayout(event.target.value); printLayout = chartPrintLayout(); draw();
     });
@@ -15374,7 +15375,7 @@ function renderChartBrowser(container, state, opts = {}) {
     const go = next => { if (next >= 0 && next < spreads.length) { at = next; draw(); } };
     container.querySelector('.chart-prev')?.addEventListener('click', () => go(at - 1));
     container.querySelector('.chart-next')?.addEventListener('click', () => go(at + 1));
-    container.querySelector('.chart-today')?.addEventListener('click', () => go(liveSelection().current));
+    container.querySelector('.chart-today')?.addEventListener('click', () => go(defaultIndex(liveSelection())));
     if (swipe && !held) wireSwipe(container, () => go(at - 1), () => go(at + 1));
   });
   draw();
@@ -25603,17 +25604,17 @@ function statusBody(published) {
   // Zmanim Chart, /chart/.
   const spreads = chartSpreads(published);
   const display = chartDisplayForNow(spreads, published, settings);
-  const at = display.current;
+  const at = display.upcoming ?? display.current;
   const spread = spreads[at];
   const chartBlock = !spread
     ? '<p class="hint">Nothing published yet, so the chart page has nothing to show.</p>'
     : (() => {
         const label = spreadLabel(spread);
-        const upcoming = display.upcoming === null ? null : spreads[display.upcoming];
+        const previous = display.upcoming === null ? null : spreads[display.current];
         return `<p><bdi lang="he">${escAttr(spread.sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi>
           chart, ${escAttr(label.english)}.</p>
-          <p class="hint">The current chart stays on top until its final week is finished. The next chart appears below it one week early, with separate print controls.</p>
-          ${upcoming ? `<p>New chart available below: ${escAttr(spreadLabel(upcoming).english)}.</p>` : ''}`;
+          <p class="hint">The newest chart appears on top one week early. The previous chart stays below it until its final week is finished, with separate print controls.</p>
+          ${previous ? `<p>Previous chart available below: ${escAttr(spreadLabel(previous).english)}.</p>` : ''}`;
       })();
 
   // Special Schedules, /schedules/.

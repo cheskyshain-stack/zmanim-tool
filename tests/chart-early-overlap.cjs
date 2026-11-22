@@ -45,7 +45,7 @@ const settle = page => page.evaluate(async () => { await document.fonts.ready; a
       clocks:(section.querySelector('.pages').innerText.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g) || []).sort(),
     }));
     return { current:id(display.current), upcoming:display.upcoming === null ? null : id(display.upcoming),
-      expectedDates:[display.current, ...(display.upcoming === null ? [] : [display.upcoming])].map(index => spreadLabel(spreads[index]).english),
+      expectedDates:(display.upcoming === null ? [display.current] : [display.upcoming, display.current]).map(index => spreadLabel(spreads[index]).english),
       sections, overflow:document.documentElement.scrollWidth > innerWidth + 1,
       controlIds:[...document.querySelectorAll('#chart-host button[id],#chart-host input[id]')].map(el => el.id) };
   });
@@ -61,18 +61,18 @@ const settle = page => page.evaluate(async () => { await document.fonts.ready; a
         assert(!value.overflow); assert.equal(new Set(value.controlIds).size, value.controlIds.length);
         value.sections.forEach((section, i) => assert(section.date.startsWith(value.expectedDates[i])));
         if (fixture.upcoming) {
-          assert.equal(value.sections[0].label, 'Current chart'); assert.equal(value.sections[1].label, 'New chart');
-          assert(value.sections[1].top >= value.sections[0].bottom); assert.equal(value.sections[1].arrows, 0);
+          assert.equal(value.sections[0].label, 'New chart'); assert.equal(value.sections[1].label, 'Previous chart');
+          assert(value.sections[1].top >= value.sections[0].bottom); assert.equal(value.sections[0].arrows, 0);
           await page.screenshot({ path:path.join(output, width + '-' + fixture.date.slice(0,10) + '.png'), fullPage:true });
           if (fixture.current === 'choref:5787:0' && width !== 320) {
             await page.evaluate(() => { window.print = () => { window.printCalls = (window.printCalls || 0) + 1; }; });
-            for (const [selector, index] of [['#print-btn',0],['#chart-upcoming-print',1]]) {
+            for (const [selector, index] of [['#print-btn',0],['#chart-previous-print',1]]) {
               await page.locator(selector).click();
               const pdf = await page.pdf({ preferCSSPageSize:true, printBackground:true });
               const text = execFileSync('pdftotext', ['-layout','-','-'], { input:pdf, encoding:'utf8' });
               assert.equal((pdf.toString('latin1').match(/\/Type \/Page\b/g) || []).length, 2, 'Print contains only the selected chart pair');
               assert.deepEqual((text.match(/\b\d{1,2}:\d{2}(?::\d{2})?\b/g) || []).sort(), value.sections[index].clocks);
-              assert(!text.includes('Current chart') && !text.includes('New chart') && !text.includes('This week'));
+              assert(!text.includes('Previous chart') && !text.includes('New chart') && !text.includes('This week'));
               fs.writeFileSync(path.join(output, width + '-' + index + '.pdf'), pdf);
               assert.equal(await page.locator('#chart-host .page:visible').count(), 4, 'Both pairs remain visible after printing');
             }
@@ -85,7 +85,7 @@ const settle = page => page.evaluate(async () => { await document.fonts.ready; a
               renderChartBrowser(document.querySelector('#chart-host'), await loadPublished({ automatic:true }), { confine:true, highlightCurrentWeek:true, showUpcoming:true });
             });
             const names = [];
-            for (const selector of ['#pdf-btn','#chart-upcoming-pdf']) {
+            for (const selector of ['#pdf-btn','#chart-previous-pdf']) {
               await page.evaluate(() => { window.pdfSheets = []; });
               const downloaded = page.waitForEvent('download'); downloaded.catch(() => {}); await page.locator(selector).click(); const download = await downloaded;
               names.push(download.suggestedFilename()); assert.equal((await page.evaluate(() => window.pdfSheets)).length, 2);
@@ -98,7 +98,7 @@ const settle = page => page.evaluate(async () => { await document.fonts.ready; a
       }
       if (width === 393) {
         await page.clock.setFixedTime(new Date('2026-12-07T17:00:00Z'));
-        await page.goto(origin + '/chart/'); await page.locator('[data-chart-upcoming]').waitFor();
+        await page.goto(origin + '/chart/'); await page.locator('[data-chart-previous]').waitFor();
         await page.evaluate(() => { const chart = document.querySelector('[data-chart-current] .page'); chart.click(); chart.click(); chart.click(); });
         await page.locator('.chart-next').waitFor();
         await page.locator('.chart-next').click(); assert.equal(await page.locator('#chart-host .page').count(), 2);
@@ -110,7 +110,7 @@ const settle = page => page.evaluate(async () => { await document.fonts.ready; a
     const popup = await create(393, '2026-12-07T17:00:00Z');
     await popup.page.goto(origin + '/'); await popup.page.locator('.luach-announce[open]').waitFor();
     assert.equal(await popup.page.evaluate(() => localStorage.getItem('zmanim-chart-announced')), 'choref:5787:1');
-    await popup.page.getByRole('link', { name:'View Chart', exact:true }).click(); await popup.page.locator('[data-chart-upcoming] .page').first().waitFor();
+    await popup.page.getByRole('link', { name:'View Chart', exact:true }).click(); await popup.page.locator('[data-chart-previous] .page').first().waitFor();
     assert.equal(await popup.page.locator('#chart-host .page').count(), 4);
     await popup.page.goto(origin + '/'); await popup.page.locator('.luach-menu').waitFor(); assert.equal(await popup.page.locator('.luach-announce').count(), 0);
     await popup.context.close();

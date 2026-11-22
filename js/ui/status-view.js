@@ -79,17 +79,17 @@ function statusBody(published) {
   // Zmanim Chart, /chart/.
   const spreads = chartSpreads(published);
   const display = chartDisplayForNow(spreads, published, settings);
-  const at = display.current;
+  const at = display.upcoming ?? display.current;
   const spread = spreads[at];
   const chartBlock = !spread
     ? '<p class="hint">Nothing published yet, so the chart page has nothing to show.</p>'
     : (() => {
         const label = spreadLabel(spread);
-        const upcoming = display.upcoming === null ? null : spreads[display.upcoming];
+        const previous = display.upcoming === null ? null : spreads[display.current];
         return `<p><bdi lang="he">${escAttr(spread.sheet.season === 'kayitz' ? 'שבת קיץ' : 'שבת חורף')}</bdi>
           chart, ${escAttr(label.english)}.</p>
-          <p class="hint">The current chart stays on top until its final week is finished. The next chart appears below it one week early, with separate print controls.</p>
-          ${upcoming ? `<p>New chart available below: ${escAttr(spreadLabel(upcoming).english)}.</p>` : ''}`;
+          <p class="hint">The newest chart appears on top one week early. The previous chart stays below it until its final week is finished, with separate print controls.</p>
+          ${previous ? `<p>Previous chart available below: ${escAttr(spreadLabel(previous).english)}.</p>` : ''}`;
       })();
 
   // Special Schedules, /schedules/.
