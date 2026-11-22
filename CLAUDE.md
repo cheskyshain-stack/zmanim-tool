@@ -615,9 +615,13 @@ event dates, so archived sheets agree with the paper and future Chanukah stays c
 year 5788, where both first rows print 6:53. The base calculation stays separate
 in `special-shacharis.js` so building the posted Chanukah rows cannot recurse.
 Seasonal chart panels, weekly cards/One sheet, messages and upcoming minyanim
-share these times. Group equal seasonal panel schedules. When several Rosh Chodesh
-months share one block on a chart, label that block `ראש חודש` without month names.
-Keep a single-month block labelled by its month when it has its own schedule.
+share these times. Group equal seasonal panel schedules. When all Rosh Chodesh
+occasions on a chart page share one schedule, label it `ראש חודש`, even for a
+single month. Include the Chanukah Rosh Chodesh when comparing schedules. Show
+month names only when distinct Rosh Chodesh schedules need to be distinguished;
+name every month covered by each block, including months with matching times.
+Separate every occasion in a combined heading with a middle dot, including
+BHB, Taanis and Rosh Chodesh, rather than joining BHB and Taanis with a vav.
 When BHB or Taanis is present and a Rosh Chodesh block matches the complete standing
 schedule, including room marks, print that schedule once under a shared heading,
 for example `בה"ב · ראש חודש` or `תענ"צ · ראש חודש` for matching multiple months.
