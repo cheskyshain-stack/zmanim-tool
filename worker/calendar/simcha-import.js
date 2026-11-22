@@ -1,4 +1,4 @@
-import { simchaFromMessage, simchaTextKey } from '../../js/calendar/simcha-message.js';
+import { simchaFromMessage, simchaRelation, mergeSimchaFollowup } from '../../js/calendar/simcha-message.js';
 import { calendarAnnouncementDate } from '../../js/calendar/announcement-model.js';
 import { calendarEvent } from '../../js/calendar/model.js';
 
@@ -6,10 +6,10 @@ import { calendarEvent } from '../../js/calendar/model.js';
  * from its event. Review records and links stay private to calendar managers. */
 export async function syncSimchaMessage(storage, message, now = new Date().toISOString()) {
   const key = 'simcha-source:' + message.id, previous = await storage.get(key);
-  if (previous?.revision === (message.revision || 1) && previous.addedAt === calendarAnnouncementDate(message)) return previous;
+  if (previous?.revision === (message.revision || 1) && previous.addedAt === calendarAnnouncementDate(message) && (previous.parserVersion === 2 || previous.status === 'skipped')) return previous;
   const parsed = simchaFromMessage(message);
   if (!parsed && !previous) return null;
-  const record = { messageId:message.id, revision:message.revision||1, addedAt:calendarAnnouncementDate(message), text:message.text,
+  const record = { parserVersion:2, messageId:message.id, revision:message.revision||1, addedAt:calendarAnnouncementDate(message), text:message.text,
     status:'review', type:parsed?.type||'simcha', reason:parsed?.reason || 'The corrected message no longer describes a simcha. Check its linked calendar event.',
     ...(previous?.eventId?{eventId:previous.eventId,eventRevision:previous.eventRevision}:{}), ...(parsed?.event?{proposal:parsed.event}:{}) };
   const review = async reason => { record.reason=reason||record.reason; await storage.put(key,record); return record; };
@@ -20,15 +20,21 @@ export async function syncSimchaMessage(storage, message, now = new Date().toISO
   if (old && (old.revision !== previous?.eventRevision || old.updatedBy !== 'simcha-message-import'))
     return review('Someone edited this event. Review the message without overwriting their changes.');
   const events = await storage.list({prefix:'event:',limit:2000});
-  const similar = [...events.values()].filter(event => event.id!==id && event.date===parsed.event.date && event.type===parsed.event.type && (event.type!=='custom'||event.customCategory===parsed.event.customCategory));
-  const same = similar.find(event => simchaTextKey(event.details || event.title) === simchaTextKey(parsed.text));
+  const similar = [...events.values()].filter(event => event.id!==id);
+  const same = similar.find(event => simchaRelation(event, parsed.event) === 'same');
   if (same) {
     record.status='duplicate';record.reason='This simcha already appears on the calendar.';record.eventId=same.id;
+    if (same.updatedBy === 'simcha-message-import' && calendarAnnouncementDate(message) >= (same.sourceDate || same.createdAt)) {
+      const merged={...same,...mergeSimchaFollowup(same,parsed.event),id:same.id,revision:same.revision+1,updatedAt:now,updatedBy:same.updatedBy,sourceDate:calendarAnnouncementDate(message)};
+      const changed=JSON.stringify(calendarEvent({...merged,revision:0})) !== JSON.stringify(calendarEvent({...same,revision:0}));
+      record.eventRevision=changed?merged.revision:same.revision;
+      if (changed) await storage.put({['event:'+same.id]:merged,['activity:'+now+':'+crypto.randomUUID()]:{at:now,types:['eventsEdited']}});
+    }
     await storage.put(key,record);return record;
   }
-  if (similar.length) return review('A simcha of this type already exists on that date. Check whether this is a follow up or a separate family.');
+  if (similar.some(event => simchaRelation(event,parsed.event) === 'unclear')) return review('A simcha of this type already exists on that date. Check whether this is a follow up or a separate family.');
   if (!old && events.size>=2000) return review('The calendar event limit has been reached.');
-  const event = {...parsed.event,id,revision:(old?.revision||0)+1,createdAt:old?.createdAt||now,createdBy:old?.createdBy||'simcha-message-import',updatedAt:now,updatedBy:'simcha-message-import'};
+  const event = {...parsed.event,sourceDate:calendarAnnouncementDate(message),id,revision:(old?.revision||0)+1,createdAt:old?.createdAt||now,createdBy:old?.createdBy||'simcha-message-import',updatedAt:now,updatedBy:'simcha-message-import'};
   record.status='added';record.reason='';record.eventId=id;record.eventRevision=event.revision;
   await storage.put({['event:'+id]:event,[key]:record,['activity:'+now+':'+crypto.randomUUID()]:{at:now,types:[old?'eventsEdited':'eventsCreated']}});
   return record;

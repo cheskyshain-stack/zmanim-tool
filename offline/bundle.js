@@ -4039,6 +4039,17 @@ const shifted = (date, days) => dateISO(Date.parse(date + 'T12:00:00Z') + days *
 const pad = n => String(n).padStart(2, '0');
 const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, ' ').trim();
 
+/** Trim greetings and closing wishes only. Names, times, places and source messages stay intact. */
+function simchaEventWording(value) {
+  return String(value || '')
+    .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu,'')
+    .replace(/\bMTZOY\b[.!]?/giu,'')
+    .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu,'')
+    .replace(/שיזכו\s+לבנות\s+בית\s+נאמן\s+בישראל[.!]?/gu,'')
+    .replace(/^\s*(?:maz[ae]l\s+tov|m["'״’]?t)[!.:,]?\s*(?:to\s+)?/iu,'')
+    .replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n').replace(/[ \t]{2,}/g,' ').trim();
+}
+
 /** Conservative, local extraction. No message is sent to an external AI service.
  * Dates are civil New York dates, anchored to the original message timestamp. */
 function simchaFromMessage(message) {
@@ -4046,13 +4057,18 @@ function simchaFromMessage(message) {
   if (/kidd?ush\s+lev[ao]n[ao]h?|קידוש\s+לבנה/iu.test(text)) return null;
   const matches = types.filter(([, pattern]) => pattern.test(text));
   if (!matches.length) return null;
-  const type = matches.some(([id]) => id.startsWith('bar-mitzva-'))
+  let type = matches.some(([id]) => id.startsWith('bar-mitzva-'))
     ? matches.find(([id]) => id.startsWith('bar-mitzva-'))[0] : matches[0][0];
-  const distinct = matches.filter(([id]) => !(id === 'bar-mitzvah' && type.startsWith('bar-mitzva-')));
+  const bar = matches.some(([id]) => id.startsWith('bar-mitzva'));
+  if (bar && /dessert|reception/iu.test(text)) type = 'bar-mitzva-dessert';
+  else if (bar && /kidd?ush|shabb[oa][st]/iu.test(text)) type = 'bar-mitzva-shabbos';
+  const distinct = matches.filter(([id]) => !(bar && (id.startsWith('bar-mitzva') || id === 'kiddush')));
+  if (bar) distinct.push([type]);
   const result = { text, type, reason: '', event: null };
   if (distinct.length > 1) return { ...result, reason: 'This message mentions multiple simchos. Review each event separately.' };
   if (/\b(?:cancelled|canceled|postponed|correction|rescheduled|not|no|maybe|possibly|tentative)\b|נדחה|בוטל/iu.test(text))
     return { ...result, reason: 'Cancellation or correction. Check the existing calendar event before changing it.' };
+  if (/details to follow|date to follow|time to follow/iu.test(text)) return {...result, reason:'Details are still to follow. Confirm the event before adding it.'};
   if (text.includes('?')) return {...result,reason:'This message asks a question. Confirm that the simcha is scheduled.'};
   if (text.length > 4364) return { ...result, reason: 'The message is too long for one calendar event. Review the complete original text.' };
   const received = calendarAnnouncementDate(message);
@@ -4084,6 +4100,10 @@ function simchaFromMessage(message) {
       dates.add(shifted(base, offset));
     }
   }
+  if (!dates.size) {
+    const target = ['kiddush','aufruf','bar-mitzva-shabbos'].includes(type) ? 6 : type === 'shalom-zachor' ? 5 : day;
+    dates.add(shifted(base, (target-day+7)%7));
+  }
   if (dates.size !== 1) return { ...result, reason: dates.size ? 'Multiple possible event dates. Confirm the date.' : 'No clear event date. Choose the date before adding this simcha.' };
   const date = [...dates][0];
   // Do not invent a clock time from an ambiguous bare 8:30 or a relative prayer time.
@@ -4094,25 +4114,63 @@ function simchaFromMessage(message) {
     const [, hour, minute = '00', period] = clocks[0];
     if (+hour < 1 || +hour > 12) return { ...result, reason:'Invalid event time.' };
     time = pad((+hour%12)+(period.toLowerCase()==='p'?12:0))+':'+minute;
+  } else if (/\b\d{1,2}:[0-5]\d\b/u.test(text)) {
+    const bare = [...text.matchAll(/\b(\d{1,2}):([0-5]\d)\b/gu)];
+    if (bare.length !== 1 || +bare[0][1] < 1 || +bare[0][1] > 12) return {...result,reason:'Confirm the event time.'};
+    const morning = /shacharis|שחרית/iu.test(text) && !/tonight|evening/iu.test(text);
+    const evening = /tonight|evening|night|dessert|chupah/iu.test(text) || type === 'bar-mitzva-dessert';
+    if (!morning && !evening) return {...result,reason:'The clock time is unclear. Confirm it before adding this simcha.'};
+    time = pad((+bare[0][1]%12)+(evening?12:0))+':'+bare[0][2];
   } else if (/(?:\bat\s+|@)\d|\b\d{1,2}:[0-5]\d\b|\b(?:after|before)\b.*(?:maariv|shacharis|mincha|davening)|אחרי|לאחר/iu.test(text))
     return { ...result, reason: 'The clock time is unclear. Confirm it before adding this simcha.' };
   if(time && +time.slice(0,2)<6 && /\b(?:tonight|night|motzai)\b/iu.test(text)) return {...result,reason:'After midnight wording. Confirm the civil calendar date.'};
   const customCategory = type === 'custom' ? (/\bbris\b|ברית/iu.test(text)?'Bris':/pidyon|פדיון/iu.test(text)?'Pidyon Haben':/sheva|שבע/iu.test(text)?'Sheva Brachos':'Bas Mitzvah') : '';
-  const fields = {title:text.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:text,description:'',location:''};
+  const wording=simchaEventWording(text);
+  const fields = {title:wording.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:wording,description:'',location:/\bshacharis\s+NS\b/iu.test(text)?'NS':/\bSimcha Hall\b/iu.test(text)?'Simcha Hall':/\bTiferes Hall\b/iu.test(text)?'Tiferes Hall':''};
   return { ...result, event: calendarEvent(fields) };
+}
+
+// Compare people rather than treating every simcha of one type as a duplicate.
+function simchaRelation(a, b) {
+  const kind = e => ['bar-mitzvah','bar-mitzva-shabbos'].includes(e.type) ? 'bar-mitzvah' : e.type;
+  if (a.date !== b.date || kind(a) !== kind(b) || (a.customCategory||'') !== (b.customCategory||'')) return 'different';
+  const text = e => e.details || e.title || '';
+  if (simchaTextKey(simchaEventWording(text(a))) === simchaTextKey(simchaEventWording(text(b)))) return 'same';
+  const identity = e => {
+    const t = text(e);
+    const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon)\b|[.!,\n]|$)/iu)?.[1] || '';
+    const child = t.match(/\b(?:son|daughter)['’]?s?\s+(.+?)(?=\s+(?:bar|bas|to|dessert|vort|chasuna)\b|[.!,\n]|$)/iu)?.[1] || '';
+    return {p:simchaTextKey(parent).split(' ').filter(Boolean),c:simchaTextKey(child)};
+  };
+  const x=identity(a),y=identity(b);
+  if (x.p.length && y.p.length) {
+    if (x.p[0]!==y.p[0]) return 'different';
+    if (x.p.length>1 && y.p.length>1 && x.p.at(-1)!==y.p.at(-1)) return 'different';
+    if (x.p[0]===y.p[0] && (x.p.join(' ')===y.p.join(' ') || x.c && x.c===y.c)) return 'same';
+  }
+  return 'unclear';
+}
+function mergeSimchaFollowup(old, incoming) {
+  // A NOW reminder preserves the original scheduled time and complete invitation.
+  if (/\bnow\b/iu.test(incoming.details || '') && old.time) return {...old};
+  return {...incoming,time:incoming.time||old.time,endTime:incoming.endTime||old.endTime,
+    allDay:!(incoming.time||old.time),location:incoming.location||old.location};
 }
 
 /** Device preview built only from messages this account may already read. */
 function simchaMessagePreview(messages, existing = []) {
   const events = [], review = [];
-  for (const message of messages) {
+  for (const message of [...messages].sort((a,b)=>calendarAnnouncementDate(a).localeCompare(calendarAnnouncementDate(b)) || a.id.localeCompare(b.id))) {
     const parsed = simchaFromMessage(message);
     if (!parsed) continue;
     if (!parsed.event) { review.push({id:message.id,text:message.text,reason:parsed.reason}); continue; }
-    const matches = [...existing,...events].filter(event=>event.date===parsed.event.date && event.type===parsed.event.type
-      && (event.type!=='custom'||event.customCategory===parsed.event.customCategory));
-    if (matches.some(event=>simchaTextKey(event.details||event.title)===simchaTextKey(parsed.text))) continue;
-    if (matches.length) { review.push({id:message.id,text:message.text,reason:'Possible duplicate. Check the existing event.'}); continue; }
+    const all=[...existing,...events], same=all.find(event=>simchaRelation(event,parsed.event)==='same');
+    if (same) {
+      const index=events.indexOf(same);
+      if(index>=0) events[index]={...mergeSimchaFollowup(same,parsed.event),id:same.id,simchaPreview:true,revision:0};
+      continue;
+    }
+    if (all.some(event=>simchaRelation(event,parsed.event)==='unclear')) { review.push({id:message.id,text:message.text,reason:'Possible duplicate. Check the existing event.'}); continue; }
     events.push({...parsed.event,id:'message-preview-'+message.id,simchaPreview:true,revision:0});
   }
   return {events,review};
@@ -4785,6 +4843,55 @@ async function openCalendarEmailImport({ dialog, timeZone }) {
   } catch (error) { if (current()) status.textContent = error.message; }
 }
 
+// ==== ui/calendar-google.js ====
+async function openCalendarGoogle(dialog, returnedState='') {
+  const view=dialog('<div data-google-content><p role="status">Checking Google Calendar…</p></div>');
+  view.title('Google Calendar');
+  const content=view.el.querySelector('[data-google-content]');
+  const escape=value=>escText(String(value||''));
+  let closed=false;
+  view.el.addEventListener('close',()=>{closed=true;},{once:true});
+  try {
+    const info=await calendarRequest('/api/info');
+    if(!info.googleCalendar) {content.innerHTML='<p>Google Calendar will be available after the shul admin updates the calendar service.</p>';return;}
+    let state;
+    if(returnedState && returnedState!=='cancelled') state=await calendarRequest('/api/google-calendar/complete',{method:'POST',body:{state:returnedState}});
+    else state=await calendarRequest('/api/google-calendar');
+    if(closed)return;
+    function paint(message='') {
+      content.innerHTML=`<p>Keep shul events in a separate <strong>Lakewood Commons</strong> calendar in your Google account. Events have a navy color and titles starting with LC ·. You can change the color in Google.</p>
+        <p>New events, changes and deletions sync automatically, usually within a few minutes. Your personal appointments stay untouched. Changes made in Google do not update this website.</p>
+        <p>Only saved congregation events sync. Message previews and private admin notes are excluded.</p>
+        ${!state.available?'<p>The shul admin still needs to finish Google setup.</p>':state.connected?`<p><strong>${state.disconnecting?'Turning off sync and removing the shul calendar…':'Google Calendar sync is on'}</strong></p>
+        ${state.lastSyncedAt?`<p>Last synced: ${escape(new Date(state.lastSyncedAt).toLocaleString())}</p>`:''}
+        ${state.disconnecting?'':`<label>Event reminders<select data-google-reminders><option value="0">No reminders</option><option value="10">10 minutes before</option><option value="30">30 minutes before</option><option value="60">1 hour before</option><option value="1440">1 day before</option></select></label><p>Google delivers reminders according to your phone and Google settings.</p><button type="button" data-google-save>Save reminders</button><button type="button" data-google-off>Turn off and remove shul calendar</button>`}`:'<p>Google Calendar sync is off.</p><button type="button" class="cal-primary" data-google-connect>Connect Google Calendar</button>'}
+        ${state.disconnecting && state.error.includes('Reconnect')?'<p>Google permission has expired. Remove the Lakewood Commons calendar in Google to stop its existing reminders, then forget this connection here.</p><button type="button" data-google-forget>I removed it in Google. Forget connection.</button>':''}
+        ${state.connected?'<button type="button" data-google-refresh>Refresh connection status</button>':''}
+        <p role="status" aria-live="polite">${escape(message||state.error||(returnedState==='cancelled'?'Google connection cancelled.':''))}</p>`;
+      const select=content.querySelector('[data-google-reminders]');if(select)select.value=String(state.reminders);
+      const action=(selector,work)=>content.querySelector(selector)?.addEventListener('click',async()=>{
+        const buttons=content.querySelectorAll('button');buttons.forEach(b=>b.disabled=true);
+        try {await work();}catch(e){if(!closed)paint(e.message);}
+        finally{buttons.forEach(b=>b.disabled=false);}
+      });
+      action('[data-google-connect]',async()=>{
+        const result=await calendarRequest('/api/google-calendar/connect',{method:'POST',body:{}});
+        const target=new URL(result.url);
+        if(target.origin!=='https://accounts.google.com'||target.pathname!=='/o/oauth2/v2/auth')throw Error('Google returned an invalid connection link.');
+        location.assign(target.href);
+      });
+      action('[data-google-save]',async()=>{state=await calendarRequest('/api/google-calendar',{method:'PUT',body:{reminders:Number(select.value)}});if(!closed)paint('Reminder preference saved.');});
+      action('[data-google-off]',async()=>{
+        if(!confirm('Turn off sync and remove the Lakewood Commons calendar and its reminders from Google? Your personal appointments stay untouched.'))return;
+        state=await calendarRequest('/api/google-calendar',{method:'DELETE',body:{}});if(!closed)paint();
+      });
+      action('[data-google-forget]',async()=>{state=await calendarRequest('/api/google-calendar/forget',{method:'POST',body:{}});if(!closed)paint('Connection forgotten.');});
+      action('[data-google-refresh]',async()=>{state=await calendarRequest('/api/google-calendar');if(!closed)paint();});
+    }
+    paint();
+  } catch(e) {if(!closed)content.innerHTML=`<p role="status">${escape(e.message)}</p><p>If Google authorization has been revoked, remove the Lakewood Commons calendar in Google to stop its existing reminders.</p>`;}
+}
+
 // ==== ui/calendar-message-feeds.js ====
 function calendarMessageFeedInstructions(endpoint, key) {
   return `Lakewood Commons posted messages API\n\nPrivate text link:\n${endpoint}/api/v1/messages.txt?key=${key}\n\nJSON API:\nGET ${endpoint}/api/v1/messages\nAuthorization: Bearer ${key}\n\nOnly posted messages are included, never calendar events or account details.\nThe current week runs Sunday through Shabbos in America/New_York.\nMessages are selected by their Added date, oldest first.\nThe same link automatically moves to the new week on Sunday.\n\nText returns UTF-8 wording with line breaks, separated by a blank line.\nAn empty week returns an empty text response or an empty JSON messages array.\nJSON includes schemaVersion, timezone, week.start, week.end, generatedAt and messages.\nEach message has id, text, postedAt, updatedAt and revision. Text contains no HTML.\nRender with textContent or escaped text. Do not interpret messages as HTML.\n\nPoll about once per minute. After a successful response, replace your saved weekly\nlist so edits, deletions and the new week are reflected. Keep your existing list\non a network error. Treat 401 as a missing, invalid or revoked key, 405 as a wrong\nHTTP method, and 5xx as temporary failure. Retry temporary failures with backoff.\n\nA website backend can keep the key in a server secret and send the Authorization\nheader. Browser requests are supported with CORS. Anyone who has the private\nlink or a browser-visible key can read this week's posted messages.\nIt never grants editing, calendar events, accounts or older weeks.\nKeep the link out of public source and analytics. There is no fixed expiry.\nThe calendar owner can revoke it at Calendar access > Share messages.\n\nReading this API does not mark messages read or count as a calendar visit.\n`;
@@ -5211,6 +5318,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const congregation = standalone && congregationPreview;
   let simchaPreview = new URLSearchParams(location.search).get('simcha-preview') === '1';
   let messageEvents = [], simchaReview = [], simchaPreviewError = '';
+  const googleButton = () => endpoint && user && !previewing() ? '<button type="button" data-cal-google>Google Calendar</button>' : '';
   const previewToggle = () => `<button type="button" data-cal-simcha-preview>${simchaPreview ? 'Turn off simcha preview' : 'Preview simchos from messages'}</button>`;
   function toggleSimchaPreview() {
     simchaPreview = !simchaPreview; messageEvents = []; simchaReview = []; simchaPreviewError = '';
@@ -5389,9 +5497,10 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+previewToggle());
+    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+googleButton()+previewToggle());
     view.el.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',()=>{view.close();toggleSimchaPreview();});
     view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
+    view.el.querySelector('[data-cal-google]')?.addEventListener('click',()=>{view.close();openCalendarGoogle(dialog);});
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
@@ -5406,6 +5515,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     }
   }
   async function openCalendarSession(session) {
+    const googleReturn = /^#google-calendar=([a-f0-9]{64}|cancelled)$/.exec(location.hash);
+    if (googleReturn) {
+      history.replaceState(null,'',location.pathname+location.search);
+      setTimeout(()=>{if(!disposed&&user) openCalendarGoogle(dialog,googleReturn[1]);},0);
+    }
     user = session.user; reminderPublicKey = session.reminderPublicKey || '';
     reminderSchedules = session.reminderSchedules === true;
     eventAudienceDetails = session.eventAudienceDetails === true;
@@ -5500,8 +5614,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelectorAll('[data-cal-simcha-preview]').forEach(button=>button.addEventListener('click',toggleSimchaPreview));
     container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
-    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+previewToggle());
+    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+googleButton()+previewToggle());
     adminActions?.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',toggleSimchaPreview);
+    adminActions?.querySelector('[data-cal-google]')?.addEventListener('click',()=>openCalendarGoogle(dialog));
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);

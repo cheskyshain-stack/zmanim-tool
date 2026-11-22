@@ -26,7 +26,7 @@ test('relative days use original New York message date, including late UTC and e
  assert.equal(simchaFromMessage(message('Kiddush on 11/21/2026')).event.date,'2026-11-21');
 });
 test('unclear dates, conflicting occasions, time ranges, corrections and lengthy SMS wait for review',()=>{
- for(const text of ['Kiddush for Example','Vort 11/22','Bris 2026-02-30','Kiddush Shabbos 8:30','Vort tomorrow 8-9pm','Shalom Zachor Friday and Kiddush Shabbos','Vort tonight cancelled','Kiddush Friday and Shabbos','Bris tomorrow after Shacharis','Kiddush tomorrow '+ 'x'.repeat(4364),'No Kiddush this Shabbos','Kiddush this Shabbos?','Maybe a Bris tomorrow','Bris tonight at 12am'])assert.ok(simchaFromMessage(message(text)).reason,text.slice(0,60));
+ for(const text of ['Vort 11/22','Bris 2026-02-30','Kiddush Shabbos 8:30','Vort tomorrow 8-9pm','Shalom Zachor Friday and Kiddush Shabbos','Vort tonight cancelled','Kiddush Friday and Shabbos','Bris tomorrow after Shacharis','Kiddush tomorrow '+ 'x'.repeat(4364),'No Kiddush this Shabbos','Kiddush this Shabbos?','Maybe a Bris tomorrow','Bris tonight at 12am'])assert.ok(simchaFromMessage(message(text)).reason,text.slice(0,60));
  for(const text of ['Shiur Sunday at 8pm','Hespedim Motzai Shabbos 9pm','Kiddush Levana Sunday','General shul update'])assert.equal(simchaFromMessage(message(text)),null);
 });
 test('safe plain text and original details are preserved',()=>{
@@ -57,7 +57,7 @@ test('owner review supports uncertain dates, multiple simchos and retry-safe sav
  await assert.rejects(()=>reviewSimchaMessage(db,source.id,'add',fields,'owner',1,{operationId:'review-operation-789'}),/changed/);
 });
 test('skipped and stale reviews cannot overwrite a decision or create events',async()=>{
- const db=new Storage(),source=message('Bris for Example');await db.put('announcement:'+source.id,source);await syncSimchaMessage(db,source);
+ const db=new Storage(),source=message('Bris for Example, details to follow');await db.put('announcement:'+source.id,source);await syncSimchaMessage(db,source);
  await assert.rejects(()=>reviewSimchaMessage(db,source.id,'skip',null,'owner',2),/changed/);
  await reviewSimchaMessage(db,source.id,'skip',null,'owner',1);assert.equal((await syncSimchaMessage(db,source)).status,'skipped');assert.equal((await db.list({prefix:'event:'})).size,0);
 });
@@ -65,10 +65,41 @@ test('skipped and stale reviews cannot overwrite a decision or create events',as
 test('private browser preview derives events without changing saved events or source messages',async()=>{
  const {simchaMessagePreview}=await import('../js/calendar/simcha-message.js');
  const source=message('Shalom Zachor Friday night at 9pm');
- const unknown=message('Bris for Example',{id:'unknown-preview'});
+ const unknown=message('Bris for Example, details to follow',{id:'unknown-preview'});
  const before=JSON.stringify([source,unknown]);
  const preview=simchaMessagePreview([source,source,unknown]);
  assert.equal(preview.events.length,1);assert.equal(preview.review.length,1);assert.equal(preview.events[0].simchaPreview,true);assert.equal(preview.events[0].date,'2026-11-20');
  assert.equal(JSON.stringify([source,unknown]),before);
  assert.equal(simchaMessagePreview([source],[{...preview.events[0],id:'saved-original'}]).events.length,0);
+});
+
+test('implicit sent dates, Shabbos compounds, contextual clocks and location abbreviations',()=>{
+ const friday=message("M'T to R&M Example Smith on their son's Shmuel Aryeh Bar Mitzvah. Shacharis NS followed by Kiddush for MEN");
+ const parsed=simchaFromMessage(friday);assert.equal(parsed.event.date,'2026-11-21');assert.equal(parsed.event.type,'bar-mitzva-shabbos');assert.equal(parsed.event.time,'');assert.equal(parsed.event.location,'NS');assert.match(parsed.event.details,/R&M Example Smith/);assert.doesNotMatch(parsed.event.details,/^M'T/);
+ const morning=simchaFromMessage(message("Mazel Tov to R&M Example Smith on their son's Bar Mitzvah. Shacharis 8:30 in the Simcha Hall followed by Kiddush"));assert.equal(morning.event.time,'08:30');assert.equal(morning.event.date,'2026-11-21');
+ const dessert=simchaFromMessage(message('Rabbi & Mrs Example are making a Bar Mitzva for their son Shmuel Aryeh. Dessert reception 9:45 Tiferes Hall',{createdAt:'2026-11-18T01:27:00Z'}));assert.equal(dessert.event.date,'2026-11-17');assert.equal(dessert.event.time,'21:45');assert.equal(dessert.event.type,'bar-mitzva-dessert');
+ assert.equal(simchaFromMessage(message('Kiddush for Example')).event.date,'2026-11-21');
+ assert.equal(simchaFromMessage(message('Vort NOW at Example Hall')).event.date,'2026-11-20');
+ assert.equal(simchaFromMessage(message('Chasuna TONIGHT Example Hall. Chupah 7:30')).event.time,'19:30');
+});
+test('followups match family and child while distinct families remain separate',async()=>{
+ const {simchaMessagePreview}=await import('../js/calendar/simcha-message.js');
+ const a=message('Rabbi & Mrs Example are making a Bar Mitzva for their son Shmuel Aryeh. Dessert reception 9:45 Tiferes Hall',{id:'dessert-1'});
+ const b=message(a.text.replace('Example are','Example Smith are'),{id:'dessert-2',createdAt:'2026-11-20T18:05:00Z'});
+ const other=message(b.text.replace('Example Smith','Other Jones'),{id:'dessert-3'});
+ const preview=simchaMessagePreview([b,other,a]);assert.equal(preview.events.length,2);assert.equal(preview.review.length,0);assert.ok(preview.events.some(e=>e.details.includes('Example Smith')));
+ const db=new Storage();await syncSimchaMessage(db,a);await syncSimchaMessage(db,b);await syncSimchaMessage(db,other);assert.equal((await db.list({prefix:'event:'})).size,2);assert.ok([...(await db.list({prefix:'event:'})).values()].some(e=>e.details.includes('Example Smith')));
+ const original=message('Mazel tov R&M Example Smith on the engagement of their SON Yosef to Sarah Jones. Vort MONDAY 7:30pm Example Hall',{id:'vort-original',createdAt:'2026-11-14T18:00:00Z'});
+ const reminder=message(original.text.replace('MONDAY 7:30pm','NOW'),{id:'vort-reminder',createdAt:'2026-11-17T01:12:00Z'});
+ const vort=simchaMessagePreview([reminder,original]);assert.equal(vort.events.length,1);assert.equal(vort.events[0].time,'19:30');
+});
+
+test('generated event wording trims wishes without changing the original source or event facts',async()=>{
+ const {simchaEventWording,simchaMessagePreview}=await import('../js/calendar/simcha-message.js');
+ const source=message('Mazel Tov to Rabbi & Mrs Example Smith on the engagement of their SON Yosef to Sarah Jones. Vort TONIGHT 7:30pm Example Hall A May the Zivug Oleh Yafe');
+ const parsed=simchaFromMessage(source);assert.equal(parsed.text,source.text);assert.match(parsed.event.details,/Vort TONIGHT 7:30pm Example Hall/);assert.doesNotMatch(parsed.event.details,/May the|Mazel Tov/);assert.match(parsed.event.details,/Yosef to Sarah Jones/);assert.equal(parsed.event.time,'19:30');
+ assert.equal(simchaEventWording('Vort tonight Example Hall A. MTZOY'),'Vort tonight Example Hall A.');
+ assert.equal(simchaEventWording('Vort tonight. May the Zivug Oleh Yafe. Entrance at 120 Park Ave'),'Vort tonight. Entrance at 120 Park Ave');
+ const preview=simchaMessagePreview([source],[{...parsed.event,details:source.text,id:'saved-event'}]);assert.equal(preview.events.length,0);assert.equal(preview.review.length,0);
+ assert.equal(simchaEventWording('Bris tomorrow at 8:30am. May they be Zoche Legadlo Ltorah Lchupa Ulmassim Tovim'),'Bris tomorrow at 8:30am.');
 });
