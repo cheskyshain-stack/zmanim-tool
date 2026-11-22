@@ -103,11 +103,21 @@ export function calendarDetailsFields(details, original = {}) {
   return { title, location: '', description, details };
 }
 
+export const calendarIsLechaim = event => event.type === 'lechaim' || event.type === 'custom' && /^(?:le?chaim|l[’']chaim)$/iu.test((event.customCategory || '').trim());
+
+export function calendarDateInMonth(date, month, preferredDay = Number(date.slice(8))) {
+  if (!Number.isFinite(calendarSerial(date)) || !Number.isFinite(calendarSerial(month+'-01')) || !Number.isInteger(preferredDay) || preferredDay < 1 || preferredDay > 31) throw new Error('Choose a valid calendar date.');
+  const [year,number]=month.split('-').map(Number);
+  const last=new Date(Date.UTC(year,number,0)).getUTCDate();
+  return month+'-'+String(Math.min(preferredDay,last)).padStart(2,'0');
+}
+
 export function calendarEventsOn(events, date) {
-  return events.filter(item => item.date <= date && item.endDate >= date)
-    .sort((a, b) => (CALENDAR_TYPE_ORDER.get(a.type) ?? 99) - (CALENDAR_TYPE_ORDER.get(b.type) ?? 99)
+  return events.filter(item => !calendarIsLechaim(item) && item.date <= date && item.endDate >= date)
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
+      || (CALENDAR_TYPE_ORDER.get(a.type) ?? 99) - (CALENDAR_TYPE_ORDER.get(b.type) ?? 99)
       || (a.type === 'custom' && b.type === 'custom' ? (a.customCategory || '').localeCompare(b.customCategory || '') : 0)
-      || Number(b.allDay) - Number(a.allDay) || (a.time || a.endTime || '').localeCompare(b.time || b.endTime || '') || a.title.localeCompare(b.title));
+      || a.title.localeCompare(b.title));
 }
 
 // Calendar wording follows the supplied monthly-calendar examples. These labels

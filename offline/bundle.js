@@ -3834,11 +3834,21 @@ function calendarDetailsFields(details, original = {}) {
   return { title, location: '', description, details };
 }
 
+const calendarIsLechaim = event => event.type === 'lechaim' || event.type === 'custom' && /^(?:le?chaim|l[’']chaim)$/iu.test((event.customCategory || '').trim());
+
+function calendarDateInMonth(date, month, preferredDay = Number(date.slice(8))) {
+  if (!Number.isFinite(calendarSerial(date)) || !Number.isFinite(calendarSerial(month+'-01')) || !Number.isInteger(preferredDay) || preferredDay < 1 || preferredDay > 31) throw new Error('Choose a valid calendar date.');
+  const [year,number]=month.split('-').map(Number);
+  const last=new Date(Date.UTC(year,number,0)).getUTCDate();
+  return month+'-'+String(Math.min(preferredDay,last)).padStart(2,'0');
+}
+
 function calendarEventsOn(events, date) {
-  return events.filter(item => item.date <= date && item.endDate >= date)
-    .sort((a, b) => (CALENDAR_TYPE_ORDER.get(a.type) ?? 99) - (CALENDAR_TYPE_ORDER.get(b.type) ?? 99)
+  return events.filter(item => !calendarIsLechaim(item) && item.date <= date && item.endDate >= date)
+    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
+      || (CALENDAR_TYPE_ORDER.get(a.type) ?? 99) - (CALENDAR_TYPE_ORDER.get(b.type) ?? 99)
       || (a.type === 'custom' && b.type === 'custom' ? (a.customCategory || '').localeCompare(b.customCategory || '') : 0)
-      || Number(b.allDay) - Number(a.allDay) || (a.time || a.endTime || '').localeCompare(b.time || b.endTime || '') || a.title.localeCompare(b.title));
+      || a.title.localeCompare(b.title));
 }
 
 // Calendar wording follows the supplied monthly-calendar examples. These labels
@@ -4042,6 +4052,8 @@ const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replace(/[\p{
 /** Trim greetings and closing wishes only. Names, times, places and source messages stay intact. */
 function simchaEventWording(value) {
   return String(value || '')
+    .replace(/\br\s*&\s*m\b\.?/giu,'Rabbi & Mrs')
+    .replace(/\brabbi\s*(?:&|and)\s*mrs\.?\s+/giu,'Rabbi & Mrs ')
     .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu,'')
     .replace(/\bMTZOY\b[.!]?/giu,'')
     .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu,'')
@@ -4138,7 +4150,7 @@ function simchaRelation(a, b) {
   if (simchaTextKey(simchaEventWording(text(a))) === simchaTextKey(simchaEventWording(text(b)))) return 'same';
   const identity = e => {
     const t = text(e);
-    const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon)\b|[.!,\n]|$)/iu)?.[1] || '';
+    const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon|would)\b|[.!,\n]|$)/iu)?.[1] || '';
     const child = t.match(/\b(?:son|daughter)['’]?s?\s+(.+?)(?=\s+(?:bar|bas|to|dessert|vort|chasuna)\b|[.!,\n]|$)/iu)?.[1] || '';
     return {p:simchaTextKey(parent).split(' ').filter(Boolean),c:simchaTextKey(child)};
   };
@@ -5312,39 +5324,31 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false } = {}) {
+function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false, googleReturnState = '' } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
-  let simchaPreview = new URLSearchParams(location.search).get('simcha-preview') === '1';
-  let messageEvents = [], simchaReview = [], simchaPreviewError = '';
+  let messageEvents = [], simchaReview = [], messageEventError = '';
   const googleButton = () => endpoint && user && !previewing() ? '<button type="button" data-cal-google>Google Calendar</button>' : '';
-  const previewToggle = () => `<button type="button" data-cal-simcha-preview>${simchaPreview ? 'Turn off simcha preview' : 'Preview simchos from messages'}</button>`;
-  function toggleSimchaPreview() {
-    simchaPreview = !simchaPreview; messageEvents = []; simchaReview = []; simchaPreviewError = '';
-    const url = new URL(location.href);
-    simchaPreview ? url.searchParams.set('simcha-preview','1') : url.searchParams.delete('simcha-preview');
-    history.replaceState(null,'',url.pathname+url.search+url.hash);
-    loadEvents();
-  }
-  async function loadSimchaPreview(number) {
-    if(!simchaPreview || !endpoint || !user) return;
+  async function loadMessageEvents(number) {
+    if(!endpoint || !user) return;
     const messages = [], seen = new Set(); let cursor = null;
     try {
       for(let page=0;page<50;page++){
         const value = await calendarRequest('/api/announcements?view=congregation'+(cursor?'&cursor='+encodeURIComponent(cursor):''));
-        if(disposed || number !== requestNumber || !simchaPreview) return;
+        if(disposed || number !== requestNumber) return;
         for(const message of value.messages || []) if(!seen.has(message.id)){seen.add(message.id);messages.push(message);}
         if(!value.nextCursor) break;
         if(value.nextCursor===cursor) throw Error('The message list changed. Refresh the calendar.');
         cursor=value.nextCursor;
-        if(page===49) throw Error('There are too many messages for one preview.');
+        if(page===49) throw Error('There are too many messages to load at once.');
       }
       const result=simchaMessagePreview(messages,events);
-      messageEvents=result.events;simchaReview=result.review;simchaPreviewError='';
-    }catch(error){if(disposed||number!==requestNumber)return;messageEvents=[];simchaReview=[];if(error.status===401)throw error;simchaPreviewError=error.message;}
+      messageEvents=result.events;simchaReview=result.review;messageEventError='';
+    }catch(error){if(disposed||number!==requestNumber)return;messageEvents=[];simchaReview=[];if(error.status===401)throw error;messageEventError=error.message;}
   }
   let today = calendarISO(shulNow(new Date(), settings).serial);
+  let preferredDay = Number(today.slice(8));
   let month = today.slice(0, 7), selected = today, events = [], endpoint = '', user = null, previewRole = congregationPreview ? 'viewer' : 'owner';
   let reminderPublicKey = '', reminderSchedules = false, eventAudienceDetails = false, messageAlerts = false;
   let disposed = false, requestNumber = 0, busy = false, examples = false, storageError = '', loadError = '', note = '', registering = false;
@@ -5424,7 +5428,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
-  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents(), ...(simchaPreview ? messageEvents : [])];
+  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents(), ...messageEvents];
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -5436,7 +5440,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   function eventCard(event) {
     const type = calendarEventCategory(event), adminsOnly = event.visibility === 'admins', editable = canEdit(event);
     const shared = calendarCongregationDetails(event), admin = reader() ? '' : calendarAdminDetails(event);
-    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">Message preview</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
+    return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">From message</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
       ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
       ${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
@@ -5480,7 +5484,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
       const next = event.target.value; close(); previewRole = next;
       clearReaderCache();
-      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; }
+      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; preferredDay = Number(today.slice(8)); }
       loadEvents();
     });
   }
@@ -5497,8 +5501,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+googleButton()+previewToggle());
-    view.el.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',()=>{view.close();toggleSimchaPreview();});
+    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+googleButton());
     view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
     view.el.querySelector('[data-cal-google]')?.addEventListener('click',()=>{view.close();openCalendarGoogle(dialog);});
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
@@ -5515,7 +5518,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     }
   }
   async function openCalendarSession(session) {
-    const googleReturn = /^#google-calendar=([a-f0-9]{64}|cancelled)$/.exec(location.hash);
+    const googleReturn = /^([a-f0-9]{64}|cancelled)$/.exec(googleReturnState);
+    googleReturnState='';
     if (googleReturn) {
       history.replaceState(null,'',location.pathname+location.search);
       setTimeout(()=>{if(!disposed&&user) openCalendarGoogle(dialog,googleReturn[1]);},0);
@@ -5540,6 +5544,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     reminderEventId = '';
     const requested = Number.isFinite(calendarSerial(target)) && dateAllowed(target);
     if (requested) { month = target.slice(0, 7); selected = target; }
+    preferredDay = Number(selected.slice(8));
     const loading = loadEvents();
     if (calendarRefresh?.focus) container.querySelector('[data-cal-refresh]')?.focus({ preventScroll: true });
     await loading;
@@ -5592,9 +5597,10 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" title="Open Schedule messages">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
       ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
       ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
-      ${simchaPreview ? `<div class="cal-preview-banner" data-cal-simcha-banner><strong>Simchos from messages: preview</strong><span>Only on this device. No calendar events are saved. ${simchaPreviewError ? calEscape(simchaPreviewError) : `${messageEvents.length} suggested events. ${simchaReview.length} messages need review.`}</span><button type="button" data-cal-simcha-preview>Exit preview</button>${simchaReview.length ? '<button type="button" data-cal-simcha-unclear>Review unclear messages</button>' : ''}</div>` : ''}
+      ${messageEventError ? `<p class="cal-error" role="status">Events from messages could not be loaded: ${calEscape(messageEventError)}</p>` : ''}
+      ${user?.role === 'owner' && !congregation && !previewing() && simchaReview.length ? `<div class="cal-preview-banner" data-cal-simcha-review><span>${simchaReview.length} messages need review.</span><button type="button" data-cal-simcha-unclear>Review unclear messages</button></div>` : ''}
       <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><button type="button" class="cal-reader-refresh" data-cal-refresh aria-label="Refresh calendar" title="Refresh calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>${announcements.markup({ label: 'Messages', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
-        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div><button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button><p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
+        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div>${isReader ? `<span class="cal-month-title">${calEscape(info.title)}</span>` : `<button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button>`}<p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
           const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
@@ -5608,14 +5614,12 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
         ${isReader ? `<p class="cal-reader-status cal-error" role="status" aria-live="polite">${calEscape(storageError || note)}</p>` : `<footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${role() === 'owner' ? 'Main admin' : role() === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>`}
       </section>${isReader ? '' : `<p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>`}${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
     container.querySelectorAll('[data-cal-step]').forEach(button => button.addEventListener('click', () => changeMonth(calendarStepMonth(month, Number(button.dataset.calStep)))));
-    container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; changeMonth(today.slice(0, 7), false); });
-    container.querySelector('[data-cal-jump]').addEventListener('click', chooseMonth);
+    container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; preferredDay = Number(today.slice(8)); changeMonth(today.slice(0, 7), false); });
+    container.querySelector('[data-cal-jump]')?.addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
-    container.querySelectorAll('[data-cal-simcha-preview]').forEach(button=>button.addEventListener('click',toggleSimchaPreview));
     container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
-    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+googleButton()+previewToggle());
-    adminActions?.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',toggleSimchaPreview);
+    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+googleButton());
     adminActions?.querySelector('[data-cal-google]')?.addEventListener('click',()=>openCalendarGoogle(dialog));
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
@@ -5625,7 +5629,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     container.querySelector('[data-cal-signout]')?.addEventListener('click', signOut);
     container.querySelectorAll('[data-cal-day]').forEach(button => {
       button.addEventListener('click', () => {
-        selected = button.dataset.calDay; redraw();
+        selected = button.dataset.calDay; preferredDay = Number(selected.slice(8)); redraw();
         if (reader() || matchMedia('(max-width: 700px)').matches) openDay(selected);
       });
       button.addEventListener('keydown', event => {
@@ -5634,6 +5638,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
         if (!(event.key in offsets)) return;
         event.preventDefault(); selected = calendarISO(calendarSerial(button.dataset.calDay) + offsets[event.key]);
         if (!dateAllowed(selected)) { selected = button.dataset.calDay; return; }
+        preferredDay = Number(selected.slice(8));
         if (!info.days.some(day => day.iso === selected)) changeMonth(selected.slice(0, 7), false);
         else redraw();
         container.querySelector(`[data-cal-day="${selected}"]`)?.focus({ preventScroll: true });
@@ -5665,7 +5670,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       }
       if (disposed || number !== requestNumber) return;
     }
-    month = next; if (reset) selected = month + '-01'; note = ''; await loadEvents();
+    month = next; if (reset) selected = calendarDateInMonth(selected, month, preferredDay); note = ''; await loadEvents();
   }
   function clearReaderCache() { cacheEpoch++; cancelAnimationFrame(swipeFrame); swipeFrame = 0; readerCache.clear(); readerPending.clear(); }
   async function monthEvents(value) {
@@ -5744,13 +5749,12 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
-    if (saved && performance.now() - saved.at < 30000 && !simchaPreview) { prefetchMonths(); return; }
     try {
       const values = await (isReader ? readerMonth(month) : monthEvents(month));
       if (disposed || number !== requestNumber) return;
       events = values;
       messageEvents=[];simchaReview=[];
-      await loadSimchaPreview(number);
+      await loadMessageEvents(number);
       if (isReader) prefetchMonths();
     } catch (error) {
       if (disposed || number !== requestNumber) return;
@@ -5847,7 +5851,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
         }
         saving = true; form.querySelector('[type=submit]').disabled = true; status.textContent = 'Saving…';
         await saveEvent(draft); saving = false; initial = new URLSearchParams(new FormData(form)).toString(); view.close();
-        selected = next.date; note = 'Event saved.';
+        selected = next.date; preferredDay = Number(selected.slice(8)); note = 'Event saved.';
         if (month !== next.date.slice(0, 7)) { month = next.date.slice(0, 7); await loadEvents(); } else redraw();
       } catch (error) { saving = false; form.querySelector('[type=submit]').disabled = false; status.textContent = error.message; }
     });
@@ -5973,7 +5977,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const now = calendarISO(shulNow(new Date(), settings).serial);
     if (now !== today && container.querySelector('.shul-calendar')) {
       today = now;
-      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; loadEvents(); }
+      if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; preferredDay = Number(today.slice(8)); loadEvents(); }
       else if (reader()) loadEvents();
       else redraw();
     }

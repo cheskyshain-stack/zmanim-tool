@@ -21,6 +21,8 @@ export const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replac
 /** Trim greetings and closing wishes only. Names, times, places and source messages stay intact. */
 export function simchaEventWording(value) {
   return String(value || '')
+    .replace(/\br\s*&\s*m\b\.?/giu,'Rabbi & Mrs')
+    .replace(/\brabbi\s*(?:&|and)\s*mrs\.?\s+/giu,'Rabbi & Mrs ')
     .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu,'')
     .replace(/\bMTZOY\b[.!]?/giu,'')
     .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu,'')
@@ -117,7 +119,7 @@ export function simchaRelation(a, b) {
   if (simchaTextKey(simchaEventWording(text(a))) === simchaTextKey(simchaEventWording(text(b)))) return 'same';
   const identity = e => {
     const t = text(e);
-    const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon)\b|[.!,\n]|$)/iu)?.[1] || '';
+    const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon|would)\b|[.!,\n]|$)/iu)?.[1] || '';
     const child = t.match(/\b(?:son|daughter)['’]?s?\s+(.+?)(?=\s+(?:bar|bas|to|dessert|vort|chasuna)\b|[.!,\n]|$)/iu)?.[1] || '';
     return {p:simchaTextKey(parent).split(' ').filter(Boolean),c:simchaTextKey(child)};
   };

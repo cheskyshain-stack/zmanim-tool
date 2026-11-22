@@ -134,10 +134,10 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await page.locator('[data-cal-day="2026-12-31"]').click(); await page.keyboard.press('Escape');
         await page.locator('[data-cal-day="2026-12-31"]').focus(); await page.keyboard.press('ArrowRight');
         assert.equal(await page.locator('[data-cal-day][aria-pressed="true"]').getAttribute('data-cal-day'), '2026-12-31');
-        await page.locator('[data-cal-jump]').click();
-        assert.equal(await page.locator('[name=month]').getAttribute('min'), '2026-10'); assert.equal(await page.locator('[name=month]').getAttribute('max'), '2026-12');
-        await page.locator('[name=month]').fill('2027-01'); await page.locator('.cal-dialog form').evaluate(form => form.dispatchEvent(new Event('submit', { cancelable:true, bubbles:true })));
-        await page.getByText('Choose last month, this month or next month.', { exact:true }).waitFor(); await page.keyboard.press('Escape');
+        assert.equal(await page.locator('[data-cal-jump]').count(),0);
+        await page.locator('.cal-month-title').click();assert.equal(await page.getByRole('dialog').count(),0,'Month heading is plain text');
+        await page.locator('[data-cal-step="-1"]').click();await page.locator('[data-cal-day="2026-11-30"].is-selected').waitFor();
+        await page.locator('[data-cal-step="1"]').click();await page.locator('[data-cal-day="2026-12-31"].is-selected').waitFor();
         await page.locator('[data-cal-today]').click(); await page.locator('[data-cal-day="2026-11-10"]:not([disabled])').waitFor();
         const saturday = page.locator('td.cal-shabbos:not(.cal-outside) [data-cal-day]').first();
         await saturday.click(); await page.locator('.cal-dialog .cal-event-card').first().waitFor(); assert.equal(await page.locator('.cal-dialog .cal-event-card').count(), 8);
@@ -147,9 +147,9 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Schedule messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
         await page.locator('[data-cal-step="-1"]').click(); await page.locator('[data-cal-day="2026-10-01"]:not([disabled])').waitFor(); assert(await page.locator('[data-cal-step="-1"]').isDisabled());
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();
-        await page.getByRole('link', { name:'Back to Home' }).click(); await page.locator('.luach-coming-soon-card').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
-        assert(await page.getByRole('button', { name:'Community calendar, coming soon' }).isDisabled());
-        assert.equal(await page.locator('.luach-coming-soon-card').evaluate(card => getComputedStyle(card).backgroundColor), 'rgb(236, 238, 239)');
+        await page.getByRole('link', { name:'Back to Home' }).click(); await page.locator('[data-community-calendar]').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
+        assert(await page.getByRole('link',{name:'Community calendar Simchos & shul events'}).isEnabled());
+        assert.equal(await page.locator('[data-community-calendar]').getAttribute('href'),'/admin/calendar/?view=congregation');
         for (const width of [320,375,393,1440]) { await page.setViewportSize({ width, height:900 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await page.screenshot({ path:path.join(output, 'home-coming-soon-' + width + '.png'), fullPage:true }); }
         await page.goBack(); await page.locator('[data-cal-options]').waitFor(); await page.locator('[data-cal-options]').click(); await page.getByRole('button', { name:'Sign out', exact:true }).click();
         await page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();

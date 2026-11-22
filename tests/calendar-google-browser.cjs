@@ -12,6 +12,7 @@ const server=http.createServer((req,res)=>{
  if(url.pathname==='/data/calendar.json')return json({endpoint:origin});
  if(url.pathname.startsWith('/api/')){
   if(url.pathname==='/api/info')return json({googleCalendar:true});
+  if(url.pathname==='/api/google-calendar/complete'){writes.push(req.url);return json(googleState);}
   if(url.pathname==='/api/google-calendar'){
    if(req.method==='GET')return json(googleState);
    writes.push(req.url);let body='';req.on('data',chunk=>body+=chunk);req.on('end',()=>{
@@ -44,15 +45,13 @@ const server=http.createServer((req,res)=>{
    await page.addInitScript(user=>{const session={user,token:'a'.repeat(64),expires:Date.now()+86400000};sessionStorage.setItem('lakewood-commons-calendar-session-v1',JSON.stringify(session));localStorage.setItem('zmanim-nocount','1');},user);
    await page.route('**/*',r=>r.request().url().startsWith(origin+'/')||r.request().url().startsWith('data:')?r.continue():r.abort());
    resetGoogle();
-   await page.goto(origin+'/admin/calendar/');
-   await page.locator('[data-cal-options]').click();
-   await page.getByRole('dialog').getByRole('button',{name:'Google Calendar',exact:true}).click();
+   await page.goto(origin+'/admin/calendar/#google-calendar='+'b'.repeat(64));
    const dialog=page.getByRole('dialog');
    await dialog.locator('[data-google-reminders]').waitFor();
    await dialog.locator('[data-google-reminders]').selectOption('30');
    await dialog.getByRole('button',{name:'Save reminders',exact:true}).click();
    await dialog.getByText('Reminder preference saved.',{exact:true}).waitFor();
-   assert.equal(googleState.reminders,30);
+   assert.equal(googleState.reminders,30);assert.equal(new URL(page.url()).hash,'','One-use return state is cleared');
    await page.evaluate(()=>document.fonts.ready);
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No page overflow');
    const bounds=await dialog.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=width+1,'Dialog fits viewport');
@@ -64,7 +63,7 @@ const server=http.createServer((req,res)=>{
    await dialog.locator('[data-cal-close]').click();
    await page.close();
   }
-  assert.equal(writes.length,4);assert.ok(writes.every(path=>path==='/api/google-calendar'),'No event or message writes');assert.deepEqual(errors,[]);
+  assert.equal(writes.length,6);assert.ok(writes.every(path=>path==='/api/google-calendar'||path==='/api/google-calendar/complete'),'No event or message writes');assert.deepEqual(errors,[]);
   console.log('Google controls passed on phone and desktop: reader access, separate reminder preference, confirmed disconnect, reconnect button and safe layout. Screenshots: '+out);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

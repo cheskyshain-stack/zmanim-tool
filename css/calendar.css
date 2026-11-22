@@ -281,6 +281,7 @@
 .is-cal-congregation .cal-month-nav { flex:1; min-width:0; gap:6px; }
 .is-cal-congregation .cal-month-nav > div { position:relative; height:48px; }
 .is-cal-congregation .cal-month-title { width:100%; min-height:48px; padding:0 0 16px; font-size:clamp(16px,4.7vw,22px); white-space:nowrap; }
+.is-cal-congregation span.cal-month-title { display:flex; align-items:center; justify-content:center; box-sizing:border-box; }
 .is-cal-congregation .cal-month-nav p { position:absolute; bottom:1px; left:0; right:0; min-height:0; margin:0; font-size:11px; line-height:14px; pointer-events:none; }
 .is-cal-congregation .cal-month-nav > button { border-radius:12px; }
 .is-cal-congregation .cal-toolbar > button { padding:.45rem .6rem; font-size:.75rem; border-radius:12px; background:#f4eedf; border-color:#dfd2ad; }

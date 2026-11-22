@@ -418,3 +418,14 @@ Generated event wording removes opening greetings and explicit closing wishes su
 as May the Zivug Oleh Yafe, MTZOY and May they be Zoche Legadlo Ltorah Lchupa
 Ulmassim Tovim. It retains names, time, location and all substantive information;
 the posted message and private source receipt retain the complete original wording.
+
+The official homepage now links to the authenticated congregation calendar in one
+click. Legacy congregation preview URLs still work. Recent message events appear
+by default, deduplicated against saved events, without enabling a preview. This is
+read-only derivation and does not persist source events or extend message retention.
+Known times sort before untimed entries and across categories, earliest first.
+Lechaim records are excluded from calendar presentation and Google export, including
+previously stored custom Lechaim records. Existing source messages stay unchanged.
+R&M expands to Rabbi & Mrs in generated wording. The congregation month title no
+longer opens a chooser. Month navigation retains the selected day, clamps shorter
+months and remembers the preferred day when returning to a longer month.

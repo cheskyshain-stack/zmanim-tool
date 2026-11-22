@@ -75,7 +75,7 @@ test('private browser preview derives events without changing saved events or so
 
 test('implicit sent dates, Shabbos compounds, contextual clocks and location abbreviations',()=>{
  const friday=message("M'T to R&M Example Smith on their son's Shmuel Aryeh Bar Mitzvah. Shacharis NS followed by Kiddush for MEN");
- const parsed=simchaFromMessage(friday);assert.equal(parsed.event.date,'2026-11-21');assert.equal(parsed.event.type,'bar-mitzva-shabbos');assert.equal(parsed.event.time,'');assert.equal(parsed.event.location,'NS');assert.match(parsed.event.details,/R&M Example Smith/);assert.doesNotMatch(parsed.event.details,/^M'T/);
+ const parsed=simchaFromMessage(friday);assert.equal(parsed.event.date,'2026-11-21');assert.equal(parsed.event.type,'bar-mitzva-shabbos');assert.equal(parsed.event.time,'');assert.equal(parsed.event.location,'NS');assert.match(parsed.event.details,/Rabbi & Mrs Example Smith/);assert.doesNotMatch(parsed.event.details,/^M'T/);
  const morning=simchaFromMessage(message("Mazel Tov to R&M Example Smith on their son's Bar Mitzvah. Shacharis 8:30 in the Simcha Hall followed by Kiddush"));assert.equal(morning.event.time,'08:30');assert.equal(morning.event.date,'2026-11-21');
  const dessert=simchaFromMessage(message('Rabbi & Mrs Example are making a Bar Mitzva for their son Shmuel Aryeh. Dessert reception 9:45 Tiferes Hall',{createdAt:'2026-11-18T01:27:00Z'}));assert.equal(dessert.event.date,'2026-11-17');assert.equal(dessert.event.time,'21:45');assert.equal(dessert.event.type,'bar-mitzva-dessert');
  assert.equal(simchaFromMessage(message('Kiddush for Example')).event.date,'2026-11-21');
@@ -102,4 +102,11 @@ test('generated event wording trims wishes without changing the original source 
  assert.equal(simchaEventWording('Vort tonight. May the Zivug Oleh Yafe. Entrance at 120 Park Ave'),'Vort tonight. Entrance at 120 Park Ave');
  const preview=simchaMessagePreview([source],[{...parsed.event,details:source.text,id:'saved-event'}]);assert.equal(preview.events.length,0);assert.equal(preview.review.length,0);
  assert.equal(simchaEventWording('Bris tomorrow at 8:30am. May they be Zoche Legadlo Ltorah Lchupa Ulmassim Tovim'),'Bris tomorrow at 8:30am.');
+});
+
+test('Rabbi and Mrs wording is consistent and saved short entries match original invitation text',async()=>{
+ const {simchaEventWording,simchaRelation}=await import('../js/calendar/simcha-message.js');
+ for(const text of ['R&M Example Smith','R & M Example Smith','Rabbi and Mrs Example Smith','Rabbi & Mrs. Example Smith']) assert.equal(simchaEventWording(text),'Rabbi & Mrs Example Smith');
+ const source=simchaFromMessage(message('Mazel Tov! Rabbi & Mrs Example Smith would like to be moidea the oilam that they are making a Bris TOMORROW Shacharis 7:10 NS')).event;
+ const saved={...source,details:'Rabbi & Mrs Example Smith\nBris. Shacharis 7:10 AM, NS.'};assert.equal(simchaRelation(source,saved),'same');
 });

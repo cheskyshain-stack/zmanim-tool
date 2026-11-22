@@ -1,3 +1,4 @@
+import { calendarIsLechaim } from '../../js/calendar/model.js';
 import { shiftDate } from '../traffic-calendar.js';
 const scope = 'https://www.googleapis.com/auth/calendar.app.created';
 const apiRoot = 'https://www.googleapis.com/calendar/v3';
@@ -160,7 +161,7 @@ export async function runGoogleSync(storage,env,now=Date.now(),send=fetch) {
       }
       const all=await storage.list({prefix:'event:'});
       // Only congregation-visible source events are ever copied, including for the owner.
-      const events=[...all.values()].filter(e=>!e.deletedAt&&e.visibility!=='admins');
+      const events=[...all.values()].filter(e=>!e.deletedAt&&!calendarIsLechaim(e)&&e.visibility!=='admins');
       const wanted=new Set(events.map(e=>e.id));
       let writes=0,pending=false;
       for(const event of events) {

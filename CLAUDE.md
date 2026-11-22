@@ -1129,23 +1129,25 @@ necessary instead of splitting a word. Very short windows keep labels that canno
 fit without overlap in their day dialogs. Measure calendar controls separately from
 row space so the heading never stretches or crowds the dates. `tests/calendar-congregation.cjs` checks fitting,
 whole words, eight-event Shabbos dates, month limits, rollover and the homepage.
-The homepage puts the gray Community calendar card after Donate, with the same
-width and height as its other cards. Keep Coming soon and its inert appearance.
-Ordinary single/double clicks do nothing. Three quick clicks or taps (within 750ms
-of each other and 1.5 seconds overall) open `/admin/calendar/?preview=congregation`.
-Use aria-disabled instead of native disabled so touch/click events can reach this
-hidden action; cancelled or interrupted gestures reset it. Do not advertise it as
-a public link. The destination retains normal calendar authentication and always
-shows the congregation experience, including for an owner or editor. Hide Preview,
-View as, editing, account management and Schedule messages from this screen and its
-dialogs. Actual server roles stay unchanged; management remains on the admin page.
-Reading announcements here records only that signed-in account's reads and opens,
-so the badge shows unread messages, hides at zero and updates for new posts. This
-is distinct from the main admin's explicit View as preview, which remains inert
-and never changes read markers. The query cannot grant ownership or bypass sign-in.
-`tests/calendar-home-preview.cjs` checks card order/geometry, mouse/touch gestures,
-sign-in, role preservation, congregation-only controls, visible-message read counts
-and unchanged read-only admin previews.
+The homepage's official Community calendar card follows Donate and opens
+`/admin/calendar/?view=congregation` with one click or tap. It uses the same active
+card appearance and geometry as its neighbors, with Simchos & shul events below
+its title. Coming soon and the hidden three-tap calendar gesture are removed.
+Keep the legacy `?preview=congregation` destination compatible. Both routes require
+normal calendar sign-in and show the congregation experience even to owners and
+editors, without exposing editor/account controls or changing actual server roles.
+The separate main admin View as preview remains inert for announcement reads.
+Clear simcha events derived from the authenticated recent message feed appear by
+default beside saved events, without a preview toggle or banner. Deduplicate against
+saved events; do not auto-save from the browser or mark messages read while deriving
+calendar entries. Ambiguous proposals remain owner-only. Message-derived entries
+are labelled From message and do not get edit or reminder controls. They depend on
+the current feed history until the existing backend import is deployed; saved events
+remain durable independently. Do not claim derived entries were saved permanently.
+Generated event wording expands R&M consistently to Rabbi & Mrs, preserving the
+original posted message and its date. Historical additions use saved normal events.
+`tests/calendar-home-preview.cjs` checks the official homepage link, authentication,
+role preservation, congregation controls and announcement behavior.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport
 so a keyboard does not cover the focused field. Preserve month-arrow position/focus.
 Calendar cells keep the English number at the top left and the unpunctuated Hebrew
@@ -2028,3 +2030,13 @@ see the lock back on.
 They test on an Android phone as well as a desktop, so mobile is not an afterthought.
 And they are direct: if they say a fix did not work, believe them and go measure, rather
 than re-explaining why it should have.
+
+
+Calendar refinements approved November 21, 2026: Lechaim notices are excluded from
+calendar entries, including legacy custom Lechaim records; keep original messages.
+Day details and grid events sort by known start time across categories, earliest
+first. Untimed entries follow, with category/title used only to break ties.
+The congregation month heading is plain text with no month chooser, since only the
+three allowed months are available. Arrows, swipes and horizontal scrolling retain
+the selected day number and clamp short months; keep the preferred day when moving
+back to a longer month. An explicit date selection or Today resets that preference.

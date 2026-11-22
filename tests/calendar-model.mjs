@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { resolveSettings } from '../js/settings.js';
-import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn } from '../js/calendar/model.js';
+import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarClock, calendarMonth, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths, calendarEvent, calendarEventsOn, calendarDateInMonth } from '../js/calendar/model.js';
 import { calendarReadPreview, calendarWritePreview, CALENDAR_STORAGE_KEY } from '../js/calendar/storage.js';
 import { calendarSessionExpiration } from '../worker/calendar/session-expiration.js';
 import { calendarReminderDate } from '../js/calendar/reminder-date.js';
@@ -144,16 +144,16 @@ test('event validation rejects impossible dates and times and allowlists fields'
   assert(!('createdBy' in value)); assert(value.title.startsWith('<img')); assert(value.description.includes('\n'));
 });
 
-test('multi-day events are inclusive and daily lists put all-day entries before timed entries', () => {
+test('multi-day events are inclusive and daily lists put timed entries in start order', () => {
   const list = [event({ allDay: false, time: '19:00', title: 'Evening' }), event({ title: 'All day' }), event({ allDay: false, time: '08:30', title: 'Morning' }), event({ date: '2026-11-06', endDate: '2026-11-08', title: 'Three days' })];
-  assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['All day', 'Three days', 'Morning', 'Evening']);
+  assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['Morning', 'Evening', 'All day', 'Three days']);
   assert.equal(calendarEventsOn(list, '2026-11-08').length, 1); assert.equal(calendarEventsOn(list, '2026-11-09').length, 0);
 });
 
-test('daily events group matching categories, named custom groups and times without changing saved order', () => {
+test('daily events sort across categories by start time without changing saved order', () => {
   const list = [event({ type:'kiddush', title:'Late Kiddush', allDay:false, time:'13:00' }), event({ type:'custom', customCategory:'Learning', title:'Learning later', allDay:false, endTime:'21:00' }), event({ type:'shalom-zachor', title:'Shalom Zachor' }), event({ type:'kiddush', title:'Early Kiddush', allDay:false, time:'11:00' }), event({ type:'custom', customCategory:'Community', title:'Community event' }), event({ type:'kiddush', title:'Untimed Kiddush' }), event({ type:'custom', customCategory:'Learning', title:'Learning first', allDay:false, time:'19:00' })];
   const original = JSON.stringify(list);
-  assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['Shalom Zachor','Untimed Kiddush','Early Kiddush','Late Kiddush','Community event','Learning first','Learning later']);
+  assert.deepEqual(calendarEventsOn(list, '2026-11-07').map(value => value.title), ['Early Kiddush','Late Kiddush','Learning first','Shalom Zachor','Untimed Kiddush','Community event','Learning later']);
   assert.equal(JSON.stringify(list), original);
 });
 
@@ -229,4 +229,16 @@ test('congregation month limits follow the current month across years and calend
   assert.deepEqual(calendarReaderMonths('1900-01-01'), { first:'1900-01', current:'1900-01', last:'1900-02' });
   assert.deepEqual(calendarReaderMonths('2299-12-31'), { first:'2299-11', current:'2299-12', last:'2299-12' });
   assert.throws(() => calendarReaderMonths('2026-02-30'), /valid calendar date/);
+});
+
+test('morning brises precede an evening chasuna regardless of category order',()=>{
+ const list=[event({type:'wedding',title:'Wedding',allDay:false,time:'19:30'}),event({type:'custom',customCategory:'Bris',title:'Second bris',allDay:false,time:'08:00'}),event({type:'custom',customCategory:'Bris',title:'First bris',allDay:false,time:'07:10'}),event({type:'custom',customCategory:'Lechaim',title:'Lechaim'})];
+ assert.deepEqual(calendarEventsOn(list,'2026-11-07').map(e=>e.title),['First bris','Second bris','Wedding']);
+});
+test('month navigation retains the preferred day and clamps only short months',()=>{
+ assert.equal(calendarDateInMonth('2026-11-21','2026-12'),'2026-12-21');
+ assert.equal(calendarDateInMonth('2027-01-31','2027-02'),'2027-02-28');
+ assert.equal(calendarDateInMonth('2027-02-28','2027-03',31),'2027-03-31');
+ assert.equal(calendarDateInMonth('2028-01-31','2028-02'),'2028-02-29');
+ assert.throws(()=>calendarDateInMonth('invalid','2027-02'),/valid/);
 });

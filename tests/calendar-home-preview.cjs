@@ -46,9 +46,9 @@ const server = http.createServer((req, res) => {
       });
       const page = await context.newPage(); page.on('pageerror', error => errors.push(error.message));
       await page.clock.setFixedTime(new Date('2026-11-06T16:00:00Z'));
-      const home = async () => { await page.goto(origin + '/?count=off'); await page.locator('[data-calendar-preview]').waitFor(); await page.evaluate(() => document.fonts.ready); };
+      const home = async () => { await page.goto(origin + '/?count=off'); await page.locator('[data-community-calendar]').waitFor(); await page.evaluate(() => document.fonts.ready); };
       const tap = async (count = 1) => {
-        const card = page.locator('[data-calendar-preview]'); await card.evaluate(el => el.scrollIntoView({ block:'center', behavior:'instant' }));
+        const card = page.locator('[data-community-calendar]'); await card.evaluate(el => el.scrollIntoView({ block:'center', behavior:'instant' }));
         const b = await card.boundingBox(), x = b.x + b.width / 2, y = b.y + b.height / 2;
         for (let i = 0; i < count; i++) touch ? await page.touchscreen.tap(x, y) : await page.mouse.click(x, y);
       };
@@ -65,9 +65,9 @@ const server = http.createServer((req, res) => {
         }));
         assert.deepEqual(cards.map(card => card.title), ['Zmanim','Donate','Community calendar']);
         assert(cards.every(card => Math.abs(card.width - cards[0].width) < 1 && Math.abs(card.height - cards[0].height) < 1), JSON.stringify({ width, date, cards }));
-        assert(cards[2].titleFits); assert.equal(cards[2].colour, 'rgb(236, 238, 239)');
-        assert(await t.page.locator('[data-calendar-preview]').isDisabled(), 'Placeholder still announces disabled semantics');
-        assert.equal(await t.page.locator('.luach-menu a[href*="calendar"]').count(), 0);
+        assert(cards[2].titleFits); assert.equal(cards[2].colour, cards[0].colour);
+        assert(!(await t.page.locator('[data-community-calendar]').isDisabled()), 'Official calendar link is active');
+        assert.equal(await t.page.locator('.luach-menu a[href*="calendar"]').count(), 1);
         assert(await t.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
         await t.page.evaluate(() => scrollTo(0,0));
         await t.page.screenshot({ path:path.join(output, width + '-' + date.slice(0,10) + '.png'), fullPage:true });
@@ -77,30 +77,12 @@ const server = http.createServer((req, res) => {
     }
     for (const touch of [false, true]) {
       const t = await prepare({ touch });
-      await t.home(); await t.tap(); assert.equal(new URL(t.page.url()).pathname, '/');
-      await t.home(); await t.tap(2); assert.equal(new URL(t.page.url()).pathname, '/');
-      assert.equal(await t.page.locator('[data-calendar-preview]').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(236, 238, 239)');
-      await t.home(); await t.tap(); await t.page.waitForTimeout(800); await t.tap(); await t.page.waitForTimeout(800); await t.tap();
-      assert.equal(new URL(t.page.url()).pathname, '/', 'Separated clicks must not add up to the preview gesture');
-      await t.home(); await t.tap(2); await t.page.locator('[data-calendar-preview]').dispatchEvent('pointercancel'); await t.tap();
-      assert.equal(new URL(t.page.url()).pathname, '/', 'A cancelled touch/scroll resets the gesture');
-      await t.home(); await t.tap(2);
-      const outside = t.page.locator('.luach-next-head').first();
-      await outside.evaluate(el => el.scrollIntoView({ block:'center', behavior:'instant' }));
-      const outsideBox = await outside.boundingBox();
-      const outsideX = outsideBox.x + outsideBox.width / 2, outsideY = outsideBox.y + outsideBox.height / 2;
-      touch ? await t.page.touchscreen.tap(outsideX,outsideY) : await t.page.mouse.click(outsideX,outsideY);
-      await t.tap(); assert.equal(new URL(t.page.url()).pathname, '/', 'An outside tap resets the sequence');
-      await t.home(); await t.tap(3);
-      await t.page.waitForURL('**/admin/calendar/?preview=congregation');
+      await t.home(); await t.tap();
+      await t.page.waitForURL('**/admin/calendar/?view=congregation');
       await t.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
-      assert.equal(await t.page.locator('.shul-calendar').count(), 0, 'The gesture does not bypass calendar sign-in');
-      assert(!t.calls.some(call => call.includes('/api/events')), 'No private event read without a session');
-      await t.page.goBack(); await t.page.locator('[data-calendar-preview]').waitFor(); await t.tap(3);
-      await t.page.waitForURL('**/admin/calendar/?preview=congregation');
-      await t.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
-      checks.push({ touch, singleAndDoubleInert:true, slowTapsInert:true, cancelResets:true, tripleOpens:true, signInRequired:true });
-      await t.context.close();
+      assert.equal(await t.page.locator('.shul-calendar').count(),0,'Calendar sign-in is required');
+      assert(!t.calls.some(call=>call.includes('/api/events')),'No private event read without a session');
+      checks.push({touch,singleActivationOpens:true,signInRequired:true});await t.context.close();
     }
     for (const touch of [false, true]) {
       const t = await prepare({ touch, role:'viewer', width:touch ? 393 : 1440 });
@@ -115,7 +97,7 @@ const server = http.createServer((req, res) => {
       await t.page.waitForURL('**/donate/'); await t.page.getByText('Choose a campaign', { exact:true }).waitFor();
       await openCalendar(); await tapHeader(2);
       await t.page.getByRole('link', { name:'Back to Home', exact:true }).click();
-      await t.page.waitForURL(origin + '/'); await t.page.locator('[data-calendar-preview]').waitFor();
+      await t.page.waitForURL(origin + '/'); await t.page.locator('[data-community-calendar]').waitFor();
       await openCalendar();
       await t.page.evaluate(() => localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at:Date.now() })));
       await tapHeader(3); await t.page.waitForURL(origin + '/admin/');
@@ -131,8 +113,8 @@ const server = http.createServer((req, res) => {
       t.addAnnouncement({ id:'long-unread', sequence:2, text:'Long update\n' + 'More announcement details\n'.repeat(80), createdAt:'2026-11-02T12:00:00Z', revision:1 });
       t.addAnnouncement({ id:'long-already-read', sequence:3, text:'Previously read details\n'.repeat(50), createdAt:'2026-11-02T15:00:00Z', revision:1, read:true });
       t.addAnnouncement({ id:'short-unread', sequence:4, text:'New Shul announcement', createdAt:'2026-11-03T12:00:00Z', revision:1 });
-      await t.home(); await t.tap(3);
-      await t.page.waitForURL('**/admin/calendar/?preview=congregation');
+      await t.home(); await t.tap();
+      await t.page.waitForURL('**/admin/calendar/?view=congregation');
       await t.page.locator('.shul-calendar').waitFor();
       assert.equal(await t.page.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), role);
       assert(await t.page.locator('body').evaluate(el => el.classList.contains('cal-reader-page')));
@@ -209,7 +191,7 @@ const server = http.createServer((req, res) => {
     await visitor.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
     assert(!visitor.calls.some(call => call.includes('/api/events')), 'The return link cannot bypass calendar sign-in');
     checks.push({ messagesReturnRequiresSignIn:true }); await visitor.context.close();
-    const login = await prepare(); await login.home(); await login.tap(3);
+    const login = await prepare(); await login.home(); await login.tap();
     await login.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
     await login.page.locator('[name=email]').fill('owner@example.test'); await login.page.locator('[name=password]').fill('Synthetic owner password 2026');
     await login.page.getByRole('button', { name:'Sign in', exact:true }).click();
