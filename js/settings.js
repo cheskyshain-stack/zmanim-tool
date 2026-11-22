@@ -65,26 +65,21 @@ export const WEEKDAY_FOOTER_NOTE = 'All underlined מנינים will be בבית
  *  naming days that are not on the paper. Which of them a chart holds is
  *  specialShacharisKinds in hebrew-calendar.js.
  *
- *  Joined with a ו on the last, the way the full heading has always read: "ר"ח בה"ב ותענ"צ",
- *  "ר"ח ותענ"צ", "בה"ב". */
+ *  Separate every included occasion with a middle dot. */
 export const SPECIAL_SHACHARIS_PARTS = [
   ['roshChodesh', 'ר"ח'],
   ['behab', 'בה"ב'],
   ['taanis', 'תענ"צ'],
 ];
 
-/** ראש חודש written out, rather than the ר"ח used everywhere else in this heading. Asked for
- *  on a page whose only reason for the heading is ר"ח: the abbreviation is what keeps a joined
- *  heading ("ר"ח ותענ"צ") from crowding the box under it, and standing alone it has nothing to
- *  be joined to, and the room to be spelled out the way ראש חודש is elsewhere on the boards
- *  (see OWN_HEADINGS). */
+/** Spell out Rosh Chodesh when it is the only occasion in this heading. */
 const ROSH_CHODESH_ALONE = 'ראש חודש';
 
 export function specialShacharisHeading(kinds) {
   const parts = SPECIAL_SHACHARIS_PARTS.filter(([key]) => kinds?.[key]).map(([, word]) => word);
   if (!parts.length) return '';
   if (parts.length === 1) return kinds.roshChodesh ? ROSH_CHODESH_ALONE : parts[0];
-  return `${parts.slice(0, -1).join(' ')} ו${parts[parts.length - 1]}`;
+  return parts.join(' · ');
 }
 
 
