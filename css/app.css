@@ -6049,3 +6049,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
 .luach-next-box.is-candles.is-urgent .luach-next-time,
 .luach-candle-result .luach-candle-countdown.is-urgent { color: #b42318; }
 .luach-next-box.is-candles.is-urgent .luach-next-countdown { font-variant-numeric: tabular-nums; }
+
+/* During early release, keep the current chart above the new one. */
+.chart-spread-title { margin:0 0 .8rem; text-align:center; font:700 1.5rem Georgia,serif; color:var(--luach-ink,var(--ink)); }
+.chart-spread + .chart-spread { margin-top:2rem; padding-top:1.5rem; border-top:1px solid rgba(22,42,67,.16); }
