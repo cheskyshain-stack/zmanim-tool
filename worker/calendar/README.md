@@ -397,3 +397,24 @@ still require the separate calendar service deployment described above.
 `node tests/simcha-preview-browser.cjs` checks the actual calendar date cell,
 original text, clear preview labels, review/exit behavior, phone and desktop
 bounds and zero API writes, using only synthetic messages and an isolated login.
+
+## Optional member Google Calendar sync
+
+See [GOOGLE-CALENDAR-SETUP.md](./GOOGLE-CALENDAR-SETUP.md) for the exact secure setup,
+member consent, encrypted token storage, one-way event updates/deletions, reminders,
+disconnect behavior and activation limitations. This feature reuses the existing
+Worker, Durable Object and alarm and is unavailable until its OAuth secrets are set.
+
+The simcha parser now uses original New York sent dates for same-day invitations,
+upcoming Shabbos for Kiddush/Aufruf and Shacharis plus Kiddush, and contextual AM/PM
+for Shacharis, dessert and tonight notices. A Bar Mitzvah followed by Kiddush is one
+Shabbos event. NS remains a prayer location without an invented clock time. Followups
+match parent/child identity and date; a NOW reminder retains the earlier known time.
+Different identified families can have events of the same category on the same day.
+Unclear cases, cancellations, manual changes and deleted events still need review.
+Parser version 2 lets an owner rescan previously unclear records with the new rules
+without reopening an unchanged skipped decision. The device preview uses the same rules.
+Generated event wording removes opening greetings and explicit closing wishes such
+as May the Zivug Oleh Yafe, MTZOY and May they be Zoche Legadlo Ltorah Lchupa
+Ulmassim Tovim. It retains names, time, location and all substantive information;
+the posted message and private source receipt retain the complete original wording.

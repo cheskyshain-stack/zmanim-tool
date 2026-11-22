@@ -1,3 +1,4 @@
+import { manageGoogle, googleCallback, runGoogleSync } from './google-calendar.js';
 import { syncSimchaMessage, reviewSimchaMessage } from './simcha-import.js';
 import { DurableObject } from 'cloudflare:workers';
 import { calendarEvent, calendarSerial } from '../../js/calendar/model.js';
@@ -35,9 +36,10 @@ async function passwordHash(password, salt) {
 export default {
   async fetch(request, env) {
     const origin = request.headers.get('Origin');
+    const callback = request.method === 'GET' && new URL(request.url).pathname === '/api/google-calendar/callback';
     const messageFeed = MESSAGE_FEED_PATHS.includes(new URL(request.url).pathname);
     const incoming = !origin && request.method === 'POST' && ['/api/email-import/receive', '/api/sms-import/receive'].includes(new URL(request.url).pathname);
-    if (origin !== env.ALLOWED_ORIGIN && !incoming && !messageFeed) return json({ error: 'Open the calendar from the shul website.' }, 403);
+    if (origin !== env.ALLOWED_ORIGIN && !incoming && !messageFeed && !callback) return json({ error: 'Open the calendar from the shul website.' }, 403);
     const cors = { 'Access-Control-Allow-Origin': messageFeed ? '*' : env.ALLOWED_ORIGIN, 'Access-Control-Allow-Methods': messageFeed ? 'GET,OPTIONS' : 'GET,POST,PUT,DELETE,OPTIONS',
       'Access-Control-Allow-Headers': 'Authorization,Content-Type', Vary: 'Origin' };
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
@@ -53,7 +55,7 @@ export default {
 
 export class CommunityCalendar extends DurableObject {
   constructor(ctx, env) {
-    super(ctx, env); this.ctx = ctx; this.env = env;
+    super(ctx, env); this.ctx = ctx; this.env = env; this.googleQueue = Promise.resolve();
     this.reminderKeys = reminderKeys(env.CALENDAR_REMINDER_VAPID);
     ctx.blockConcurrencyWhile(async () => {
       if (!await ctx.storage.get('config:activity-start')) await ctx.storage.put('config:activity-start', new Date().toISOString());
@@ -70,6 +72,9 @@ export class CommunityCalendar extends DurableObject {
         await ctx.storage.put('config:announcement-date-index', 1);
       }
     });
+  }
+  googleTask(task) {
+    const result=this.googleQueue.then(task);this.googleQueue=result.catch(()=>{});return result;
   }
   async activityReport(url) {
     let range; try { range = requestedRange(url.searchParams); } catch (error) { fail(error.message); }
@@ -529,8 +534,9 @@ export class CommunityCalendar extends DurableObject {
   }
   async route(request) {
     const url = new URL(request.url), path = url.pathname, method = request.method;
+    if (path === '/api/google-calendar/callback' && method === 'GET') return this.googleTask(()=>googleCallback(this.ctx.storage,this.env,url));
     if (MESSAGE_FEED_PATHS.includes(path)) return readMessageFeed(this.ctx.storage, request, url);
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, simchaImport: true, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, googleCalendar: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, simchaImport: true, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -576,6 +582,11 @@ export class CommunityCalendar extends DurableObject {
       return json(await this.session(next, 'invitation-claimed'));
     }
     const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/message-feeds' || path.startsWith('/api/message-feeds/') || path === '/api/activity' || path === '/api/sms-import' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    if (path === '/api/google-calendar' || path.startsWith('/api/google-calendar/')) {
+      if (method !== 'GET') await this.limited(request,'google-calendar:'+user.id,30);
+      const body = method === 'GET' ? {} : await this.body(request,4096);
+      return this.googleTask(()=>manageGoogle(this.ctx.storage,this.env,request,user,body));
+    }
     if (path === '/api/message-feeds' || path.startsWith('/api/message-feeds/')) return manageMessageFeeds(this.ctx.storage, request, url, request => this.body(request));
     if (path === '/api/sms-import') return this.manageSms(request, url);
     if (path === '/api/email-import' || path.startsWith('/api/email-import/')) return this.manageEmail(request, url);
@@ -703,7 +714,7 @@ export class CommunityCalendar extends DurableObject {
     const now = Date.now(), storage = this.ctx.storage;
     let cleanup = await storage.get('config:calendar-cleanup') || 0;
     if (cleanup <= now) {
-      for (const prefix of ['session:', 'attempt:', 'invite:']) {
+      for (const prefix of ['session:', 'attempt:', 'invite:', 'google-state:']) {
         const rows = await storage.list({ prefix });
         const expired = [...rows].filter(([, value]) => (value.expires || value.until) <= now).map(([key]) => key);
         for (let i = 0; i < expired.length; i += 100) await storage.delete(expired.slice(i, i + 100));
@@ -711,9 +722,10 @@ export class CommunityCalendar extends DurableObject {
       cleanup = now + 86400000;
       await storage.put('config:calendar-cleanup', cleanup);
     }
-    if (!this.reminderKeys) { await scheduleCalendarAlarm(storage, cleanup); return; }
+    const googleNext=await this.googleTask(()=>runGoogleSync(storage,this.env,now));
+    if (!this.reminderKeys) { await scheduleCalendarAlarm(storage, Math.min(cleanup,googleNext)); return; }
     const alerts = await runCalendarMessageAlerts(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, now);
     const next = await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, Date.now());
-    await scheduleCalendarAlarm(storage, Math.min(cleanup, next, alerts));
+    await scheduleCalendarAlarm(storage, Math.min(cleanup, next, alerts, googleNext));
   }
 }

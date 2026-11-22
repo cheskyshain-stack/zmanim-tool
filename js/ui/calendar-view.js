@@ -1,3 +1,4 @@
+import { openCalendarGoogle } from './calendar-google.js';
 import { simchaMessagePreview } from '../calendar/simcha-message.js';
 import { openCalendarSimchaImport } from './calendar-simcha-import.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, CALENDAR_EVENT_DETAILS_MAX, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
@@ -31,6 +32,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const congregation = standalone && congregationPreview;
   let simchaPreview = new URLSearchParams(location.search).get('simcha-preview') === '1';
   let messageEvents = [], simchaReview = [], simchaPreviewError = '';
+  const googleButton = () => endpoint && user && !previewing() ? '<button type="button" data-cal-google>Google Calendar</button>' : '';
   const previewToggle = () => `<button type="button" data-cal-simcha-preview>${simchaPreview ? 'Turn off simcha preview' : 'Preview simchos from messages'}</button>`;
   function toggleSimchaPreview() {
     simchaPreview = !simchaPreview; messageEvents = []; simchaReview = []; simchaPreviewError = '';
@@ -209,9 +211,10 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><p>Browse last month, this month and next month. Tap a date to see every event and its details.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
     const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+previewToggle());
+    signOutButton.insertAdjacentHTML('beforebegin', phoneReminderButton()+googleButton()+previewToggle());
     view.el.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',()=>{view.close();toggleSimchaPreview();});
     view.el.querySelector('[data-cal-phone-reminders]')?.addEventListener('click', () => { view.close(); showPhoneReminders(); });
+    view.el.querySelector('[data-cal-google]')?.addEventListener('click',()=>{view.close();openCalendarGoogle(dialog);});
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
   }
   function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
@@ -226,6 +229,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
     }
   }
   async function openCalendarSession(session) {
+    const googleReturn = /^#google-calendar=([a-f0-9]{64}|cancelled)$/.exec(location.hash);
+    if (googleReturn) {
+      history.replaceState(null,'',location.pathname+location.search);
+      setTimeout(()=>{if(!disposed&&user) openCalendarGoogle(dialog,googleReturn[1]);},0);
+    }
     user = session.user; reminderPublicKey = session.reminderPublicKey || '';
     reminderSchedules = session.reminderSchedules === true;
     eventAudienceDetails = session.eventAudienceDetails === true;
@@ -320,8 +328,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelectorAll('[data-cal-simcha-preview]').forEach(button=>button.addEventListener('click',toggleSimchaPreview));
     container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
-    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+previewToggle());
+    adminActions?.insertAdjacentHTML('beforeend', phoneReminderButton()+googleButton()+previewToggle());
     adminActions?.querySelector('[data-cal-simcha-preview]')?.addEventListener('click',toggleSimchaPreview);
+    adminActions?.querySelector('[data-cal-google]')?.addEventListener('click',()=>openCalendarGoogle(dialog));
     bindViewChoice(container);
     container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
