@@ -15,13 +15,14 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
   let selected = areas.some(area => area.id === selectedArea) ? selectedArea : groups[0]?.id || 'community';
   const dedications = items.filter(item => item.kind === 'dedication' && ['showing','scheduled'].includes(phase(item,snapshot.at))).sort((a,b) => (a.startsAt || '').localeCompare(b.startsAt || ''));
   const dedicationControls = can('dedication') ? `<section class="panel screen-dedication-controls"><div class="screen-area-heading"><h2 dir="auto">פרנס היום · Lower center of the screen</h2><button type="button" id="screen-add-dedication">+ Add פרנס היום</button></div><p class="muted">Remove from screen stops a dedication from appearing and keeps it saved under Hidden.</p><div class="screen-dedication-items">${dedications.map(item => `<article class="screen-item"><div><span class="tag">${phase(item,snapshot.at) === 'showing' ? 'Active now' : 'Scheduled'}</span><h3 dir="auto">${esc(item.data?.dedicationName || item.internalName || item.data?.dedicationText || 'פרנס היום')}</h3><p>${formatInstant(item.startsAt)} → ${formatInstant(item.endsAt)}</p></div><div class="actions"><button type="button" data-screen-edit="${esc(item.id)}">Edit dedication</button>${onRemoveDedication ? `<button type="button" class="remove-from-screen" data-screen-remove="${esc(item.id)}">Remove from screen</button>` : ''}</div></article>`).join('') || '<p class="muted">No active or upcoming dedications.</p>'}</div></section>` : '';
-  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Tap the sponsorship panel in the lower center to edit it. Saved announcements can still be managed below; they are not displayed in this TV layout.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with an editable sponsorship panel"></div>${dedicationControls}${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose a saved announcement group">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} active</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}`;
+  container.innerHTML = `<div class="screen-edit-intro"><div><h2>Edit on the screen</h2><p>Parnas Hayom displays for 15 seconds, then announcements rotate in the lower center. Tap the displayed card to edit it, or choose a saved announcement below.</p></div><span class="screen-time">${esc(formatInstant(snapshot.at))} · New York</span></div><div class="preview-host screen-edit-preview" aria-label="Shul View with editable sponsorship and announcements"></div>${dedicationControls}${can('announcement') ? `<div class="screen-area-picker" role="group" aria-label="Choose a saved announcement group">${areas.map(area => `<button type="button" data-screen-area="${esc(area.id)}" aria-pressed="false"><strong>${esc(area.title)}</strong><span>${groups.find(group => group.id === area.id)?.sections.length || 0} active</span></button>`).join('')}</div><section class="screen-area-detail panel" aria-labelledby="screen-area-title"></section>` : ''}`;
   const warning = document.createElement('p');
   warning.className = 'notice';warning.hidden = true;warning.setAttribute('role','status');
   const host = container.querySelector('.preview-host');
   host.before(warning);
   const view = new DisplayView(host);
   view.update(snapshot, {preview:true});
+  const rotationTimer = setInterval(() => view.update(snapshot,{preview:true}),1000);
   const cholHamoedSlot = host.querySelector('.board-chol-hamoed-announcements:not([hidden])');
   if (cholHamoedSlot) {
     groups.push(...groupCholHamoedAnnouncements(snapshot.items));
@@ -64,12 +65,18 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       specialArea.classList.toggle('screen-selected-area',selected === cholHamoedArea.id);
     }
     const dedication = host.querySelector('.board-dedication');
-    if (dedication && can('dedication') && !dedication.hidden) {
+    if (dedication && !dedication.hidden) {
       const current = records.get(view.slots.get('dedication')?.id);
-      dedication.classList.add('screen-edit-target');
-      dedication.setAttribute('role','button');
-      dedication.tabIndex = 0;
-      dedication.setAttribute('aria-label',current ? 'Edit displayed פרנס היום' : 'Add פרנס היום sponsorship');
+      const editable = current ? can(current.kind) : can('dedication');
+      dedication.classList.toggle('screen-edit-target',editable);
+      if (editable) {
+        dedication.setAttribute('role','button');
+        dedication.tabIndex = 0;
+        dedication.setAttribute('aria-label',current?.kind === 'announcement' ? `Edit announcement: ${current.title}` : current ? 'Edit displayed פרנס היום' : 'Add פרנס היום sponsorship');
+      } else {
+        dedication.removeAttribute('role');
+        dedication.removeAttribute('tabindex');
+      }
     }
   }
 
@@ -119,10 +126,10 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
       return;
     }
     if (target.closest('#screen-add-dedication') && can('dedication')) { onAdd({kind:'dedication',status:'draft',data:{}});return; }
-    if (target.closest('.board-dedication') && can('dedication')) {
+    if (target.closest('.board-dedication')) {
       const current = records.get(view.slots.get('dedication')?.id);
-      if (current) onEdit(current);
-      else onAdd({kind:'dedication',status:'draft',data:{}});
+      if (current && can(current.kind)) onEdit(current);
+      else if (!current && can('dedication')) onAdd({kind:'dedication',status:'draft',data:{}});
       return;
     }
     if (target.closest('.board-chol-hamoed-announcements') && can('announcement')) {
@@ -150,5 +157,5 @@ export function mountScreenEditor(container, {snapshot, items, can, onEdit, onAd
   observer.observe(host,{childList:true,subtree:true});
   decorate();
   chooseArea(selected);
-  return {chooseArea,destroy(){observer.disconnect();container.removeEventListener('click',click);container.removeEventListener('keydown',key);view.destroy();}};
+  return {chooseArea,destroy(){clearInterval(rotationTimer);observer.disconnect();container.removeEventListener('click',click);container.removeEventListener('keydown',key);view.destroy();}};
 }

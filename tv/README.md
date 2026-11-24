@@ -129,9 +129,9 @@ The Worker reads the congregation site's published settings and saves them with 
 - Visibility is start-inclusive and end-exclusive. Public requests evaluate it on the server; the browser removes expired cards at the boundary and fetches at the next known start/end. The displayed clock advances from server time, so a mis-set device clock does not control visibility. Sunset and midnight also trigger refreshes. It also polls every 15 seconds to discover edits/new records without an admin visit.
 - DST gaps are rejected. Repeated November times require selecting the first or second occurrence; the extra choice appears only when relevant.
 - The dedication evening option is the preceding sunset through sunset on the selected daytime date, using the existing shul location and solar calculation. Civil-day mode is local midnight to the following midnight, including 23/25-hour days. Custom mode uses explicit instants. The editor shows the Hebrew/civil correspondence and exact timestamps.
-- The 1920 x 1080 composition scales uniformly to 4K. Empty side columns disappear. Schedules remain steady; announcement and dedication rotations have independent state and keep the current card across successful refreshes.
-- Announcements default to 25 seconds; dedications to 35 seconds, with a minimum of 25. Long messages continue on subsequent readable cards, with page indicators. No automatic font shrinking is used.
-- One pinned announcement per side is prioritized. Additional cards rotate. When a dedication shares the right column, that column has one announcement rotation slot. Preview warns about excessive pinned cards and overflow. Keep titles/names short and use Preview for long or crowded content.
+- The 1920 x 1080 composition scales uniformly to 4K. The lower center panel rotates Parnas Hayom with active announcements, preserving the current card and its timer across refreshes and theme changes.
+- Parnas Hayom displays for 15 seconds, including the sponsorship availability card when no dedication is active. Each announcement keeps its saved display duration, defaulting to 25 seconds.
+- Each announcement is shown as one complete card, with saved line breaks and contact details. Preview flags content that exceeds the panel's capacity.
 - Temporary connection loss retains the last successful schedule, prominently marks it stale and suppresses the next-minyan claim. On a cold offline load it shows an unavailable/reconnecting message rather than unverified cached times.
 - Preview uses `DisplayView`, the same component as the public screen, with a server-calculated future snapshot. Unsaved content is sent only to the authenticated preview endpoint. It is not written or publicly exposed.
 
@@ -486,11 +486,11 @@ Leaving the sponsor blank creates neither a sponsor row nor an anonymous label.
 
 The screen's left header reads Bais Medrash of Lakewood Commons and קהל לב מנחם.
 Both languages use centered 28px lettering; the English name stays on two lines.
-The gold-bordered פרנס היום card always appears directly below זמני היום.
-It displays the active dedication, or a sponsorship-availability message when
-none is active. Optional fields render only when filled; Hebrew/English text
-and intentional line breaks are preserved. The area reserves enough height for
-the tallest active dedication so rotation and theme changes keep its size steady.
+The lower center panel shows the active פרנס היום dedication for 15 seconds,
+or a sponsorship-availability message when none is active, then cycles through
+the active announcements. Optional fields render only when filled; Hebrew/English
+text and intentional line breaks are preserved. Rotation and theme changes retain
+the panel's dimensions.
 The on-screen admin can click the existing dedication to edit it, or the
 availability message to add a new draft, including using Enter or Space.
 Long copy remains complete and the shared admin preview flags capacity problems.

@@ -14,6 +14,7 @@ const availableDedicationHTML = `<article class="tv-card dedication dedication-a
     <div><dt>Week</dt><dd>$180</dd></div><div><dt>Month</dt><dd>$500</dd></div>
   </dl>
 </article>`;
+const availableDedication = {id:'parnas-hayom-available',kind:'dedication',data:{}};
 const dateLabel = s => new Date(s + 'T12:00:00Z').toLocaleDateString('en-US', {month:'short',day:'numeric',weekday:'short',timeZone:'UTC'});
 const nextPeriod = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',hour12:true});
 export function nextMinyanHTML(next, instant) {
@@ -35,7 +36,7 @@ export function cardHTML(item) {
     const lines = [['dedication-type',d.dedicationType === 'Custom' ? '' : d.dedicationType],['dedication-name',d.dedicationName],['dedication-text',d.dedicationText],['dedication-message',d.message],['sponsor',sponsor]];
     return `<article class="tv-card dedication"><h2 lang="he" dir="rtl">פרנס היום</h2><div class="dedication-copy">${lines.filter(([,text])=>String(text||'').trim()).map(([name,text])=>`<p class="${name}" dir="auto">${esc(text)}</p>`).join('')}</div>${d.hebrewLabel ? `<p class="card-page" dir="auto">${esc(d.hebrewLabel)}</p>` : ''}</article>`;
   }
-  return `<article class="tv-card ${esc(d.priority)}"><p class="eyebrow">${esc(d.category || 'Community')}</p><h2 dir="auto">${esc(item.title)}</h2><p dir="auto" style="white-space:pre-wrap">${esc(d.message)}</p>${d.contact || d.phone ? `<p class="contact"><bdi dir="auto">${esc(d.contact)}</bdi><bdi dir="ltr">${esc(d.phone)}</bdi></p>` : ''}</article>`;
+  return `<article class="tv-card announcement ${esc(d.priority)}"><p class="eyebrow">${esc(d.category || 'Community')}</p><h2 dir="auto">${esc(item.title)}</h2><p dir="auto" style="white-space:pre-wrap">${esc(d.message)}</p>${d.contact || d.phone ? `<p class="contact"><bdi dir="auto">${esc(d.contact)}</bdi><bdi dir="ltr">${esc(d.phone)}</bdi></p>` : ''}</article>`;
 }
 function setHTML(node, html) {
   if (node._html === html) return false;
@@ -88,7 +89,8 @@ export class DisplayView {
   choose(key, items, now) {
     if (!items.length) { this.slots.delete(key); return null; }
     let state = this.slots.get(key), selected = items.find(i => i.id === state?.id);
-    if (!selected || now - state.at >= (selected.data.duration || 35) * 1000 || now < state.at) {
+    const seconds = selected?.kind === 'dedication' ? 15 : selected?.data?.duration || 25;
+    if (!selected || now - state.at >= seconds * 1000 || now < state.at) {
       selected = items[selected ? (items.indexOf(selected) + 1) % items.length : 0];
       this.slots.set(key, {id:selected.id, at:now});
     }
@@ -105,9 +107,12 @@ export class DisplayView {
     setHTML(this.date, `<b dir="rtl">${esc(s.hebrewDate)}</b><span>${dateLabel(s.date)}</span>`);
     const clock = new Intl.DateTimeFormat('en-US', {timeZone:'America/New_York',hour:'numeric',minute:'2-digit'}).format(new Date(instant));
     if (this.clock.textContent !== clock) this.clock.textContent = clock;
-    const dedication = this.choose('dedication', items.filter(i => i.kind === 'dedication'), now);
-    this.stage.classList.toggle('sponsorship-available', !dedication);
-    const dedicationHTML = dedication ? cardHTML(dedication) : availableDedicationHTML;
+    const dedications = items.filter(i => i.kind === 'dedication');
+    const cards = [...(dedications.length ? dedications : [availableDedication]), ...items.filter(i => i.kind === 'announcement')];
+    const notice = this.choose('dedication', cards, now);
+    this.stage.classList.toggle('sponsorship-available', notice === availableDedication);
+    this.dedication.setAttribute('aria-label',notice.kind === 'dedication' ? 'פרנס היום' : 'Announcements');
+    const dedicationHTML = notice === availableDedication ? availableDedicationHTML : cardHTML(notice);
     if (setHTML(this.dedication, dedicationHTML) || this.dedicationKey !== dedicationHTML) {
       this.dedicationKey = dedicationHTML;
       this.fitDedicationSlot();
@@ -136,6 +141,16 @@ export class DisplayView {
     this.checkCapacity();
   }
   fitDedicationSlot() {
+    const announcement = this.dedication.querySelector('.announcement');
+    if (announcement) {
+      let size = 38;
+      announcement.style.setProperty('--notice-size',size+'px');
+      while (size > 24 && (this.dedication.scrollHeight > this.dedication.clientHeight + 1 || announcement.scrollHeight > announcement.clientHeight + 1)) {
+        size -= 2;
+        announcement.style.setProperty('--notice-size',size+'px');
+      }
+      return;
+    }
     const copy = this.dedication.querySelector('.dedication-copy');
     if (!copy) return;
     let size = 48;

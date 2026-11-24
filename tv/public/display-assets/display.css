@@ -1068,6 +1068,11 @@ button {
 .quarter-board .dedication-copy .dedication-name {font-weight:700}
 .quarter-board .dedication-copy .dedication-message,.quarter-board .dedication-copy .sponsor {font-size:.65em;font-family:David,serif}
 .quarter-board .board-dedication .tv-card .card-page {display:block;font:20px/1.2 David,serif;color:var(--quarter-muted)}
+.quarter-board .board-dedication .tv-card.announcement {font:var(--notice-size,38px)/1.24 David,serif;gap:.45em}
+.quarter-board .board-dedication .tv-card.announcement h2 {font-size:1.24em;margin:0;overflow-wrap:anywhere}
+.quarter-board .board-dedication .tv-card.announcement p {overflow-wrap:anywhere}
+.quarter-board .board-dedication .tv-card.announcement .eyebrow {font-size:.55em;color:var(--quarter-muted)}
+.quarter-board .board-dedication .tv-card.announcement .contact {font-size:.72em}
 .quarter-board .board-dedication .tv-card .availability-copy {font:27px/1.4 David,serif}
 .quarter-board .board-dedication .tv-card .availability-benefits {font:25px/1.4 David,serif}
 .quarter-board .availability-rates {font-family:David,serif;display:grid;grid-template-columns:1fr 1fr;gap:13px 48px;margin:6px auto 0;width:90%;padding-top:20px;border-top:1px solid var(--quarter-rule)}
