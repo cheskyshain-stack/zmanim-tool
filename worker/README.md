@@ -70,6 +70,17 @@ reports the archive as disabled.
 
 ## Verification and publishing
 
+GitHub publishes the website on pushes to `main`. The calendar, seating and
+yahrzeit service, and statistics service also deploy automatically when their
+Worker files or deployment workflows change on `main`. Their existing manual
+Actions remain available.
+
+The service workflows use the `SHUL_SERVICES_DEPLOY_TOKEN` repository secret,
+scoped to Editor access on the existing `zmanim-calendar`, `zmanim-seats`, and
+`zmanim-traffic` Workers in the account below. Existing
+`CLOUDFLARE_API_TOKEN` credentials remain supported. Shul View has its separate
+Worker account and `SHUL_VIEW_DEPLOY_TOKEN` secret.
+
 Run from the repository root:
 
 ```sh

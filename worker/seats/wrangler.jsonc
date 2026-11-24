@@ -4,6 +4,7 @@
   "account_id": "04b085d9f19ac1ba6d333e0006fc94c1",
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
+  "keep_vars": true,
   "vars": { "ALLOWED_ORIGIN": "https://baismedrashoflakewoodcommons.org" },
   "durable_objects": {
     "bindings": [{ "name": "SEATS_WORKSPACE", "class_name": "SeatsWorkspace" }]

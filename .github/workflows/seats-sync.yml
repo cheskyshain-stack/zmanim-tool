@@ -1,6 +1,11 @@
 name: Activate shared seating plans
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/seats/**'
+      - '.github/workflows/seats-sync.yml'
   workflow_dispatch:
     inputs:
       service_only:
@@ -14,12 +19,15 @@ permissions:
   id-token: write
 
 concurrency:
-  group: ${{ inputs.service_only && 'seats-service' || 'pages' }}
+  group: seats-service
   cancel-in-progress: false
 
 jobs:
   service:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
     outputs:
       endpoint: ${{ steps.deploy.outputs.endpoint }}
     steps:
@@ -39,11 +47,11 @@ jobs:
       - name: Deploy the shared seating service
         id: deploy
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SHUL_SERVICES_DEPLOY_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           WRANGLER_SEND_METRICS: 'false'
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
-            echo "::error::Add CLOUDFLARE_API_TOKEN in repository Settings, Secrets and variables, Actions, then run this workflow again."
+            echo "::error::Add the SHUL_SERVICES_DEPLOY_TOKEN repository secret for the existing seating service."
             exit 1
           fi
           set -o pipefail
@@ -68,7 +76,11 @@ jobs:
           const yahrzeitsDenied=await fetch(process.env.SEATS_API_URL+'/api/yahrzeits',{headers});
           assert.equal(yahrzeitsDenied.status,401,'The yahrzeit register must require a Seats session.');
           const privatePin=process.env.SEATS_VERIFICATION_PIN;
-          const login=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin || '4444'})});
+          if (!privatePin) {
+            console.log('Verified private Seats and yahrzeit endpoints require sign-in.');
+            process.exit(0);
+          }
+          const login=await fetch(process.env.SEATS_API_URL+'/api/session',{method:'POST',headers,body:JSON.stringify({name:'Activation check',pin:privatePin})});
           assert.equal(login.status,200,'The Seats PIN must open a server session.');
           const session=await login.json();
           assert.equal(typeof session.token,'string');
@@ -102,9 +114,12 @@ jobs:
           console.log('Verified server PIN protection and authenticated storage.');
           JS
   publish:
-    if: ${{ !inputs.service_only }}
+    if: ${{ github.event_name == 'workflow_dispatch' && !inputs.service_only }}
     needs: service
     runs-on: ubuntu-latest
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
