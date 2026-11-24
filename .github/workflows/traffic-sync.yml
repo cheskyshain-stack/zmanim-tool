@@ -1,0 +1,42 @@
+name: Deploy site statistics service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'worker/traffic-worker.js'
+      - 'worker/traffic-calendar.js'
+      - 'worker/wrangler.jsonc'
+      - '.github/workflows/traffic-sync.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: traffic-service
+  cancel-in-progress: false
+
+jobs:
+  service:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify statistics and date boundaries with local fixtures
+        run: node --test --test-isolation=none tests/traffic-worker.mjs tests/traffic-view.mjs
+      - name: Install the pinned deployment tool
+        run: npm ci --prefix worker/calendar --no-audit --no-fund
+      - name: Deploy the existing statistics service
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.SHUL_SERVICES_DEPLOY_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
+          WRANGLER_SEND_METRICS: 'false'
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Add the SHUL_SERVICES_DEPLOY_TOKEN repository secret for the existing statistics service."
+            exit 1
+          fi
+          worker/calendar/node_modules/.bin/wrangler deploy --config worker/wrangler.jsonc
