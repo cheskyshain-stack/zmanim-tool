@@ -1021,7 +1021,7 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "texts", "seats", "yahrzeits", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "calendar", "texts", "seats", "yahrzeits", "offline"]
 DIST_FILES = ["index.html", "404.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
@@ -1163,9 +1163,11 @@ def main():
     stamp_seats_build()
     stamp_css_versions(ROOT / "yahrzeits" / "index.html", "../")
     stamp_js_versions(ROOT / "yahrzeits" / "index.html", "../", "yahrzeits-app.js")
-    stamp_css_versions(ROOT / "admin" / "calendar" / "index.html", "../../")
-    stamp_js_versions(ROOT / "admin" / "calendar" / "index.html", "../../", "calendar-app.js")
-    stamp_analytics(ROOT / "admin" / "calendar" / "index.html", ready_event="zmanim-calendar-open", exclude_account_links=True)
+    stamp_css_versions(ROOT / "calendar" / "index.html", "../")
+    stamp_js_versions(ROOT / "calendar" / "index.html", "../", "calendar-app.js")
+    stamp_analytics(ROOT / "calendar" / "index.html", ready_event="zmanim-calendar-open", exclude_account_links=True)
+    # Existing installations keep their app identity and learn the new starting address.
+    (ROOT / "admin" / "calendar" / "site.webmanifest").write_bytes((ROOT / "calendar" / "site.webmanifest").read_bytes())
 
     # The offline copy is the app, not the luach: a USB stick is for making sheets, and
     # the luach needs a published file it has no way to fetch under file://. One plain

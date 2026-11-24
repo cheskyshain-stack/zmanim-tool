@@ -3,7 +3,7 @@ self.addEventListener('install', event => event.waitUntil(self.skipWaiting()));
 self.addEventListener('push', event => {
   let payload;
   try { payload = event.data?.json(); } catch { return; }
-  const url = new URL('/admin/calendar/', self.location.origin);
+  const url = new URL('/calendar/', self.location.origin);
   if (payload?.messageAlert === true && (payload.test === true || Number.isSafeInteger(payload.sequence) && payload.sequence > 0)) {
     url.searchParams.set('messages', '1');
     event.waitUntil(self.registration.showNotification(payload.test ? 'Shul test alert' : 'New Shul message', {
@@ -35,7 +35,8 @@ self.addEventListener('push', event => {
 self.addEventListener('notificationclick', event => {
   event.notification.close();
   const url = new URL(event.notification.data, self.location.origin);
-  if (url.origin !== self.location.origin || url.pathname !== '/admin/calendar/') return;
+  if (url.origin !== self.location.origin || !['/calendar/', '/admin/calendar/'].includes(url.pathname)) return;
+  url.pathname = '/calendar/';
   if (url.searchParams.has('event') || url.searchParams.has('messages')) {
     event.waitUntil(self.clients.openWindow(url.href));
     return;

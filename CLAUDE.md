@@ -264,8 +264,10 @@ that fakes a tint is a row of magic numbers nobody can check. The icon links liv
 manifest cannot be fetched over `file://` at all.
 
 Calendar, Seating and Yahrzeit have their own installable identities. The manifests
-use `/admin/calendar/`, `/seats/` and `/yahrzeits/` as their respective id, scope and
-start_url. Each installation opens its own tool. Their matching navy, cream and gold
+use `/seats/` and `/yahrzeits/` as their respective id, scope and start_url. Calendar
+keeps its installed id `/admin/calendar/`, with start_url and scope `/calendar/`.
+The old manifest is copied from the canonical manifest by the builder. Each installation
+opens its own tool. Their matching navy, cream and gold
 artwork lives under `icons/calendar/`, `icons/seats/` and `icons/yahrzeits/`.
 Run `node scripts/make-tool-icons.cjs` with the test Playwright and Chrome setup after
 editing a source SVG. Pass a tool folder name to rebuild only its art. Commit the
@@ -1149,13 +1151,17 @@ fit without overlap in their day dialogs. Measure calendar controls separately f
 row space so the heading never stretches or crowds the dates. `tests/calendar-congregation.cjs` checks fitting,
 whole words, eight-event Shabbos dates, month limits, rollover and the homepage.
 The homepage's official Community calendar card follows Donate and opens
-`/admin/calendar/?view=congregation` with one click or tap. It uses the same active
-card appearance and geometry as its neighbors, with Simchos & shul events below
-its title. Coming soon and the hidden three-tap calendar gesture are removed.
-Keep the legacy `?preview=congregation` destination compatible. Both routes require
-normal calendar sign-in and show the congregation experience even to owners and
-editors, without exposing editor/account controls or changing actual server roles.
+`/calendar/` with one click or tap. It uses the same active card appearance and
+geometry as its neighbors, with Simchos & shul events below its title.
+The same address requires normal calendar sign-in and shows the actual account's
+owner, editor or congregation controls. Saved `/admin/calendar/` links redirect
+with replace to `/calendar/`, retaining all query parameters and account-token
+hashes except the obsolete `view=congregation` override. Explicit
+`?preview=congregation` remains available as a read-only congregation view.
 The separate main admin View as preview remains inert for announcement reads.
+Phone reminders retain their `/admin/calendar/` service-worker registration and
+scope to preserve existing push subscriptions. New alerts open `/calendar/`;
+the click handler also normalizes previously delivered old-address alerts.
 Clear simcha events derived from the authenticated recent message feed appear by
 default beside saved events, without a preview toggle or banner. Deduplicate against
 saved events; do not auto-save from the browser or mark messages read while deriving
@@ -1183,7 +1189,7 @@ including crowded event cells, to keep text and event markers above the Hebrew d
 With `data/calendar.json` blank, only main admin gets device preview storage. Label
 that limitation. Examples are optional and are never persisted. Keep backup/restore
 and storage-error handling; never silently replace corrupt data or claim a failed
-write succeeded. The restricted `/admin/calendar/` page must not pretend that device
+write succeeded. The restricted `/calendar/` page must not pretend that device
 storage or the main admin PIN is server authentication.
 
 `worker/calendar/` prepares a separate, authenticated service. Owner setup uses a
@@ -1199,10 +1205,10 @@ the client-side admin PIN. Activation does not publish a congregation calendar.
 After activation, the main admin sign-in and Calendar access screens retain
 Previous device preview backup. It downloads the exact existing local data without
 uploading it or replacing it with shared events. Calendar-only accounts do not see it.
-After signing in on `/admin/calendar/`, calendar accounts can open
+After signing in on `/calendar/`, calendar accounts can open
 Schedule messages at `/texts/` from the calendar toolbar. Open it in the same tab
 so its Back to calendar button can return with the editor's session preserved.
-The return link goes to `/admin/calendar/` and retains server authentication and
+The return link goes to `/calendar/` and retains server authentication and
 the actual account role. It does not grant other admin access.
 
 New readers can register immediately with their name, email address and their own
@@ -1507,7 +1513,7 @@ local-only edits, copying and the heading's year-view gesture unchanged. Editing
 help stays in How to edit and copy and remains open across filter redraws.
 
 - **Its only navigation link is Back to calendar**, explicitly requested by the user,
-  returning to `/admin/calendar/`. Keep it in the Shul header with a 44px touch target.
+  returning to `/calendar/`. Keep it in the Shul header with a 44px touch target.
   Messages itself remains open without a PIN or calendar account. The return destination
   requires the usual calendar sign-in and keeps the real owner/editor/viewer role.
   Do not add other admin, site-menu or congregation links. Browser checks assert this

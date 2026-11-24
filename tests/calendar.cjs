@@ -136,7 +136,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.goto(origin + '/admin/calendar/'); await page.getByRole('heading', { name: 'Calendar editor access' }).waitFor();
       assert.equal(await page.locator('.cal-grid').count(), 0, 'Unconnected editor page does not simulate private access');
       await page.goto(origin + '/?count=off');
-      assert.equal(await page.locator('a[href*="calendar"]').count(), 0, 'No calendar was added to congregation navigation');
+      assert.equal(await page.locator('a[href="/calendar/"]').count(), 1, 'The homepage opens the canonical calendar address');
       await ctx.close();
     }
     assert(!requests.some(request => /\/api\/events|\/api\/access|\/api\/session/.test(request.url)), 'Device preview sends no event/account data to a server');
@@ -661,7 +661,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
     await ownerPage.locator('[data-cal-access]').click(); await ownerPage.locator('.cal-account').first().waitFor();
     await ownerPage.locator('.cal-invite-form [name=name]').fill('Browser invite test'); await ownerPage.locator('.cal-invite-form [name=email]').fill('browser@example.test');
     await ownerPage.getByRole('button', { name: 'Create invitation', exact: true }).click(); await ownerPage.locator('[data-cal-invitation]:visible').waitFor();
-    const link = await ownerPage.locator('[data-cal-invitation] input').inputValue(); assert(link.startsWith(origin + '/admin/calendar/#invite='));
+    const link = await ownerPage.locator('[data-cal-invitation] input').inputValue(); assert(link.startsWith(origin + '/calendar/#invite='));
     await ownerPage.screenshot({ path: path.join(output, 'calendar-accounts.png') });
     await ownerPage.getByRole('button', { name: 'Sign-in history', exact: true }).click();
     await ownerPage.getByRole('heading', { name: 'Sign-in history', exact: true }).waitFor();

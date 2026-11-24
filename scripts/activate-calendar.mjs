@@ -44,7 +44,7 @@ if (!state.ready) {
   const digest = createHash('sha256').update(token).digest('hex');
   wrangler(['secret', 'put', 'BOOTSTRAP_SHA256', '--config', config], digest + '\n');
   setupFile = path.join(homedir(), 'Lakewood-Commons-calendar-owner-setup-' + Date.now() + '.txt');
-  await writeFile(setupFile, 'Private calendar owner setup\n\nOpen this link to create your main calendar admin account:\n' + origin + '/admin/calendar/#setup=' + token + '\n\nKeep this file private. Never commit it or paste the link into deployment logs.\n', { mode: 0o600, flag: 'wx' });
+  await writeFile(setupFile, 'Private calendar owner setup\n\nOpen this link to create your main calendar admin account:\n' + origin + '/calendar/#setup=' + token + '\n\nKeep this file private. Never commit it or paste the link into deployment logs.\n', { mode: 0o600, flag: 'wx' });
 }
 await writeFile(path.join(root, 'data/calendar.json'), JSON.stringify({ endpoint }) + '\n');
 console.log('Verified private calendar service. Rebuild, test and publish the website connection using the normal deployment process.');

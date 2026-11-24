@@ -8,7 +8,7 @@ const adminHtml = await readFile(new URL('../admin/index.html', import.meta.url)
 const publicHtml = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const offlineHtml = await readFile(new URL('../offline/index.html', import.meta.url), 'utf8');
 const seatsHtml = await readFile(new URL('../seats/index.html', import.meta.url), 'utf8');
-const calendarHtml = await readFile(new URL('../admin/calendar/index.html', import.meta.url), 'utf8');
+const calendarHtml = await readFile(new URL('../calendar/index.html', import.meta.url), 'utf8');
 const messagesHtml = await readFile(new URL('../texts/index.html', import.meta.url), 'utf8');
 const loader = (html) => {
   const code = html.match(/<!-- analytics: [^>]+-->\s*<script>(.*?)<\/script>/s)?.[1];
