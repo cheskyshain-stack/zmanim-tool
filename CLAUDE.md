@@ -1159,6 +1159,14 @@ with replace to `/calendar/`, retaining all query parameters and account-token
 hashes except the obsolete `view=congregation` override. Explicit
 `?preview=congregation` remains available as a read-only congregation view.
 The separate main admin View as preview remains inert for announcement reads.
+The congregation homepage starts loading `/calendar/` in the background after its
+first paint. Use native prerender where available, with public module, document and
+stylesheet warming as a fallback. Respect Save Data and keep private events out of
+persistent preload caches. Prerendered calendars validate normal sessions but defer
+analytics and phone-worker updates until activation. Activation rechecks local
+session expiry and fits the visible calendar. Preloading must not mark messages read.
+`tests/calendar-preload.cjs` measures real Chrome activation, cold opening, roles,
+expired sessions, invitation links, fallback loading and Save Data with isolated data.
 Phone reminders retain their `/admin/calendar/` service-worker registration and
 scope to preserve existing push subscriptions. New alerts open `/calendar/`;
 the click handler also normalizes previously delivered old-address alerts.

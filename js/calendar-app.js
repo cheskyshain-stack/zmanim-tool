@@ -12,7 +12,9 @@ const calendarCongregationPreview = calendarQuery.get('preview') === 'congregati
 // A one-time account token belongs only in the registration request body.
 if (location.hash) history.replaceState(null, '', location.pathname + location.search);
 wireSecretDoor(document.querySelector('.cal-editor-header'), '/admin/');
-refreshCalendarPhoneReminderWorker().catch(() => { /* The calendar can open while a reminder worker update is unavailable. */ });
+const refreshReminders = () => refreshCalendarPhoneReminderWorker().catch(() => { /* The calendar can open while a reminder worker update is unavailable. */ });
+if (document.prerendering) document.addEventListener('prerenderingchange', refreshReminders, { once: true });
+else refreshReminders();
 (async () => {
   try {
     const [tables, response] = await Promise.all([loadTables(), fetch('/data/published.json', { cache: 'no-cache' })]);

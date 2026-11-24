@@ -27,6 +27,7 @@ import { wireInstalledSystemBars } from './ui/system-bars.js';
 import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL } from './website-clock.js';
 import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
 import { wireCandleLightingDialog } from './ui/candle-lighting-dialog.js';
+import { preloadCalendar } from './calendar-preload.js';
 
 enableWebsitePreview(location.search);
 
@@ -801,6 +802,7 @@ function renderHome(published) {
   // Home and Donate use the approved compact design; charts keep their own layout.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  if (!isWebsitePreview()) preloadCalendar();
   refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
   // The card is drawn here as well as by the ticker, so the row is asked here too rather

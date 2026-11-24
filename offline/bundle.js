@@ -4342,6 +4342,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
   }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
+    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
     const id = actor;
     try {
       const value = await request('/api/announcements/status');
@@ -5735,7 +5736,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function loadEvents() {
     const number = ++requestNumber;
     if (!endpoint) { redraw(); return; }
-    if (!calendarAnalyticsOpened) { calendarAnalyticsOpened = true; window.dispatchEvent(new Event('zmanim-calendar-open')); }
+    if (document.prerendering) document.addEventListener('prerenderingchange', announceCalendarOpen, { once: true });
+    else announceCalendarOpen();
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
@@ -5973,6 +5975,19 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     }
   };
   const dayTimer = setInterval(updateToday, 60000);
+  function announceCalendarOpen() {
+    if (disposed || calendarAnalyticsOpened || !user || !calendarSession()) return;
+    calendarAnalyticsOpened = true;
+    window.dispatchEvent(new Event('zmanim-calendar-open'));
+  }
+  const activateCalendar = () => {
+    if (endpoint && user && !calendarSession()) {
+      user = null; events = []; messageEvents = []; simchaReview = []; signIn();
+      return;
+    }
+    updateToday(); fitReader();
+  };
+  document.addEventListener('prerenderingchange', activateCalendar, { once: true });
   document.addEventListener('visibilitychange', updateToday);
   window.addEventListener('resize', fitReader);
   window.visualViewport?.addEventListener('resize', fitReader);
@@ -6025,6 +6040,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   return () => {
     readerResize?.disconnect();
     disposed = true; requestNumber++; clearReaderCache(); announcements.dispose(); clearInterval(dayTimer);
+    document.removeEventListener('prerenderingchange', announceCalendarOpen);
+    document.removeEventListener('prerenderingchange', activateCalendar);
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
     window.removeEventListener('online', retryConnection);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
