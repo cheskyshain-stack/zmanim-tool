@@ -31,6 +31,7 @@ on:
     - cron: '7 4,5 * * *'
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -44,6 +45,8 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    env:
+      PAGES_ARTIFACT: github-pages-${{ github.run_id }}-${{ github.run_attempt }}
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -69,9 +72,42 @@ jobs:
 
       - uses: actions/configure-pages@v5
 
-      - uses: actions/upload-pages-artifact@v3
+      - id: upload
+        uses: actions/upload-pages-artifact@v3
         with:
           path: dist
+          name: ${{ env.PAGES_ARTIFACT }}
+
+      - name: Wait for the uploaded site to be visible
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PAGES_ARTIFACT_ID: ${{ steps.upload.outputs.artifact_id }}
+        run: |
+          node --input-type=module <<'JS'
+          const {GITHUB_API_URL, GITHUB_REPOSITORY, GITHUB_RUN_ID, GH_TOKEN, PAGES_ARTIFACT, PAGES_ARTIFACT_ID} = process.env;
+          const url = `${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts?per_page=100`;
+          for (let attempt = 0; attempt < 20; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            const response = await fetch(url, {
+              headers: {Authorization: `Bearer ${GH_TOKEN}`, Accept: 'application/vnd.github+json'},
+              cache: 'no-store', signal: AbortSignal.timeout(10000),
+            });
+            if (response.ok) {
+              const {artifacts} = await response.json();
+              const matches = artifacts.filter(artifact => artifact.name === PAGES_ARTIFACT && !artifact.expired);
+              if (matches.length === 1 && String(matches[0].id) === PAGES_ARTIFACT_ID) {
+                console.log('The uploaded site is ready to publish.');
+                process.exit(0);
+              }
+            } else if (![429, 500, 502, 503, 504].includes(response.status)) {
+              throw Error(`Could not verify the uploaded site: HTTP ${response.status}`);
+            }
+            await response.body?.cancel();
+          }
+          throw Error('The uploaded site is not yet visible. Retry this publishing job.');
+          JS
 
       - id: deploy
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: ${{ env.PAGES_ARTIFACT }}
