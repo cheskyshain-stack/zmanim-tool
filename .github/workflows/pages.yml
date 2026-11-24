@@ -99,10 +99,12 @@ jobs:
                 console.log('The uploaded site is ready to publish.');
                 process.exit(0);
               }
-            } else if (![429, 500, 502, 503, 504].includes(response.status)) {
-              throw Error(`Could not verify the uploaded site: HTTP ${response.status}`);
+            } else {
+              await response.body?.cancel();
+              if (![429, 500, 502, 503, 504].includes(response.status)) {
+                throw Error(`Could not verify the uploaded site: HTTP ${response.status}`);
+              }
             }
-            await response.body?.cancel();
           }
           throw Error('The uploaded site is not yet visible. Retry this publishing job.');
           JS
