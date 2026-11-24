@@ -1,7 +1,7 @@
 // Build first. Use actual mouse/touch events and synthetic, intercepted account data.
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), os = require('node:os');
 const assert = require('node:assert/strict'), { chromium } = require('playwright');
-const root = path.resolve(__dirname, '../dist'), endpoint = 'https://calendar-preview.example.test';
+const root = path.resolve(process.env.CALENDAR_TEST_DIST || path.join(__dirname, '../dist')), endpoint = 'https://calendar-preview.example.test';
 const output = process.env.CALENDAR_HOME_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'calendar-home-preview-'));
 fs.mkdirSync(output, { recursive: true });
 const server = http.createServer((req, res) => {

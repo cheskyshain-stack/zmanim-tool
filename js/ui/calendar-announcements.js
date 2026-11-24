@@ -99,6 +99,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
+    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
     const id = actor;
     try {
       const value = await request('/api/announcements/status');
