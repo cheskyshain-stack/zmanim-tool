@@ -548,7 +548,7 @@ function homeHtml(published) {
       <a class="luach-item" href="/donate/">
         ${ICON_HEART}<span class="luach-item-copy"><span class="luach-item-title">${escAttr(DONATE.name)}</span><span class="luach-item-description">Support our shul and community</span></span>${CHEVRON}
       </a>
-      <a class="luach-item luach-calendar-card" href="/admin/calendar/?view=congregation" data-community-calendar>
+      <a class="luach-item luach-calendar-card" href="/calendar/" data-community-calendar>
         ${ICON_COMMUNITY_CALENDAR}<span class="luach-item-copy"><span class="luach-item-title">Community calendar</span><span class="luach-item-description">Simchos &amp; shul events</span></span>${CHEVRON}
       </a>
     </nav>

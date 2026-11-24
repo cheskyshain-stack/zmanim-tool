@@ -600,7 +600,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
       const area = view.el.querySelector('[data-cal-invitation]'); area.hidden = false;
-      area.querySelector('input').value = location.origin + '/admin/calendar/#invite=' + result.token;
+      area.querySelector('input').value = location.origin + '/calendar/#invite=' + result.token;
       status.textContent = 'Invitation ready.';
     };
     const list = async () => {

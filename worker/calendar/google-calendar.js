@@ -51,7 +51,7 @@ export async function googleEvent(event,reminders=0,generation='') {
     }
   }
   return {id:'lc'+await digest(generation+':'+event.id),summary:'LC · '+event.title,
-    description:(event.details||event.description||'')+'\n\nLakewood Commons\nhttps://baismedrashoflakewoodcommons.org/admin/calendar/'+(event.time&&!event.endTime?'\nEnd time is an estimated one hour after the start.':''),
+    description:(event.details||event.description||'')+'\n\nLakewood Commons\nhttps://baismedrashoflakewoodcommons.org/calendar/'+(event.time&&!event.endTime?'\nEnd time is an estimated one hour after the start.':''),
     location:event.location||'',start,end,visibility:'private',
     reminders:{useDefault:false,overrides:reminders?[{method:'popup',minutes:reminders}]:[]}};
 }
@@ -115,10 +115,10 @@ export async function googleCallback(storage,env,url) {
   const code=url.searchParams.get('code');
   if(url.searchParams.has('error')||!code||code.length>4096) {
     await storage.delete(key);
-    return new Response(null,{status:303,headers:{Location:env.ALLOWED_ORIGIN+'/admin/calendar/#google-calendar=cancelled','Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
+    return new Response(null,{status:303,headers:{Location:env.ALLOWED_ORIGIN+'/calendar/#google-calendar=cancelled','Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
   }
   await storage.put(key,{...pending,code:await crypt(env,user.id,code)});
-  return new Response(null,{status:303,headers:{Location:env.ALLOWED_ORIGIN+'/admin/calendar/#google-calendar='+state,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
+  return new Response(null,{status:303,headers:{Location:env.ALLOWED_ORIGIN+'/calendar/#google-calendar='+state,'Cache-Control':'no-store','Referrer-Policy':'no-referrer'}});
 }
 async function schedule(storage,at) {const old=await storage.getAlarm();if(!old||old>at)await storage.setAlarm(at);}
 

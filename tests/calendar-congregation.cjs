@@ -149,7 +149,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();
         await page.getByRole('link', { name:'Back to Home' }).click(); await page.locator('[data-community-calendar]').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
         assert(await page.getByRole('link',{name:'Community calendar Simchos & shul events'}).isEnabled());
-        assert.equal(await page.locator('[data-community-calendar]').getAttribute('href'),'/admin/calendar/?view=congregation');
+        assert.equal(await page.locator('[data-community-calendar]').getAttribute('href'),'/calendar/');
         for (const width of [320,375,393,1440]) { await page.setViewportSize({ width, height:900 }); assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)); await page.screenshot({ path:path.join(output, 'home-coming-soon-' + width + '.png'), fullPage:true }); }
         await page.goBack(); await page.locator('[data-cal-options]').waitFor(); await page.locator('[data-cal-options]').click(); await page.getByRole('button', { name:'Sign out', exact:true }).click();
         await page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();

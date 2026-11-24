@@ -35,7 +35,7 @@ const server = http.createServer((req, res) => {
         await page.goto(origin + '/texts/?count=off&verify=' + Date.now());
         await page.locator('.tx-title').waitFor();
         assert.equal(await page.locator('a').count(), 1, 'Messages has only its calendar return link');
-        assert.equal(await page.locator('[data-calendar-back]').getAttribute('href'), '/admin/calendar/');
+        assert.equal(await page.locator('[data-calendar-back]').getAttribute('href'), '/calendar/');
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'Fits this viewport');
         const header = await page.locator('.tx-site-header').evaluate(element => {
           const box = node => { const r = node.getBoundingClientRect(); return { left:r.left, right:r.right, top:r.top, bottom:r.bottom, width:r.width, height:r.height }; };

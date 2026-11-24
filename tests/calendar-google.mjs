@@ -40,7 +40,7 @@ async function connect(db,mock){
  const url=new URL(result.url),state=url.searchParams.get('state');
  assert.equal(url.searchParams.get('scope'),'https://www.googleapis.com/auth/calendar.app.created');assert.equal(url.searchParams.get('access_type'),'offline');assert.ok(url.searchParams.get('code_challenge'));
  const callback=await googleCallback(db,env,new URL(env.GOOGLE_CALENDAR_REDIRECT_URI+'?state='+state+'&code=synthetic-code'));
- assert.equal(callback.status,303);assert.equal(callback.headers.get('Location'),env.ALLOWED_ORIGIN+'/admin/calendar/#google-calendar='+state);
+ assert.equal(callback.status,303);assert.equal(callback.headers.get('Location'),env.ALLOWED_ORIGIN+'/calendar/#google-calendar='+state);
  await assert.rejects(()=>manageGoogle(db,env,request('/complete','POST'),{...user,id:'other'}, {state},mock.send),/expired/);
  const completed=await (await manageGoogle(db,env,request('/complete','POST'),user,{state},mock.send)).json();
  assert.equal(completed.connected,true);assert.equal(JSON.stringify(completed).includes('synthetic-refresh'),false);

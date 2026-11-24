@@ -18,9 +18,9 @@ for (const path of ['/api/announcements', '/api/announcements/status', '/api/ann
   await response.body?.cancel();
 }
 if (process.argv.includes('--site')) {
-  const local = fs.readFileSync(new URL('../admin/calendar/index.html', import.meta.url), 'utf8');
+  const local = fs.readFileSync(new URL('../calendar/index.html', import.meta.url), 'utf8');
   const version = html => /"\/js\/ui\/calendar-announcements.js": "\/js\/ui\/calendar-announcements.js\?v=([a-f0-9]+)"/.exec(html)?.[1];
-  const response = await fetch(origin + '/admin/calendar/?release-check=' + Date.now(), { headers });
+  const response = await fetch(origin + '/calendar/?release-check=' + Date.now(), { headers });
   assert.equal(response.status, 200);
   const html = await response.text();
   assert(version(local), 'Build the release checkout before checking site versions.');

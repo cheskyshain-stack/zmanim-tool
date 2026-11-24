@@ -1,8 +1,9 @@
 import { calendarRequest } from '../calendar/api.js';
 import { CALENDAR_REMINDER_TYPES, DEFAULT_CALENDAR_REMINDER_RULE } from '../calendar/reminder-date.js';
 
+// Retain the existing worker scope so saved phone subscriptions survive the page move.
 const calendarPath = '/admin/calendar/';
-const workerPath = calendarPath + 'phone-reminders.js?v=4';
+const workerPath = calendarPath + 'phone-reminders.js?v=5';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });

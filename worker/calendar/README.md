@@ -12,7 +12,7 @@ With `data/calendar.json` disabled, the main admin can add, edit and delete test
 in this browser. The view clearly labels device storage, offers an event backup and
 restore, and can show examples without saving them. It never invents a shared login.
 
-The separate `/admin/calendar/` entry is for calendar-only accounts once connected.
+The separate `/calendar/` entry is for calendar-only accounts once connected.
 The ordinary admin PIN is a browser gate, not a server credential. The main calendar
 admin creates one owner account using a private, one-use bootstrap link. The owner
 invites editors by name and email. Each editor chooses their own password using an
@@ -384,7 +384,7 @@ node tests/calendar-simcha-import.cjs after npm ci --prefix worker/calendar.
 
 ### Private browser preview before service activation
 
-Signed-in accounts can try `/admin/calendar/?preview=congregation&simcha-preview=1`
+Signed-in accounts can try `/calendar/?preview=congregation&simcha-preview=1`
 or choose Preview simchos from messages under Calendar options. This uses the
 existing authenticated message reads with the congregation history restriction.
 It derives suggested events in memory and labels them Message preview. Unknown

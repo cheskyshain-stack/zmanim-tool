@@ -17,7 +17,7 @@ const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
   '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
-  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
+  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/calendar/': 'Calendar', '/calendar/index.html': 'Calendar', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
