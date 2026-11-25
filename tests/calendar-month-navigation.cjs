@@ -1,4 +1,5 @@
 // Exercise real touch/trackpad gestures against delayed, synthetic private events.
+const {calendarView}=require('./calendar-browser-controls.cjs');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), os = require('node:os');
 const assert = require('node:assert/strict'), { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../dist'), endpoint = 'https://month-navigation.example.test';
@@ -63,9 +64,9 @@ const server = http.createServer((req,res) => {
       }).observe(document.getElementById('calendar-editor'),{childList:true,subtree:true});
     });
     await page.locator('[data-cal-step="1"]').click();
-    assert.match(await page.locator('[data-cal-jump]').innerText(),/November/,'The old month remains visible while prefetch completes');
+    assert.match(await page.locator('.cal-month-title').innerText(),/November/,'The old month remains visible while prefetch completes');
     await page.locator('[data-cal-day="2026-12-15"]:not([disabled]) .cal-event-total').waitFor();
-    await page.waitForFunction(()=>document.querySelector('[data-cal-jump]').textContent.includes('December'));
+    await page.waitForFunction(()=>document.querySelector('.cal-month-title').textContent.includes('December'));
     assert.equal(calls.length,3,'Current, previous and next month each load once');
     for(let step=0;finished.length<3&&step<50;step++)await page.waitForTimeout(30);
     assert.equal(finished.length,3,JSON.stringify({calls,finished}));
@@ -88,14 +89,14 @@ const server = http.createServer((req,res) => {
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
       await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));
     };
-    const month=()=>page.locator('[data-cal-jump]').innerText();
+    const month=()=>page.locator('.cal-month-title').innerText();
     await swipe('right');assert.match(await month(),/November/);assert.equal(await page.locator('.cal-dialog').count(),0,'A swipe must not open day details');
     await swipe('right');assert.match(await month(),/October/);
     await swipe('right');assert.match(await month(),/October/,'Readers stop at last month');
     const grid=await page.locator('.cal-grid-wrap').boundingBox();await page.mouse.move(grid.x+grid.width/2,grid.y+grid.height/2);
-    await page.mouse.wheel(100,0);await page.waitForFunction(()=>document.querySelector('[data-cal-jump]').textContent.includes('November'));
+    await page.mouse.wheel(100,0);await page.waitForFunction(()=>document.querySelector('.cal-month-title').textContent.includes('November'));
     await page.mouse.wheel(110,0);assert.match(await month(),/November/,'Trackpad inertia advances only once');
-    await page.waitForTimeout(250);await page.mouse.wheel(100,0);await page.waitForFunction(()=>document.querySelector('[data-cal-jump]').textContent.includes('December'));
+    await page.waitForTimeout(250);await page.mouse.wheel(100,0);await page.waitForFunction(()=>document.querySelector('.cal-month-title').textContent.includes('December'));
     await swipe('left');assert.match(await month(),/December/,'Readers stop at next month');
     await swipe('right');assert.match(await month(),/November/);
     await touchTap(page.locator('[data-cal-day="2026-11-15"]'));
@@ -174,7 +175,7 @@ const server = http.createServer((req,res) => {
     checks.push({expiredAccessClearsCache:true});
     revoked=false;role='owner';
     await page.goto(origin+'/admin/calendar/');
-    await page.getByRole('combobox',{name:'View calendar as'}).selectOption('viewer');
+    await calendarView(page,'viewer');
     await page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();
     await reloadCalendar();
     await page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();

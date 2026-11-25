@@ -262,6 +262,11 @@
 .cal-reader-heading h2 { margin:0; text-align:center; color:#142b46; font:700 clamp(27px,7vw,36px)/1.15 Georgia,serif; letter-spacing:-.025em; }
 .cal-reader-heading h2 small { display:block; margin-top:4px; font:500 10px/1.2 system-ui,sans-serif; color:#806223; letter-spacing:normal; }
 .cal-reader-actions { display:grid; grid-template-columns:48px minmax(0,1fr) 48px; gap:10px; width:100%; max-width:420px; margin:auto; }
+.cal-message-links { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); min-width:0; border:1px solid #dfddd3; border-radius:12px; overflow:hidden; background:#fff; box-shadow:0 2px 5px #142b4605; }
+.cal-reader-heading .cal-message-links > :is(button,a) { display:flex; align-items:center; justify-content:center; gap:4px; box-sizing:border-box; min-width:0; min-height:46px; padding:6px; margin:0; border:0; border-radius:0; box-shadow:none; color:#142b46; background:#fff; font:600 13px/1.2 system-ui,sans-serif; text-align:center; text-decoration:none; }
+.cal-reader-heading .cal-message-links > a { border-left:1px solid #dfddd3; white-space:normal; }
+.cal-reader-heading .cal-message-links > a:hover { background:#f1eadb; }
+.cal-options-actions { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:.6rem; margin:1rem 0; }
 .cal-reader-heading button { display:flex; align-items:center; justify-content:center; gap:9px; min-height:48px; padding:10px 14px; font-size:14px; border-radius:12px; border-color:#dfddd3; box-shadow:0 2px 5px #142b4605; }
 .cal-reader-heading [data-cal-announcements] { white-space:nowrap; }
 .cal-reader-heading [data-cal-announcements] svg { flex:none; color:#997d3a; }
@@ -325,4 +330,6 @@
   .is-cal-congregation .cal-month-title { min-height:44px; }
 }
 @media (max-height:460px) and (max-width:600px) { .cal-reader-heading h2 { font-size:20px; } .cal-reader-heading [data-cal-announcements] > span:first-of-type { display:none; } .cal-reader-heading [data-cal-announcements] { padding-inline:10px; } }
+@media (max-height:680px) { .cal-reader-heading .cal-message-links > :is(button,a) { min-height:44px; height:44px; } }
+@media (max-height:460px) and (max-width:600px) { .cal-manager-heading h2 { display:none; } .cal-manager-heading .cal-reader-actions { width:100%; grid-template-columns:44px minmax(0,1fr) 44px; margin:auto; } .cal-manager-heading [data-cal-announcements] > span:first-of-type { display:inline; } }
 @media print { .cal-admin-heading, .cal-preview-banner, .shul-calendar, .cal-dialog, .cal-login, .cal-status, .cal-example-note { display:none !important; } }
