@@ -116,6 +116,28 @@ test('Rabbi and Mrs wording is consistent and saved short entries match original
 const weddingSource = 'Rabbi & Mrs Example Smith on the marriage of their DAUGHTER. Chasuna TONIGHT Fountain Ballroom Chupa 7:30 SCVK 10pm';
 const weddingWording = 'Mazel tov to Rabbi and Mrs. Example Smith on the marriage of their daughter!\n\nThe chasuna will take place tonight at Fountain Ballroom.\n\nChuppah: 7:30 PM\nSimchas Chosson V’Kallah: 10:00 PM';
 
+test('Messages retain exact incoming text while calendar descriptions use professional wording',async()=>{
+ const {calendarMessageHtml,calendarEventHtml}=await import('../js/ui/calendar-message-wording.js');
+ const {escText}=await import('../js/util.js');
+ for(const source of [weddingSource,'Mazel Tov!!\n\n  R&M Example Smith\nMTZOY','Shiur TONIGHT 8pm Main Shul','<img src=x onerror=alert(1)> & "quoted"\n\nKeep  two spaces']){
+  assert.equal(calendarMessageHtml(source),escText(source));
+  assert.doesNotMatch(calendarMessageHtml(source),/<(?:img|script|strong)\b/);
+ }
+ assert.match(calendarEventHtml(weddingSource),/<strong>Rabbi and Mrs\. Example Smith<\/strong>/);
+ assert.match(calendarEventHtml(weddingSource),/<strong>Chuppah:<\/strong> 7:30 PM/);
+ assert.match(calendarEventHtml('<script>alert(1)</script>'),/&lt;script&gt;/);
+});
+
+test('automatic calendar headings keep the occasion and family concise',async()=>{
+ const {calendarEventHeading}=await import('../js/calendar/message-wording.js');
+ assert.equal(calendarEventHeading(weddingSource,'Chasuna'),'Chasuna: Rabbi and Mrs. Example Smith');
+ assert.equal(calendarEventHeading(weddingWording,'Chasuna'),'Chasuna: Rabbi and Mrs. Example Smith');
+ assert.equal(calendarEventHeading('Rabbi & Mrs Example S. Jones on their son’s bar mitzvah. Kiddush Shabbos','Bar mitzva shabbos'),'Bar mitzva shabbos: Rabbi and Mrs. Example S. Jones');
+ for(const category of ['Shalom Zachor','Kiddush','Vort','Aufruf','Bar mitzva shabbos','Bar mitzva dessert'])
+  assert.equal(calendarEventHeading(category+' for the Example family on 2026-11-27 at 9pm',category),category+': the Example family');
+ assert.equal(calendarEventHeading('Bris tomorrow Shacharis 7:10 NS','Bris'),'Bris');
+});
+
 test('the approved wedding wording keeps both milestones and uses the chuppah as the event start', async () => {
  const {calendarMessageWording}=await import('../js/calendar/message-wording.js');
  const original=message(weddingSource),before=JSON.stringify(original),parsed=simchaFromMessage(original);

@@ -3784,6 +3784,16 @@ function messagePeopleWording(value) {
     .replace(/\bbas\s*mitzva[h]?\b/giu, 'bas mitzvah');
 }
 
+/** Short calendar headings name the occasion and known family, never the entire SMS. */
+function calendarEventHeading(value, category) {
+  const source = simchaSourceWording(value);
+  const family = /^((?:Rabbi & Mrs|Mr & Mrs)\s+.+?)(?=\s+(?:on|upon|are|would|will|invite|invites)\b|[!\n]|$)/iu.exec(source)?.[1]?.trim().replace(/[.!]+$/u, '');
+  if (family && family.length <= 100 && !/\b(?:chasuna|wedding|bris|vort|kiddush|shacharis|tonight|tomorrow)\b/iu.test(family))
+    return `${category}: ${messagePeopleWording(family)}`.slice(0, 160);
+  const forWhom = /^(?:shalom\s+zachor|kiddush|vort|aufruf|bris|chasuna|wedding|bar\s+mitzva[h]?(?:\s+(?:dessert|shabbos))?)\s+for\s+(.+?)(?=\s+(?:on|at|tonight|today|tomorrow|this|next)\b|[\n!]|$)/iu.exec(source)?.[1]?.trim().replace(/[.!]+$/u, '');
+  return (forWhom && forWhom.length <= 100 ? `${category}: ${messagePeopleWording(forWhom)}` : category).slice(0, 160);
+}
+
 function messageDatedOccasion(value) {
   const pattern = new RegExp(String.raw`^((?:shalom zachor|kiddush|vort|chas[su]?na[h]?|wedding|bris|aufruf|bar mitzva[h]?|shiur|hespedim|tehillim)\b.+?)\s+on\s+(\d{4}-\d{2}-\d{2})(?:\s+at\s+` + messageClockSource + String.raw`)?[.!]?$`, 'iu');
   const match = pattern.exec(value);
@@ -4263,6 +4273,7 @@ function simchaFromMessage(message) {
   const wording=simchaEventWording(text);
   if (wording.length > CALENDAR_EVENT_DETAILS_MAX) return { ...result, reason: 'Review this message before adding its complete calendar wording.' };
   const fields = {title:wording.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:wording,description:'',location:/\bshacharis\s+NS\b/iu.test(text)?'NS':/\bSimcha Hall\b/iu.test(text)?'Simcha Hall':/\bTiferes Hall\b/iu.test(text)?'Tiferes Hall':''};
+  fields.title = calendarEventHeading(wording, calendarEventCategory(fields).label);
   return { ...result, event: calendarEvent(fields) };
 }
 
@@ -4272,7 +4283,7 @@ function simchaEventPresentation(event) {
   const source = calendarEventDetails(event), wording = simchaEventWording(source);
   if (!wording || wording.length > CALENDAR_EVENT_DETAILS_MAX) return event;
   const time = event.type === 'wedding' ? simchaWeddingTime(source) || event.time : event.time;
-  return { ...event, details: wording, title: wording.split('\n')[0].slice(0, 160), time, allDay: !time && !event.endTime };
+  return { ...event, details: wording, title: calendarEventHeading(wording, calendarEventCategory(event).label), time, allDay: !time && !event.endTime };
 }
 
 // Compare people rather than treating every simcha of one type as a duplicate.
@@ -4383,8 +4394,13 @@ async function openCalendarActivity({ dialog, timeZone }) {
 }
 
 // ==== ui/calendar-message-wording.js ====
-/** Known emphasis only. Source HTML and Markdown are always treated as plain text. */
+/** Messages retain the original wording, punctuation, case and paragraph breaks. */
 function calendarMessageHtml(value) {
+  return escText(String(value ?? ''));
+}
+
+/** Calendar descriptions use known emphasis; source markup is still plain text. */
+function calendarEventHtml(value) {
   return calendarMessageWording(value).split('\n').map(line => {
     const opening = /^(Mazel tov to )(.+?)( on .+)$/u.exec(line);
     if (opening) return escText(opening[1]) + '<strong>' + escText(opening[2]) + '</strong>' + escText(opening[3]);
@@ -5576,6 +5592,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins').map(simchaEventPresentation), ...sampleEvents(), ...messageEvents];
+  const eventName = event => {
+    const prefix = calendarEventCategory(event).label + ': ';
+    return event.title.startsWith(prefix) ? event.title.slice(prefix.length) : event.title;
+  };
+  const eventLabel = event => eventName(event) === calendarEventCategory(event).label ? eventName(event) : calendarEventCategory(event).label + ': ' + eventName(event);
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -5589,7 +5610,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const shared = calendarMessageWording(calendarCongregationDetails(event)), admin = reader() ? '' : calendarAdminDetails(event);
     const clock = !event.endTime && /^(?:Chuppah|Shacharis|Time): \d{1,2}:/mu.test(shared) ? '' : calendarEventTime(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">From message</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
-      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarMessageHtml(shared)}</p>` : ''}
+      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarEventHtml(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
       ${clock ? `<p class="cal-event-clock">${calEscape(clock)}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
@@ -5745,11 +5766,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div>${isReader ? `<span class="cal-month-title">${calEscape(info.title)}</span>` : `<button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button>`}<p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
-          const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
+          const list = calendarEventsOn(all, day.iso), labels = list.map(eventLabel);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
           return `<td role="cell" class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${!dateAllowed(day.iso) || isReader && busy ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
             <span class="cal-facts" lang="he" dir="rtl">${gridFacts(day)}</span>
-            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(calendarEventCategory(event).label + ': ' + event.title)}"><span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
+            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(eventLabel(event))}">${eventName(event) !== calendarEventCategory(event).label ? `<span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>` : ''}${calEscape(eventName(event))}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
             ${mobileEvents(list)}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
@@ -5821,7 +5842,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const to = info.days.at(-1).iso > '2299-12-31' ? '2299-12-31' : info.days.at(-1).iso;
     const response = await calendarRequest(`/api/events?from=${from}&to=${to}${reader() ? '&view=congregation' : ''}`);
     if (!Array.isArray(response.events)) throw new Error('The calendar returned an invalid event list.');
-    return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedAt: String(item.updatedAt || '') }));
+    return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedBy: String(item.updatedBy || ''), updatedAt: String(item.updatedAt || '') }));
   }
   function readerMonth(value) {
     const saved = readerCache.get(value);

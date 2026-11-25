@@ -1,5 +1,5 @@
-import { calendarEvent, calendarSerial, calendarEventDetails, CALENDAR_EVENT_DETAILS_MAX } from './model.js';
-import { calendarMessageWording, simchaSourceWording, simchaWeddingMilestones, simchaWeddingTime } from './message-wording.js';
+import { calendarEvent, calendarEventCategory, calendarSerial, calendarEventDetails, CALENDAR_EVENT_DETAILS_MAX } from './model.js';
+import { calendarMessageWording, calendarEventHeading, simchaSourceWording, simchaWeddingMilestones, simchaWeddingTime } from './message-wording.js';
 export function simchaEventWording(value) { return calendarMessageWording(value); }
 import { calendarAnnouncementDate } from './announcement-model.js';
 
@@ -106,6 +106,7 @@ export function simchaFromMessage(message) {
   const wording=simchaEventWording(text);
   if (wording.length > CALENDAR_EVENT_DETAILS_MAX) return { ...result, reason: 'Review this message before adding its complete calendar wording.' };
   const fields = {title:wording.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:wording,description:'',location:/\bshacharis\s+NS\b/iu.test(text)?'NS':/\bSimcha Hall\b/iu.test(text)?'Simcha Hall':/\bTiferes Hall\b/iu.test(text)?'Tiferes Hall':''};
+  fields.title = calendarEventHeading(wording, calendarEventCategory(fields).label);
   return { ...result, event: calendarEvent(fields) };
 }
 
@@ -115,7 +116,7 @@ export function simchaEventPresentation(event) {
   const source = calendarEventDetails(event), wording = simchaEventWording(source);
   if (!wording || wording.length > CALENDAR_EVENT_DETAILS_MAX) return event;
   const time = event.type === 'wedding' ? simchaWeddingTime(source) || event.time : event.time;
-  return { ...event, details: wording, title: wording.split('\n')[0].slice(0, 160), time, allDay: !time && !event.endTime };
+  return { ...event, details: wording, title: calendarEventHeading(wording, calendarEventCategory(event).label), time, allDay: !time && !event.endTime };
 }
 
 // Compare people rather than treating every simcha of one type as a duplicate.
