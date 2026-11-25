@@ -1,9 +1,15 @@
 # Optional Google Calendar connection
 
-Status: implemented, tested against isolated records and synthetic Google responses,
-and deployed on the existing Worker. The live callback checked November 25, 2026
-still reports incomplete OAuth configuration. Publishing the website does not activate
-Google access. Real Google app configuration and member consent are required. Do not create another
+Status: Google configuration activated November 24, 2026 in the shul's
+`lakewood-commons-calendar` project. Calendar API is enabled, the External app is
+In production, and its only requested scope is the non-sensitive
+`calendar.app.created` permission. The owner-approved public privacy notice is at
+`https://baismedrashoflakewoodcommons.org/privacy/google-calendar/`.
+The existing Worker's readiness and signed-out denial checks passed after its
+three Google secrets were installed. Preserve those credentials and the existing
+encryption key. Configuration readiness does not prove member consent or completed
+event sync; each member must connect and approve Google access normally.
+Do not create another
 Worker, Durable Object, database or domain route. TV and Messages resources stay separate.
 
 ## What members get
@@ -37,8 +43,8 @@ Removing a site account also schedules cleanup through the ongoing sync alarm.
 1. Use a Google Cloud project owned by the shul. Enable Google Calendar API.
 2. Configure Google Auth Platform branding, audience and data access. The member
    consent screen should identify Bais Medrash of Lakewood Commons, with appropriate
-   contact information, homepage and privacy policy. No privacy policy page is added
-   by this patch. Complete Google's domain/consent requirements before general use.
+   contact information, homepage and the public Google Calendar privacy notice.
+   Complete Google's domain/consent requirements before general use.
    Use test users for the initial consent test; a testing app can have limited token
    lifetimes. Finish the production publishing/verification steps Google requires
    before relying on unattended member sync.
