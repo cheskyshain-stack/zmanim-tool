@@ -1,5 +1,6 @@
 import { calendarRequest, calendarSession } from '../calendar/api.js';
 import { calendarAnnouncementText, calendarAnnouncementDate, calendarAnnouncementOrder, calendarAnnouncementLocalTime, calendarAnnouncementInstant } from '../calendar/announcement-model.js';
+import { calendarMessageHtml } from './calendar-message-wording.js';
 import { escText, escAttr } from '../util.js';
 
 export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messageAlertsAvailable, openMessageAlerts }) {
@@ -199,12 +200,12 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     }
     function card(message) {
       const at = calendarAnnouncementDate(message);
-      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(at)}">${escText(whenDate(at))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${escText(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(at))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(at))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
+      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(at)}">${escText(whenDate(at))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${calendarMessageHtml(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(at))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(at))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
     }
     const messageNode = key => [...feed.querySelectorAll('[data-announcement-id]')].find(node => node.dataset.announcementId === key);
     function paintMessage(message) {
       const node = messageNode(message.id); if (!node) return;
-      node.querySelector(':scope > p').textContent = message.text;
+      node.querySelector(':scope > p').innerHTML = calendarMessageHtml(message.text);
       const at = calendarAnnouncementDate(message), time = node.querySelector('header time'); time.dateTime = at; time.textContent = whenDate(at);
       node.querySelector('[data-cal-edit-announcement]').setAttribute('aria-label', 'Edit announcement from ' + whenDate(at));
       node.querySelector('[data-cal-delete-announcement]').setAttribute('aria-label', 'Delete announcement from ' + whenDate(at));

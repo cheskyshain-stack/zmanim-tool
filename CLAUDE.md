@@ -1177,8 +1177,22 @@ calendar entries. Ambiguous proposals remain owner-only. Message-derived entries
 are labelled From message and do not get edit or reminder controls. They depend on
 the current feed history until the existing backend import is deployed; saved events
 remain durable independently. Do not claim derived entries were saved permanently.
-Generated event wording expands R&M consistently to Rabbi & Mrs, preserving the
-original posted message and its date. Historical additions use saved normal events.
+Calendar congregation details and every message in the Messages feed use the shared
+`calendarMessageWording` formatter. Use a natural mazel-tov opening for identified
+family announcements, Rabbi and Mrs., sentence case, readable venue sentences,
+and separate labelled times. Expand SCVK to Simchas Chosson V’Kallah. The approved
+wedding example has a 7:30 PM Chuppah and 10:00 PM Simchas Chosson V’Kallah; the
+calendar starts at the chuppah and does not use SCVK as an end time. Preserve names,
+initials, addresses, other instructions, and unknown or ambiguous details. Keep
+original posted text and timestamps stored, returned by the raw API, and available
+in Edit. Rendering must escape source HTML and use emphasis only for known names
+and time labels. Existing and older Messages format on display, including edits;
+never mark posts read simply to polish them. Already saved untouched automatic
+simcha entries get the same presentation without browser writes; hand-edited events
+retain their stored wording and fields while congregation details share the same
+display style. Admin-only information stays unchanged. Parser version 3 can update
+untouched imports when scanned, while preserving review decisions, event IDs and
+manual-edit protection. Historical additions use saved normal events.
 `tests/calendar-home-preview.cjs` checks the official homepage link, authentication,
 role preservation, congregation controls and announcement behavior.
 Phone day clicks open a details dialog; the event dialog follows the visual viewport

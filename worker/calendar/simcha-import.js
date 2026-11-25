@@ -6,10 +6,10 @@ import { calendarEvent } from '../../js/calendar/model.js';
  * from its event. Review records and links stay private to calendar managers. */
 export async function syncSimchaMessage(storage, message, now = new Date().toISOString()) {
   const key = 'simcha-source:' + message.id, previous = await storage.get(key);
-  if (previous?.revision === (message.revision || 1) && previous.addedAt === calendarAnnouncementDate(message) && (previous.parserVersion === 2 || previous.status === 'skipped')) return previous;
+  if (previous?.revision === (message.revision || 1) && previous.addedAt === calendarAnnouncementDate(message) && (previous.parserVersion === 3 || previous.status === 'skipped' || previous.reviewedBy)) return previous;
   const parsed = simchaFromMessage(message);
   if (!parsed && !previous) return null;
-  const record = { parserVersion:2, messageId:message.id, revision:message.revision||1, addedAt:calendarAnnouncementDate(message), text:message.text,
+  const record = { parserVersion:3, messageId:message.id, revision:message.revision||1, addedAt:calendarAnnouncementDate(message), text:message.text,
     status:'review', type:parsed?.type||'simcha', reason:parsed?.reason || 'The corrected message no longer describes a simcha. Check its linked calendar event.',
     ...(previous?.eventId?{eventId:previous.eventId,eventRevision:previous.eventRevision}:{}), ...(parsed?.event?{proposal:parsed.event}:{}) };
   const review = async reason => { record.reason=reason||record.reason; await storage.put(key,record); return record; };

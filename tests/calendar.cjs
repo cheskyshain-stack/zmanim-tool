@@ -136,6 +136,7 @@ const editorPassword = 'Synthetic calendar editor password 2026';
       await page.goto(origin + '/admin/calendar/'); await page.getByRole('heading', { name: 'Calendar editor access' }).waitFor();
       assert.equal(await page.locator('.cal-grid').count(), 0, 'Unconnected editor page does not simulate private access');
       await page.goto(origin + '/?count=off');
+      await page.locator('a[href="/calendar/"]').waitFor();
       assert.equal(await page.locator('a[href="/calendar/"]').count(), 1, 'The homepage opens the canonical calendar address');
       await ctx.close();
     }

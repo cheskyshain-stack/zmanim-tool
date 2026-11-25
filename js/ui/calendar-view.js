@@ -1,5 +1,7 @@
 import { openCalendarGoogle } from './calendar-google.js';
-import { simchaMessagePreview } from '../calendar/simcha-message.js';
+import { simchaMessagePreview, simchaEventPresentation } from '../calendar/simcha-message.js';
+import { calendarMessageWording } from '../calendar/message-wording.js';
+import { calendarMessageHtml } from './calendar-message-wording.js';
 import { openCalendarSimchaImport } from './calendar-simcha-import.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, CALENDAR_EVENT_DETAILS_MAX, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarDateInMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarCompactDayFacts, fitCalendarDayFacts } from './calendar-day-facts.js';
@@ -130,7 +132,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
-  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents(), ...messageEvents];
+  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins').map(simchaEventPresentation), ...sampleEvents(), ...messageEvents];
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -141,11 +143,12 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
     const type = calendarEventCategory(event), adminsOnly = event.visibility === 'admins', editable = canEdit(event);
-    const shared = calendarCongregationDetails(event), admin = reader() ? '' : calendarAdminDetails(event);
+    const shared = calendarMessageWording(calendarCongregationDetails(event)), admin = reader() ? '' : calendarAdminDetails(event);
+    const clock = !event.endTime && /^(?:Chuppah|Shacharis|Time): \d{1,2}:/mu.test(shared) ? '' : calendarEventTime(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">From message</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
-      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(shared)}</p>` : ''}
+      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarMessageHtml(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
-      ${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
+      ${clock ? `<p class="cal-event-clock">${calEscape(clock)}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
       ${admin || editable ? `<div class="cal-event-actions">${admin ? `<button type="button" data-cal-copy-event="${escAttr(event.id)}" title="Copy admin information">Copy</button>` : ''}${editable ? `<button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}" ${previewing() ? 'disabled' : ''}>Delete</button>` : ''}</div>` : ''}</article>`;
   }

@@ -1,4 +1,6 @@
-import { calendarEvent, calendarSerial } from './model.js';
+import { calendarEvent, calendarSerial, calendarEventDetails, CALENDAR_EVENT_DETAILS_MAX } from './model.js';
+import { calendarMessageWording, simchaSourceWording, simchaWeddingMilestones, simchaWeddingTime } from './message-wording.js';
+export function simchaEventWording(value) { return calendarMessageWording(value); }
 import { calendarAnnouncementDate } from './announcement-model.js';
 
 const types = [
@@ -17,19 +19,6 @@ const dateISO = value => new Date(value).toISOString().slice(0, 10);
 const shifted = (date, days) => dateISO(Date.parse(date + 'T12:00:00Z') + days * 86400000);
 const pad = n => String(n).padStart(2, '0');
 export const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, ' ').trim();
-
-/** Trim greetings and closing wishes only. Names, times, places and source messages stay intact. */
-export function simchaEventWording(value) {
-  return String(value || '')
-    .replace(/\br\s*&\s*m\b\.?/giu,'Rabbi & Mrs')
-    .replace(/\brabbi\s*(?:&|and)\s*mrs\.?\s+/giu,'Rabbi & Mrs ')
-    .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu,'')
-    .replace(/\bMTZOY\b[.!]?/giu,'')
-    .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu,'')
-    .replace(/שיזכו\s+לבנות\s+בית\s+נאמן\s+בישראל[.!]?/gu,'')
-    .replace(/^\s*(?:maz[ae]l\s+tov|m["'״’]?t)[!.:,]?\s*(?:to\s+)?/iu,'')
-    .replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n').replace(/[ \t]{2,}/g,' ').trim();
-}
 
 /** Conservative, local extraction. No message is sent to an external AI service.
  * Dates are civil New York dates, anchored to the original message timestamp. */
@@ -90,8 +79,15 @@ export function simchaFromMessage(message) {
   // Do not invent a clock time from an ambiguous bare 8:30 or a relative prayer time.
   let time = '', endTime = '';
   const clocks = [...text.matchAll(/\b(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?m\.?\b/gi)];
-  if (clocks.length > 1 || /\d\s*[-–]\s*\d/.test(text.replace(/20\d{2}-\d{2}-\d{2}/g,''))) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
-  if (clocks.length) {
+  if (/\d\s*[-–]\s*\d/.test(text.replace(/20\d{2}-\d{2}-\d{2}/g,''))) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
+  const milestones = type === 'wedding' ? simchaWeddingMilestones(text) : [];
+  const chuppah = milestones.filter(item => item.kind === 'chuppah');
+  if (type === 'wedding' && /\bchup(?:p)?a[h]?\b/iu.test(text) && !chuppah.length) return { ...result, reason: 'Confirm the chuppah time before adding this simcha.' };
+  if (chuppah.length) {
+    time = simchaWeddingTime(text);
+    if (!time) return { ...result, reason: 'Confirm the separately labelled wedding times before adding this simcha.' };
+  } else if (clocks.length > 1) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
+  else if (clocks.length) {
     const [, hour, minute = '00', period] = clocks[0];
     if (+hour < 1 || +hour > 12) return { ...result, reason:'Invalid event time.' };
     time = pad((+hour%12)+(period.toLowerCase()==='p'?12:0))+':'+minute;
@@ -100,6 +96,7 @@ export function simchaFromMessage(message) {
     if (bare.length !== 1 || +bare[0][1] < 1 || +bare[0][1] > 12) return {...result,reason:'Confirm the event time.'};
     const morning = /shacharis|שחרית/iu.test(text) && !/tonight|evening/iu.test(text);
     const evening = /tonight|evening|night|dessert|chupah/iu.test(text) || type === 'bar-mitzva-dessert';
+    if (+bare[0][1] === 12) return { ...result, reason: 'Confirm AM or PM and the calendar date for this time.' };
     if (!morning && !evening) return {...result,reason:'The clock time is unclear. Confirm it before adding this simcha.'};
     time = pad((+bare[0][1]%12)+(evening?12:0))+':'+bare[0][2];
   } else if (/(?:\bat\s+|@)\d|\b\d{1,2}:[0-5]\d\b|\b(?:after|before)\b.*(?:maariv|shacharis|mincha|davening)|אחרי|לאחר/iu.test(text))
@@ -107,8 +104,18 @@ export function simchaFromMessage(message) {
   if(time && +time.slice(0,2)<6 && /\b(?:tonight|night|motzai)\b/iu.test(text)) return {...result,reason:'After midnight wording. Confirm the civil calendar date.'};
   const customCategory = type === 'custom' ? (/\bbris\b|ברית/iu.test(text)?'Bris':/pidyon|פדיון/iu.test(text)?'Pidyon Haben':/sheva|שבע/iu.test(text)?'Sheva Brachos':'Bas Mitzvah') : '';
   const wording=simchaEventWording(text);
+  if (wording.length > CALENDAR_EVENT_DETAILS_MAX) return { ...result, reason: 'Review this message before adding its complete calendar wording.' };
   const fields = {title:wording.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:wording,description:'',location:/\bshacharis\s+NS\b/iu.test(text)?'NS':/\bSimcha Hall\b/iu.test(text)?'Simcha Hall':/\bTiferes Hall\b/iu.test(text)?'Tiferes Hall':''};
   return { ...result, event: calendarEvent(fields) };
+}
+
+/** Presentation only: never replace an editor's wording or write back from the browser. */
+export function simchaEventPresentation(event) {
+  if (!event.simchaPreview && event.updatedBy !== 'simcha-message-import') return event;
+  const source = calendarEventDetails(event), wording = simchaEventWording(source);
+  if (!wording || wording.length > CALENDAR_EVENT_DETAILS_MAX) return event;
+  const time = event.type === 'wedding' ? simchaWeddingTime(source) || event.time : event.time;
+  return { ...event, details: wording, title: wording.split('\n')[0].slice(0, 160), time, allDay: !time && !event.endTime };
 }
 
 // Compare people rather than treating every simcha of one type as a duplicate.
@@ -116,9 +123,9 @@ export function simchaRelation(a, b) {
   const kind = e => ['bar-mitzvah','bar-mitzva-shabbos'].includes(e.type) ? 'bar-mitzvah' : e.type;
   if (a.date !== b.date || kind(a) !== kind(b) || (a.customCategory||'') !== (b.customCategory||'')) return 'different';
   const text = e => e.details || e.title || '';
-  if (simchaTextKey(simchaEventWording(text(a))) === simchaTextKey(simchaEventWording(text(b)))) return 'same';
+  if (simchaTextKey(simchaSourceWording(text(a))) === simchaTextKey(simchaSourceWording(text(b)))) return 'same';
   const identity = e => {
-    const t = text(e);
+    const t = simchaSourceWording(text(e));
     const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon|would)\b|[.!,\n]|$)/iu)?.[1] || '';
     const child = t.match(/\b(?:son|daughter)['’]?s?\s+(.+?)(?=\s+(?:bar|bas|to|dessert|vort|chasuna)\b|[.!,\n]|$)/iu)?.[1] || '';
     return {p:simchaTextKey(parent).split(' ').filter(Boolean),c:simchaTextKey(child)};
