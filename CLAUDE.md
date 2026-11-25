@@ -2092,3 +2092,11 @@ Calendar phone reminder buttons are removed from day details, individual events,
 the admin toolbar and Calendar options. Keep the separate Messages alerts control
 and the optional Google Calendar connection. Existing server registrations and
 message alert delivery are not changed by this interface removal.
+
+The Google Calendar connection has a public privacy notice at
+`/privacy/google-calendar/`, linked from the public footer and the Google Calendar
+connection dialog. Keep it readable without JavaScript or sign-in. Its wording
+must match the existing app-created-calendar scope, encrypted authorization,
+Cloudflare processing, cleanup and retention behavior. Publishing or materially
+changing this notice requires the owner's review. Do not substitute a placeholder
+privacy URL in Google Auth Platform.

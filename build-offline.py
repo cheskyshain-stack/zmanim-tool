@@ -1021,7 +1021,7 @@ DIST_STRIP = {
 # and adding Special Schedules wrote /schedules/ and put it in the sitemap while leaving it
 # out of dist/, which is the copy that gets published: the sitemap pointed at a page that was
 # not there. One list, so a new route cannot be half-published.
-DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "calendar", "texts", "seats", "yahrzeits", "offline"]
+DIST_TREES = ["css", "js", "assets", "icons", "vendor", "data", *ROUTES, "admin", "calendar", "privacy", "texts", "seats", "yahrzeits", "offline"]
 DIST_FILES = ["index.html", "404.html", "favicon.ico", "site.webmanifest", "robots.txt", "sitemap.xml",
               "CNAME"]
 # Third-party, minified, and carrying licences that have to travel with it. Copied byte for
