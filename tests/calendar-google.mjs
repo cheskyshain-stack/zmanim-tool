@@ -78,6 +78,44 @@ test('inactive accounts stop exporting and cleanup their shul calendar',async()=
  await db.put('user:'+user.id,{...user,active:false});await runGoogleSync(db,env,Date.now()+61000,mock.send);
  assert.equal((await db.list({prefix:'google-connection:'})).size,0);
 });
+
+test('calendar-list appearance failures do not block event sync and retry at most hourly',async()=>{
+ for(const status of [401,403,429,503]) {
+  const db=new Storage(),mock=mockGoogle();await connect(db,mock);
+  await db.put('event:event-1',fields);
+  await db.put('event:private',{...fields,id:'private',visibility:'admins'});
+  let styleAttempts=0,rejectStyle=true;
+  const send=async(url,options)=>{
+   if(url.includes('/calendarList/')) {
+    styleAttempts++;
+    if(rejectStyle)return Response.json({error:'synthetic appearance failure'},{status});
+   }
+   return mock.send(url,options);
+  };
+  let now=Date.now()+100;await runGoogleSync(db,env,now,send);
+  assert.equal(mock.events.size,1,'Public events sync even when appearance is unavailable');
+  let state=await(await manageGoogle(db,env,request(),user,{})).json();
+  assert.equal(state.error,'');assert.ok(state.lastSyncedAt);assert.equal(state.connected,true);
+  await db.put('event:event-1',{...fields,title:'Updated after appearance failure'});
+  await runGoogleSync(db,env,now+=61000,send);
+  assert.equal([...mock.events.values()][0].summary,'LC · Updated after appearance failure');
+  assert.equal(styleAttempts,1,'Normal minute syncs do not repeat failed appearance requests');
+  rejectStyle=false;await runGoogleSync(db,env,now+=60*60000,send);
+  assert.equal(styleAttempts,2);assert.equal((await db.get('google-connection:'+user.id)).styled,true);
+  assert.equal((await db.get('google-connection:'+user.id)).styleRetryAt,undefined);
+  assert.equal(mock.calls.filter(c=>c.url.endsWith('/calendars')&&c.method==='POST').length,1,'The existing calendar is reused');
+ }
+});
+
+test('event authorization failures still stop sync when optional appearance also fails',async()=>{
+ const db=new Storage(),mock=mockGoogle();await connect(db,mock);await db.put('event:event-1',fields);
+ const send=(url,options)=>url.includes('/calendarList/')||url.includes('/events/')
+  ?Response.json({error:'synthetic authorization failure'},{status:401}):mock.send(url,options);
+ await runGoogleSync(db,env,Date.now()+100,send);
+ const state=await(await manageGoogle(db,env,request(),user,{})).json();
+ assert.match(state.error,/Reconnect/);assert.equal(state.lastSyncedAt,null);
+ assert.equal(mock.events.size,0);assert.equal((await db.list({prefix:'google-entry:'})).size,0);
+});
 test('date only, multiple days, explicit ends and missing end durations preserve source meaning',async()=>{
  const allDay=await googleEvent({...fields,time:'',endDate:'2026-11-24'});assert.deepEqual(allDay.start,{date:'2026-11-22'});assert.deepEqual(allDay.end,{date:'2026-11-25'});
  const overnight=await googleEvent({...fields,time:'23:30'});assert.equal(overnight.end.dateTime,'2026-11-23T00:30:00');assert.match(overnight.description,/estimated/);

@@ -18,8 +18,9 @@ Sign in to the website, open Calendar options > Google Calendar, then choose Con
 Google asks the member to approve access. The service uses only
 `https://www.googleapis.com/auth/calendar.app.created`: access to calendars created
 by this app, rather than access to their personal appointments.
-A separate Lakewood Commons calendar gets a navy starting color and LC · event titles.
-Members may change its color in Google. Reminder choices are off, 10 minutes,
+A separate Lakewood Commons calendar gets LC · event titles. Navy calendar styling
+is optional: if Google rejects the calendar-list request, event sync continues and
+styling retries at most hourly. Members may choose the color in Google. Reminder choices are off, 10 minutes,
 30 minutes, one hour or one day before. Google and device settings control delivery.
 Changing reminders never enables the website's separate phone push feature.
 

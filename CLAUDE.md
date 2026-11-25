@@ -2100,3 +2100,8 @@ must match the existing app-created-calendar scope, encrypted authorization,
 Cloudflare processing, cleanup and retention behavior. Publishing or materially
 changing this notice requires the owner's review. Do not substitute a placeholder
 privacy URL in Google Auth Platform.
+
+Google calendar-list styling is optional. A rejected color/default-reminder request
+must not stop saved event sync or tell a member to reconnect. Back off that optional
+request for an hour, while preserving normal event authorization failures and the
+existing app-created calendar. Do not expand OAuth scopes to repair appearance.
