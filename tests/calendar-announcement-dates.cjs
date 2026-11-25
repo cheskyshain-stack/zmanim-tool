@@ -106,7 +106,7 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
      return page;
     };
     const manager=await prepare(owner,393),congregant=await prepare(viewer,393);
-    const managerDialog = manager.getByRole('dialog', { name: 'Announcements' });
+    const managerDialog = manager.getByRole('dialog', { name: 'Messages' });
     const managerFeed = managerDialog.locator('.cal-announcement-feed');
     const managerCards = managerFeed.locator('[data-announcement-id]');
     const composer = managerDialog.locator('.cal-announcement-compose');

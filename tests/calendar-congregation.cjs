@@ -1,4 +1,5 @@
 // Build first. Only synthetic sessions and intercepted calendar records are used.
+const {calendarOptions,calendarView}=require('./calendar-browser-controls.cjs');
 const fs = require('node:fs'), path = require('node:path'), os = require('node:os'), http = require('node:http');
 const assert = require('node:assert/strict'), { chromium } = require('playwright');
 const root = path.resolve(__dirname, '../dist'), endpoint = 'https://calendar.example.test';
@@ -144,7 +145,7 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
         assert.deepEqual(await page.locator('.cal-dialog .cal-event-card').evaluateAll(nodes => nodes.map(node => [...node.classList].find(name => name.startsWith('cal-type-')).slice(9))), types, 'Day details automatically group event types');
         await page.keyboard.press('Escape');
         await page.getByRole('button', { name:/^Messages/ }).click(); await page.getByText('Example Shul announcement', { exact:true }).waitFor(); await page.keyboard.press('Escape');
-        await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Schedule messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
+        await page.locator('[data-cal-options]').click(); assert.equal(await page.getByRole('link', { name:'Scheduled messages', exact:true }).count(), 0); assert.equal(await page.locator('.cal-dialog .cal-legend > span').count(), 8); await page.keyboard.press('Escape');
         await page.locator('[data-cal-step="-1"]').click(); await page.locator('[data-cal-day="2026-10-01"]:not([disabled])').waitFor(); assert(await page.locator('[data-cal-step="-1"]').isDisabled());
         await page.clock.setFixedTime(new Date('2026-12-01T17:00:00Z')); await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange'))); await page.locator('[data-cal-day="2026-12-01"]:not([disabled])').waitFor();
         await page.getByRole('link', { name:'Back to Home' }).click(); await page.locator('[data-community-calendar]').waitFor(); assert.equal(new URL(page.url()).pathname, '/');
@@ -162,11 +163,11 @@ const types = ['shalom-zachor','kiddush','vort','aufruf','wedding','bar-mitzva-s
           localStorage.setItem('zmanim-admin-unlock', JSON.stringify({ at:Date.now() }));
           sessionStorage.setItem('lakewood-commons-calendar-session-v1', JSON.stringify({ token:'c'.repeat(64), expires:new Date('2299-01-01T00:00:00Z').getTime(), user:{ id:'fixture-owner', role:'owner', name:'Example owner', active:true } }));
         });
-        await page.goto(origin + '/admin/#calendar'); await page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
-        await page.locator('[data-cal-view]').selectOption('viewer'); await page.locator('.is-cal-congregation [data-cal-day]:not([disabled])').first().waitFor();
+        await page.goto(origin + '/admin/#calendar'); await page.locator('.cal-reader-heading').waitFor();
+        await calendarView(page,'viewer'); await page.locator('.is-cal-congregation [data-cal-day]:not([disabled])').first().waitFor();
         const preview = await page.locator('.shul-calendar').boundingBox(); assert(preview.y + preview.height <= 901, 'Congregation preview fits below the main admin controls');
         await page.locator('[data-cal-options]').click(); await page.locator('[data-cal-view]').selectOption('owner');
-        assert(await page.locator('[data-cal-access]').isVisible()); assert.equal(await page.locator('.is-cal-congregation').count(), 0);
+        await calendarOptions(page); assert(await page.locator('[data-cal-access]').isVisible()); assert.equal(await page.locator('.is-cal-congregation').count(), 1); await page.keyboard.press('Escape');
       }
       await context.close();
     }

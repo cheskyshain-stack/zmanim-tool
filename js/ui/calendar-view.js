@@ -141,6 +141,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
+  const sharedLayout = () => !!endpoint && !!user;
   const monthAllowed = value => !reader() || value >= calendarReaderMonths(today).first && value <= calendarReaderMonths(today).last;
   const dateAllowed = value => value >= '1900-01-01' && value <= '2299-12-31' && monthAllowed(value.slice(0, 7));
   const canAdd = () => !endpoint || ['owner', 'editor'].includes(role());
@@ -202,13 +203,25 @@ export function renderCalendar(container, settings, tables, { standalone = false
     calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
-  function readerOptions() {
-    const view = dialog(`${previewing() ? `<div><p>Congregation preview. Your main admin account stays unchanged.</p>${viewChoice()}</div>` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its announcements are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><h3>Event colors</h3><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><button type="button" data-cal-signout>Sign out</button>`);
+  function calendarOptions() {
+    const view = dialog(`${user.role === 'owner' && !congregation ? `${viewChoice()}${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin here to make changes.</p>' : ''}` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its messages are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><div class="cal-options-actions">
+      ${canAdd() ? `<button type="button" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>Add an event</button>` : ''}
+      ${!reader() ? '<button type="button" data-cal-choose-month>Go to month</button>' : ''}
+      ${role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}
+      ${user.role === 'owner' && !congregation && !previewing() && simchaReview.length ? `<button type="button" data-cal-simcha-unclear>Review unclear messages (${simchaReview.length})</button>` : ''}
+      ${googleButton()}<button type="button" data-cal-signout>Sign out</button></div>
+      <details class="cal-extra"><summary>Event colors</summary><div class="cal-legend">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div></details>`);
     view.title('Calendar options'); bindViewChoice(view.el, view.close);
-    const signOutButton = view.el.querySelector('[data-cal-signout]');
-    signOutButton.insertAdjacentHTML('beforebegin', googleButton());
+    wireDay(view.el, view.close);
+    view.el.querySelector('[data-cal-choose-month]')?.addEventListener('click',()=>{view.close();chooseMonth();});
+    view.el.querySelector('[data-cal-access]')?.addEventListener('click',()=>{view.close();access();});
+    view.el.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{view.close();reviewMessages();});
     view.el.querySelector('[data-cal-google]')?.addEventListener('click',()=>{view.close();openCalendarGoogle(dialog);});
     view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
+  }
+  function reviewMessages() {
+    const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));
+    view.title('Simcha messages to review');
   }
   function openDay(date, { event, missingEvent = false, remindToPost = false } = {}) {
     const content = event
@@ -235,7 +248,10 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const { calendarRefresh, ...historyState } = history.state || {};
     if (calendarRefresh) {
       history.replaceState(historyState, '');
-      if (calendarRefresh.preview && user.role === 'owner' && !congregation) previewRole = 'viewer';
+      if (user.role === 'owner' && !congregation) {
+        if (['owner','editor','viewer'].includes(calendarRefresh.role)) previewRole = calendarRefresh.role;
+        else if (calendarRefresh.preview) previewRole = 'viewer';
+      }
       const first = calendarRefresh.month + '-01', day = calendarRefresh.selected;
       if (Number.isFinite(calendarSerial(first)) && dateAllowed(first)) {
         month = calendarRefresh.month;
@@ -267,7 +283,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   function fitReader() {
     if (disposed) return;
     const calendar = container.querySelector('.shul-calendar');
-    if (reader() && calendar) {
+    if (sharedLayout() && calendar) {
       const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
       const rows = Number(container.style.getPropertyValue('--cal-weeks'));
       const chrome = calendar.getBoundingClientRect().height - calendar.querySelector('tbody').getBoundingClientRect().height;
@@ -279,33 +295,33 @@ export function renderCalendar(container, settings, tables, { standalone = false
         : viewport - top - bottom;
       container.style.setProperty('--cal-reader-height', `${Math.max(0, Math.floor(Math.min(available, chrome + rows * rowHeight)))}px`);
     } else container.style.removeProperty('--cal-reader-height');
-    fitCalendarDayFacts(container, reader());
+    fitCalendarDayFacts(container, sharedLayout());
   }
   function gridFacts(day) {
-    if (reader()) return calendarCompactDayFacts(day);
+    if (sharedLayout()) return calendarCompactDayFacts(day);
     return `${day.specialLabel ? `<span class="cal-observance">${calEscape(day.specialLabel)}</span>` : ''}${day.facts.map(fact => `<span>${calEscape(fact)}</span>`).join('')}${day.parsha ? `<span class="cal-parsha">${calEscape(day.parsha)}</span>` : ''}${day.mevarchim ? '<span class="cal-observance">מברכים</span>' : ''}`;
   }
   function mobileEvents(list) {
     if (!list.length) return '';
     const types = [...new Set(list.map(event => event.type))];
-    const text = list.length > 1 || reader() ? `${list.length} ${list.length === 1 ? 'event' : 'events'}` : calendarEventCategory(list[0]).compact;
+    const text = list.length > 1 || sharedLayout() ? `${list.length} ${list.length === 1 ? 'event' : 'events'}` : calendarEventCategory(list[0]).compact;
     return `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-event-total">${calEscape(text)}</span><span class="cal-event-colors">${types.map(type => `<i class="cal-type-${type}"></i>`).join('')}</span></span>`;
   }
   function draw() {
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
     const isReader = reader();
-    container.classList.toggle('is-cal-congregation', isReader);
-    document.body.classList.toggle('cal-reader-page', standalone && isReader);
+    const shared = sharedLayout();
+    const messages = announcements.markup({ label: 'Messages', icon: isReader });
+    const messageControls = !isReader ? `<div class="cal-message-links">${messages}<a href="/texts/" class="cal-scheduled-messages" title="Open Scheduled messages">Scheduled messages</a></div>` : messages;
+    container.classList.toggle('is-cal-congregation', shared);
+    document.body.classList.toggle('cal-reader-page', standalone && shared);
     container.style.setProperty('--cal-weeks', weeks.length);
-    container.innerHTML = `${isReader ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${user?.role === 'owner' ? viewChoice() : ''}${endpoint && user ? announcements.markup() : ''}${(standalone || previewing()) && user ? '<a href="/texts/" title="Open Schedule messages">Schedule messages</a>' : ''}${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
-      ${previewing() && !isReader ? `<div class="cal-preview-banner" data-cal-view-notice><strong>Calendar editor preview</strong><span>Preview only. Choose Main admin above to make changes. Editors can edit and delete only their own events.</span></div>` : ''}
-      ${isReader ? '' : `<div class="cal-preview-banner"><strong>${endpoint ? 'Private calendar' : 'Admin preview'}</strong><span>${endpoint ? 'Visible only to signed-in calendar accounts.' : 'Not on the congregation website. Test events are saved only in this browser.'}</span></div>`}
-      ${messageEventError ? `<p class="cal-error" role="status">Events from messages could not be loaded: ${calEscape(messageEventError)}</p>` : ''}
-      ${user?.role === 'owner' && !congregation && !previewing() && simchaReview.length ? `<div class="cal-preview-banner" data-cal-simcha-review><span>${simchaReview.length} messages need review.</span><button type="button" data-cal-simcha-unclear>Review unclear messages</button></div>` : ''}
-      <section class="shul-calendar" aria-label="Community calendar"><header class="${isReader ? 'cal-reader-heading' : 'cal-brand'}">${isReader ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><button type="button" class="cal-reader-refresh" data-cal-refresh aria-label="Refresh calendar" title="Refresh calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>${announcements.markup({ label: 'Messages', icon: true })}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
-        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div>${isReader ? `<span class="cal-month-title">${calEscape(info.title)}</span>` : `<button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button>`}<p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
-        ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
+    container.innerHTML = `${shared ? '' : `<div class="cal-admin-heading"><div><h2>Calendar</h2><p class="hint">Simchas, shul events and announcements, all in one place.</p></div><div class="cal-admin-actions">${!endpoint || role() === 'owner' ? '<button type="button" data-cal-access>Calendar access</button>' : ''}</div></div>`}
+      ${shared ? '' : '<div class="cal-preview-banner"><strong>Admin preview</strong><span>Not on the congregation website. Test events are saved only in this browser.</span></div>'}
+      <section class="shul-calendar" aria-label="Community calendar"><header class="${shared ? 'cal-reader-heading' + (!isReader ? ' cal-manager-heading' : '') : 'cal-brand'}">${shared ? `<h2>Community Calendar ${previewing() ? '<small data-cal-view-notice>Preview</small>' : ''}</h2><div class="cal-reader-actions"><button type="button" class="cal-reader-refresh" data-cal-refresh aria-label="Refresh calendar" title="Refresh calendar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 7a7 7 0 0 1 11.6-1L20 9M4 15l2.3 3a7 7 0 0 0 11.6-1"/></svg></button>${messageControls}<button type="button" data-cal-options aria-label="Calendar options" title="Calendar options">⋯</button></div>` : `<div><h3>Community Calendar</h3></div>${canAdd() ? `<button type="button" class="cal-primary" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>+ Add event</button>` : ''}`}</header>
+        <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div>${shared ? `<span class="cal-month-title">${calEscape(info.title)}</span>` : `<button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button>`}<p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
+        ${shared ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
           const list = calendarEventsOn(all, day.iso), labels = list.map(eventLabel);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
@@ -314,19 +330,18 @@ export function renderCalendar(container, settings, tables, { standalone = false
             <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(eventLabel(event))}">${eventName(event) !== calendarEventCategory(event).label ? `<span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>` : ''}${calEscape(eventName(event))}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
             ${mobileEvents(list)}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
-        <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
-        ${isReader ? `<p class="cal-reader-status cal-error" role="status" aria-live="polite">${calEscape(storageError || note)}</p>` : `<footer class="cal-footer"><span>${endpoint ? `${calEscape(user.name)} · ${role() === 'owner' ? 'Main admin' : role() === 'editor' ? 'Calendar editor' : 'Viewer'}` : 'Preview your own events or try examples.'}</span>${endpoint ? '<button type="button" data-cal-signout>Sign out</button>' : `<label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label>`}</footer>`}
-      </section>${isReader ? '' : `<p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>`}${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
+        ${shared ? '' : `<aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside>`}</div>
+        ${shared ? `<p class="cal-reader-status cal-error" role="status" aria-live="polite">${calEscape(storageError || note || (messageEventError ? 'Events from messages could not be loaded: ' + messageEventError : ''))}</p>` : `<footer class="cal-footer"><span>Preview your own events or try examples.</span><label class="cal-example-switch"><input type="checkbox" data-cal-examples ${examples ? 'checked' : ''}> Show example events</label></footer>`}
+      </section>${shared ? '' : `<p class="cal-status ${storageError ? 'cal-error' : ''}" role="status" aria-live="polite">${calEscape(storageError || note)}</p>`}${examples ? '<p class="hint cal-example-note">Example events are for testing the design. They are not saved.</p>' : ''}`;
     container.querySelectorAll('[data-cal-step]').forEach(button => button.addEventListener('click', () => changeMonth(calendarStepMonth(month, Number(button.dataset.calStep)))));
     container.querySelector('[data-cal-today]').addEventListener('click', () => { selected = today; preferredDay = Number(today.slice(8)); changeMonth(today.slice(0, 7), false); });
     container.querySelector('[data-cal-jump]')?.addEventListener('click', chooseMonth);
     container.querySelector('[data-cal-access]')?.addEventListener('click', access);
-    container.querySelector('[data-cal-simcha-unclear]')?.addEventListener('click',()=>{const view=dialog(simchaReview.map(item=>`<article class="cal-announcement-message"><p><strong>${calEscape(item.reason)}</strong></p><p dir="auto" style="white-space:pre-wrap">${calEscape(item.text)}</p></article>`).join(''));view.title('Simcha messages to review');});
     const adminActions = container.querySelector('.cal-admin-actions');
     adminActions?.insertAdjacentHTML('beforeend', googleButton());
     adminActions?.querySelector('[data-cal-google]')?.addEventListener('click',()=>openCalendarGoogle(dialog));
     bindViewChoice(container);
-    container.querySelector('[data-cal-options]')?.addEventListener('click', readerOptions);
+    container.querySelector('[data-cal-options]')?.addEventListener('click', calendarOptions);
     container.querySelector('[data-cal-refresh]')?.addEventListener('click', refreshCalendar);
     announcements.bind(container);
     container.querySelector('[data-cal-examples]')?.addEventListener('change', event => { examples = event.target.checked; redraw(); });
@@ -334,7 +349,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     container.querySelectorAll('[data-cal-day]').forEach(button => {
       button.addEventListener('click', () => {
         selected = button.dataset.calDay; preferredDay = Number(selected.slice(8)); redraw();
-        if (reader() || matchMedia('(max-width: 700px)').matches) openDay(selected);
+        if (sharedLayout() || matchMedia('(max-width: 700px)').matches) openDay(selected);
       });
       button.addEventListener('keydown', event => {
         const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7,
@@ -349,7 +364,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       });
     });
     wireDay(container);
-    if (isReader) wireMonthGestures(container.querySelector('.cal-grid-wrap'));
+    if (shared) wireMonthGestures(container.querySelector('.cal-grid-wrap'));
     fitReader(); document.fonts.ready.then(fitReader);
   }
   function chooseMonth() {
@@ -425,7 +440,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const next = calendarStepMonth(month, x < 0 ? 1 : -1), epoch = cacheEpoch;
       // Finish the native touch sequence before replacing its target elements.
       cancelAnimationFrame(swipeFrame);
-      swipeFrame = requestAnimationFrame(() => { swipeFrame = 0; if (!disposed && user && reader() && epoch === cacheEpoch) changeMonth(next); });
+      swipeFrame = requestAnimationFrame(() => { swipeFrame = 0; if (!disposed && sharedLayout() && epoch === cacheEpoch) changeMonth(next); });
     }, { passive: true });
     grid.addEventListener('click', event => {
       if (event.detail && performance.now() < suppressClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
@@ -441,7 +456,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   function refreshCalendar(event) {
     try {
-      const calendarRefresh = { month, selected, preview: previewing(), focus: document.activeElement === event.currentTarget };
+      const calendarRefresh = { month, selected, role: previewRole, preview: previewing(), focus: document.activeElement === event.currentTarget };
       history.replaceState({ ...history.state, calendarRefresh }, '');
     } catch { /* The page can still reload if the browser cannot save the view. */ }
     location.reload();
@@ -704,7 +719,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   document.addEventListener('visibilitychange', updateToday);
   window.addEventListener('resize', fitReader);
   window.visualViewport?.addEventListener('resize', fitReader);
-  const readerResize = standalone ? new ResizeObserver(() => { if (user && reader()) fitReader(); }) : null;
+  const readerResize = standalone ? new ResizeObserver(() => { if (sharedLayout()) fitReader(); }) : null;
   readerResize?.observe(container);
   const retryConnection = () => {
     if (container.querySelector('[data-cal-connection-retry]')) startCalendar();

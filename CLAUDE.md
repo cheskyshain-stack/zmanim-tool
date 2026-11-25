@@ -2112,3 +2112,11 @@ emphasis to the message feed. Calendar entries use the professional wording and
 labelled milestones separately. Automatic event headings name the occasion and
 known family. Google export applies the same presentation to untouched imports,
 including legacy entries, without rewriting source Messages or hand-edited events.
+
+All signed-in calendar roles use the congregation calendar's grid, sizing and
+navigation. Visual layout must stay separate from reader permissions: owners still
+see private admin information and editors still edit only their own events.
+Managers keep Messages and Scheduled messages together on the visible toolbar.
+Adding events, choosing a month, account access, role previews, Google settings,
+review controls and sign-out belong under Calendar options (the three dots).
+Keep the original device-only preview and backup behavior when no service is set.

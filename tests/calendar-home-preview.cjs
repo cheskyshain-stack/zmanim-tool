@@ -1,4 +1,5 @@
 // Build first. Use actual mouse/touch events and synthetic, intercepted account data.
+const {calendarOptions,calendarView}=require('./calendar-browser-controls.cjs');
 const fs = require('node:fs'), path = require('node:path'), http = require('node:http'), os = require('node:os');
 const assert = require('node:assert/strict'), { chromium } = require('playwright');
 const root = path.resolve(process.env.CALENDAR_TEST_DIST || path.join(__dirname, '../dist')), endpoint = 'https://calendar-preview.example.test';
@@ -112,17 +113,17 @@ const server = http.createServer((req, res) => {
       const t = await prepare({ role });
       await t.home(); await t.tap();
       await t.page.waitForURL('**/calendar/'); await t.page.locator('.shul-calendar').waitFor();
-      if (role !== 'viewer') await t.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+      await t.page.locator('.cal-reader-heading').waitFor(); await calendarOptions(t.page);
       assert.equal(await t.page.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), role);
-      assert.equal(await t.page.locator('.cal-brand [data-cal-add]:not([disabled])').count(), role === 'viewer' ? 0 : 1);
-      assert.equal(await t.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0);
-      assert.equal(await t.page.locator('body').evaluate(el => el.classList.contains('cal-reader-page')), role === 'viewer');
+      assert.equal(await t.page.locator('.cal-dialog [data-cal-add]:not([disabled])').count(), role === 'viewer' ? 0 : 1);
+      assert.equal(await t.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0); await t.page.keyboard.press('Escape');
+      assert.equal(await t.page.locator('body').evaluate(el => el.classList.contains('cal-reader-page')), true);
       // Bookmarks keep their session but now use the real account's controls.
       await t.page.goto(origin + '/admin/calendar/?view=congregation');
       await t.page.waitForURL('**/calendar/'); await t.page.locator('.shul-calendar').waitFor();
-      if (role !== 'viewer') await t.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
-      assert.equal(await t.page.locator('.cal-brand [data-cal-add]:not([disabled])').count(), role === 'viewer' ? 0 : 1);
-      assert.equal(await t.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0);
+      await t.page.locator('.cal-reader-heading').waitFor(); await calendarOptions(t.page);
+      assert.equal(await t.page.locator('.cal-dialog [data-cal-add]:not([disabled])').count(), role === 'viewer' ? 0 : 1);
+      assert.equal(await t.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0); await t.page.keyboard.press('Escape');
       checks.push({ role, canonicalHomeLink:true, bookmarkKeepsSession:true, controlsFollowAccount:true });
       await t.context.close();
     }
@@ -185,24 +186,24 @@ const server = http.createServer((req, res) => {
       await t.context.close();
     }
     const admin = await prepare({ role:'owner' });
-    await admin.page.goto(origin + '/admin/calendar/'); await admin.page.locator('[data-cal-view]').waitFor();
-    await admin.page.locator('[data-cal-view]').selectOption('viewer');
+    await admin.page.goto(origin + '/admin/calendar/'); await admin.page.locator('.cal-reader-heading').waitFor();
+    await calendarView(admin.page,'viewer');
     await admin.page.locator('.cal-reader-heading [data-cal-view-notice]').waitFor();
     await admin.page.getByRole('button', { name:/^Messages/ }).click();
     await admin.page.locator('.cal-dialog').waitFor(); await admin.page.keyboard.press('Escape');
     assert(admin.calls.every(call => call.startsWith('GET ')), 'The explicit admin preview still does not write reads or opens');
     await admin.page.locator('[data-cal-options]').click(); await admin.page.locator('[data-cal-view]').selectOption('owner');
-    await admin.page.locator('.cal-admin-heading').waitFor(); await admin.context.close();
+    await admin.page.locator('.cal-manager-heading').waitFor(); await admin.context.close();
     checks.push({ adminPreviewRemainsReadOnly:true });
     for (const role of ['owner','editor']) {
       const back = await prepare({ role });
-      await back.page.goto(origin + '/admin/calendar/'); await back.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
-      await back.page.getByRole('link', { name:'Schedule messages', exact:true }).click(); await back.page.locator('.tx-title').waitFor();
+      await back.page.goto(origin + '/admin/calendar/'); await back.page.locator('.cal-manager-heading').waitFor();
+      await back.page.getByRole('link', { name:'Scheduled messages', exact:true }).click(); await back.page.locator('.tx-title').waitFor();
       assert.equal(await back.page.locator('a').count(), 1);
       await back.page.getByRole('link', { name:'Back to calendar', exact:true }).click();
-      await back.page.locator('.cal-brand [data-cal-add]:not([disabled])').waitFor();
+      await back.page.locator('.cal-manager-heading').waitFor();
       assert.equal(await back.page.evaluate(() => JSON.parse(sessionStorage.getItem('lakewood-commons-calendar-session-v1')).user.role), role);
-      assert.equal(await back.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0);
+      await calendarOptions(back.page); assert.equal(await back.page.locator('[data-cal-access]').count(), role === 'owner' ? 1 : 0); await back.page.keyboard.press('Escape');
       checks.push({ role, messagesReturnKeepsSession:true }); await back.context.close();
     }
     const visitor = await prepare(); await visitor.page.goto(origin + '/texts/'); await visitor.page.locator('.tx-title').waitFor();
@@ -214,7 +215,7 @@ const server = http.createServer((req, res) => {
     await login.page.getByRole('heading', { name:'Calendar sign in', exact:true }).waitFor();
     await login.page.locator('[name=email]').fill('owner@example.test'); await login.page.locator('[name=password]').fill('Synthetic owner password 2026');
     await login.page.getByRole('button', { name:'Sign in', exact:true }).click();
-    await login.page.locator('.cal-admin-heading').waitFor();
+    await login.page.locator('.cal-manager-heading').waitFor(); await calendarOptions(login.page);
     assert.equal(await login.page.locator('[data-cal-access]').count(), 1);
     checks.push({ ownerLoginOpensOwnerControls:true }); await login.context.close();
     assert.deepEqual(errors, []);
