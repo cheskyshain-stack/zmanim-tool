@@ -283,10 +283,10 @@ const footHtml = (s) => `<div class="luach-footer">
 
 function usefulContactsHtml() {
   const sections = [
-    { id: 'leadership', name: 'Shul leadership', icon: '<path d="M4 19.5h16M7 19.5v-14l5-2 5 2v14M10 8h4m-4 4h4m-4 4h4"/>' },
+    { id: 'community', name: 'Community services', icon: '<path d="M3 11 12 4l9 7M5 10v10h14V10m-10 10v-7h6v7"/>' },
     { id: 'gabboim', name: 'Gabboim', icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 3a6 6 0 0 1 3 4v2"/>' },
     { id: 'mikva', name: 'Mikva & eruv', icon: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11Z"/>' },
-    { id: 'community', name: 'Community services', icon: '<path d="M3 11 12 4l9 7M5 10v10h14V10m-10 10v-7h6v7"/>' },
+    { id: 'leadership', name: 'Rav', icon: '<path d="M4 19.5h16M7 19.5v-14l5-2 5 2v14M10 8h4m-4 4h4m-4 4h4"/>' },
   ];
   const count = SHUL_USEFUL_CONTACTS.reduce((total, group) => total + group.people.length, 0);
   const icon = contents => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${contents}</svg>`;
@@ -297,7 +297,7 @@ function usefulContactsHtml() {
     ${sections.map(section => {
       const groups = SHUL_USEFUL_CONTACTS.filter(group => group.section === section.id);
       const total = groups.reduce((sum, group) => sum + group.people.length, 0);
-      return `<details class="luach-info-section" data-info-section="${escAttr(section.name)}"${section.id === 'leadership' ? ' open' : ''}>
+      return `<details class="luach-info-section" data-info-section="${escAttr(section.name)}">
         <summary><span class="luach-info-section-icon">${icon(section.icon)}</span><span class="luach-info-section-label"><span>${escAttr(section.name)}</span><small data-info-count>${total} contacts</small></span>${icon('<path d="m7 10 5 5 5-5"/>')}</summary>
         <div class="luach-info-section-body">${groups.map(group => `<section class="luach-info-group">
           <h4>${escAttr(group.category)}</h4>
