@@ -5880,6 +5880,16 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-site-footer .luach-contact-email { color:#576674; min-height:30px; text-underline-offset:3px; }
  .luach-calculation-credit { margin:16px 0 0; font:400 12px/1.65 Arial,sans-serif; color:#64707c; }
  .luach-calculation-credit a { color:#576674; text-underline-offset:3px; }
+ .luach-info-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:7px 15px; border:1px solid #ded8c7; border-radius:22px; background:transparent; color:#576674; font:600 13px/1.4 Arial,sans-serif; cursor:pointer; }
+ .luach-info-button:hover { background:#f0ece1; border-color:#b39754; color:#142b46; }
+ .luach-info-button:focus-visible,.luach-info-close:focus-visible { outline:2px solid #a88b43; outline-offset:3px; }
+ .luach-info-dialog { width:min(30rem,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); box-sizing:border-box; padding:24px; overflow:auto; overscroll-behavior:contain; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:18px; background:#faf7f0; color:#142b46; text-align:left; box-shadow:0 18px 70px #142b4633; }
+ .luach-info-dialog::backdrop { background:#142b4673; }
+ .luach-info-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px; }
+ .luach-info-header h2 { margin:0; font:700 30px/1.2 Georgia,serif; letter-spacing:0; }
+ .luach-info-close { display:grid; place-items:center; width:44px; height:44px; min-height:44px; margin:0; padding:0; border:1px solid #ded8c7; border-radius:12px; background:transparent; color:#576674; font:400 27px/1 Arial,sans-serif; cursor:pointer; }
+ .luach-info-contact { padding:0 0 20px; border-bottom:1px solid #e5e2da; text-align:center; }
+ .luach-info-dialog .luach-calculation-credit { margin:16px 0 0; text-align:center; }
  .is-home .luach-site-footer { max-width:560px; }
  body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:calc(24px + var(--donation-scroll-room,0px)); }
  .is-give .luach-home.luach-give-page { display:flex; flex-direction:column; flex:1; gap:0; max-width:624px; width:100%; min-height:calc(100dvh - 114px - var(--luach-safe-top,0px)); margin:0 auto; text-align:left; }
