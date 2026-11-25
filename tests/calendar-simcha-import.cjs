@@ -48,6 +48,17 @@ const {Miniflare,convertV4MiniflareOptions}=require(require.resolve('miniflare',
   await call('/api/announcements/'+source.id,'PUT',{text:'Kiddush for Example on 2026-11-28 at 10am',revision:1,operationId:'synthetic-edit-123'},owner.token);
   result=await events();assert.ok(result.body.events.some(event=>event.date==='2026-11-28'));
   assert.equal((await call('/api/simcha-import','GET',null,owner.token)).body.review.length,0);
+  const weddingText='Rabbi & Mrs Example Smith on the marriage of their DAUGHTER. Chasuna TONIGHT Fountain Ballroom Chupa 7:30 SCVK 10pm';
+  const unreadBefore=(await call('/api/announcements/status','GET',null,viewer.token)).body.unread;
+  const wedding={id:'synthetic-wedding-wording',text:weddingText,addedAt:'2026-11-20T18:00:00.000Z'};
+  assert.equal((await call('/api/announcements','POST',wedding,owner.token)).status,201);
+  const written=(await events()).body.events.find(event=>event.type==='wedding');
+  assert.equal(written.time,'19:30');assert.equal(written.endTime,'');
+  assert.match(written.details,/^Mazel tov to Rabbi and Mrs\. Example Smith/);
+  assert.match(written.details,/Chuppah: 7:30 PM\nSimchas Chosson V’Kallah: 10:00 PM/);
+  assert.equal((await call('/api/announcements','GET',null,owner.token)).body.messages.find(message=>message.id===wedding.id).text,weddingText,'Stored announcements retain their exact original text');
+  assert.equal((await call('/api/announcements/status','GET',null,viewer.token)).body.unread,unreadBefore+1,'Formatting never marks a new post as read');
+  assert.equal((await call('/api/info')).body.simchaWordingVersion,1);
   console.log('Real local service passed automatic imports, private permissions, review, SMS retries, historical scan, corrections and unchanged unread state.');
  }finally{await backend.dispose();}
 })().catch(error=>{console.error(error);process.exitCode=1;});

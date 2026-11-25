@@ -3726,6 +3726,137 @@ async function calendarRequest(path, { method = 'GET', body, signal } = {}) {
   return value;
 }
 
+// ==== calendar/message-wording.js ====
+const messageClockSource = String.raw`(\d{1,2})(?::([0-5]\d))?(?:\s*([ap])\.?m\.?)?`;
+const messageMilestoneNames = String.raw`chup(?:p)?a[h]?|s\.?c\.?v\.?k\.?|simchas\s+chosson\s+(?:v[’']?kallah|vekallah|and\s+kallah)`;
+const wordingPad = value => String(value).padStart(2, '0');
+
+/** Only explicit AM/PM or an unambiguous evening context supplies a period. */
+function messageClockValue(hour, minute = '00', period = '', evening = false) {
+  if (+hour < 1 || +hour > 12) return null;
+  const suffix = period ? period.toUpperCase() + 'M' : evening && +hour !== 12 ? 'PM' : '';
+  return { text: `${+hour}:${minute || '00'}${suffix ? ' ' + suffix : ''}`,
+    time: suffix ? wordingPad((+hour % 12) + (suffix === 'PM' ? 12 : 0)) + ':' + (minute || '00') : '' };
+}
+
+/** Keep named wedding milestones separate. Simchas chosson v'kallah is not an end time. */
+function simchaWeddingMilestones(value) {
+  const text = String(value || ''), evening = /\b(?:tonight|evening|night|motzai)\b/iu.test(text);
+  const pattern = new RegExp(`\\b(${messageMilestoneNames})\\s*:?\\s*${messageClockSource}(?=\\s|[.,;!?]|$)`, 'giu');
+  return [...text.matchAll(pattern)].map(match => {
+    const clock = messageClockValue(match[2], match[3], match[4], evening);
+    return { kind: /^chup/iu.test(match[1]) ? 'chuppah' : 'simchas', label: /^chup/iu.test(match[1]) ? 'Chuppah' : 'Simchas Chosson V’Kallah',
+      text: clock?.text || match[0], time: clock?.time || '', valid: !!clock, start: match.index, end: match.index + match[0].length };
+  });
+}
+
+/** An unambiguous labelled chuppah is the wedding start, never the later dancing time. */
+function simchaWeddingTime(value) {
+  const text = String(value || ''), milestones = simchaWeddingMilestones(text);
+  const chuppah = milestones.filter(item => item.kind === 'chuppah');
+  const clocks = [...text.matchAll(/\b\d{1,2}(?::[0-5]\d)?\s*[ap]\.?m\.?\b/giu), ...text.matchAll(/\b\d{1,2}:[0-5]\d\b/gu)];
+  if (chuppah.length !== 1 || milestones.filter(item => item.kind === 'simchas').length > 1
+    || milestones.some(item => !item.valid || !item.time)
+    || clocks.some(clock => !milestones.some(item => clock.index >= item.start && clock.index < item.end))) return '';
+  return chuppah[0].time;
+}
+
+/** Canonical source wording is also used for duplicate matching. */
+function simchaSourceWording(value) {
+  return String(value || '')
+    .replace(/\br\s*&\s*m\b\.?/giu, 'Rabbi & Mrs')
+    .replace(/\brabbi\s*(?:&|and)\s*mrs\.?\s+/giu, 'Rabbi & Mrs ')
+    .replace(/\bmr\.?\s*(?:&|and)\s*mrs\.?\s+/giu, 'Mr & Mrs ')
+    .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu, '')
+    .replace(/\bMTZOY\b[.!]?/giu, '')
+    .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu, '')
+    .replace(/שיזכו\s+לבנות\s+בית\s+נאמן\s+בישראל[.!]?/gu, '')
+    .replace(/^\s*(?:maz[ae]l\s*tov|m["'״’]?t)[!.:,]?\s*(?:to\s+)?/iu, '')
+    .replace(/[ \t]+\n/g, '\n').replace(/\n[ \t]+/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
+}
+
+function messagePeopleWording(value) {
+  return value.replace(/\bRabbi & Mrs\b/gu, 'Rabbi and Mrs.')
+    .replace(/\bMr & Mrs\b/gu, 'Mr. and Mrs.')
+    .replace(/\b(their|our|his|her)\s+(son|daughter)\b/giu, (_, pronoun, child) => pronoun.toLowerCase() + ' ' + child.toLowerCase())
+    .replace(/\bon (their|our) (son|daughter)['’]s ([^.!?\n]+?) (bar|bas)\s*mitzva[h]?\b/giu, (_, whose, child, name, kind) => 'on the ' + kind.toLowerCase() + ' mitzvah of ' + whose.toLowerCase() + ' ' + child.toLowerCase() + ' ' + name)
+    .replace(/\bbar\s*mitzva[h]?\b/giu, 'bar mitzvah')
+    .replace(/\bbas\s*mitzva[h]?\b/giu, 'bas mitzvah');
+}
+
+function messageDatedOccasion(value) {
+  const pattern = new RegExp(String.raw`^((?:shalom zachor|kiddush|vort|chas[su]?na[h]?|wedding|bris|aufruf|bar mitzva[h]?|shiur|hespedim|tehillim)\b.+?)\s+on\s+(\d{4}-\d{2}-\d{2})(?:\s+at\s+` + messageClockSource + String.raw`)?[.!]?$`, 'iu');
+  const match = pattern.exec(value);
+  if (!match) return value;
+  const date = new Date(match[2] + 'T12:00:00Z');
+  if (!Number.isFinite(+date) || date.toISOString().slice(0, 10) !== match[2]) return value;
+  const clock = match[3] ? messageClockValue(match[3], match[4], match[5]) : null;
+  const label = new Intl.DateTimeFormat('en-US', { timeZone:'UTC', weekday:'long', year:'numeric', month:'long', day:'numeric' }).format(date);
+  return match[1] + '\n\nDate: ' + label + (clock ? '\nTime: ' + clock.text : '');
+}
+
+function messageOccasionLine(value) {
+  const match = /^(?:the\s+)?(chas[su]?na[h]?|wedding|vort|bris|kiddush|shalom\s+zachor|shiur|hespedim|tehillim|asifa)\s+(.+)$/iu.exec(value.replace(/[.!]+$/u, '').trim());
+  if (!match) return value;
+  const name = /^(?:chas[su]?na[h]?|wedding)$/iu.test(match[1]) ? 'chasuna' : match[1].toLowerCase();
+  let rest = match[2].trim();
+  const when = /^(tonight|tomorrow(?:\s+night)?|today|now|(?:this\s+)?(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|shabbos)(?:\s+night)?)\b/iu.exec(rest);
+  if (!when) return value;
+  let timing = when[1].toLowerCase().replace(/\b(sunday|monday|tuesday|wednesday|thursday|friday|saturday|shabbos)\b/gu, word => word[0].toUpperCase() + word.slice(1));
+  if (/^(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Shabbos)\b/u.test(timing)) timing = 'on ' + timing;
+  rest = rest.slice(when[0].length).trim();
+  if (/^(?:for|in honou?r of|celebrating|\d{4}-\d{2}-\d{2}|\d{1,2}\/\d{1,2}|January|February|March|April|May|June|July|August|September|October|November|December)\b/iu.test(rest)) return value;
+  let clock = '';
+  const leadingClock = new RegExp(`^(?:at\\s+)?${messageClockSource}(?=\\s|$)`, 'iu').exec(rest);
+  if (leadingClock) {
+    const parsed = messageClockValue(leadingClock[1], leadingClock[2], leadingClock[3], /night|evening/iu.test(timing));
+    if (!parsed) return value;
+    clock = parsed.text; rest = rest.slice(leadingClock[0].length).trim();
+  }
+  // A venue with its own sentence, address or instructions is kept verbatim.
+  const sentence = /[.!](?:\s|$)|\n/u.exec(rest);
+  const venue = (sentence ? rest.slice(0, sentence.index) : rest).replace(/^(?:at|in)\s+/iu, '').replace(/[,.]$/u, '').trim();
+  const tail = sentence ? rest.slice(sentence.index + 1).trim() : '';
+  if (venue && !/^(?:at|in)\s+/iu.test(rest) && !/\b(?:hall|ballroom|shul|home|house|hotel|restaurant|room|street|st|avenue|ave|road|rd|way|lane|ln)\b/iu.test(venue)) return value;
+  const main = `The ${name} ${timing === 'now' ? 'is taking place' : 'will take place'} ${timing}${venue ? ' at ' + venue : ''}.`;
+  return main + (clock ? '\nTime: ' + clock : '') + (tail ? '\n' + tail : '');
+}
+
+/** Polish only recognizable announcement language. Preserve names, addresses and unknown instructions. */
+function calendarMessageWording(value) {
+  const hadGreeting = /^\s*(?:maz[ae]l\s*tov|m["'״’]?t)\b/iu.test(String(value || ''));
+  let text = simchaSourceWording(value);
+  if (!text) return hadGreeting ? 'Mazel tov!' : String(value || '').trim();
+  if (/\b(?:cancelled|canceled|postponed|rescheduled|correction|not|no|maybe|possibly|tentative)\b|נדחה|בוטל/iu.test(text)) return String(value || '').trim();
+  // Reformatting a generated entry must not duplicate its greeting or time labels.
+  text = text.replace(/^((?:Rabbi & Mrs|Mr & Mrs)\s+.+?)\s+are making a\s+(bar\s*mitzva[h]?|bas\s*mitzva[h]?|chas[su]?na[h]?)\s+for their\s+(son|daughter)\s+([\p{L}\p{M}'’ -]{1,100})([.!])(?=\s|$)/iu, (_, family, occasion, child, name, stop) => family + ' on the ' + occasion.toLowerCase() + ' of their ' + child.toLowerCase() + ' ' + name + stop);
+  const boundary = String.raw`(?=!(?:\s|$)|\.(?:\s+(?:chas[su]?na[h]?|wedding|vort|shacharis|mincha|maariv|mariv|dessert|kiddush|shalom|bris|the|please|at|location|reception|time|entrance)\b|$)|\n|$)`;
+  const familyOpening = new RegExp(String.raw`^((?:Rabbi & Mrs|Mr & Mrs)\s+.+?\s+(?:on|upon)\s+.+?)` + boundary, 'iu');
+  const greetingOpening = new RegExp(String.raw`^(.+?\s+(?:on|upon)\s+.+?)` + boundary, 'iu');
+  const opening = (hadGreeting ? greetingOpening : familyOpening).exec(text);
+  let greeting = '';
+  if (opening) {
+    greeting = 'Mazel tov to ' + messagePeopleWording(opening[1]).replace(/[.!]+$/u, '') + '!';
+    text = text.slice(opening[0].length).replace(/^[.!\s]+/u, '');
+  }
+  if (!opening && hadGreeting) text = 'Mazel tov to ' + text;
+  text = messagePeopleWording(text).replace(/\bfor (MEN|WOMEN)\b/gu, (_, audience) => 'for ' + audience.toLowerCase());
+  const milestones = simchaWeddingMilestones(text);
+  for (const item of [...milestones].reverse()) text = text.slice(0, item.start).trimEnd().replace(/\s+(?:and|&)$/iu, '') + '\n' + item.label + ': ' + item.text + text.slice(item.end);
+  text = text.replace(/\b(TONIGHT|TODAY|TOMORROW|NOW)\b/gu, word => word.toLowerCase());
+  // Put prayer times on their own labelled line without supplying a missing period.
+  text = text.replace(new RegExp(`\\b(Shacharis|Mincha|Maariv|Mariv)\\s*:?\\s*${messageClockSource}(?=\\s|[.,;!?]|$)`, 'giu'), (all, label, hour, minute, period) => {
+    const clock = messageClockValue(hour, minute, period || (/^shacharis$/iu.test(label) && +hour < 12 ? 'a' : ''), false);
+    return clock ? '\n' + (/mariv|maariv/iu.test(label) ? 'Maariv' : label[0].toUpperCase() + label.slice(1).toLowerCase()) + ': ' + clock.text : all;
+  });
+  let lines = text.trim().split('\n').map(line => line.trim());
+  if (lines.length) lines[0] = messageOccasionLine(messageDatedOccasion(lines[0]));
+  lines = lines.join('\n').split('\n');
+  const timingLine = lines.findIndex(line => /^(?:Date|Chuppah|Simchas Chosson V’Kallah|Shacharis|Mincha|Maariv|Time): /u.test(line));
+  text = lines.map((line, index) => (index === timingLine && index > 0 && lines[index - 1] ? '\n' : '') + line).join('\n');
+  return [greeting, text].filter(Boolean).join('\n\n').replace(/\n{3,}/gu, '\n\n');
+}
+
 // ==== calendar/model.js ====
 const CALENDAR_TYPES = [
   { id: 'shalom-zachor', label: 'Shalom Zachor', compact: 'Shalom Z.', colour: '#356a9a' },
@@ -4027,6 +4158,8 @@ function calendarAnnouncementText(value, maximum = CALENDAR_ANNOUNCEMENT_LENGTH)
 }
 
 // ==== calendar/simcha-message.js ====
+function simchaEventWording(value) { return calendarMessageWording(value); }
+
 const types = [
   ['shalom-zachor', /\bsh[ao]l[oa]m\s+z[ao]ch[oa]r\b|שלום\s+זכ[ו]?ר/iu],
   ['kiddush', /\bkidd?ush\b|קידוש/iu],
@@ -4043,19 +4176,6 @@ const dateISO = value => new Date(value).toISOString().slice(0, 10);
 const shifted = (date, days) => dateISO(Date.parse(date + 'T12:00:00Z') + days * 86400000);
 const pad = n => String(n).padStart(2, '0');
 const simchaTextKey = text => text.normalize('NFKC').toLowerCase().replace(/[\p{P}\p{S}\s]+/gu, ' ').trim();
-
-/** Trim greetings and closing wishes only. Names, times, places and source messages stay intact. */
-function simchaEventWording(value) {
-  return String(value || '')
-    .replace(/\br\s*&\s*m\b\.?/giu,'Rabbi & Mrs')
-    .replace(/\brabbi\s*(?:&|and)\s*mrs\.?\s+/giu,'Rabbi & Mrs ')
-    .replace(/(?:\bA\s+)?May\s+the\s+Zivug\s+Oleh\s+Yaf[ae]h?\b[.!]?/giu,'')
-    .replace(/\bMTZOY\b[.!]?/giu,'')
-    .replace(/May\s+they\s+be\s+Zoche\s+Legadlo\s+Ltorah\s+Lchupa\s+Ulmassim\s+Tovim[.!]?/giu,'')
-    .replace(/שיזכו\s+לבנות\s+בית\s+נאמן\s+בישראל[.!]?/gu,'')
-    .replace(/^\s*(?:maz[ae]l\s+tov|m["'״’]?t)[!.:,]?\s*(?:to\s+)?/iu,'')
-    .replace(/[ \t]+\n/g,'\n').replace(/\n[ \t]+/g,'\n').replace(/[ \t]{2,}/g,' ').trim();
-}
 
 /** Conservative, local extraction. No message is sent to an external AI service.
  * Dates are civil New York dates, anchored to the original message timestamp. */
@@ -4116,8 +4236,15 @@ function simchaFromMessage(message) {
   // Do not invent a clock time from an ambiguous bare 8:30 or a relative prayer time.
   let time = '', endTime = '';
   const clocks = [...text.matchAll(/\b(\d{1,2})(?::([0-5]\d))?\s*([ap])\.?m\.?\b/gi)];
-  if (clocks.length > 1 || /\d\s*[-–]\s*\d/.test(text.replace(/20\d{2}-\d{2}-\d{2}/g,''))) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
-  if (clocks.length) {
+  if (/\d\s*[-–]\s*\d/.test(text.replace(/20\d{2}-\d{2}-\d{2}/g,''))) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
+  const milestones = type === 'wedding' ? simchaWeddingMilestones(text) : [];
+  const chuppah = milestones.filter(item => item.kind === 'chuppah');
+  if (type === 'wedding' && /\bchup(?:p)?a[h]?\b/iu.test(text) && !chuppah.length) return { ...result, reason: 'Confirm the chuppah time before adding this simcha.' };
+  if (chuppah.length) {
+    time = simchaWeddingTime(text);
+    if (!time) return { ...result, reason: 'Confirm the separately labelled wedding times before adding this simcha.' };
+  } else if (clocks.length > 1) return { ...result, reason: 'Confirm the time range before adding this simcha.' };
+  else if (clocks.length) {
     const [, hour, minute = '00', period] = clocks[0];
     if (+hour < 1 || +hour > 12) return { ...result, reason:'Invalid event time.' };
     time = pad((+hour%12)+(period.toLowerCase()==='p'?12:0))+':'+minute;
@@ -4126,6 +4253,7 @@ function simchaFromMessage(message) {
     if (bare.length !== 1 || +bare[0][1] < 1 || +bare[0][1] > 12) return {...result,reason:'Confirm the event time.'};
     const morning = /shacharis|שחרית/iu.test(text) && !/tonight|evening/iu.test(text);
     const evening = /tonight|evening|night|dessert|chupah/iu.test(text) || type === 'bar-mitzva-dessert';
+    if (+bare[0][1] === 12) return { ...result, reason: 'Confirm AM or PM and the calendar date for this time.' };
     if (!morning && !evening) return {...result,reason:'The clock time is unclear. Confirm it before adding this simcha.'};
     time = pad((+bare[0][1]%12)+(evening?12:0))+':'+bare[0][2];
   } else if (/(?:\bat\s+|@)\d|\b\d{1,2}:[0-5]\d\b|\b(?:after|before)\b.*(?:maariv|shacharis|mincha|davening)|אחרי|לאחר/iu.test(text))
@@ -4133,8 +4261,18 @@ function simchaFromMessage(message) {
   if(time && +time.slice(0,2)<6 && /\b(?:tonight|night|motzai)\b/iu.test(text)) return {...result,reason:'After midnight wording. Confirm the civil calendar date.'};
   const customCategory = type === 'custom' ? (/\bbris\b|ברית/iu.test(text)?'Bris':/pidyon|פדיון/iu.test(text)?'Pidyon Haben':/sheva|שבע/iu.test(text)?'Sheva Brachos':'Bas Mitzvah') : '';
   const wording=simchaEventWording(text);
+  if (wording.length > CALENDAR_EVENT_DETAILS_MAX) return { ...result, reason: 'Review this message before adding its complete calendar wording.' };
   const fields = {title:wording.split('\n').find(line=>line.trim()).slice(0,160),type,customCategory,date,endDate:date,time,endTime,allDay:!time,visibility:'everyone',details:wording,description:'',location:/\bshacharis\s+NS\b/iu.test(text)?'NS':/\bSimcha Hall\b/iu.test(text)?'Simcha Hall':/\bTiferes Hall\b/iu.test(text)?'Tiferes Hall':''};
   return { ...result, event: calendarEvent(fields) };
+}
+
+/** Presentation only: never replace an editor's wording or write back from the browser. */
+function simchaEventPresentation(event) {
+  if (!event.simchaPreview && event.updatedBy !== 'simcha-message-import') return event;
+  const source = calendarEventDetails(event), wording = simchaEventWording(source);
+  if (!wording || wording.length > CALENDAR_EVENT_DETAILS_MAX) return event;
+  const time = event.type === 'wedding' ? simchaWeddingTime(source) || event.time : event.time;
+  return { ...event, details: wording, title: wording.split('\n')[0].slice(0, 160), time, allDay: !time && !event.endTime };
 }
 
 // Compare people rather than treating every simcha of one type as a duplicate.
@@ -4142,9 +4280,9 @@ function simchaRelation(a, b) {
   const kind = e => ['bar-mitzvah','bar-mitzva-shabbos'].includes(e.type) ? 'bar-mitzvah' : e.type;
   if (a.date !== b.date || kind(a) !== kind(b) || (a.customCategory||'') !== (b.customCategory||'')) return 'different';
   const text = e => e.details || e.title || '';
-  if (simchaTextKey(simchaEventWording(text(a))) === simchaTextKey(simchaEventWording(text(b)))) return 'same';
+  if (simchaTextKey(simchaSourceWording(text(a))) === simchaTextKey(simchaSourceWording(text(b)))) return 'same';
   const identity = e => {
-    const t = text(e);
+    const t = simchaSourceWording(text(e));
     const parent = t.match(/(?:r\s*&\s*m|rabbi\s*&\s*mrs|mr\s*&\s*mrs)\.?\s+(.+?)(?=\s+(?:on|are|upon|would)\b|[.!,\n]|$)/iu)?.[1] || '';
     const child = t.match(/\b(?:son|daughter)['’]?s?\s+(.+?)(?=\s+(?:bar|bas|to|dessert|vort|chasuna)\b|[.!,\n]|$)/iu)?.[1] || '';
     return {p:simchaTextKey(parent).split(' ').filter(Boolean),c:simchaTextKey(child)};
@@ -4242,6 +4380,17 @@ async function openCalendarActivity({ dialog, timeZone }) {
     finally { if (view.el.isConnected) retry.disabled = false; }
   }
   retry.addEventListener('click', load); await load();
+}
+
+// ==== ui/calendar-message-wording.js ====
+/** Known emphasis only. Source HTML and Markdown are always treated as plain text. */
+function calendarMessageHtml(value) {
+  return calendarMessageWording(value).split('\n').map(line => {
+    const opening = /^(Mazel tov to )(.+?)( on .+)$/u.exec(line);
+    if (opening) return escText(opening[1]) + '<strong>' + escText(opening[2]) + '</strong>' + escText(opening[3]);
+    const label = /^(Date|Chuppah|Simchas Chosson V’Kallah|Shacharis|Mincha|Maariv|Time):(?= )/u.exec(line);
+    return label ? '<strong>' + escText(label[0]) + '</strong>' + escText(line.slice(label[0].length)) : escText(line);
+  }).join('\n');
 }
 
 // ==== ui/calendar-announcements.js ====
@@ -4442,12 +4591,12 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
     }
     function card(message) {
       const at = calendarAnnouncementDate(message);
-      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(at)}">${escText(whenDate(at))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${escText(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(at))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(at))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
+      return `<article class="cal-announcement-message${message.read ? '' : ' is-unread'}" data-announcement-id="${escAttr(message.id)}"><header><strong>Shul</strong><time datetime="${escAttr(at)}">${escText(whenDate(at))}</time><span class="cal-announcement-new" ${message.read ? 'hidden' : ''}>New</span></header><p dir="auto">${calendarMessageHtml(message.text)}</p><div class="cal-announcement-actions"><button type="button" data-cal-edit-announcement="${escAttr(message.id)}" aria-label="${escAttr('Edit announcement from ' + whenDate(at))}" ${canEdit ? '' : 'hidden'}>Edit</button><button type="button" class="cal-announcement-delete" data-cal-delete-announcement="${escAttr(message.id)}" aria-label="${escAttr('Delete announcement from ' + whenDate(at))}" ${canDelete ? '' : 'hidden'}>Delete</button></div><span class="cal-announcement-end" data-cal-announcement-end="${escAttr(message.id)}" aria-hidden="true"></span></article>`;
     }
     const messageNode = key => [...feed.querySelectorAll('[data-announcement-id]')].find(node => node.dataset.announcementId === key);
     function paintMessage(message) {
       const node = messageNode(message.id); if (!node) return;
-      node.querySelector(':scope > p').textContent = message.text;
+      node.querySelector(':scope > p').innerHTML = calendarMessageHtml(message.text);
       const at = calendarAnnouncementDate(message), time = node.querySelector('header time'); time.dateTime = at; time.textContent = whenDate(at);
       node.querySelector('[data-cal-edit-announcement]').setAttribute('aria-label', 'Edit announcement from ' + whenDate(at));
       node.querySelector('[data-cal-delete-announcement]').setAttribute('aria-label', 'Delete announcement from ' + whenDate(at));
@@ -5425,7 +5574,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       ['bar-mitzva-shabbos', 'Example bar mitzva shabbos', calendarISO(calendarSerial(firstShabbos) + 14)], ['shalom-zachor', 'Example Shalom Zachor', month + '-18']];
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
-  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins'), ...sampleEvents(), ...messageEvents];
+  const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins').map(simchaEventPresentation), ...sampleEvents(), ...messageEvents];
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -5436,11 +5585,12 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   const hebrewLabel = date => jewishDateString(calendarSerial(date), false, settings.useGregorianBefore1582);
   function eventCard(event) {
     const type = calendarEventCategory(event), adminsOnly = event.visibility === 'admins', editable = canEdit(event);
-    const shared = calendarCongregationDetails(event), admin = reader() ? '' : calendarAdminDetails(event);
+    const shared = calendarMessageWording(calendarCongregationDetails(event)), admin = reader() ? '' : calendarAdminDetails(event);
+    const clock = !event.endTime && /^(?:Chuppah|Shacharis|Time): \d{1,2}:/mu.test(shared) ? '' : calendarEventTime(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">From message</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
-      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(shared)}</p>` : ''}
+      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarMessageHtml(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
-      ${calendarEventTime(event) ? `<p class="cal-event-clock">${calEscape(calendarEventTime(event))}</p>` : ''}
+      ${clock ? `<p class="cal-event-clock">${calEscape(clock)}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
       ${admin || editable ? `<div class="cal-event-actions">${admin ? `<button type="button" data-cal-copy-event="${escAttr(event.id)}" title="Copy admin information">Copy</button>` : ''}${editable ? `<button type="button" data-cal-edit="${escAttr(event.id)}">Edit</button><button type="button" data-cal-delete="${escAttr(event.id)}" ${previewing() ? 'disabled' : ''}>Delete</button>` : ''}</div>` : ''}</article>`;
   }
