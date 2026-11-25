@@ -72,7 +72,7 @@ const openedAt = Date.now();
 let lastInteraction = openedAt;
 const tabIsStale = () => Date.now() - openedAt >= REFRESH_AFTER_MS;
 const donationPanelOpen = () => Boolean(document.querySelector('.luach-give-frame:not([hidden])'));
-const candleDialogOpen = () => Boolean(main.querySelector('.luach-candle-dialog[open]'));
+const publicDialogOpen = () => Boolean(main.querySelector('.luach-candle-dialog[open], .luach-info-dialog[open]'));
 
 /** What it takes to land back where the reader was. The page itself needs nothing saved -
  *  reload() repeats the same address - so this is only the scroll position and, on
@@ -121,21 +121,21 @@ function watchForStaleTab() {
   // The only trigger that waits rather than acting the moment it is asked: everything
   // else below is already a safe moment on its own.
   setInterval(() => {
-    if (!tabIsStale() || donationPanelOpen() || candleDialogOpen()) return;
+    if (!tabIsStale() || donationPanelOpen() || publicDialogOpen()) return;
     if (Date.now() - lastInteraction < IDLE_BEFORE_REFRESH_MS) return;
     reloadInPlace();
   }, 60000);
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+    if (document.visibilityState === 'visible' && tabIsStale() && !donationPanelOpen() && !publicDialogOpen()) reloadInPlace();
   });
   window.addEventListener('pageshow', (ev) => {
     // persisted: restored from the back-forward cache, i.e. a tab that sat aside for a
     // while - not the ordinary pageshow every fresh load also fires, which openedAt being
     // brand new already keeps tabIsStale() from acting on.
-    if (ev.persisted && tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+    if (ev.persisted && tabIsStale() && !donationPanelOpen() && !publicDialogOpen()) reloadInPlace();
   });
   window.addEventListener('focus', () => {
-    if (tabIsStale() && !donationPanelOpen() && !candleDialogOpen()) reloadInPlace();
+    if (tabIsStale() && !donationPanelOpen() && !publicDialogOpen()) reloadInPlace();
   });
 }
 
@@ -280,13 +280,47 @@ const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
 
-const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer">
-  ${footHtml(s)}
-  <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
-  ${legal}
-  <p class="luach-calculation-credit no-print"><a href="/privacy/google-calendar/">Google Calendar privacy</a></p>
-  <p class="luach-calculation-credit no-print">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
+const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer no-print">
+  <button type="button" class="luach-info-button" data-site-info aria-haspopup="dialog" aria-controls="luach-info-dialog"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-10v1"/></svg>Info</button>
+  <dialog id="luach-info-dialog" class="luach-info-dialog no-print" aria-labelledby="luach-info-title">
+    <div class="luach-info-header"><h2 id="luach-info-title">Info</h2><button type="button" class="luach-info-close" data-site-info-close aria-label="Close Info">&times;</button></div>
+    <div class="luach-info-contact">
+      ${footHtml(s)}
+      <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
+      ${legal}
+    </div>
+    <p class="luach-calculation-credit">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
+    <p class="luach-calculation-credit"><a href="/privacy/google-calendar/">Google Calendar privacy</a></p>
+  </dialog>
 </footer>`;
+
+/** Delegate once from main so Home and Donate share the same small footer control. */
+function wireSiteInfo() {
+  let trigger = null;
+  main.addEventListener('click', event => {
+    const opener = event.target.closest('[data-site-info]');
+    if (opener) {
+      const dialog = opener.closest('.luach-site-footer').querySelector('.luach-info-dialog');
+      if (dialog.open) return;
+      trigger = opener;
+      dialog.showModal();
+      dialog.scrollTop = 0;
+      updateFootDots();
+      return;
+    }
+    const dialog = event.target.closest('.luach-info-dialog');
+    if (!dialog) return;
+    if (event.target.closest('[data-site-info-close]')) dialog.close();
+    else if (event.target === dialog) {
+      const bounds = dialog.getBoundingClientRect();
+      if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) dialog.close();
+    }
+  });
+  main.addEventListener('close', event => {
+    if (event.target.matches('.luach-info-dialog') && trigger?.isConnected) trigger.focus({ preventScroll: true });
+  }, true);
+  window.addEventListener('beforeprint', () => main.querySelector('.luach-info-dialog[open]')?.close());
+}
 
 /** The address, cut so that where it takes two lines the break falls between the shul's name
  *  and its street address.
@@ -690,7 +724,7 @@ function startNextUp(published) {
     // the card could not come back when midnight rolled into a day that has one.
     const home = main.querySelector('.luach-home');
     if (!home) return stopNextUp(); // the page moved on
-    if (candleDialogOpen()) {
+    if (publicDialogOpen()) {
       clearTimeout(nextUpTimer);
       nextUpTimer = setTimeout(draw, 60000);
       return;
@@ -1471,6 +1505,7 @@ function wireNav(published) {
   try { congregationScheduleTables = await loadTables(); } catch { /* Existing full-page schedules remain available without the calendar tables. */ }
   installWebsitePreviewBanner(resolveSettings(published.settings).timezone.id, ROUTES);
   wireNav(published);
+  wireSiteInfo();
   // Consumed once, before the first render: the other end of a stale-tab reload (see
   // watchForStaleTab) names the week /week/ had open and the scroll position to put back,
   // both otherwise lost the moment the old script is gone. Null on every ordinary load.

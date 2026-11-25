@@ -22,9 +22,12 @@ and the workbook uses the standard UTC offset for both UTC transition thresholds
 The actual homepage clock uses IANA timezone rules separately from that calculation rule.
 
 Live at https://baismedrashoflakewoodcommons.org (GitHub Pages from `main`, CNAME in the repo).
-The shared public website footer credits **Zmanim calculations by Shai Hershfeld**,
-with his name linking to `mailto:rambamkh@gmail.com`. Use the approved quiet 12px
-footer style below the shul's contact details. Do not mention a spreadsheet in the
+The shared public website footer has a small Info button. Its native dialog contains
+the shul's contact details, the donation page's nonprofit details, Google Calendar
+privacy link and **Zmanim calculations by Shai Hershfeld**, with his name linking
+to `mailto:rambamkh@gmail.com`. Keep the quiet 12px credit below the contact details.
+Retain Escape, backdrop/close dismissal, keyboard focus and the reader's scroll
+position. The Info button and dialog stay off paper. Do not mention a spreadsheet in the
 visible credit. This is website attribution, excluded from printed sheets.
 It was on lczmanim.cjaffa.com until the shul took a domain of its own. The address is written
 in `SITE_URL` in `build-offline.py` and in `CNAME`, and everything else is stamped from there.
