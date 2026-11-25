@@ -5016,7 +5016,7 @@ async function openCalendarGoogle(dialog, returnedState='') {
     else state=await calendarRequest('/api/google-calendar');
     if(closed)return;
     function paint(message='') {
-      content.innerHTML=`<p>Keep shul events in a separate <strong>Lakewood Commons</strong> calendar in your Google account. Events have a navy color and titles starting with LC ·. You can change the color in Google.</p>
+      content.innerHTML=`<p>Keep shul events in a separate <strong>Lakewood Commons</strong> calendar in your Google account. Event titles start with LC ·. You can choose the calendar's color in Google.</p>
         <p>New events, changes and deletions sync automatically, usually within a few minutes. Your personal appointments stay untouched. Changes made in Google do not update this website.</p>
         <p>Only saved congregation events sync. Message previews and private admin notes are excluded.</p>
         <p><a href="/privacy/google-calendar/" target="_blank" rel="noopener">Google Calendar privacy</a></p>

@@ -155,9 +155,16 @@ export async function runGoogleSync(storage,env,now=Date.now(),send=fetch) {
         if(!calendar.id || calendar.id==='primary') throw error('Google did not return the new shul calendar.',503);
         c.calendarId=calendar.id;c.provisioning=false;await save();
       }
-      if(!c.styled) {
-        await google(token,'/users/me/calendarList/'+encodeURIComponent(c.calendarId)+'?colorRgbFormat=true','PATCH',{backgroundColor:'#1b3654',foregroundColor:'#ffffff',selected:true,defaultReminders:[]},send);
-        c.styled=true;await save();
+      if(!c.styled && (!c.styleRetryAt || c.styleRetryAt<=now)) {
+        try {
+          await google(token,'/users/me/calendarList/'+encodeURIComponent(c.calendarId)+'?colorRgbFormat=true','PATCH',{backgroundColor:'#1b3654',foregroundColor:'#ffffff',selected:true,defaultReminders:[]},send);
+          c.styled=true;delete c.styleRetryAt;
+        } catch {
+          // Google can reject calendar-list styling while permitting this app's event writes.
+          // Optional appearance must not block sync or require another member authorization.
+          c.styleRetryAt=now+60*60000;
+        }
+        await save();
       }
       const all=await storage.list({prefix:'event:'});
       // Only congregation-visible source events are ever copied, including for the owner.
