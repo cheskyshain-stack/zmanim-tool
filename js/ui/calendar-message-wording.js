@@ -1,8 +1,13 @@
 import { calendarMessageWording } from '../calendar/message-wording.js';
 import { escText } from '../util.js';
 
-/** Known emphasis only. Source HTML and Markdown are always treated as plain text. */
+/** Messages retain the original wording, punctuation, case and paragraph breaks. */
 export function calendarMessageHtml(value) {
+  return escText(String(value ?? ''));
+}
+
+/** Calendar descriptions use known emphasis; source markup is still plain text. */
+export function calendarEventHtml(value) {
   return calendarMessageWording(value).split('\n').map(line => {
     const opening = /^(Mazel tov to )(.+?)( on .+)$/u.exec(line);
     if (opening) return escText(opening[1]) + '<strong>' + escText(opening[2]) + '</strong>' + escText(opening[3]);

@@ -2105,3 +2105,10 @@ Google calendar-list styling is optional. A rejected color/default-reminder requ
 must not stop saved event sync or tell a member to reconnect. Back off that optional
 request for an hour, while preserving normal event authorization failures and the
 existing app-created calendar. Do not expand OAuth scopes to repair appearance.
+
+Messages display their original incoming wording, spelling, capitalization and
+paragraph breaks as escaped plain text. Never apply calendar wording or inferred
+emphasis to the message feed. Calendar entries use the professional wording and
+labelled milestones separately. Automatic event headings name the occasion and
+known family. Google export applies the same presentation to untouched imports,
+including legacy entries, without rewriting source Messages or hand-edited events.

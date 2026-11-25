@@ -55,6 +55,16 @@ function messagePeopleWording(value) {
     .replace(/\bbas\s*mitzva[h]?\b/giu, 'bas mitzvah');
 }
 
+/** Short calendar headings name the occasion and known family, never the entire SMS. */
+export function calendarEventHeading(value, category) {
+  const source = simchaSourceWording(value);
+  const family = /^((?:Rabbi & Mrs|Mr & Mrs)\s+.+?)(?=\s+(?:on|upon|are|would|will|invite|invites)\b|[!\n]|$)/iu.exec(source)?.[1]?.trim().replace(/[.!]+$/u, '');
+  if (family && family.length <= 100 && !/\b(?:chasuna|wedding|bris|vort|kiddush|shacharis|tonight|tomorrow)\b/iu.test(family))
+    return `${category}: ${messagePeopleWording(family)}`.slice(0, 160);
+  const forWhom = /^(?:shalom\s+zachor|kiddush|vort|aufruf|bris|chasuna|wedding|bar\s+mitzva[h]?(?:\s+(?:dessert|shabbos))?)\s+for\s+(.+?)(?=\s+(?:on|at|tonight|today|tomorrow|this|next)\b|[\n!]|$)/iu.exec(source)?.[1]?.trim().replace(/[.!]+$/u, '');
+  return (forWhom && forWhom.length <= 100 ? `${category}: ${messagePeopleWording(forWhom)}` : category).slice(0, 160);
+}
+
 function messageDatedOccasion(value) {
   const pattern = new RegExp(String.raw`^((?:shalom zachor|kiddush|vort|chas[su]?na[h]?|wedding|bris|aufruf|bar mitzva[h]?|shiur|hespedim|tehillim)\b.+?)\s+on\s+(\d{4}-\d{2}-\d{2})(?:\s+at\s+` + messageClockSource + String.raw`)?[.!]?$`, 'iu');
   const match = pattern.exec(value);

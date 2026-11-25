@@ -1,4 +1,5 @@
 import { calendarIsLechaim } from '../../js/calendar/model.js';
+import { simchaEventPresentation } from '../../js/calendar/simcha-message.js';
 import { shiftDate } from '../traffic-calendar.js';
 const scope = 'https://www.googleapis.com/auth/calendar.app.created';
 const apiRoot = 'https://www.googleapis.com/calendar/v3';
@@ -38,6 +39,7 @@ async function google(token,path,method,body,send,allowed=[]) {
   return response.status===204?{}:response.json();
 }
 export async function googleEvent(event,reminders=0,generation='') {
+  event=simchaEventPresentation(event);
   const endDate=event.endDate||event.date;
   let start,end;
   if(!event.time) {start={date:event.date};end={date:shiftDate(endDate,1)};}

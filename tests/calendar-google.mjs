@@ -122,6 +122,22 @@ test('date only, multiple days, explicit ends and missing end durations preserve
  const explicit=await googleEvent({...fields,endTime:'21:00'});assert.equal(explicit.end.dateTime,'2026-11-22T21:00:00');assert.doesNotMatch(explicit.description,/estimated/);
 });
 
+test('Google uses the professional calendar presentation for legacy imports without changing source records',async()=>{
+ const source='Rabbi & Mrs Example Smith on the marriage of their DAUGHTER. Chasuna TONIGHT Fountain Ballroom Chupa 7:30 SCVK 10pm';
+ const imported={...fields,type:'wedding',title:source.slice(0,160),details:source,time:'22:00',updatedBy:'simcha-message-import'};
+ const before=JSON.stringify(imported),payload=await googleEvent(imported);
+ assert.equal(payload.summary,'LC · Chasuna: Rabbi and Mrs. Example Smith');
+ assert.equal(payload.start.dateTime,fields.date+'T19:30:00');
+ assert.match(payload.description,/Chuppah: 7:30 PM\nSimchas Chosson V’Kallah: 10:00 PM/);
+ assert.equal(payload.description.includes('Never export this'),false);
+ assert.equal(JSON.stringify(imported),before);
+ const manual={...imported,updatedBy:'calendar-owner',title:'Our chosen title',details:'Our exact calendar wording'};
+ const manualPayload=await googleEvent(manual);
+ assert.equal(manualPayload.summary,'LC · Our chosen title');assert.equal(manualPayload.start.dateTime,fields.date+'T22:00:00');
+ assert.match(manualPayload.description,/^Our exact calendar wording\n/);
+ assert.equal(payload.id,manualPayload.id,'Presentation updates retain the existing event identity');
+});
+
 test('lost insert responses and Google tombstones retry without duplicate live events',async()=>{
  const db=new Storage(),mock=mockGoogle();await connect(db,mock);await db.put('event:event-1',fields);
  let lost=true;const tombstones=new Set();

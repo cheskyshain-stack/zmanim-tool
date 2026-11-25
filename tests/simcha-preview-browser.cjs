@@ -70,6 +70,7 @@ const server=http.createServer((req,res)=>{
    await page.reload();
    await page.locator('[data-cal-day="2026-11-27"]').filter({hasText:'Example family'}).waitFor();
    for(const date of ['2026-11-20','2026-11-23']){
+    assert.match(await page.locator(`[data-cal-day="${date}"] .cal-event-chip`).innerText(),/Rabbi and Mrs\. Example Smith/,'Fetched and preview events share the concise family heading');
     await page.locator(`[data-cal-day="${date}"]`).click();
     const event=page.getByRole('dialog').locator('.cal-event-card').filter({hasText:'Fountain Ballroom'});
     await event.waitFor();assert.equal(await event.locator('.cal-event-description').innerText(),weddingWording);
@@ -83,9 +84,9 @@ const server=http.createServer((req,res)=>{
    await page.locator('[data-cal-announcements]').click();
    const feed=page.locator('.cal-announcement-feed');
    const wedding=feed.locator('[data-announcement-id="wedding-wording-example"]');await wedding.waitFor();
-   assert.equal(await wedding.locator(':scope > p').innerText(),weddingWording);
-   assert.deepEqual(await wedding.locator(':scope > p strong').allTextContents(),['Rabbi and Mrs. Example Smith','Chuppah:','Simchas Chosson V’Kallah:']);
-   assert.equal(await feed.locator('[data-announcement-id="general-wording-example"] > p').innerText(),'The shiur will take place tonight at Main Shul.\n\nTime: 8:00 PM');
+   assert.equal(await wedding.locator(':scope > p').innerText(),weddingSource);
+   assert.deepEqual(await wedding.locator(':scope > p strong').allTextContents(),[]);
+   assert.equal(await feed.locator('[data-announcement-id="general-wording-example"] > p').innerText(),messages[3].text);
    assert(await page.getByRole('dialog').evaluate(el=>el.scrollWidth<=el.clientWidth+1));
    assert.equal(await feed.locator('img,script').count(),0,'Message HTML stays plain text');
    assert.equal(await feed.locator('[data-announcement-id="unsafe-wording-example"] > p').innerText(),messages[4].text);
@@ -103,11 +104,11 @@ const server=http.createServer((req,res)=>{
   await sourceCard.locator('[data-cal-edit-announcement]').click();
   assert.equal(await sourceCard.locator('textarea[name=text]').inputValue(),weddingSource,'Edit retains the exact original wording');
   await sourceCard.locator('[data-cal-cancel-edit]').click();
-  assert.equal(await sourceCard.locator(':scope > p').innerText(),weddingWording);
+  assert.equal(await sourceCard.locator(':scope > p').innerText(),weddingSource);
   await manager.close();
   assert.equal(JSON.stringify({messages,storedEvents}),originals,'Original event and announcement records are unchanged');
   assert(writes.every(route=>['/api/announcements/open','/api/announcements/read'].includes(new URL(route,'http://local').pathname)),'Only deliberate message viewing records reads');
   assert.deepEqual(errors,[]);
-  console.log('Polished calendar entries and Messages passed on phone/desktop, with names, labelled clocks, unchanged originals and normal read tracking. Screenshots: '+out);
+  console.log('Professional calendar entries and original Messages passed on phone/desktop, with names, labelled clocks, unchanged originals and normal read tracking. Screenshots: '+out);
  }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e);server.close();process.exitCode=1;});

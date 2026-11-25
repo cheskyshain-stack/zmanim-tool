@@ -1,7 +1,7 @@
 import { openCalendarGoogle } from './calendar-google.js';
 import { simchaMessagePreview, simchaEventPresentation } from '../calendar/simcha-message.js';
 import { calendarMessageWording } from '../calendar/message-wording.js';
-import { calendarMessageHtml } from './calendar-message-wording.js';
+import { calendarEventHtml } from './calendar-message-wording.js';
 import { openCalendarSimchaImport } from './calendar-simcha-import.js';
 import { CALENDAR_TYPES, CALENDAR_LEGACY_TYPES, CALENDAR_EVENT_DETAILS_MAX, calendarEventCategory, calendarEventDetails, calendarCongregationDetails, calendarAdminDetails, calendarDetailsFields, calendarEventTime, calendarMonth, calendarDateInMonth, calendarEvent, calendarEventsOn, calendarSerial, calendarISO, calendarStepMonth, calendarReaderMonths } from '../calendar/model.js';
 import { calendarCompactDayFacts, fitCalendarDayFacts } from './calendar-day-facts.js';
@@ -133,6 +133,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
     return definitions.map(([type, title, date], index) => ({ ...calendarEvent({ type, title, date, description: 'An example to try the calendar design. This event is not saved.' }), id: 'example-' + index, example: true }));
   }
   const visibleEvents = () => [...events.filter(event => !reader() || event.visibility !== 'admins').map(simchaEventPresentation), ...sampleEvents(), ...messageEvents];
+  const eventName = event => {
+    const prefix = calendarEventCategory(event).label + ': ';
+    return event.title.startsWith(prefix) ? event.title.slice(prefix.length) : event.title;
+  };
+  const eventLabel = event => eventName(event) === calendarEventCategory(event).label ? eventName(event) : calendarEventCategory(event).label + ': ' + eventName(event);
   const role = () => congregation ? 'viewer' : user?.role === 'owner' ? previewRole : user?.role;
   const previewing = () => !congregation && user?.role === 'owner' && previewRole !== 'owner';
   const reader = () => !!endpoint && role() === 'viewer';
@@ -146,7 +151,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const shared = calendarMessageWording(calendarCongregationDetails(event)), admin = reader() ? '' : calendarAdminDetails(event);
     const clock = !event.endTime && /^(?:Chuppah|Shacharis|Time): \d{1,2}:/mu.test(shared) ? '' : calendarEventTime(event);
     return `<article class="cal-event-card cal-type-${type.id}"><div class="cal-event-meta"><span class="cal-tag">${calEscape(type.label)}</span>${event.example ? '<span class="cal-example-tag">Example</span>' : ''}${event.simchaPreview ? '<span class="cal-example-tag">From message</span>' : ''}${adminsOnly ? '<span class="cal-visibility-tag">Admins only</span>' : ''}</div>
-      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarMessageHtml(shared)}</p>` : ''}
+      ${shared ? `${admin ? '<h4>Congregation information</h4>' : ''}<p class="cal-event-description" dir="auto">${calendarEventHtml(shared)}</p>` : ''}
       ${admin ? `${shared ? '<h4>Admin information</h4>' : ''}<p class="cal-event-description" dir="auto">${calEscape(admin)}</p>` : ''}
       ${clock ? `<p class="cal-event-clock">${calEscape(clock)}</p>` : ''}
       ${event.date !== event.endDate ? `<p class="cal-event-meta">${calEscape(calFullDate(event.date))} to ${calEscape(calFullDate(event.endDate))}</p>` : ''}
@@ -302,11 +307,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
         <div class="cal-toolbar"><div class="cal-month-nav"><button type="button" data-cal-step="-1" aria-label="Previous month" ${month === '1900-01' || !monthAllowed(calendarStepMonth(month, -1)) ? 'disabled' : ''}>‹</button><div>${isReader ? `<span class="cal-month-title">${calEscape(info.title)}</span>` : `<button type="button" class="cal-month-title" data-cal-jump aria-label="Choose month">${calEscape(info.title)} <span aria-hidden="true">⌄</span></button>`}<p lang="he" dir="rtl">${calEscape(info.hebrewRange)}</p></div><button type="button" data-cal-step="1" aria-label="Next month" ${month === '2299-12' || !monthAllowed(calendarStepMonth(month, 1)) ? 'disabled' : ''}>›</button></div><button type="button" data-cal-today>Today</button></div>
         ${isReader ? '' : `<div class="cal-legend" aria-label="Event types">${CALENDAR_TYPES.map(type => `<span class="cal-type-${type.id}"><i aria-hidden="true"></i>${calEscape(type.label)}</span>`).join('')}</div><p class="cal-interaction-hint">Choose a date to view event details.${canAdd() ? ' Use Edit or Delete beside an event to make changes.' : ''}</p>`}
         <div class="cal-content"><div class="cal-grid-wrap"><table role="table" class="cal-grid" aria-label="${escAttr(info.title)}"><thead role="rowgroup"><tr role="row">${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Shabbos'].map(day => `<th role="columnheader" scope="col">${day}</th>`).join('')}</tr></thead><tbody role="rowgroup">${weeks.map(week => `<tr role="row">${week.map(day => {
-          const list = calendarEventsOn(all, day.iso), labels = list.map(event => `${calendarEventCategory(event).label}: ${event.title}`);
+          const list = calendarEventsOn(all, day.iso), labels = list.map(eventLabel);
           const label = [calFullDate(day.iso), day.hebrewLabel, day.specialLabel, ...day.facts, day.parsha ? 'Parshas ' + day.parsha : '', day.mevarchim ? 'מברכים' : '', ...labels].filter(Boolean).join('. ');
           return `<td role="cell" class="${day.inMonth ? '' : 'cal-outside'} ${day.shabbos ? 'cal-shabbos' : ''}"><button type="button" class="cal-day ${selected === day.iso ? 'is-selected' : ''} ${today === day.iso ? 'is-today' : ''}" data-cal-day="${day.iso}" tabindex="${selected === day.iso ? 0 : -1}" aria-pressed="${selected === day.iso}" ${!dateAllowed(day.iso) || isReader && busy ? 'disabled' : ''} ${today === day.iso ? 'aria-current="date"' : ''} aria-label="${escAttr(label)}"><span class="cal-date-numbers"><span class="cal-english-day">${day.day}</span></span>
             <span class="cal-facts" lang="he" dir="rtl">${gridFacts(day)}</span>
-            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(calendarEventCategory(event).label + ': ' + event.title)}"><span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>${calEscape(event.title)}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
+            <span class="cal-grid-events">${list.slice(0, 2).map(event => `<span class="cal-event-chip cal-type-${event.type}" title="${escAttr(eventLabel(event))}">${eventName(event) !== calendarEventCategory(event).label ? `<span class="cal-chip-type">${calEscape(calendarEventCategory(event).label)} · </span>` : ''}${calEscape(eventName(event))}</span>`).join('')}${list.length > 2 ? `<span class="cal-more">+${list.length - 2} more</span>` : ''}</span>
             ${mobileEvents(list)}<span class="cal-hebrew-day" lang="he" dir="rtl">${calEscape(day.hebrewDay)}</span></button></td>`;
         }).join('')}</tr>`).join('')}</tbody></table></div>
         <aside class="cal-day-panel" aria-label="Selected day">${dayHtml(selected)}</aside></div>
@@ -378,7 +383,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const to = info.days.at(-1).iso > '2299-12-31' ? '2299-12-31' : info.days.at(-1).iso;
     const response = await calendarRequest(`/api/events?from=${from}&to=${to}${reader() ? '&view=congregation' : ''}`);
     if (!Array.isArray(response.events)) throw new Error('The calendar returned an invalid event list.');
-    return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedAt: String(item.updatedAt || '') }));
+    return response.events.map(item => ({ ...calendarEvent(item), id: String(item.id), createdBy: String(item.createdBy), updatedBy: String(item.updatedBy || ''), updatedAt: String(item.updatedAt || '') }));
   }
   function readerMonth(value) {
     const saved = readerCache.get(value);
