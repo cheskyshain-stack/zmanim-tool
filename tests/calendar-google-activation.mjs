@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 import { activateGoogleCalendar } from '../scripts/activate-google-calendar.mjs';
 
 const callback = 'https://zmanim-calendar.cheskyshain.workers.dev/api/google-calendar/callback';
@@ -94,7 +95,7 @@ test('invalid downloads, redirect changes and repository-local credentials fail 
     assert.deepEqual(f.commands, []);
   }
   const f = fixture();
-  await assert.rejects(activateGoogleCalendar(new URL('../private-google.json', import.meta.url).pathname, f.dependencies), /outside the repository/);
+  await assert.rejects(activateGoogleCalendar(fileURLToPath(new URL('../private-google.json', import.meta.url)), f.dependencies), /outside the repository/);
   assert.deepEqual(f.commands, []);
 });
 
