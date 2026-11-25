@@ -5883,12 +5883,54 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-info-button { display:inline-flex; align-items:center; justify-content:center; gap:7px; min-height:44px; padding:7px 15px; border:1px solid #ded8c7; border-radius:22px; background:transparent; color:#576674; font:600 13px/1.4 Arial,sans-serif; cursor:pointer; }
  .luach-info-button:hover { background:#f0ece1; border-color:#b39754; color:#142b46; }
  .luach-info-button:focus-visible,.luach-info-close:focus-visible { outline:2px solid #a88b43; outline-offset:3px; }
- .luach-info-dialog { width:min(30rem,calc(100vw - 32px)); max-width:none; max-height:calc(100dvh - 32px); box-sizing:border-box; padding:24px; overflow:auto; overscroll-behavior:contain; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:18px; background:#faf7f0; color:#142b46; text-align:left; box-shadow:0 18px 70px #142b4633; }
+ .luach-info-dialog { position:fixed; inset:auto; left:var(--info-view-x,50vw); top:var(--info-view-y,50dvh); transform:translate(-50%,-50%); margin:0; width:min(34rem,calc(var(--info-view-width,100vw) - 32px)); height:min(52rem,calc(var(--info-view-height,100dvh) - 32px)); max-width:none; max-height:calc(var(--info-view-height,100dvh) - 32px); box-sizing:border-box; padding:0; overflow:hidden; border:1px solid #ded8c7; border-top:3px solid #b39754; border-radius:18px; background:#faf7f0; color:#142b46; text-align:left; box-shadow:0 18px 70px #142b4633; }
+ .luach-info-dialog[open] { display:flex; flex-direction:column; }
  .luach-info-dialog::backdrop { background:#142b4673; }
- .luach-info-header { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:22px; }
+ .luach-info-header { flex:none; padding:20px 24px 16px; border-bottom:1px solid #e5e2da; }
+ .luach-info-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
  .luach-info-header h2 { margin:0; font:700 30px/1.2 Georgia,serif; letter-spacing:0; }
  .luach-info-close { display:grid; place-items:center; width:44px; height:44px; min-height:44px; margin:0; padding:0; border:1px solid #ded8c7; border-radius:12px; background:transparent; color:#576674; font:400 27px/1 Arial,sans-serif; cursor:pointer; }
  .luach-info-contact { padding:0 0 20px; border-bottom:1px solid #e5e2da; text-align:center; }
+ .luach-info-content { flex:1; min-height:0; box-sizing:border-box; padding:20px 24px 24px; overflow:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+ .luach-info-content:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+ .luach-info-directory { padding:22px 0 4px; }
+ .luach-info-directory-heading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:4px 12px; margin:0 0 14px; }
+ .luach-info-directory h3 { margin:0; color:#142b46; font:700 22px/1.3 Georgia,serif; }
+ .luach-info-directory-heading > span { color:#64707c; font:400 12px/1.5 Arial,sans-serif; }
+ .luach-info-search { display:flex; align-items:center; gap:9px; min-width:0; margin:14px 0 0; padding:0 12px; border:1px solid #ded8c7; border-radius:10px; background:#fff; color:#64707c; }
+ .luach-info-search svg { width:18px; height:18px; flex:none; }
+ .luach-info-search:focus-within { outline:2px solid #a88b43; outline-offset:1px; }
+ body.is-luach #main .luach-info-search input { width:100%; min-width:0; min-height:44px; margin:0; padding:10px 0; border:0; border-radius:0; outline:none; background:transparent; color:#142b46; box-shadow:none; font:400 16px/1.5 Arial,sans-serif; }
+ .luach-info-search-status { margin:0 0 14px; color:#64707c; font:400 13px/1.5 Arial,sans-serif; }
+ .luach-info-section { margin:0 0 10px; border:1px solid #e0d9c9; border-radius:12px; overflow:clip; background:#f4f0e5; }
+ .luach-info-section > summary { display:flex; align-items:center; gap:11px; min-height:64px; box-sizing:border-box; margin:0; padding:11px 13px; list-style:none; color:#142b46; cursor:pointer; }
+ .luach-info-section > summary::-webkit-details-marker { display:none; }
+ .luach-info-section-icon { display:grid; place-items:center; flex:none; width:32px; height:32px; border:1px solid #ded3b5; border-radius:9px; color:#8d7135; background:#faf7f0; }
+ .luach-info-section-label { flex:1; min-width:0; font:600 14px/1.4 Arial,sans-serif; }
+ .luach-info-section-label > span,.luach-info-section-label small { display:block; }
+ .luach-info-section-label small { margin-top:2px; color:#64707c; font:400 11px/1.4 Arial,sans-serif; }
+ .luach-info-section > summary > svg { width:17px; height:17px; flex:none; color:#8d7135; }
+ .luach-info-section[open] > summary > svg { transform:rotate(180deg); }
+ .luach-info-section-body { padding:0 12px 12px; }
+ .luach-info-group { margin:0 0 13px; }
+ .luach-info-group:last-child { margin-bottom:0; }
+ .luach-info-group h4 { margin:0 0 6px; color:#7d652d; font:600 12px/1.5 Arial,sans-serif; }
+ .luach-info-group ul { display:grid; gap:7px; margin:0; padding:0; list-style:none; }
+ .luach-info-person { min-width:0; }
+ .luach-info-phone { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:62px; box-sizing:border-box; padding:10px 11px; border:1px solid #e5dfd2; border-radius:9px; background:#fff; color:#142b46; text-decoration:none; }
+ .luach-info-person-copy { display:block; min-width:0; }
+ .luach-info-person-name { display:block; font:600 13px/1.5 Arial,sans-serif; }
+ .luach-info-number { display:block; margin-top:2px; color:#576674; font:400 13px/1.5 Arial,sans-serif; white-space:nowrap; direction:ltr; unicode-bidi:isolate; }
+ .luach-info-call { display:grid; place-items:center; flex:none; width:30px; height:30px; border-radius:8px; background:#f4f0e5; color:#8d7135; }
+ .luach-info-call svg { width:17px; height:17px; }
+ .luach-info-phone:hover { border-color:#b39754; background:#fffdf8; }
+ .luach-info-phone:focus-visible,.luach-info-section > summary:focus-visible,.luach-info-about > summary:focus-visible { outline:2px solid #a88b43; outline-offset:-3px; }
+ .luach-info-about { margin-top:12px; padding-top:14px; border-top:1px solid #e5e2da; }
+ .luach-info-about > summary { min-height:44px; box-sizing:border-box; padding:12px 0; color:#64707c; font:600 12px/1.5 Arial,sans-serif; cursor:pointer; }
+ .luach-info-dialog.is-searching :is(.luach-info-contact,.luach-info-directory-heading,.luach-info-section > summary,.luach-info-about) { display:none; }
+ .luach-info-dialog.is-searching .luach-info-directory { padding-top:0; }
+ .luach-info-dialog.is-searching .luach-info-section { border:0; background:transparent; }
+ .luach-info-dialog.is-searching .luach-info-section-body { padding:0; }
  .luach-info-dialog .luach-calculation-credit { margin:16px 0 0; text-align:center; }
  .is-home .luach-site-footer { max-width:560px; }
  body.is-luach main.is-give { display:flex; flex-direction:column; padding-top:calc(90px + var(--luach-safe-top, 0px)); padding-bottom:calc(24px + var(--donation-scroll-room,0px)); }

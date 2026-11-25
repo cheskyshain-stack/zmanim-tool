@@ -28,6 +28,7 @@ import { enableWebsitePreview, isWebsitePreview, websiteNow, websitePreviewURL }
 import { installWebsitePreviewBanner } from './ui/website-preview-banner.js';
 import { wireCandleLightingDialog } from './ui/candle-lighting-dialog.js';
 import { preloadCalendar } from './calendar-preload.js';
+import { SHUL_USEFUL_CONTACTS } from './site-contacts.js';
 
 enableWebsitePreview(location.search);
 
@@ -280,31 +281,125 @@ const footHtml = (s) => `<div class="luach-footer">
       <p class="luach-foot">${footAddressHtml(s.footerAddress)}</p>
     </div>`;
 
+function usefulContactsHtml() {
+  const sections = [
+    { id: 'leadership', name: 'Shul leadership', icon: '<path d="M4 19.5h16M7 19.5v-14l5-2 5 2v14M10 8h4m-4 4h4m-4 4h4"/>' },
+    { id: 'gabboim', name: 'Gabboim', icon: '<circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m2 3a6 6 0 0 1 3 4v2"/>' },
+    { id: 'mikva', name: 'Mikva & eruv', icon: '<path d="M12 3s-6 7-6 11a6 6 0 0 0 12 0c0-4-6-11-6-11Z"/>' },
+    { id: 'community', name: 'Community services', icon: '<path d="M3 11 12 4l9 7M5 10v10h14V10m-10 10v-7h6v7"/>' },
+  ];
+  const count = SHUL_USEFUL_CONTACTS.reduce((total, group) => total + group.people.length, 0);
+  const icon = contents => `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${contents}</svg>`;
+  const callIcon = icon('<path d="m7 3 3 5-2 2a15 15 0 0 0 6 6l2-2 5 3-1 4C10 22 2 14 3 4Z"/>');
+  return `<section class="luach-info-directory" aria-labelledby="luach-info-directory-title">
+    <div class="luach-info-directory-heading"><h3 id="luach-info-directory-title">Useful contacts</h3><span>${count} contacts</span></div>
+    <p class="luach-info-search-status" role="status" aria-live="polite" hidden></p>
+    ${sections.map(section => {
+      const groups = SHUL_USEFUL_CONTACTS.filter(group => group.section === section.id);
+      const total = groups.reduce((sum, group) => sum + group.people.length, 0);
+      return `<details class="luach-info-section" data-info-section="${escAttr(section.name)}"${section.id === 'leadership' ? ' open' : ''}>
+        <summary><span class="luach-info-section-icon">${icon(section.icon)}</span><span class="luach-info-section-label"><span>${escAttr(section.name)}</span><small data-info-count>${total} contacts</small></span>${icon('<path d="m7 10 5 5 5-5"/>')}</summary>
+        <div class="luach-info-section-body">${groups.map(group => `<section class="luach-info-group">
+          <h4>${escAttr(group.category)}</h4>
+          <ul>${group.people.map(person => `<li class="luach-info-person">
+            <a class="luach-info-phone" href="tel:+1${person.phone.replace(/\D/g, '')}" aria-label="${escAttr('Call ' + (person.name ? person.name + ', ' : '') + group.category + ' at ' + person.phone)}"><span class="luach-info-person-copy">${person.name ? `<span class="luach-info-person-name">${escAttr(person.name)}</span>` : ''}<span class="luach-info-number">${escAttr(person.phone)}</span></span><span class="luach-info-call">${callIcon}</span></a>
+          </li>`).join('')}</ul>
+        </section>`).join('')}</div>
+      </details>`;
+    }).join('')}
+  </section>`;
+}
+
 const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer no-print">
   <button type="button" class="luach-info-button" data-site-info aria-haspopup="dialog" aria-controls="luach-info-dialog"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-10v1"/></svg>Info</button>
   <dialog id="luach-info-dialog" class="luach-info-dialog no-print" aria-labelledby="luach-info-title">
-    <div class="luach-info-header"><h2 id="luach-info-title">Info</h2><button type="button" class="luach-info-close" data-site-info-close aria-label="Close Info">&times;</button></div>
+    <div class="luach-info-header">
+      <div class="luach-info-heading"><h2 id="luach-info-title">Info</h2><button type="button" class="luach-info-close" data-site-info-close aria-label="Close Info">&times;</button></div>
+      <label class="luach-info-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input type="search" data-info-search aria-label="Search contacts" placeholder="Search contacts" autocomplete="off"></label>
+    </div>
+    <div class="luach-info-content" tabindex="0" role="region" aria-label="Shul information and useful contacts">
     <div class="luach-info-contact">
       ${footHtml(s)}
       <p class="luach-home-email"><a href="mailto:info@baismedrashoflakewoodcommons.org" class="luach-contact-email" aria-label="Email info@baismedrashoflakewoodcommons.org">Email the shul</a></p>
-      ${legal}
     </div>
-    <p class="luach-calculation-credit">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
-    <p class="luach-calculation-credit"><a href="/privacy/google-calendar/">Google Calendar privacy</a></p>
+    ${usefulContactsHtml()}
+    <details class="luach-info-about"><summary>About &amp; privacy</summary>
+      ${legal}
+      <p class="luach-calculation-credit">Zmanim calculations by <a href="mailto:rambamkh@gmail.com">Shai Hershfeld</a></p>
+      <p class="luach-calculation-credit"><a href="/privacy/google-calendar/">Google Calendar privacy</a></p>
+    </details>
+    </div>
   </dialog>
 </footer>`;
 
 /** Delegate once from main so Home and Donate share the same small footer control. */
 function wireSiteInfo() {
   let trigger = null;
+  const fitInfoViewport = () => {
+    const dialog = main.querySelector('.luach-info-dialog[open]');
+    if (!dialog) return;
+    const view = window.visualViewport;
+    const width = view?.width || innerWidth, height = view?.height || innerHeight;
+    dialog.style.setProperty('--info-view-width', `${width}px`);
+    dialog.style.setProperty('--info-view-height', `${height}px`);
+    dialog.style.setProperty('--info-view-x', `${(view?.offsetLeft || 0) + width / 2}px`);
+    dialog.style.setProperty('--info-view-y', `${(view?.offsetTop || 0) + height / 2}px`);
+  };
+  window.visualViewport?.addEventListener('resize', fitInfoViewport);
+  window.visualViewport?.addEventListener('scroll', fitInfoViewport);
+  window.addEventListener('resize', fitInfoViewport);
+  const searchStates = new WeakMap();
+  const filterContacts = input => {
+    const dialog = input.closest('.luach-info-dialog');
+    const content = dialog.querySelector('.luach-info-content');
+    const sections = [...dialog.querySelectorAll('.luach-info-section')];
+    const query = input.value.trim().toLocaleLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
+    if (query && !searchStates.has(dialog)) searchStates.set(dialog, { openStates: new Map(sections.map(section => [section, section.open])), scrollTop: content.scrollTop });
+    dialog.classList.toggle('is-searching', Boolean(query));
+    const numeric = query && /^[\d\s()+.\-]+$/.test(query) ? query.replace(/\D/g, '') : '';
+    let total = 0;
+    sections.forEach(section => {
+      let visible = 0;
+      section.querySelectorAll('.luach-info-group').forEach(group => {
+        let matches = 0;
+        group.querySelectorAll('.luach-info-person').forEach(person => {
+          const text = `${section.dataset.infoSection} ${group.querySelector('h4').textContent} ${person.textContent}`.toLocaleLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
+          const show = numeric ? person.querySelector('a').getAttribute('href').replace(/\D/g, '').includes(numeric) : text.includes(query);
+          person.hidden = !show;
+          if (show) matches++;
+        });
+        group.hidden = matches === 0;
+        visible += matches;
+      });
+      section.hidden = visible === 0;
+      section.querySelector('[data-info-count]').textContent = `${visible} contact${visible === 1 ? '' : 's'}`;
+      if (query) section.open = visible > 0;
+      else if (searchStates.has(dialog)) section.open = searchStates.get(dialog).openStates.get(section);
+      total += visible;
+    });
+    if (query) content.scrollTop = 0;
+    else if (searchStates.has(dialog)) {
+      content.scrollTop = searchStates.get(dialog).scrollTop;
+      searchStates.delete(dialog);
+    }
+    const status = dialog.querySelector('.luach-info-search-status');
+    status.hidden = !query;
+    status.textContent = total ? `${total} matching contact${total === 1 ? '' : 's'}` : 'No contacts found. Try another name or service.';
+  };
+  main.addEventListener('input', event => {
+    if (event.target.matches('[data-info-search]')) filterContacts(event.target);
+  });
   main.addEventListener('click', event => {
     const opener = event.target.closest('[data-site-info]');
     if (opener) {
       const dialog = opener.closest('.luach-site-footer').querySelector('.luach-info-dialog');
       if (dialog.open) return;
       trigger = opener;
+      const search = dialog.querySelector('[data-info-search]');
+      if (search.value) { search.value = ''; filterContacts(search); }
       dialog.showModal();
-      dialog.scrollTop = 0;
+      fitInfoViewport();
+      dialog.querySelector('.luach-info-content').scrollTop = 0;
       updateFootDots();
       return;
     }
