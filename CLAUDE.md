@@ -30,9 +30,9 @@ Retain Escape, backdrop/close dismissal, keyboard focus and the reader's scroll
 position. The Info button and dialog stay off paper. Do not mention a spreadsheet in the
 visible credit. This is website attribution, excluded from printed sheets.
 The Info panel also lists all 20 contacts from the supplied Useful_Information.xlsx
-in `js/site-contacts.js`, arranged under Shul leadership, Gabboim, Mikva & eruv,
-and Community services. Keep exact category labels, names and phone numbers,
-including contacts repeated for separate roles. Use labelled tap-to-call cards,
+in `js/site-contacts.js`, arranged in this order: Community services, Gabboim,
+Mikva & eruv, then Rav. All four sections start collapsed. Keep exact category
+labels, names and phone numbers, including contacts repeated for separate roles. Use labelled tap-to-call cards,
 search by name/service/number, and an internally scrolling body so the close button
 stays visible on short screens. The fixed search field stays above the list, including
 when the phone keyboard opens. Search reveals matching sections and clearing it
