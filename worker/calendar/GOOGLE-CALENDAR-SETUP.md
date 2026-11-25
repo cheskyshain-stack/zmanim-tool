@@ -1,8 +1,9 @@
 # Optional Google Calendar connection
 
-Status: implemented and tested against isolated records and synthetic Google responses.
-Not activated by publishing the website. Real Google consent and an authorized deployment
-of the existing `zmanim-calendar` Worker are still required. Do not create another
+Status: implemented, tested against isolated records and synthetic Google responses,
+and deployed on the existing Worker. The live callback checked November 25, 2026
+still reports incomplete OAuth configuration. Publishing the website does not activate
+Google access. Real Google app configuration and member consent are required. Do not create another
 Worker, Durable Object, database or domain route. TV and Messages resources stay separate.
 
 ## What members get
@@ -54,6 +55,21 @@ Removing a site account also schedules cleanup through the ongoing sync alarm.
      using AES-GCM with the member's site account ID as associated data.
    Never put values in Git, workflow output, screenshots, chat, or the browser app.
    The nonsecret redirect URI is already in the existing Wrangler config.
+   Alternatively, download the Google Web client JSON outside this checkout and run:
+
+   ```
+   npm ci --prefix worker/calendar --no-audit --no-fund
+   node scripts/activate-google-calendar.mjs "/absolute/path/outside/repo/client.json"
+   ```
+
+   Run it only on the computer with the shul's authorized Cloudflare login. The helper
+   validates the exact Worker and callback, keeps any existing encryption key, backs
+   up a newly generated key outside the repository (mode 0600 on Unix),
+   and sends new credentials over stdin with Wrangler disk logs disabled. It refuses
+   to replace existing OAuth client settings. It verifies readiness without a member
+   session or production event writes. It does not approve Google consent or prove sync.
+   See `CODEX-DESKTOP-GOOGLE-CALENDAR-CONNECTION.txt` in the repository root for the
+   complete handoff, including Google Cloud project setup when needed.
 5. Deploy the existing Worker from this revision on the computer with Cloudflare
    authentication, or configure the repository Actions secret `CLOUDFLARE_API_TOKEN`
    securely and run Deploy private calendar service. The cloud workspace does not
@@ -91,7 +107,7 @@ same Google account may be connected through another site account.
 Validation:
 
 ```
-node --test tests/calendar-google.mjs tests/simcha-messages.mjs
+node --test tests/calendar-google.mjs tests/calendar-google-activation.mjs tests/simcha-messages.mjs
 node tests/calendar-google-service.cjs
 node tests/calendar-simcha-import.cjs
 python build-offline.py

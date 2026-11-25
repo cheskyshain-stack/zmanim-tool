@@ -1,0 +1,87 @@
+Finish the Lakewood Commons Google Calendar connection
+
+The user authorized setting up the website's Google Calendar connection.
+This is separate from ChatGPT's Google Calendar app and the LC Text email bridge.
+The website and existing calendar Worker already contain the connection code.
+The live callback checked on November 25, 2026 returns Google setup incomplete.
+The remaining work requires the shul's Google Cloud and Cloudflare authorization.
+
+Repository: https://github.com/cheskyshain-stack/zmanim-tool
+Website: https://baismedrashoflakewoodcommons.org/calendar/
+Existing Worker: zmanim-calendar
+Cloudflare account: 04b085d9f19ac1ba6d333e0006fc94c1
+Configuration: worker/calendar/wrangler.jsonc
+Exact Google OAuth callback:
+https://zmanim-calendar.cheskyshain.workers.dev/api/google-calendar/callback
+
+1. Fetch the latest main. Use an isolated worktree if this checkout has other work.
+   Read CLAUDE.md and worker/calendar/GOOGLE-CALENDAR-SETUP.md. Preserve all calendar
+   accounts, announcements, events, invitations, message links, email imports,
+   phone subscriptions and secrets. Do not bootstrap or reset the owner.
+
+2. On this computer, use the normal signed-in Google Cloud account for the shul.
+   Open https://console.cloud.google.com/ and choose its existing project, or
+   create a shul-owned project if needed. Enable Google Calendar API:
+   https://console.cloud.google.com/apis/library/calendar-json.googleapis.com
+
+3. Configure Google Auth Platform for Bais Medrash of Lakewood Commons. Choose an
+   External audience if congregation members use personal Google accounts. Use the
+   shul's real support contact, domain and privacy disclosures. Initial testing
+   may use named test users. Before general congregation use, publish the app and
+   finish any domain/consent steps Google requires. Testing mode can expire
+   refresh tokens, so do not promise ongoing sync while it remains in that mode.
+   Request only this existing scope:
+   https://www.googleapis.com/auth/calendar.app.created
+   This allows the app's separate shul calendar, without reading personal events.
+
+4. Create an OAuth client of type Web application. Add the exact callback above
+   as an Authorized redirect URI. Download its JSON into Downloads or another
+   private folder OUTSIDE the checkout. Do not paste credentials into chat, source,
+   screenshots, shell arguments or workflow logs. Keep any other Google projects
+   and existing email scripts unchanged.
+
+5. Use the existing authorized Cloudflare account:
+   npm ci --prefix worker/calendar --no-audit --no-fund
+   node worker/calendar/node_modules/wrangler/bin/wrangler.js whoami
+   If needed, use the normal Wrangler login command and the user's browser login.
+   Then run, using the actual local download path:
+   node scripts/activate-google-calendar.mjs "/absolute/path/outside/repo/client.json"
+
+   The helper validates the downloaded Web client and callback, checks the existing
+   live service, and sends credentials to only the existing Worker over stdin.
+   It preserves an existing encryption key and all unrelated secrets. If there is
+   no previous Google configuration it creates a new 32-byte encryption key. It
+   refuses to overwrite existing OAuth client settings. Never remove secrets to
+   bypass this refusal: inspect the authorized dashboard and restore missing
+   original settings from secure backups instead. Keep a secure backup of the
+   encryption key. The helper saves a new key in a private file in the user's
+   home folder and prints only that file's path. Move it into the shul's secure
+   backup system, not chat or Git. It preserves an existing key without reading it.
+   The backup uses mode 0600 on Unix. On Windows, keep the file in the user's
+   private home folder and apply the normal private-file permissions.
+   No new Worker, Durable Object, database, domain or website deployment is needed.
+
+6. The helper verifies setup readiness with an invalid OAuth state, which cannot
+   consume a real member's authorization. It checks that sign-in is still required.
+   This checks configuration only, without creating an account or test event.
+
+7. The user now signs in normally at the website calendar. Open Calendar options >
+   Google Calendar > Connect Google Calendar, choose their Google account and
+   approve Google's request. Google consent must be completed by that account's
+   user. Never substitute a ChatGPT app connection or a manufactured site session.
+
+8. Confirm the website says sync is on. Allow a few minutes for the separate
+   Lakewood Commons calendar to appear in Google. Compare real existing saved
+   congregation events without creating synthetic production events or messages.
+   Private admin events, private notes and posted Messages are not exported.
+   Event updates/deletions sync one way from the website to Google. Reminder
+   choices are optional and separate from website Messages alerts. Removing the
+   connection removes only its app-created shul calendar, not personal calendars.
+
+Report configuration readiness, user consent and successful event sync separately.
+Do not claim Connected just because code is deployed or the readiness check passes.
+
+Local checks, with isolated synthetic records only:
+node --test tests/calendar-google.mjs tests/calendar-google-activation.mjs
+node tests/calendar-google-service.cjs
+CHROME_PATH=/usr/bin/chromium node tests/calendar-google-browser.cjs

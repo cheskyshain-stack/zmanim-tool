@@ -28,7 +28,7 @@ jobs:
         with:
           node-version: '24'
       - name: Check calendar validation and Google bridge
-        run: node --test tests/calendar-model.mjs tests/calendar-announcements.mjs tests/calendar-email-import.mjs tests/simcha-messages.mjs tests/calendar-google.mjs
+        run: node --test tests/calendar-model.mjs tests/calendar-announcements.mjs tests/calendar-email-import.mjs tests/simcha-messages.mjs tests/calendar-google.mjs tests/calendar-google-activation.mjs
       - name: Install the pinned calendar deployment tool
         run: npm ci --prefix worker/calendar --no-audit --no-fund
       - name: Verify automatic simcha events with isolated local records
