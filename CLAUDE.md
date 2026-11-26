@@ -36,7 +36,7 @@ to `mailto:rambamkh@gmail.com`. Keep the quiet 12px credit below the contact det
 Retain Escape, backdrop/close dismissal, keyboard focus and the reader's scroll
 position. The Info button and dialog stay off paper. Do not mention a spreadsheet in the
 visible credit. This is website attribution, excluded from printed sheets.
-The Info panel also lists all 20 contacts from the supplied Useful_Information.xlsx
+The Info panel lists 19 contact entries based on the supplied Useful_Information.xlsx
 in `js/site-contacts.js`, arranged in this order: Community services, Gabboim,
 Mikva & eruv, then Rav. All four sections start collapsed. Keep exact category
 labels, names and phone numbers, including contacts repeated for separate roles. Use labelled tap-to-call cards,
@@ -45,6 +45,8 @@ stays visible on short screens. The fixed search field stays above the list, inc
 when the phone keyboard opens. Search reveals matching sections and clearing it
 restores their previous open states and scroll position. Credits, privacy and nonprofit details are in
 the About & privacy disclosure below the directory.
+Rav contains only the appointment instruction and the Rebbetzin's number,
+(848) 300-3565. Do not restore the Rav's direct number or the older two-name display.
 It was on lczmanim.cjaffa.com until the shul took a domain of its own. The address is written
 in `SITE_URL` in `build-offline.py` and in `CNAME`, and everything else is stamped from there.
 Read `README.md` for how a user runs it. This file is about changing it.
@@ -1014,7 +1016,7 @@ Export/Import in Settings moves it between devices.
   Use “Choose a campaign” in the existing subtitle line below Donate so the prompt
   does not add another row or extra scrolling.
   Opening a campaign closes the others, reveals Card · ACH and DAF, and reveals Zelle
-  only for Neileich. Give the expanded campaign heading and its payment choices one
+  only for Ravs Fund and Neileich. Give the expanded campaign heading and its payment choices one
   continuous light background with a 3px gold line along the left of the active group.
   Use an overlay for that line so grouping adds no height or changes to content width.
   Payment methods are visibly separate rounded white buttons with an outline and subtle
@@ -1041,10 +1043,12 @@ Export/Import in Settings moves it between devices.
   Keep the condensed nonprofit information and plain EIN inside the contact footer
   at the bottom. The footer follows expanded forms and uses spare height above it
   when the page is short. Switching methods preserves entered payment forms.
-  Zelle is available only inside Neileich, after Card · ACH and DAF, using its real brand mark in
-  `GIVE_ICONS`. The confirmed recipient is Bais Medrash of Lakewood Commons at
-  `donations@neileich.org`. Show the recipient name, banking-app instructions and
-  Copy email button. Keep the email selectable and let its copy row wrap on phones.
+  Zelle is available inside Ravs Fund and Neileich, after Card · ACH and DAF, using its
+  real brand mark in `GIVE_ICONS`. Store the recipient email on each campaign:
+  Ravs Fund uses `donations@baismedrashoflakewoodcommons.org`; Neileich uses
+  `donations@neileich.org`. Show the recipient name, banking-app instructions,
+  Copy email button and shared reminder: Please include the purpose in your Zelle note.
+  Keep the email selectable and let its copy row wrap on phones.
 - `main:not(.is-sheet-view)` is capped at 62rem and left aligned against the sidebar.
   This is deliberate and was asked for twice: the point is not dragging the mouse from
   one edge of the screen to the other. **Do not centre it.** Centring was tried and

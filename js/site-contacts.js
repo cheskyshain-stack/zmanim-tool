@@ -1,12 +1,13 @@
-// From Useful_Information.xlsx, supplied November 25, 2026.
-// Keep the supplied labels and separate roles even when a contact appears twice.
+// Based on Useful_Information.xlsx and the owner's later contact updates.
+// Keep separate roles even when a contact appears twice.
 export const SHUL_USEFUL_CONTACTS = [
   { category: 'Mikva', section: 'mikva', people: [
     { name: "R' Shmuel Gleiberman", phone: '(732) 504-9177' },
     { name: "R' Yossi Fishman", phone: '(732) 644-2281' },
   ] },
-  { category: 'The Rav', section: 'leadership', people: [{ name: 'Rabbi Sherwinter', phone: '(732) 806-1369' }] },
-  { category: 'The Rebbetzin', section: 'leadership', people: [{ name: 'Mrs. Sherwinter', phone: '(848) 300-3565' }] },
+  { category: 'Rav appointments', section: 'leadership',
+    description: 'To contact the Rav, please arrange an appointment with the Rebbetzin.',
+    people: [{ name: '', phone: '(848) 300-3565' }] },
   { category: 'The Eruv', section: 'mikva', people: [{ name: "R' Yitzchok M. Weiss", phone: '(732) 806-5745' }] },
   { category: 'Gabboim OS', section: 'gabboim', people: [
     { name: "R' Yossi Fishman", phone: '(732) 644-2281' },

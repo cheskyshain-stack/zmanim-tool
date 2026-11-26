@@ -250,7 +250,7 @@ const giveIcon = (key, cls) =>
  *  padlock to check it by, so the frame carries the host name itself.
  *
  *  `funds` records the designations available inside a merchant's form. `zelle` on an
- *  account enables the confirmed Zelle recipient only for that campaign.
+ *  account is its confirmed recipient email, scoped to that campaign.
  *
  *  `copy` is something to be typed into another app rather than somewhere to go, which is
  *  what Zelle and The Donors' Fund are: `label` says what it is and `value` is the thing
@@ -298,9 +298,10 @@ function usefulContactsHtml() {
       const groups = SHUL_USEFUL_CONTACTS.filter(group => group.section === section.id);
       const total = groups.reduce((sum, group) => sum + group.people.length, 0);
       return `<details class="luach-info-section" data-info-section="${escAttr(section.name)}">
-        <summary><span class="luach-info-section-icon">${icon(section.icon)}</span><span class="luach-info-section-label"><span>${escAttr(section.name)}</span><small data-info-count>${total} contacts</small></span>${icon('<path d="m7 10 5 5 5-5"/>')}</summary>
+        <summary><span class="luach-info-section-icon">${icon(section.icon)}</span><span class="luach-info-section-label"><span>${escAttr(section.name)}</span><small data-info-count>${total} contact${total === 1 ? '' : 's'}</small></span>${icon('<path d="m7 10 5 5 5-5"/>')}</summary>
         <div class="luach-info-section-body">${groups.map(group => `<section class="luach-info-group">
-          <h4>${escAttr(group.category)}</h4>
+          <h4${group.description ? ' class="luach-sr"' : ''}>${escAttr(group.category)}</h4>
+          ${group.description ? `<p class="luach-info-group-note">${escAttr(group.description)}</p>` : ''}
           <ul>${group.people.map(person => `<li class="luach-info-person">
             <a class="luach-info-phone" href="tel:+1${person.phone.replace(/\D/g, '')}" aria-label="${escAttr('Call ' + (person.name ? person.name + ', ' : '') + group.category + ' at ' + person.phone)}"><span class="luach-info-person-copy">${person.name ? `<span class="luach-info-person-name">${escAttr(person.name)}</span>` : ''}<span class="luach-info-number">${escAttr(person.phone)}</span></span><span class="luach-info-call">${callIcon}</span></a>
           </li>`).join('')}</ul>
@@ -365,7 +366,7 @@ function wireSiteInfo() {
       section.querySelectorAll('.luach-info-group').forEach(group => {
         let matches = 0;
         group.querySelectorAll('.luach-info-person').forEach(person => {
-          const text = `${section.dataset.infoSection} ${group.querySelector('h4').textContent} ${person.textContent}`.toLocaleLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
+          const text = `${section.dataset.infoSection} ${group.querySelector('h4').textContent} ${group.querySelector('.luach-info-group-note')?.textContent || ''} ${person.textContent}`.toLocaleLowerCase().replace(/[‘’]/g, "'").replace(/\s+/g, ' ');
           const show = numeric ? person.querySelector('a').getAttribute('href').replace(/\D/g, '').includes(numeric) : text.includes(query);
           person.hidden = !show;
           if (show) matches++;
@@ -503,6 +504,7 @@ const DONATE = {
         },
         {
           title: 'Ravs Fund',
+          zelle: 'donations@baismedrashoflakewoodcommons.org',
           href: 'https://secure.cardknox.com/ravsfundtzorcheishchuna',
         },
         {
@@ -511,7 +513,7 @@ const DONATE = {
         },
         {
           title: 'Neileich',
-          zelle: true,
+          zelle: 'donations@neileich.org',
           href: 'https://secure.cardknox.com/neileich',
           websiteHref: 'https://www.neileich.org/',
           websiteLabel: 'Visit Neileich\u2019s full website',
@@ -522,9 +524,10 @@ const DONATE = {
     {
       title: 'Zelle',
       how: 'Send through Zelle in your banking app.',
+      note: 'Please include the purpose in your Zelle note.',
       icon: 'zelle',
       recipient: 'Bais Medrash of Lakewood Commons',
-      copy: { label: '', value: 'donations@neileich.org', buttonLabel: 'Copy email' },
+      copy: { label: '', buttonLabel: 'Copy email' },
     },
     {
       // An outside donor-advised fund, not something the shul holds. Somebody with money
@@ -1095,7 +1098,8 @@ function donateAccountHtml(acc, index) {
   const prefix = `campaign-${index}`;
   const card = DONATE.ways.find(way => way.icon === 'card');
   const daf = DONATE.ways.find(way => way.providers);
-  const ways = [card, daf, ...(acc.zelle ? [DONATE.ways.find(way => way.icon === 'zelle')] : [])];
+  const zelle = DONATE.ways.find(way => way.icon === 'zelle');
+  const ways = [card, daf, ...(typeof acc.zelle === 'string' && acc.zelle ? [{ ...zelle, copy: { ...zelle.copy, value: acc.zelle } }] : [])];
   return `<div class="luach-give-account luach-campaign" data-campaign="${prefix}">
     <h2 class="luach-campaign-heading"><button type="button" class="luach-fund-row luach-campaign-toggle" id="${prefix}-heading" aria-expanded="false" aria-controls="${prefix}-details">
       <span class="luach-account-title">${escAttr(acc.title)}</span>
@@ -1140,6 +1144,7 @@ function donateWayHtml(way, prefix, account) {
     <p class="luach-payment-intro">${escAttr(intro)}</p>
     ${way.recipient ? `<p class="luach-zelle-recipient">${escAttr(way.recipient)}</p>` : ''}
     ${copy}
+    ${way.note ? `<p class="luach-payment-note">${escAttr(way.note)}</p>` : ''}
     ${providers ? `<div class="luach-daf-providers">${providers}</div>` : ''}
     `}
   </div>`;
