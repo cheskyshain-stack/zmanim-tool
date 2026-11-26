@@ -786,7 +786,7 @@ def write_route_pages():
             html = html.replace("</head>", '<meta name="robots" content="noindex, follow">\n</head>')
         # Down one folder: every path that was relative to the root has to say so.
         html = re.sub(r'(href|src)="(css/|js/|vendor/)', r'\1="/\2', html)
-        full_title = f"{meta['title']} &middot; Bais Medrash of Lakewood Commons"
+        full_title = f"{meta['title']} &middot; Lakewood Commons"
         html = re.sub(r"<title>.*?</title>", f"<title>{full_title}</title>", html, flags=re.S)
         html = re.sub(
             r'(<meta name="description" content=")[^"]*(">)',
