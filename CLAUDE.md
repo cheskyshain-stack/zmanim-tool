@@ -22,6 +22,11 @@ and the workbook uses the standard UTC offset for both UTC transition thresholds
 The actual homepage clock uses IANA timezone rules separately from that calculation rule.
 
 Live at https://baismedrashoflakewoodcommons.org (GitHub Pages from `main`, CNAME in the repo).
+The public site's preferred name is Lakewood Commons. Keep the homepage WebSite
+structured data, og:site_name, visible desktop brand and public page titles consistent
+with that short name. Keep the Synagogue entity's full name, confirmed address and
+existing aliases. Naming changes help search engines understand the site; they do
+not guarantee a ranking or submit a Google Search Console indexing request.
 The homepage has a small Info button at the top right of its navy header, opposite
 the shul photo. Do not duplicate it at the bottom. The Donate page retains its footer
 Info button. Their shared native dialog contains

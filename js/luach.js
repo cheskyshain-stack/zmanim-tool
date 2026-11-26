@@ -1475,11 +1475,11 @@ function whereAmI() {
 }
 
 const PAGE_TITLE = {
-  '': 'Lakewood Commons Shul · Bais Medrash of Lakewood Commons',
-  week: 'Weekly Zmanim · Bais Medrash of Lakewood Commons',
-  chart: 'Zmanim Chart · Bais Medrash of Lakewood Commons',
-  schedules: 'Special Schedules · Bais Medrash of Lakewood Commons',
-  donate: 'Donate to Support Our Shul · Bais Medrash of Lakewood Commons',
+  '': 'Lakewood Commons · Shul Zmanim & Community',
+  week: 'Weekly Zmanim · Lakewood Commons',
+  chart: 'Zmanim Chart · Lakewood Commons',
+  schedules: 'Special Schedules · Lakewood Commons',
+  donate: 'Donate to Support Our Shul · Lakewood Commons',
 };
 
 /** Keep the tab, the canonical link and the address bar saying the same thing.
