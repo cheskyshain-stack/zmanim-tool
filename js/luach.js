@@ -310,9 +310,7 @@ function usefulContactsHtml() {
   </section>`;
 }
 
-const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer no-print">
-  <button type="button" class="luach-info-button" data-site-info aria-haspopup="dialog" aria-controls="luach-info-dialog"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-10v1"/></svg>Info</button>
-  <dialog id="luach-info-dialog" class="luach-info-dialog no-print" aria-labelledby="luach-info-title">
+const siteInfoDialogHtml = (s, legal = '') => `<dialog id="luach-info-dialog" class="luach-info-dialog no-print" aria-labelledby="luach-info-title">
     <div class="luach-info-header">
       <div class="luach-info-heading"><h2 id="luach-info-title">Info</h2><button type="button" class="luach-info-close" data-site-info-close aria-label="Close Info">&times;</button></div>
       <label class="luach-info-search"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg><input type="search" data-info-search aria-label="Search contacts" placeholder="Search contacts" autocomplete="off"></label>
@@ -329,10 +327,14 @@ const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer no-p
       <p class="luach-calculation-credit"><a href="/privacy/google-calendar/">Google Calendar privacy</a></p>
     </details>
     </div>
-  </dialog>
+  </dialog>`;
+
+const siteFooterHtml = (s, legal = '') => `<footer class="luach-site-footer no-print">
+  <button type="button" class="luach-info-button" data-site-info aria-haspopup="dialog" aria-controls="luach-info-dialog"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 10v7m0-10v1"/></svg>Info</button>
+  ${siteInfoDialogHtml(s, legal)}
 </footer>`;
 
-/** Delegate once from main so Home and Donate share the same small footer control. */
+/** Delegate once from main for the homepage header and the Donate footer. */
 function wireSiteInfo() {
   let trigger = null;
   const fitInfoViewport = () => {
@@ -392,7 +394,7 @@ function wireSiteInfo() {
   main.addEventListener('click', event => {
     const opener = event.target.closest('[data-site-info]');
     if (opener) {
-      const dialog = opener.closest('.luach-site-footer').querySelector('.luach-info-dialog');
+      const dialog = main.querySelector('.luach-info-dialog');
       if (dialog.open) return;
       trigger = opener;
       const search = dialog.querySelector('[data-info-search]');
@@ -685,7 +687,7 @@ function homeHtml(published) {
     </nav>
     </div>
     </div>
-    ${siteFooterHtml(s)}`;
+    ${siteInfoDialogHtml(s)}`;
 }
 
 /** Read both the date and parsha in the shul's calendar, including after a tab wakes. */
@@ -932,6 +934,7 @@ function renderHome(published) {
   // Home and Donate use the approved compact design; charts keep their own layout.
   main.className = 'is-home';
   main.innerHTML = homeHtml(published);
+  main.querySelector('.luach-header-info')?.removeAttribute('hidden');
   if (!isWebsitePreview()) preloadCalendar();
   refreshHomeDate(resolveSettings(published.settings));
   fitContactEmail();
