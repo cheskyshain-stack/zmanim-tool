@@ -5917,6 +5917,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-info-group { margin:0 0 13px; }
  .luach-info-group:last-child { margin-bottom:0; }
  .luach-info-group h4 { margin:0 0 6px; color:#7d652d; font:600 12px/1.5 Arial,sans-serif; }
+ .luach-info-group-note { margin:0 0 12px; color:#576674; font:400 14px/1.6 Arial,sans-serif; }
  .luach-info-group ul { display:grid; gap:7px; margin:0; padding:0; list-style:none; }
  .luach-info-person { min-width:0; }
  .luach-info-phone { display:flex; align-items:center; justify-content:space-between; gap:10px; min-height:62px; box-sizing:border-box; padding:10px 11px; border:1px solid #e5dfd2; border-radius:9px; background:#fff; color:#142b46; text-decoration:none; }
@@ -5954,6 +5955,7 @@ body.is-luach #main .print-btn:focus-visible { outline:2px solid #15283f; outlin
  .luach-payment-panel { min-height:356px; padding:19px 18px 12px; }
  .luach-payment-heading { margin:0; color:#142b46; font:700 22px/1.25 Georgia,serif; }
  .luach-payment-intro { margin:4px 0 0; color:#64707c; font:400 12px/1.6 Arial,sans-serif; }
+ .luach-payment-note { margin:12px 0 0; color:#576674; font:400 13px/1.6 Arial,sans-serif; }
  .is-give .luach-copy { padding:7px 10px; margin:13px 0 0; border:1px solid #e9e7e0; border-radius:10px; background:#f5f4f0; gap:10px; font:400 12px/1.6 Arial,sans-serif; }
  .luach-copy-info { display:flex; align-items:baseline; gap:7px; min-width:0; }
  .is-give .luach-copy-label { color:#64707c; opacity:1; }

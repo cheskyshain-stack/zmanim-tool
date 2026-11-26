@@ -48,7 +48,7 @@ const server = http.createServer((req, res) => {
       assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 0);
       assert.equal(await page.locator('.luach-payment-tab:visible').count(), 0, 'Payment choices start collapsed');
       assert.equal(await page.locator('.luach-frame').count(), 0, 'No merchant forms load before a method is selected');
-      assert.equal(await page.locator('[data-method="zelle"]').count(), 1);
+      assert.equal(await page.locator('[data-method="zelle"]').count(), 2);
       if (process.env.ARTIFACT_DIR && width === 375) await page.screenshot({ path: path.join(process.env.ARTIFACT_DIR, 'campaigns-collapsed.png'), fullPage: true });
       await page.evaluate(() => {
         window.copyWrites = [];
@@ -66,7 +66,7 @@ const server = http.createServer((req, res) => {
         const afterTop = await toggle.evaluate(node => node.getBoundingClientRect().top);
         if (index === 0) assert(Math.abs(afterTop - beforeTop) < 2, 'Opening a campaign keeps it in place: ' + JSON.stringify({width,title,beforeTop,afterTop}));
         assert.equal(await page.locator('.luach-campaign-toggle[aria-expanded="true"]').count(), 1);
-        assert.equal(await page.locator('.luach-payment-tab:visible').count(), index === 3 ? 3 : 2);
+        assert.equal(await page.locator('.luach-payment-tab:visible').count(), index === 1 || index === 3 ? 3 : 2);
         assert.equal(await campaign.locator('.luach-payment-panel:visible').count(), 0, 'Details wait for the payment-method click');
         await card.click();
         const position = await toggle.evaluate(node => ({ top: node.getBoundingClientRect().top,
@@ -107,13 +107,16 @@ const server = http.createServer((req, res) => {
         await einCopy.click();
         await page.waitForFunction(id => document.getElementById(id).querySelector('.luach-copy-btn').textContent === 'Copied', await dafPanel.getAttribute('id'));
         assert((await einCopy.boundingBox()).height >= 44);
-        if (index === 3) {
+        if (index === 1 || index === 3) {
           const zelle = campaign.locator('[data-method="zelle"]');
           await zelle.click();
           const panel = campaign.locator('.luach-payment-panel.is-zelle');
           assert(await panel.isVisible());
           assert.equal(await panel.locator('.luach-zelle-recipient').innerText(), 'Bais Medrash of Lakewood Commons');
-          assert.equal(await panel.locator('.luach-copy-value').innerText(), 'donations@neileich.org');
+          const zelleEmail = index === 1 ? 'donations@baismedrashoflakewoodcommons.org' : 'donations@neileich.org';
+          assert.equal(await panel.locator('.luach-copy-value').innerText(), zelleEmail);
+          assert.equal(await panel.locator('.luach-copy-btn').getAttribute('data-copy'), zelleEmail);
+          assert.equal(await panel.locator('.luach-payment-note').innerText(), 'Please include the purpose in your Zelle note.');
           const copy = panel.locator('.luach-copy-btn');
           assert.equal(await copy.innerText(), 'Copy email');
           await copy.click();
@@ -123,7 +126,7 @@ const server = http.createServer((req, res) => {
             const bounds = node.closest('.luach-copy').getBoundingClientRect();
             return [...text.getClientRects()].every(rect => rect.left >= bounds.left && rect.right <= bounds.right);
           }));
-          if (process.env.ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.ARTIFACT_DIR, `neileich-zelle-${width}.png`),fullPage:true});
+          if (process.env.ARTIFACT_DIR) await page.screenshot({path:path.join(process.env.ARTIFACT_DIR, `${index === 1 ? 'ravs-fund' : 'neileich'}-zelle-${width}.png`),fullPage:true});
         }
         await card.click();
         assert.equal(await frame.locator('#donor-name').inputValue(), 'Preserved ' + title);
@@ -144,9 +147,9 @@ const server = http.createServer((req, res) => {
         assert.equal(await page.locator('.luach-frame').count(), 0);
         assert(await campaign.locator('.luach-give-go').evaluate(node => node === document.activeElement));
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-        layouts.push({title, position, methods:index === 3 ? 3 : 2});
+        layouts.push({title, position, methods:index === 1 || index === 3 ? 3 : 2});
       }
-      assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675','donations@neileich.org']);
+      assert.deepEqual(await page.evaluate(() => window.copyWrites), ['26-4527675','donations@baismedrashoflakewoodcommons.org','donations@neileich.org']);
       await page.reload();
       await campaigns.first().waitFor();
       assert.equal(await page.locator('.luach-payment-tab:visible').count(),0);
