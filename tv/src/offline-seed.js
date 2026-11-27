@@ -3,9 +3,9 @@ import {addDays,localStamp} from '../public/display-assets/time.js';
 
 // Both runtimes can calculate from the same public settings carried in the seed.
 // Bump when the seed schema or calculation contract changes.
-export const OFFLINE_ENGINE='shul-calendar-v10';
+export const OFFLINE_ENGINE='shul-calendar-v11';
 const fields={
-  announcement:['message','contact','phone','category','displayGroup','sectionPosition','placement','priority','behavior','duration'],
+  announcement:['message','contact','phone','category','displayGroup','sectionPosition','placement','priority','behavior','duration','recurrence'],
   dedication:['sponsor','anonymous','dedicationType','dedicationName','dedicationText','message','sponsorshipDate','timing','duration','hebrewLabel'],
   schedule:['source','appliesFrom','appliesTo','portion','precedence','previewAt'],
 };

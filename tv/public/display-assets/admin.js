@@ -1,3 +1,4 @@
+import {YOM_TOV_CHOICES} from './notice-recurrence.js';
 import {previewCalendar} from './preview-calendar.js';
 import {mountScreenEditor} from './admin.screen.js';
 import { validateAppearance, appearanceSummary } from './appearance.js';
@@ -74,7 +75,7 @@ async function dashboard() {
     page(`<h1>Manage Shul View</h1><p class="subtitle">Choose an area on the screen to edit its announcements or add something there.</p>${me.local ? '<div class="notice">LOCAL DEVELOPMENT · Nothing here has been deployed to the public website.</div>' : ""}<div class="toolbar">${can("announcement") ? '<button data-new="announcement">+ Add announcement</button>' : ""}${can("dedication") ? '<button data-new="dedication">+ Add פרנס היום</button>' : ""}${can("schedule") ? '<button data-new="schedule">Manage display schedules</button>' : ""}<button id="preview-screen">Preview calendar</button>${can("full") ? '<button id="appearance">Appearance</button><button id="permissions">Permissions</button>' : ""}</div>
       <div class="screen-mode-switch" role="group" aria-label="Display management view"><button id="screen-layout" aria-pressed="${!saved}">Screen layout</button><button id="saved-items" aria-pressed="${saved}">Saved items</button>${!saved ? '<button id="refresh-screen">Refresh screen</button>' : ''}</div>
       <div id="error" class="error" role="alert"></div>
-      ${saved ? `<div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => phase(i, new Date().toISOString()) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="list"></div>` : '<section id="screen-editor" aria-label="Edit announcements on the screen"><p class="notice" role="status">Loading your screen…</p></section>'}
+      ${saved ? `<div class="toolbar">${[["showing", "Showing now"], ["scheduled", "Scheduled"], ["draft", "Drafts"], ["expired", "Expired"], ["hidden", "Hidden"], ["archived", "Archive"]].map(([k, v]) => `<button data-filter="${k}" aria-pressed="${filter === k}">${v} <span>${items.filter((i) => (i.phase || phase(i, new Date().toISOString())) === k).length}</span></button>`).join("")}</div><label>Find an item<input id="search" type="search" placeholder="Search title, internal name or sponsor" value="${esc(search)}"></label><div id="list"></div>` : '<section id="screen-editor" aria-label="Edit announcements on the screen"><p class="notice" role="status">Loading your screen…</p></section>'}
       <p class="identity">${esc(me.email)} · All scheduling uses America/New_York · <a href="/cdn-cgi/access/logout">Sign out</a></p>`);
     document.querySelectorAll("[data-new]").forEach((b) => b.onclick = () => edit({ kind: b.dataset.new, status: "draft", data: {} }));
     document.querySelectorAll("[data-filter]").forEach((b) => b.onclick = () => {
@@ -122,8 +123,8 @@ async function removeDedication(item, button) {
   }
 }
 function renderList() {
-  const selected = items.filter((i) => phase(i, (/* @__PURE__ */ new Date()).toISOString()) === filter && [i.title, i.internalName, i.data.sponsor].join(" ").toLowerCase().includes(search.toLowerCase()));
-  document.querySelector("#list").innerHTML = selected.length ? selected.map((i) => `<article class="item"><div><span class="tag">${esc(i.kind)}</span><h3 dir="auto">${esc(i.internalName || (i.kind === "dedication" ? i.data.dedicationName || i.title : i.title) || "Untitled draft")}</h3>${i.kind === "dedication" ? '<p dir="auto">' + esc(i.data.anonymous ? "Anonymous sponsor (private: " + i.data.sponsor + ")" : i.data.sponsor) + "</p>" : ""}<p>${formatInstant(i.startsAt)} → ${formatInstant(i.endsAt)}</p><p>Updated by ${esc(i.updatedBy)} · ${formatInstant(i.updatedAt)}</p></div><div class="actions"><button data-edit="${i.id}">Edit</button><button data-action="duplicate" data-id="${i.id}">Duplicate</button>${i.status === "published" ? `<button data-action="hide" data-id="${i.id}">Hide now</button>` : ""}${i.status !== "archived" ? `<button data-action="archive" data-id="${i.id}">Archive</button>` : ""}</div></article>`).join("") : '<div class="empty">No items in this section.</div>';
+  const selected = items.filter((i) => (i.phase || phase(i, (/* @__PURE__ */ new Date()).toISOString())) === filter && [i.title, i.internalName, i.data.sponsor].join(" ").toLowerCase().includes(search.toLowerCase()));
+  document.querySelector("#list").innerHTML = selected.length ? selected.map((i) => `<article class="item"><div><span class="tag">${esc(i.kind)}</span><h3 dir="auto">${esc(i.internalName || (i.kind === "dedication" ? i.data.dedicationName || i.title : i.title) || "Untitled draft")}</h3>${i.kind === "dedication" ? '<p dir="auto">' + esc(i.data.anonymous ? "Anonymous sponsor (private: " + i.data.sponsor + ")" : i.data.sponsor) + "</p>" : ""}<p>${i.data.recurrence ? 'Every year: two weeks before ' + esc(YOM_TOV_CHOICES.filter(([id])=>i.data.recurrence.holidays.includes(id)).map(([,label])=>label).join(', ')) : formatInstant(i.startsAt) + ' → ' + formatInstant(i.endsAt)}</p><p>Updated by ${esc(i.updatedBy)} · ${formatInstant(i.updatedAt)}</p></div><div class="actions"><button data-edit="${i.id}">Edit</button><button data-action="duplicate" data-id="${i.id}">Duplicate</button>${i.status === "published" ? `<button data-action="hide" data-id="${i.id}">Hide now</button>` : ""}${i.status !== "archived" ? `<button data-action="archive" data-id="${i.id}">Archive</button>` : ""}</div></article>`).join("") : '<div class="empty">No items in this section.</div>';
   document.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => edit(items.find((i) => i.id === b.dataset.edit)));
   document.querySelectorAll("[data-action]").forEach((b) => b.onclick = async () => {
     const i = items.find((i2) => i2.id === b.dataset.id);
@@ -166,7 +167,8 @@ const savedFold = (iso) => {
   }
 };
 function timing(s) {
-  return `<section class="panel"><h2>When it appears</h2><div class="timing-shortcuts"><button type="button" data-shortcut="now">Start now</button><button type="button" data-shortcut="today">Today only</button><button type="button" data-shortcut="friday">Through Friday</button><button type="button" data-shortcut="custom">Choose dates</button></div><div class="grid">${input(s.kind === "schedule" ? "Becomes main schedule" : "Start date and time", "startLocal", s.startsAt ? localStamp(s.startsAt) : "", "datetime-local")}${input(s.kind === "schedule" ? "Regular schedule resumes" : "End date and time", "endLocal", s.endsAt ? localStamp(s.endsAt) : "", "datetime-local")}${fold("startFold", savedFold(s.startsAt))}${fold("endFold", savedFold(s.endsAt))}${s.kind !== "schedule" ? check("Until I turn it off", "untilOff", !!s.startsAt && !s.endsAt) : ""}</div><p class="exact" id="exact-times">Choose dates to see the exact New York timestamps.</p></section>`;
+  const yearly = s.kind === 'announcement' ? `${select('Schedule', 'repeat', [['once','Choose dates'],['before-yom-tov','Every year before Yom Tov']], s.data.recurrence ? 'before-yom-tov' : 'once')}<div id="yearly-timing" ${s.data.recurrence ? '' : 'hidden'}><fieldset class="yom-tov-choices"><legend>Show before</legend>${YOM_TOV_CHOICES.map(([id,label])=>check(label,'before-'+id,!s.data.recurrence || s.data.recurrence.holidays.includes(id))).join('')}</fieldset><p class="muted">Starts two weeks before each selected Yom Tov and stops at sunset when it begins. Repeats every year using the Hebrew calendar.</p></div>` : '';
+  return `<section class="panel"><h2>When it appears</h2>${yearly}<div id="one-time-timing" ${s.data.recurrence ? 'hidden' : ''}><div class="timing-shortcuts"><button type="button" data-shortcut="now">Start now</button><button type="button" data-shortcut="today">Today only</button><button type="button" data-shortcut="friday">Through Friday</button><button type="button" data-shortcut="custom">Choose dates</button></div><div class="grid">${input(s.kind === "schedule" ? "Becomes main schedule" : "Start date and time", "startLocal", s.startsAt ? localStamp(s.startsAt) : "", "datetime-local")}${input(s.kind === "schedule" ? "Regular schedule resumes" : "End date and time", "endLocal", s.endsAt ? localStamp(s.endsAt) : "", "datetime-local")}${fold("startFold", savedFold(s.startsAt))}${fold("endFold", savedFold(s.endsAt))}${s.kind !== "schedule" ? check("Until I turn it off", "untilOff", !!s.startsAt && !s.endsAt) : ""}</div></div><p class="exact" id="exact-times">Choose dates to see the exact New York timestamps.</p></section>`;
 }
 async function edit(s, unsaved = false) {
   dirty = unsaved;
@@ -178,16 +180,23 @@ async function edit(s, unsaved = false) {
   const datePicker = kind === 'dedication' ? `<section class="panel dedication-date-picker"><h2>Choose the sponsorship date</h2><div id="dedication-calendar" class="dedication-date-calendar wide"></div><p id="dedication-selection" class="exact" aria-live="polite">${d.sponsorshipDate ? esc(d.sponsorshipDate) : 'Choose a day from the calendar.'}</p><details id="dedication-manual-date"><summary>Enter an English or Hebrew date directly</summary><div class="grid">${input("Sponsorship date (English)", "sponsorshipDate", d.sponsorshipDate, "date")}<div><p class="muted">Or enter the Hebrew date:</p><div class="grid">${input("Day", "hebrewDay", "", "number", 'min="1" max="30"')}${select("Month", "hebrewMonth", [[7, "Tishrei"], [8, "Cheshvan"], [9, "Kislev"], [10, "Teves"], [11, "Shevat"], [12, "Adar"], [13, "Adar I"], [14, "Adar II"], [1, "Nissan"], [2, "Iyar"], [3, "Sivan"], [4, "Tammuz"], [5, "Av"], [6, "Elul"]], 7)}${input("Hebrew year", "hebrewYear", currentHebrewYear, "number", 'min="5700" max="5900"')}<button id="convert-date" type="button">Use Hebrew date</button></div></div></div></details></section>` : '';
   page(`<button id="back">← Display dashboard</button><h1>${s.id ? "Edit" : "Add"} ${kind === "dedication" ? "פרנס היום" : kind === "schedule" ? "display schedule" : "announcement"}</h1><p class="subtitle">Only Publish makes an item eligible to appear. All times are America/New_York.</p>${kind === 'dedication' && s.id && s.status === 'published' && can('dedication') ? '<div class="dedication-remove-bar"><button type="button" id="remove-dedication" class="remove-from-screen">Remove from screen</button><span>Stops this dedication from appearing. Keeps it saved under Hidden.</span></div>' : ''}<div id="error" class="error" role="alert"></div><div class="form-layout"><form id="editor">${datePicker}<section class="panel"><h2>${kind === "schedule" ? "Schedule source" : "Content"}</h2><div class="grid">${fields}</div></section>${timing(s)}<div class="form-footer"><button type="button" id="cancel">Cancel</button><button type="button" id="draft">Save draft</button><button type="button" id="preview">Preview</button><button type="submit" class="primary">Publish</button></div></form><aside class="card-preview"><h2>Card preview</h2><div id="card-preview"></div><p id="length-warning" class="warn"></p><p class="muted">Parnas Hayom displays for 15 seconds, then announcements rotate in the lower center. Use the screen preview to check each card.</p></aside></div>`);
   const form = document.querySelector("#editor"), el = (n) => form.elements[n];
-  let dateRequest = 0, syncedCivilDate = null, dedicationCalendar = null;
+  let dateRequest = 0, syncedCivilDate = null, dedicationCalendar = null, recurrenceKey = '', recurrenceDates;
   const value = () => {
     const fd = new FormData(form), data = {};
     for (const [key, val] of fd) data[key] = val;
     for (const c of form.querySelectorAll("[type=checkbox]")) data[c.name] = c.checked;
-    return { id: s.id, version: s.version, kind, title: fd.get("title") || s.title || "", internalName: fd.get("internalName") || "", startLocal: el('startLocal')?.value || "", endLocal: fd.get("untilOff") ? "" : el('endLocal')?.value || "", startFold: fd.get("startFold"), endFold: fd.get("endFold"), data };
+    const yearly = kind === 'announcement' && el('repeat').value === 'before-yom-tov';
+    if (yearly) data.recurrence = {type:'before-yom-tov',holidays:YOM_TOV_CHOICES.filter(([id])=>el('before-'+id).checked).map(([id])=>id)};
+    return { id: s.id, version: s.version, kind, title: fd.get("title") || s.title || "", internalName: fd.get("internalName") || "", startLocal: yearly ? "" : el('startLocal')?.value || "", endLocal: yearly || fd.get("untilOff") ? "" : el('endLocal')?.value || "", startFold: fd.get("startFold"), endFold: fd.get("endFold"), data };
   };
   const update = async () => {
     const request = ++dateRequest;
     const v = value();
+    const yearly = !!v.data.recurrence;
+    if (kind === 'announcement') {
+      document.querySelector('#yearly-timing').hidden = !yearly;
+      document.querySelector('#one-time-timing').hidden = yearly;
+    }
     for (const [field, choice] of [["startLocal", "startFold"], ["endLocal", "endFold"], ["previewLocal", "previewFold"]]) {
       if (!el(choice)) continue;
       let ambiguous = false;
@@ -242,6 +251,22 @@ async function edit(s, unsaved = false) {
     } catch (e) {
       if (request !== dateRequest || !form.isConnected) return;
       document.querySelector("#exact-times").textContent = e.message;
+    }
+    if (yearly) {
+      const key = JSON.stringify(v.data.recurrence);
+      if (key !== recurrenceKey) {
+        recurrenceKey = key;
+        recurrenceDates = api('recurrence','POST',{recurrence:v.data.recurrence});
+      }
+      try {
+        const windows = await recurrenceDates;
+        if (request !== dateRequest || !form.isConnected) return;
+        document.querySelector('#exact-times').innerHTML = windows.length ? '<strong>Upcoming dates (New York)</strong>' + windows.map(w=>`<span class="recurrence-date"><b>${esc(w.label)} ${esc(w.year)}</b><br>${esc(formatInstant(w.startsAt))}<br>through ${esc(formatInstant(w.endsAt))}</span>`).join('') : 'Select at least one Yom Tov.';
+      } catch (error) {
+        if (request !== dateRequest || !form.isConnected) return;
+        recurrenceKey = '';
+        document.querySelector('#exact-times').textContent = error.message;
+      }
     }
     if (kind !== "schedule") {
       document.querySelector("#card-preview").innerHTML = cardHTML({ ...v, title: v.title || "Your title", data: v.data });
@@ -373,8 +398,16 @@ async function edit(s, unsaved = false) {
   update();
 }
 async function preview(item = null, back = dashboard) {
+  let initialAt = localStamp();
+  if (item?.data.recurrence) {
+    try {
+      const windows = await api('recurrence','POST',{recurrence:item.data.recurrence});
+      if (!windows.length) throw Error('Select at least one Yom Tov.');
+      if (windows[0].startsAt > new Date().toISOString()) initialAt = localStamp(windows[0].startsAt);
+    } catch (error) { showError(error); return; }
+  }
   dirty = !!item;
-  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview calendar</h1><p class="subtitle">Private preview using the same components as Shul View. Nothing here is published.</p><section class="panel" id="preview-calendar"></section><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${localStamp()}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="toolbar"><button id="preview-prev" type="button">← Previous day</button><span>Swipe the preview to change dates</span><button id="preview-next" type="button">Next day →</button></div><div class="preview-host" id="preview-host" tabindex="0" aria-label="Schedule preview. Swipe left for next day or right for previous day."></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
+  page(`<button id="back">← ${item ? "Editor" : "Dashboard"}</button><h1>Preview calendar</h1><p class="subtitle">Private preview using the same components as Shul View. Nothing here is published.</p><section class="panel" id="preview-calendar"></section><div class="toolbar"><label>Preview date and time (New York)<input id="at" type="datetime-local" value="${initialAt}"></label><label>DST occurrence<select id="fold"><option value="">Automatic</option><option value="earlier">First (EDT)</option><option value="later">Second (EST)</option></select></label><button class="primary" id="apply">Show this time</button></div><div id="error" class="error" role="alert"></div><div id="warnings" class="notice" hidden></div><div class="toolbar"><button id="preview-prev" type="button">← Previous day</button><span>Swipe the preview to change dates</span><button id="preview-next" type="button">Next day →</button></div><div class="preview-host" id="preview-host" tabindex="0" aria-label="Schedule preview. Swipe left for next day or right for previous day."></div><section class="panel"><h2>Content at this time</h2><div id="timeline"></div></section>`);
   document.querySelector("#back").onclick = back;
   previewView = new DisplayView(document.querySelector("#preview-host"));
   let result, previewRequest=0;
@@ -397,7 +430,7 @@ async function preview(item = null, back = dashboard) {
   const calendar=previewCalendar(document.querySelector('#preview-calendar'),api,date=>{
     const at=document.querySelector('#at');at.value=date+'T'+(at.value.split('T')[1]||'12:00');
     run();
-  });
+  },{initialDate:initialAt.slice(0,10)});
   document.querySelector('#at').onchange=()=>{calendar.select(document.querySelector('#at').value.slice(0,10));run();};
   const moveDay=delta=>{
     const at=document.querySelector('#at'),[date,time]=at.value.split('T');

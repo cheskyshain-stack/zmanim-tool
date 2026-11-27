@@ -7,6 +7,7 @@ import { scheduleCalendar } from "./schedules.js";
 import { loadCongregationSchedule } from "./published-calendar.js";
 import { phase, localStamp, addDays } from "../public/display-assets/time.js";
 import {nextMinyanChangeAt} from '../public/display-assets/minyan-timing.js';
+import {nextYomTovWindows,noticeBoundaries} from '../public/display-assets/notice-recurrence.js';
 const json = (x, status = 200) => Response.json(x, { status });
 const decode = (r) => ({ id: r.id, kind: r.kind, status: r.status, internalName: r.internal_name, title: r.title, startsAt: r.starts_at, endsAt: r.ends_at, data: JSON.parse(r.data_json), version: r.version, createdAt: r.created_at, updatedAt: r.updated_at, createdBy: r.created_by, updatedBy: r.updated_by });
 const list = async (db) => (await db.prepare("SELECT * FROM display_items ORDER BY updated_at DESC").all()).results.map(decode);
@@ -47,13 +48,14 @@ async function body(req) {
 async function snapshot(items, at, appearance, calendar, preview = false) {
   const controls = items.filter((i) => i.kind === "schedule"), schedule = calendar.scheduleSnapshot(at, controls);
   const boundaries = items.filter((i) => i.status === "published").flatMap((i) => [i.startsAt, i.endsAt, i.data.previewAt]).filter((x) => x && x > at);
+  boundaries.push(...noticeBoundaries(items,at,calendar.dateInfo));
   const today = calendar.dateInfo(schedule.date);
   boundaries.push(today.civilEnd);
   if (today.sunset > at) boundaries.push(today.sunset);
   const minyanChangeAt = nextMinyanChangeAt(schedule.next);
   if (minyanChangeAt > at) boundaries.push(minyanChangeAt);
   if (schedule.nextChangeAt && schedule.nextChangeAt > at) boundaries.push(schedule.nextChangeAt);
-  return { appearance, theme: themeAt(appearance, at), at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at) : [] };
+  return { appearance, theme: themeAt(appearance, at), at, generatedAt: (/* @__PURE__ */ new Date()).toISOString(), nextChangeAt: boundaries.sort()[0] || null, preview, items: publicItems(items, at, calendar.dateInfo), upcoming: controls.filter((i) => i.status === "published" && i.data.previewAt && i.data.previewAt <= at && at < i.startsAt).map(publicItem), schedule, warnings: preview ? warnings(items, at, calendar.dateInfo) : [] };
 }
 async function handle(req, env) {
   const url = new URL(req.url), path = url.pathname;
@@ -91,7 +93,8 @@ async function handle(req, env) {
     if (path === "/api/display/admin/me") return json({ ...who, local: who.email === "local-admin" });
     if (path === "/api/display/admin/items" && req.method === "GET") {
       const rows = await list(env.DB);
-      return json(rows.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ ...i, phase: phase(i, (/* @__PURE__ */ new Date()).toISOString()) })));
+      const calendar = await currentCalendar();
+      return json(rows.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ ...i, phase: phase(i, (/* @__PURE__ */ new Date()).toISOString(), calendar.dateInfo) })));
     }
     if (path === "/api/display/admin/catalog") {
       const year = Number(url.searchParams.get("year"));
@@ -101,6 +104,12 @@ async function handle(req, env) {
     if (path === "/api/display/admin/date" && req.method === "POST") {
       const d = await body(req);
       return json((await currentCalendar()).dateInfo(d.date, d.hebrew));
+    }
+    if (path === '/api/display/admin/recurrence' && req.method === 'POST') {
+      allow(who, 'announcement');
+      const raw = await body(req), item = validate({kind:'announcement',status:'draft',data:{recurrence:raw.recurrence}});
+      if (!item.data.recurrence) throw new ApiError(422, 'Choose a yearly schedule.');
+      return json(nextYomTovWindows(item.data.recurrence,new Date().toISOString(),(await currentCalendar()).dateInfo));
     }
     if(path === '/api/display/admin/calendar' && req.method === 'GET') {
       const month=url.searchParams.get('month');
@@ -119,7 +128,7 @@ async function handle(req, env) {
         items.push({ ...draft, id: raw.item.id || "unsaved-preview" });
       }
       const result = await snapshot(items, at, appearance, calendar, true);
-      result.timeline = items.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ id: i.id, title: i.internalName || i.title, phase: phase(i, at) }));
+      result.timeline = items.filter((i) => who.capabilities.includes("full") || who.capabilities.includes({ announcement: "announcements", dedication: "dedications", schedule: "schedules" }[i.kind])).map((i) => ({ id: i.id, title: i.internalName || i.title, phase: phase(i, at, calendar.dateInfo) }));
       return json(result);
     }
     if (path === '/api/display/admin/appearance') {
