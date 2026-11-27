@@ -139,6 +139,15 @@ its source event, prayer times, date ownership and expiration rules remain intac
 
 ## Timing and display behavior
 
+- Announcements can use **When it appears > Every year before Yom Tov**. Select
+  Pesach, Sukkos and/or Shavuos. Each window starts at sunset fourteen calendar
+  days before the opening sunset of that Yom Tov, and stops at its opening sunset.
+  Dates use the shared Hebrew calendar and published shul location, including
+  leap years and New York daylight saving. The editor lists the next dates and
+  opens Preview in the next active window. Publishing enables the recurring rule;
+  Hide now or Archive stops it. Existing notices keep their one-time dates until
+  edited and published with this option. The saved rule also works in later years
+  offline, without yearly copies, a cron job or a database migration.
 - All entry and screen date logic uses `America/New_York`. Stored instants are UTC. Date labels include EDT/EST where times are being reviewed.
 - Visibility is start-inclusive and end-exclusive. Public requests evaluate it on the server; the browser removes expired cards at the boundary and fetches at the next known start/end. The displayed clock advances from server time, so a mis-set device clock does not control visibility. Sunset and midnight also trigger refreshes. It also polls every 15 seconds to discover edits/new records without an admin visit.
 - DST gaps are rejected. Repeated November times require selecting the first or second occurrence; the extra choice appears only when relevant.

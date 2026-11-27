@@ -1,6 +1,7 @@
 import { ApiError } from "./auth.js";
 import { localToISO, visible, phase } from "../public/display-assets/time.js";
 import { scheduleCalendar } from "./schedules.js";
+import { YOM_TOV_CHOICES } from '../public/display-assets/notice-recurrence.js';
 export const text = (v, n = 200) => {
   if (typeof v !== "string") return "";
   if (v.length > n) throw new ApiError(422, `Text exceeds ${n} characters.`);
@@ -16,12 +17,19 @@ export function validate(raw, { dateInfo, source } = scheduleCalendar()) {
   const kind = choice(raw.kind, ["announcement", "dedication", "schedule"]), status = choice(raw.status, ["draft", "published", "hidden", "archived"], "draft");
   const d = raw.data || {}, data = {};
   let startsAt = null, endsAt = null;
-  if (raw.startLocal) startsAt = localToISO(raw.startLocal, raw.startFold);
-  if (raw.endLocal) endsAt = localToISO(raw.endLocal, raw.endFold);
+  if (d.recurrence && kind !== 'announcement') throw new ApiError(422, 'Yearly Yom Tov timing is only available for announcements.');
+  if (!d.recurrence && raw.startLocal) startsAt = localToISO(raw.startLocal, raw.startFold);
+  if (!d.recurrence && raw.endLocal) endsAt = localToISO(raw.endLocal, raw.endFold);
   if (endsAt && (!startsAt || endsAt <= startsAt)) throw new ApiError(422, "End must be after start.");
   let title = text(raw.title);
   const internalName = text(raw.internalName);
   if (kind === "announcement") {
+    if (d.recurrence) {
+      const rule = d.recurrence, choices = YOM_TOV_CHOICES.map(([id])=>id);
+      if (rule.type !== 'before-yom-tov' || !Array.isArray(rule.holidays) || rule.holidays.some(id=>!choices.includes(id))) throw new ApiError(422, 'Choose valid Yomim Tovim for the yearly schedule.');
+      if (status === 'published' && !rule.holidays.length) throw new ApiError(422, 'Select at least one Yom Tov.');
+      data.recurrence = {type:'before-yom-tov',holidays:choices.filter(id=>rule.holidays.includes(id))};
+    }
     Object.assign(data, { message: text(d.message, 1200), contact: text(d.contact, 100), phone: text(d.phone, 40), category: text(d.category, 60), displayGroup: choice(d.displayGroup, ["automatic", "hall", "rav", "community", "support", "separate"], "automatic"), sectionPosition: choice(d.sectionPosition, ["automatic", "first"], "automatic"), placement: choice(d.placement, ["automatic", "left", "right", "chol-hamoed"], "automatic"), priority: choice(d.priority, ["normal", "important", "urgent"], "normal"), behavior: choice(d.behavior, ["pinned", "rotating"], "rotating"), duration: Math.min(120, Math.max(15, Number(d.duration) || 25)) });
     if (status === "published" && (!title || !data.message)) throw new ApiError(422, "Enter a visible title and message.");
   }
@@ -52,7 +60,7 @@ export function validate(raw, { dateInfo, source } = scheduleCalendar()) {
     if (data.previewAt && startsAt && data.previewAt > startsAt) throw new ApiError(422, "Preview must begin no later than the main schedule.");
     if (status === "published" && (!title || !data.source || !data.appliesFrom || !data.appliesTo || !endsAt || !Number.isInteger(data.precedence) || data.precedence < 1 || data.precedence > 999)) throw new ApiError(422, "Choose a source, applicable dates, activation/resume times and an explicit precedence from 1 to 999.");
   }
-  if (status === "published" && !startsAt) throw new ApiError(422, "Choose when this item starts.");
+  if (status === "published" && !startsAt && !data.recurrence) throw new ApiError(422, "Choose when this item starts.");
   return { kind, status, title, internalName, startsAt, endsAt, data };
 }
 export function conflicts(item, others) {
@@ -65,11 +73,11 @@ export function publicItem(item) {
   delete d.overlapAcknowledged;
   return { id: item.id, kind: item.kind, title: item.title, startsAt: item.startsAt, endsAt: item.endsAt, data: d };
 }
-export function publicItems(items, instant) {
-  return items.filter((i) => i.kind !== "schedule" && visible(i, instant)).map(publicItem);
+export function publicItems(items, instant, dateInfo) {
+  return items.filter((i) => i.kind !== "schedule" && visible(i, instant, dateInfo)).map(publicItem);
 }
-export function warnings(items, instant) {
-  const active = items.filter((i) => visible(i, instant));
+export function warnings(items, instant, dateInfo) {
+  const active = items.filter((i) => visible(i, instant, dateInfo));
   const out = [];
   if (active.some((i) => (i.data.message || "").length > 600 || (i.data.dedicationText || "").length > 250)) out.push("Long notices stay complete. Check the full screen preview for space before publishing.");
   if (active.some((i) => conflicts(i, active).length)) out.push("Overlapping schedules: the higher precedence wins for each affected portion.");

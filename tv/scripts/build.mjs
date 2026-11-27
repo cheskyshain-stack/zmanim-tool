@@ -20,6 +20,10 @@ async function build(relative = "") {
   }
 }
 await build();
+// Shared Hebrew-calendar timing is also used by the small admin time helpers.
+await bundle({entryPoints:[join(root,'public/display-assets/notice-recurrence.js')],
+  outfile:join(root,'dist/display-assets/notice-recurrence.js'),bundle:true,format:'esm',platform:'browser',minify:true,
+  legalComments:'none',target:'es2022'});
 // Remove the retired page from incremental builds as well as fresh builds.
 await rm(join(root, 'dist/display/index.html'), {force:true});
 // The special schedule is the site's original page inside an isolated shadow

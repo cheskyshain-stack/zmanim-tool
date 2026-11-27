@@ -31,6 +31,10 @@ h2 {
   margin: 0 0 28px;
   line-height: 1.5;
 }
+.yom-tov-choices {display:flex;flex-wrap:wrap;gap:12px 24px;margin:18px 0;padding:16px;border:1px solid #cfd5dd;border-radius:10px}
+.yom-tov-choices legend {font-weight:600;padding:0 6px}
+.yom-tov-choices .check {display:flex;align-items:center;gap:10px;min-height:44px;margin:0}
+.recurrence-date {display:block;margin-top:14px;line-height:1.6}
 .toolbar,
 .actions {
   display: flex;
