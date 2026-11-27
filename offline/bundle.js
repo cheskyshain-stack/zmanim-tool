@@ -7852,11 +7852,12 @@ function asaraCell(trace) {
 
 function buildAsaraBTevesPoster(year, settings) {
   if (!year) return null;
-  return buildFastDayPoster(year, settings, asaraBTevesSerial(year), ASARA_TEXT);
+  return buildFastDayPoster(year, settings, asaraBTevesSerial(year), ASARA_TEXT,
+    { firstMincha: year >= 5787 ? '1:00' : '12:45' });
 }
 
 /** The same fast-day timing rules, evaluated on the chosen fast's actual date. */
-function buildFastDayPoster(year, settings, serial, labels) {
+function buildFastDayPoster(year, settings, serial, labels, { firstMincha = '12:45' } = {}) {
   if (!year) return null;
   const date = dateFromSerial(serial);
   const friday = excelWeekday(serial) === 6;
@@ -7876,8 +7877,9 @@ function buildFastDayPoster(year, settings, serial, labels) {
   const gedola = zman('מנחה גדולה לחומרא', Z.minchaGedolaLechumra(date, settings), 'on the fast day, using the configured shul location');
   const earlyMincha = fixedTime(gedola.value <= 13.25 / 24 ? '1:15' : '1:20')
     .mark('*').onlyWhen(gedola.value <= (13 + 20 / 60) / 24, 'The 1:15/1:20 minyan must not precede Mincha Gedola Lechumra');
+  const first = fixedTime(firstMincha).underline();
   const standingMincha = [
-    fixedTime('12:45').underline().onlyWhen(gedola.value <= 12.75 / 24, '12:45 runs only after Mincha Gedola Lechumra'),
+    first.onlyWhen(gedola.value <= first.value, `${firstMincha} runs only after Mincha Gedola Lechumra`),
     earlyMincha,
     fixedTime('1:35').laterOf(gedola.ceilToStep(5, 'Advance to a five-minute time after Mincha Gedola Lechumra'),
       'The early downstairs Mincha cannot start before Mincha Gedola Lechumra').underline(),

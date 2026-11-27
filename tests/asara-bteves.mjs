@@ -8,8 +8,9 @@ import { buildChorefRow } from '../js/sheets/choref.js';
 import { buildKayitzRow } from '../js/sheets/kayitz.js';
 import { asaraBTevesText } from '../js/taanis-text.js';
 import { hasTaanis, excelWeekday } from '../js/hebrew-calendar.js';
+import { minchaGedolaLechumra } from '../js/zmanim/zmanim.js';
 import { dateFromSerial } from '../js/zmanim/solar.js';
-import { minyanimForDay } from '../js/upcoming.js';
+import { minyanimForDay, nextMinyan } from '../js/upcoming.js';
 import { buildAutomaticCharts } from '../js/publish.js';
 import { weeklyReaderData, readerWeekIndex } from '../js/ui/weekly-reader.js';
 import { weeklyAgenda } from '../js/ui/weekly-agenda.js';
@@ -83,6 +84,10 @@ test('5787 sunset and fast-day Maariv never announce an earlier minute', () => {
   const p = buildAsaraBTevesPoster(5787, settings);
   assert.equal(dateFromSerial(p.span.from).toISOString().slice(0, 10), '2026-12-20');
   assert(p.shkia > clock(16, 34) && p.shkia < clock(16, 34, 30), 'The actual sunset has seconds that nearest-minute display would discard');
+  assert.deepEqual(times(p, 'mincha').slice(0, 4).map(time => [time.text, time.underlined, time.mark]),
+    [['1:00', true, ''], ['1:15', false, '*'], ['1:35', true, ''], ['1:50', false, '']]);
+  assert.match(asaraBTevesText(p), /Mincha 1:00d, 1:15en, 1:35d, 1:50m/);
+  assert.doesNotMatch(asaraBTevesText(p), /12:45/);
   assert.equal(block(p, 'shkia').note.text, '4:35');
   assert.equal(times(p, 'mincha').at(-1).text, '3:50', 'Mincha keeps its earlier deadline from the true sunset');
   assert.deepEqual(times(p, 'maariv').map(t => [t.text, t.underlined]), [['5:10', false], ['5:25', true], ['10:30', false]]);
@@ -114,6 +119,11 @@ test('every year obeys its own sunset rules and the seasonal morning schedule', 
       assert(gap >= 25 - 1e-7 && gap < 26);
     } else {
       weekdays++;
+      const first = times(p, 'mincha')[0];
+      assert.equal(first.text, year >= 5787 ? '1:00' : '12:45', 'The new weekday opening applies going forward');
+      assert.equal(first.underlined, true, 'The first Mincha remains downstairs');
+      assert.equal(first.mark, '');
+      assert(first.trace.value >= minchaGedolaLechumra(dateFromSerial(p.span.from), settings), 'The first Mincha must clear Mincha Gedola Lechumra');
       assert(gap >= 40 - 1e-7 && gap < 45);
       assert.equal(Math.round(last.trace.value * 1440) % 5, 0);
       const evening = times(p, 'maariv');
@@ -135,6 +145,12 @@ test('weekly agenda, next minyan and roomless ten-day API read the same special 
     const p = buildAsaraBTevesPoster(year, settings), serial = p.span.from;
     const now = new Date(dateFromSerial(serial).toISOString().slice(0, 10) + 'T12:00:00Z');
     const state = buildAutomaticCharts(config, tables, now), index = readerWeekIndex(state);
+    if (year >= 5787 && !p.friday) {
+      const day = dateFromSerial(serial).toISOString().slice(0, 10);
+      const next = nextMinyan(new Date(day + 'T17:44:00Z'), state, settings);
+      assert.equal(next.name, 'מנחה'); assert.equal(next.mins, 13 * 60); assert.equal(next.place, 'למטה');
+      assert(!p.minyanim.some(event => event.name === 'מנחה' && event.mins === 12 * 60 + 45));
+    }
     assert.deepEqual(minyanimForDay(serial, state, settings), [...p.minyanim].sort((a, b) => a.mins - b.mins));
     const anchor = serial + 7 - excelWeekday(serial);
     const data = weeklyReaderData(anchor, index, state, settings);
