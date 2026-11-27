@@ -1,3 +1,4 @@
+import { isCandleLighting } from './candle-lighting.js';
 import { minyanKey, nextMinyanKey } from './minyan-timing.js';
 const isShemaDeadline = group => group.auxiliary && /^(?:סזק(?:ר)?ש|סוףזמן(?:קריאתשמע|ק(?:ר)?ש))/.test(String(group.label).replace(/[^\p{L}\p{N}]/gu,''));
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -44,7 +45,7 @@ export class QuarterPanel {
     const days = this.kind === 'zmanim' ? data.zmanDays || [] : data.prayerSections || data.prayerDays || [];
     const rows = [];
     for (const day of days) {
-      const entries = this.kind === 'zmanim' ? day.zmanim : day.groups?.filter(group => !isShemaDeadline(group));
+      const entries = this.kind === 'zmanim' ? day.zmanim : day.groups?.filter(group => !isShemaDeadline(group) && !(group.auxiliary && isCandleLighting(group.label)));
       if (!entries?.length && !day.note) continue;
       const section = day.key || 'day:'+day.date,sourceDate = day.sourceDate || day.date;
       const heading = day.relativeLabel === 'אתמול' ? day.relativeLabel : day.displayTitle || day.title;
