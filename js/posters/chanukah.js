@@ -18,6 +18,7 @@
 // meant just למטה, the same room `minchaParts`, `maarivParts` and `fridayMainMinchaParts`
 // already seat it in the rest of the year: nothing there moves to אולם השמחות for חנוכה.
 import { dateFromHebrew, excelWeekday, hasRoshChodesh, hasParsha, hebrewDateExtended, chanukahYearFor, jewishDateString } from '../hebrew-calendar.js';
+import { chanukahEarlyMincha, chanukahMinchaFollowing } from '../chanukah-mincha.js';
 import { dateFromSerial } from '../zmanim/solar.js';
 import * as Z from '../zmanim/zmanim.js';
 import { formatTime, formatTimeWithSeconds, floorToMinute } from '../format.js';
@@ -126,7 +127,17 @@ export function chanukahSundayOpening(minchaGedola) {
 
 export function chanukahSundayMincha(serial, settings) {
   if (excelWeekday(serial) !== 1 || !chanukahYearFor(serial, settings)) return null;
-  return chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings));
+  return chanukahMinchaFollowing(
+    chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings)),
+    chanukahEarlyMincha(serial, settings));
+}
+
+/** The Sunday-only pair, shared by posters, charts, daily schedules, API and messages. */
+export function chanukahSundayMinchaTimes(serial, settings) {
+  const following = chanukahSundayMincha(serial, settings);
+  if (!following) return [];
+  const early = chanukahEarlyMincha(serial, settings);
+  return [...(early ? [early] : []), following];
 }
 
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
@@ -557,8 +568,8 @@ export function combineErevShabbos(erevShabbosList, settings, tables) {
   return { title, cells };
 }
 
-/** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
- *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
+/** The Erev Shabbos מנחה menu: the shared Friday menu (see `fridayMainMinchaParts`),
+ *  including its Chanukah early minyan and rooms - the early candidates stay למטה for חנוכה exactly as they
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
  *  lighting (see `candleLightingParts`) appended after it. */
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
@@ -599,7 +610,7 @@ function compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbo
     const weekday = excelWeekday(day.serial);
     if (weekday === CH_FRIDAY) continue;
     const extra = sundayMincha.find(item => item.serial === day.serial);
-    const times = [...(extra ? [toCell(extra.time)] : []), ...base]
+    const times = [...(extra ? extra.times.map(toCell) : []), ...base]
       .sort((a, b) => clockMins(a.text, AFTERNOON) - clockMins(b.text, AFTERNOON));
     record(day.serial, weekday === 1 ? 'sunday' : 'weekday', times);
   }
@@ -647,23 +658,23 @@ export function buildChanukahPoster(year, settings, tables) {
   const sundayMincha = [];
   for (const day of days) {
     if (fridaySerials.has(day.serial)) continue;
-    const extra = chanukahSundayMincha(day.serial, settings);
-    if (extra) {
-      sundayMincha.push({ serial: day.serial, time: extra });
-      M.list(day.serial, CH_TEXT.mincha, [toCell(extra)], AFTERNOON);
+    const extra = chanukahSundayMinchaTimes(day.serial, settings);
+    if (extra.length) {
+      sundayMincha.push({ serial: day.serial, time: extra.at(-1), times: extra });
+      M.list(day.serial, CH_TEXT.mincha, extra.map(toCell), AFTERNOON);
     }
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
   }
   const sundayGroups = new Map();
   for (const extra of sundayMincha) {
-    const key = extra.time.plain();
-    if (!sundayGroups.has(key)) sundayGroups.set(key, { time: extra.time, serials: [] });
+    const key = extra.times.map(time => time.plain()).join('/');
+    if (!sundayGroups.has(key)) sundayGroups.set(key, { times: extra.times, serials: [] });
     sundayGroups.get(key).serials.push(extra.serial);
   }
-  const sundayMinchaRows = [...sundayGroups.values()].map(({ time, serials }) => ({
+  const sundayMinchaRows = [...sundayGroups.values()].map(({ times, serials }) => ({
     label: sundayGroups.size === 1 ? "ביום א' בלבד" : serials.map(serial =>
       `יום א' ${jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]}`).join(' / '),
-    times: [toCell(time)],
+    times: times.map(toCell),
   }));
 
   const maariv = chanukahMaariv(year, settings);

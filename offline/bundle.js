@@ -2557,9 +2557,31 @@ function sofZmanTfilaGRA(date, settings) {
   return fromStartOfDay(sunriseElev(date, settings), solarNoon(date, settings), sunsetElev(date, settings), 1 / 3, 1 / 1.5, settings.useAstronomicalChatzos);
 }
 
+// ==== chanukah-mincha.js ====
+/** The new downstairs minyan begins with Chanukah 5787. Keep older schedules intact.
+ * Friday includes the first candle's afternoon when 25 Kislev falls on Shabbos. */
+function chanukahEarlyMincha(serial, settings) {
+  const weekday = excelWeekday(serial);
+  if (weekday !== 1 && weekday !== 6) return null;
+  const year = chanukahYearFor(serial, settings) || (weekday === 6 ? chanukahYearFor(serial + 1, settings) : null);
+  if (!year || year < 5787) return null;
+  const limit = zman('מנחה גדולה לחומרא', minchaGedolaLechumra(dateFromSerial(serial), settings),
+    `on this Chanukah ${weekday === 6 ? 'Friday' : 'Sunday'}`)
+    .ceilToStep(5, 'round up to five minutes, keeping the exact zman and its seconds until rounding');
+  return clockTime(12, 15, 'the extra early downstairs Mincha on Chanukah Fridays and Sundays')
+    .laterOf(limit, 'the early minyan cannot begin before Mincha Gedola Lechumra').underline();
+}
+
+/** Keep the following 12:30 minyan at least fifteen minutes after the early minyan. */
+function chanukahMinchaFollowing(time, early) {
+  return early ? time.laterOf(early.plus(15, 'leave fifteen minutes before the following minyan'),
+    'the following minyan must start at least fifteen minutes after the early Mincha') : time;
+}
+
 // ==== sheets/common.js ====
 // Helpers shared between שבת קיץ and שבת חורף - both sheets use the exact same
 // "day-of-year window" gate and the exact same Erev Shabbos main-Mincha menu formula.
+
 
 
 
@@ -2645,9 +2667,9 @@ function weekLatestMinchaGedola(anchorSerial, settings) {
  *
  *  12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
- *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
- *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
- *  before that Friday's מנחה גדולה לחומרא, rounded up to the next five minutes.
+ *  workbook, which does not have it. From Chanukah 5787, add an earlier downstairs
+ *  minyan on its Fridays, with at least fifteen minutes before the 12:30 behind it.
+ *  Both clear that Friday's exact Mincha Gedola Lechumra, rounded upward to five minutes.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -2687,12 +2709,15 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
      Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
      flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
   const clocksBack = 'offered only while the clocks are back';
+  const chanukahEarly = chanukahEarlyMincha(excelSerial(fridayDate), settings);
   const all = [
+    ...(chanukahEarly ? [chanukahEarly] : []),
     /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
        Math.max is symmetric so the answer is the same, but the chain starts where the name
        does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
-    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    chanukahMinchaFollowing(clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים')
+      .laterOf(mgl(), notBefore).underline(), chanukahEarly).onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
     /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
        neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
@@ -2718,7 +2743,7 @@ function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
     text,
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
-    note: !onStandardTime
+    note: chanukahEarly ? `Chanukah adds an early downstairs Mincha at ${chanukahEarly.plain()}. The following minyan is at ${all[1].plain()}, at least fifteen minutes later.` : !onStandardTime
       ? 'The clocks are forward this week, so 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
       : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest.',
   };
@@ -7005,6 +7030,7 @@ function roshChodeshBaseSchedule(serial, settings) {
 
 
 
+
 const CH_MIN = 1 / 1440;
 const CH_SHABBOS = 7; // excelWeekday: 1 = Sunday .. 7 = Shabbos
 const CH_FRIDAY = 6;
@@ -7104,7 +7130,17 @@ function chanukahSundayOpening(minchaGedola) {
 
 function chanukahSundayMincha(serial, settings) {
   if (excelWeekday(serial) !== 1 || !chanukahYearFor(serial, settings)) return null;
-  return chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings));
+  return chanukahMinchaFollowing(
+    chanukahSundayOpening(Z.minchaGedolaLechumra(dateFromSerial(serial), settings)),
+    chanukahEarlyMincha(serial, settings));
+}
+
+/** The Sunday-only pair, shared by posters, charts, daily schedules, API and messages. */
+function chanukahSundayMinchaTimes(serial, settings) {
+  const following = chanukahSundayMincha(serial, settings);
+  if (!following) return [];
+  const early = chanukahEarlyMincha(serial, settings);
+  return [...(early ? [early] : []), following];
 }
 
 /** For the שבת chart's own parsha column: whether `shabbosSerial` itself falls inside
@@ -7535,8 +7571,8 @@ function combineErevShabbos(erevShabbosList, settings, tables) {
   return { title, cells };
 }
 
-/** The Erev Shabbos מנחה menu: the everyday Friday's own menu (see `fridayMainMinchaParts`)
- *  untouched, including its room - the early candidates stay למטה for חנוכה exactly as they
+/** The Erev Shabbos מנחה menu: the shared Friday menu (see `fridayMainMinchaParts`),
+ *  including its Chanukah early minyan and rooms - the early candidates stay למטה for חנוכה exactly as they
  *  are the rest of the year, with nothing moved to אולם השמחות - and the Friday's own candle
  *  lighting (see `candleLightingParts`) appended after it. */
 function chanukahErevShabbos(fridaySerial, shabbosSerial, settings) {
@@ -7577,7 +7613,7 @@ function compactChanukahMinchaRows(days, weekdayMincha, sundayMincha, erevShabbo
     const weekday = excelWeekday(day.serial);
     if (weekday === CH_FRIDAY) continue;
     const extra = sundayMincha.find(item => item.serial === day.serial);
-    const times = [...(extra ? [toCell(extra.time)] : []), ...base]
+    const times = [...(extra ? extra.times.map(toCell) : []), ...base]
       .sort((a, b) => clockMins(a.text, AFTERNOON) - clockMins(b.text, AFTERNOON));
     record(day.serial, weekday === 1 ? 'sunday' : 'weekday', times);
   }
@@ -7625,23 +7661,23 @@ function buildChanukahPoster(year, settings, tables) {
   const sundayMincha = [];
   for (const day of days) {
     if (fridaySerials.has(day.serial)) continue;
-    const extra = chanukahSundayMincha(day.serial, settings);
-    if (extra) {
-      sundayMincha.push({ serial: day.serial, time: extra });
-      M.list(day.serial, CH_TEXT.mincha, [toCell(extra)], AFTERNOON);
+    const extra = chanukahSundayMinchaTimes(day.serial, settings);
+    if (extra.length) {
+      sundayMincha.push({ serial: day.serial, time: extra.at(-1), times: extra });
+      M.list(day.serial, CH_TEXT.mincha, extra.map(toCell), AFTERNOON);
     }
     M.list(day.serial, CH_TEXT.mincha, weekdayMincha.map(toCell), AFTERNOON);
   }
   const sundayGroups = new Map();
   for (const extra of sundayMincha) {
-    const key = extra.time.plain();
-    if (!sundayGroups.has(key)) sundayGroups.set(key, { time: extra.time, serials: [] });
+    const key = extra.times.map(time => time.plain()).join('/');
+    if (!sundayGroups.has(key)) sundayGroups.set(key, { times: extra.times, serials: [] });
     sundayGroups.get(key).serials.push(extra.serial);
   }
-  const sundayMinchaRows = [...sundayGroups.values()].map(({ time, serials }) => ({
+  const sundayMinchaRows = [...sundayGroups.values()].map(({ times, serials }) => ({
     label: sundayGroups.size === 1 ? "ביום א' בלבד" : serials.map(serial =>
       `יום א' ${jewishDateString(serial, false, settings.useGregorianBefore1582).split(',')[0]}`).join(' / '),
-    times: [toCell(time)],
+    times: times.map(toCell),
   }));
 
   const maariv = chanukahMaariv(year, settings);
@@ -11877,12 +11913,12 @@ function buildWeekdayRow(week, settings) {
   }
   const maariv = maarivParts(week, settings);
   const mincha = minchaParts(week, settings);
-  const sundayMincha = chanukahSundayMincha(week.serial - (excelWeekday(week.serial) - 1), settings);
+  const sundayMincha = chanukahSundayMinchaTimes(week.serial - (excelWeekday(week.serial) - 1), settings);
   const printOverrides = {
     ...(maariv.printText != null ? { B: maariv.printText } : {}),
-    // The Sunday tag adds width: keep its time and 1:00 above the four remaining times.
-    ...(sundayMincha ? { C: splitLinesInHalf([
-      chanukahTag(sundayMincha.text(), 'חנוכה יום א׳'), ...mincha.times.map(time => time.text()),
+    // Keep both Sunday-only times in one tag, beside 1:00, above the regular times.
+    ...(sundayMincha.length ? { C: splitLinesInHalf([
+      chanukahTag(sundayMincha.map(time => time.text()).join(SLASH), 'חנוכה יום א׳'), ...mincha.times.map(time => time.text()),
     ], undefined, 2) } : {}),
   };
   return {
@@ -11891,8 +11927,8 @@ function buildWeekdayRow(week, settings) {
     /* The traces from that same pass, for the calculations page. E, the merged שחרית block,
        is not calculated at all: it is the schedule the program carries, printed as written,
        and the page says so rather than pretending there is working to show. */
-    traces: { B: maariv.times, C: [...(sundayMincha ? [sundayMincha] : []), ...mincha.times] },
-    notes: { B: maariv.note, C: sundayMincha ? "Regular times work for all five weekdays. The extra Chanukah Mincha is Sunday only, checked against that Sunday's exact מנחה גדולה לחומרא." : mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
+    traces: { B: maariv.times, C: [...sundayMincha, ...mincha.times] },
+    notes: { B: maariv.note, C: sundayMincha.length > 1 ? "Regular times work for all five weekdays. The extra early Chanukah Mincha and its following minyan are Sunday only, with fifteen minutes between them, checked against that Sunday's exact מנחה גדולה לחומרא." : sundayMincha.length ? "Regular times work for all five weekdays. The extra Chanukah Mincha is Sunday only, checked against that Sunday's exact מנחה גדולה לחומרא." : mincha.note, E: 'שחרית on this chart is not worked out at all. It is one merged cell down the whole board, holding the schedule the shul davens every morning, so the board, the week card, what is on next and the messages all print the one list and cannot come to disagree. Changing it is a change to the program, not a setting.' },
     dropped: { B: maariv.dropped, C: mincha.dropped },
     /* The "NEW" 11:30 tag, read only by sheet-view.js's own cell rendering (never by B
        itself, which stays the plain text every other reader - the week card, "what is
@@ -12183,8 +12219,7 @@ function minyanimForDay(serial, state, settings) {
     if (morning.length) out.push(...morning);
     else for (const t of weekdayShacharis(serial, settings)) out.push({ ...t, name: shacharisName });
   }
-  const sundayMincha = chanukahSundayMincha(serial, settings);
-  if (sundayMincha) {
+  for (const sundayMincha of chanukahSundayMinchaTimes(serial, settings)) {
     const extra = parseCell(sundayMincha.text())[0];
     if (!out.some(t => t.name === 'מנחה' && t.mins === extra.mins && t.place === extra.place)) {
       out.push({ ...extra, name: 'מנחה' });

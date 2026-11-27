@@ -5,6 +5,7 @@ import * as Z from '../zmanim/zmanim.js';
 import { hebrewDateExtended, excelWeekday, isAssurMelacha } from '../hebrew-calendar.js';
 import { formatTime, underlineTime, ceilToMinute } from '../format.js';
 import { flattenNonEmpty, splitLinesInHalf, isolate, NBSP, SLASH } from '../util.js';
+import { chanukahEarlyMincha, chanukahMinchaFollowing } from '../chanukah-mincha.js';
 import { zman, clockTime, fixedTime } from '../zmanim/trace.js';
 
 export const T = (h, m) => ((h % 24) + m / 60) / 24; // Excel TIME(h,m,) as a day-fraction
@@ -87,9 +88,9 @@ export function weekLatestMinchaGedola(anchorSerial, settings) {
  *
  *  12:30 and 1:00 still read the clock: while the clocks are forward, nothing is
  *  offered before 1:35. That is the shul's rule and it is a deliberate departure from the
- *  workbook, which does not have it. The extra Chanukah-only 12:15 candidate, usually held
- *  back to 12:20 by מנחה גדולה, was removed at the shul's request. 12:30 may not print
- *  before that Friday's מנחה גדולה לחומרא, rounded up to the next five minutes.
+ *  workbook, which does not have it. From Chanukah 5787, add an earlier downstairs
+ *  minyan on its Fridays, with at least fifteen minutes before the 12:30 behind it.
+ *  Both clear that Friday's exact Mincha Gedola Lechumra, rounded upward to five minutes.
  *
  *  1:15/1:20 and 1:35/1:40 read מנחה גדולה instead, across the whole week (see
  *  weekLatestMinchaGedola), which is a change from how both used to be decided. 1:15 used
@@ -129,12 +130,15 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
      Silenced rather than removed: onlyWhen hands back a value whose text is empty, and both
      flattenNonEmpty and splitLinesInHalf drop empties, so the printed cell is unchanged. */
   const clocksBack = 'offered only while the clocks are back';
+  const chanukahEarly = chanukahEarlyMincha(excelSerial(fridayDate), settings);
   const all = [
+    ...(chanukahEarly ? [chanukahEarly] : []),
     /* The shul's own time first and מנחה גדולה weighed against it, not the other way round.
        Math.max is symmetric so the answer is the same, but the chain starts where the name
        does: this is the 12:30 מנין, held back on the weeks מנחה גדולה is later. Written the
        other way the page headed it 1:22 on such a week, which is not what anybody calls it. */
-    clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים').laterOf(mgl(), notBefore).underline().onlyWhen(onStandardTime, clocksBack),
+    chanukahMinchaFollowing(clockTime(12, 30, 'the first of the earlier ערב שבת מנחה מנינים')
+      .laterOf(mgl(), notBefore).underline(), chanukahEarly).onlyWhen(onStandardTime, clocksBack),
     clockTime(1, 0, 'one of the earlier ערב שבת מנחה מנינים').underline().onlyWhen(onStandardTime, clocksBack),
     /* 1:15, or 1:20 behind it if מנחה גדולה creeps past 1:15 anywhere in the week, or
        neither if it creeps past 1:20 too. Two fixed candidates, never an odd minute between
@@ -160,7 +164,7 @@ export function fridayMainMinchaParts(fridayDate, settings, shabbosSerial) {
     text,
     times: all.filter((t) => t.held !== false),
     dropped: all.filter((t) => t.held === false),
-    note: !onStandardTime
+    note: chanukahEarly ? `Chanukah adds an early downstairs Mincha at ${chanukahEarly.plain()}. The following minyan is at ${all[1].plain()}, at least fifteen minutes later.` : !onStandardTime
       ? 'The clocks are forward this week, so 12:30 and 1:00 are not offered. That is the shul\'s own rule and the workbook does not have it.'
       : 'The clocks are back this week, so 12:30 and 1:00 are offered in front of the rest.',
   };

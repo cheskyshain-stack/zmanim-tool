@@ -72,10 +72,15 @@ const server=http.createServer((req,res)=>{
     if(output)fs.writeFileSync(path.join(output,width+'-'+kind+'.pdf'),pdf);
    };
    await pdfCheck('charts',2);
+   await page.goto(origin+'/schedules/');await page.locator('.luach-sheet').filter({has:page.locator('.luach-sheet-name',{hasText:'חנוכה'})}).first().locator('.poster').first().waitFor();await settle();
+   const publicChanukah=page.locator('.luach-sheet').filter({has:page.locator('.luach-sheet-name',{hasText:'חנוכה'})}).first().locator('.poster').first();
+   assert((await publicChanukah.innerText()).includes('12:20')&&(await publicChanukah.innerText()).includes('12:35'),'Congregation Special Schedules includes both downstairs Mincha times');
+   if(output)await publicChanukah.screenshot({path:path.join(output,width+'-public-chanukah.png')});
    for(const [key,kind]of [['chanukah','chanukah'],['roshchodesh10','rosh-chodesh']]){
     await page.goto(origin+'/admin/#posters/'+key);await page.locator('.poster').first().waitFor();await settle();
     const text=(await page.locator('.poster').allInnerTexts()).join('\n');
     assert(text.includes('6:43')&&!text.includes('6:44'),kind+' poster agrees');
+    if(kind==='chanukah') { assert.equal((text.match(/12:20/g)||[]).length,2);assert.equal((text.match(/12:35/g)||[]).length,2); }
     await pdfCheck(kind,1);
     if(output)await page.locator('.poster').first().screenshot({path:path.join(output,width+'-'+kind+'.png')});
    }

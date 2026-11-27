@@ -68,7 +68,7 @@ jobs:
         run: node scripts/build-schedule-api.mjs
 
       - name: Verify the schedule API and special-day rules
-        run: node --test tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs
+        run: node --test tests/schedule-feed.mjs tests/asara-bteves.mjs tests/shacharis-handouts.mjs tests/chanukah-early-mincha.mjs tests/chanukah-sunday-mincha.mjs tests/chanukah-mincha-groups.mjs
 
       - name: Verify calendar addresses and private account links
         run: node --test tests/calendar-address.mjs tests/admin-analytics.mjs

@@ -36,33 +36,38 @@ const server = http.createServer((req, res) => {
       const { weeklyAgenda } = await import('/js/ui/weekly-agenda.js');
       const { erevShabbosText } = await import('/js/erev-text.js');
       const { renderSheet } = await import('/js/ui/sheet-view.js');
+      const { minchaGedolaLechumra } = await import('/js/zmanim/zmanim.js');
+      const { formatTime } = await import('/js/format.js');
       const { dateFromSerial } = await import('/js/zmanim/solar.js');
       const tables = await loadTables();
       const config = await (await fetch('/data/published.json')).json();
       const state = buildAutomaticCharts(config, tables, new Date('2026-10-06T12:00:00Z'));
       const settings = resolveSettings(state.settings), index = readerWeekIndex(state);
-      const expected = ['12:30', '1:00', '1:15', '1:35', '1:50', '2:15', '3:00'];
+      const expected = ['12:20', '12:35', '1:00', '1:15', '1:35', '1:50', '2:15', '3:00'];
       const clocks = text => text.match(/\d{1,2}:\d{2}/g) || [];
       const check = (value, message) => { if (!value) throw Error(message); };
       const years = [...new Set(state.sheets.map(sheet => sheet.hebrewYear))].sort();
       const checked = [];
       for (const year of years) {
         const poster = buildChanukahPoster(year, settings, tables);
-        check(JSON.stringify(poster.erevShabbos.cells.flatMap(cell => clocks(cell.text))) === JSON.stringify(expected),
-          'Combined poster must contain only the regular early Friday Mincha times in ' + year);
+        check(poster.erevShabbos.cells.length === (year >= 5787 ? 8 : 7), 'The combined poster retains the early minyan in ' + year);
         for (const friday of poster.erevShabbosList) {
+          const limit = minchaGedolaLechumra(dateFromSerial(friday.serial), settings);
+          const earliest = Math.max(735, Math.ceil(limit * 1440 / 5 - 1e-9) * 5);
+          const expectedFriday = year >= 5787
+            ? [formatTime(earliest / 1440), formatTime(Math.max(750, earliest + 15) / 1440), ...expected.slice(2)]
+            : [formatTime(Math.max(750, Math.ceil(limit * 1440 / 5 - 1e-9) * 5) / 1440), ...expected.slice(2)];
           const week = index.get(friday.shabbosSerial).week;
           const winter = buildChorefRow(week, settings), summer = buildKayitzRow(week, settings);
           for (const menu of [winter.I, summer.L, friday.times.slice(0, -1).map(time => time.text()).join(' / ')]) {
-            check(JSON.stringify(clocks(menu)) === JSON.stringify(expected), 'Friday menu changed in ' + year + ': ' + menu);
+            check(JSON.stringify(clocks(menu)) === JSON.stringify(expectedFriday), 'Friday menu changed in ' + year + ': ' + menu);
           }
           check(!winter.printOverrides?.I && !summer.printOverrides?.L, 'Retired Friday badge remains');
-          check(!/12:15|12:20/.test(erevShabbosText(CHOREF_COLUMNS, winter, 'Chanukah')), 'Retired time remains in the Friday message');
+          check(expectedFriday.every(time => erevShabbosText(CHOREF_COLUMNS, winter, 'Chanukah').includes(time)), 'Friday message retains both early minyanim');
           const data = weeklyReaderData(friday.shabbosSerial, index, state, settings);
           const agenda = weeklyAgenda(data, friday.shabbosSerial, state, settings, dateFromSerial(friday.shabbosSerial - 6));
           const mincha = agenda.sections.flatMap(section => section.events).filter(event => event.serial === friday.serial && /מנחה/.test(event.name) && !event.auxiliary);
-          check(!mincha.some(event => event.mins === 735 || event.mins === 740), 'Retired minyan remains in the weekly agenda');
-          check(expected.every(time => mincha.some(event => {
+          check(expectedFriday.every(time => mincha.some(event => {
             const [hour, minute] = time.split(':').map(Number);
             return event.mins === (hour === 12 ? 12 : hour + 12) * 60 + minute;
           })), 'Regular Friday minyanim missing from the weekly agenda');
