@@ -31,6 +31,8 @@ jobs:
         run: node --test tests/calendar-model.mjs tests/calendar-announcements.mjs tests/calendar-email-import.mjs tests/simcha-messages.mjs tests/calendar-google.mjs tests/calendar-google-activation.mjs
       - name: Install the pinned calendar deployment tool
         run: npm ci --prefix worker/calendar --no-audit --no-fund
+      - name: Verify the paused calendar preserves accounts and messages
+        run: node tests/shul-messages-service.cjs
       - name: Verify automatic simcha events with isolated local records
         run: node tests/calendar-simcha-import.cjs
       - name: Verify Google connection account and origin restrictions
@@ -61,15 +63,19 @@ jobs:
           let response;
           for(let attempt=0;attempt<20;attempt++){
             response=await fetch(endpoint+'/api/info?deployment='+Date.now(),{headers,cache:'no-store',signal:AbortSignal.timeout(10000)});
-            if(response.ok&&(await response.clone().json()).simchaWordingVersion===1||attempt===19)break;
+            if(response.ok&&(await response.clone().json()).messagesPage===true||attempt===19)break;
             await response.body?.cancel();
             await new Promise(resolve=>setTimeout(resolve,3000));
           }
           assert.equal(response.status,200);
           const info=await response.json();
-          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','announcementDateEditing','loginHistory','selfRegistration','activityStatistics','emailImport','messageFeeds','simchaImport'])assert.equal(info[field],true,field);
+          for(const field of ['ready','private','accounts','announcements','announcementDeletion','announcementEditing','announcementDateEditing','loginHistory','selfRegistration','activityStatistics','emailImport','messageFeeds'])assert.equal(info[field],true,field);
           assert.equal(info.announcementHistoryDays,10);
           assert.equal(info.simchaWordingVersion,1);
+          assert.equal(info.calendarEnabled,false);
+          assert.equal(info.simchaImport,false);
+          assert.equal(info.googleCalendar,false);
+          assert.equal(info.messagesPage,true);
           for(const path of ['/api/events?from=2026-11-01&to=2026-11-30','/api/announcements','/api/email-import','/api/email-import/review','/api/simcha-import']){
             const denied=await fetch(endpoint+path,{headers});assert.equal(denied.status,401,path);await denied.body?.cancel();
           }
@@ -80,5 +86,5 @@ jobs:
           assert.equal(receipt.status,401,'Inbox requests need their separate private key');await receipt.body?.cancel();
           const unrelated=await fetch(endpoint+'/api/info',{headers:{Origin:'https://unrelated.example'}});
           assert.equal(unrelated.status,403);await unrelated.body?.cancel();
-          console.log('Verified the existing owner, calendar features, LC Text capability and private access. No calendar data was written.');
+          console.log('Verified existing accounts, Shul Messages, paused calendar and private access. No production data was written.');
           JS

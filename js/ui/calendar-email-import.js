@@ -5,7 +5,7 @@ import { keepPosition } from './keep-position.js';
 export async function openCalendarEmailImport({ dialog, timeZone }) {
   let script = '', connection = null, saving = false, includeExisting = true;
   const drafts = new Map();
-  const view = dialog('<p>Import LC Text messages into calendar notifications.</p><p role="status" aria-live="polite">Checking connection…</p><div data-cal-inbox-content></div>', {
+  const view = dialog('<p>Import LC Text messages into Shul Messages.</p><p role="status" aria-live="polite">Checking connection…</p><div data-cal-inbox-content></div>', {
     onClose: () => { if (saving || [...drafts.values()].some(text => text.trim()) && !confirm('Discard your unsaved notification wording?')) return false; script = ''; drafts.clear(); return true; },
   });
   view.title('LC Text connection'); view.el.classList.add('cal-inbox-dialog');
@@ -16,7 +16,7 @@ export async function openCalendarEmailImport({ dialog, timeZone }) {
   const paint = () => keepPosition(view.el, draw);
   function draw() {
     content.innerHTML = `<div class="cal-inbox-summary"><strong>${connectionLabel()}</strong><span>ads@neileich.org</span><span>Lc Text (848) 356-4187</span><dl><div><dt>Last checked</dt><dd data-cal-inbox-checked>${escText(date(connection.lastCheckedAt))}</dd></div><div><dt>Notifications imported</dt><dd data-cal-inbox-imported>${connection.importedCount || 0}</dd></div></dl><button type="button" data-cal-inbox-refresh>Refresh connection</button></div>
-      <details class="cal-extra"><summary>How this connection works</summary><p>Google checks this mailbox every five minutes for the exact LC Text sender and subject. Only the message wording is posted, with its original date. Your other emails and the Comments newsletter connection stay unchanged. Messages that cannot be extracted safely wait here for your review.</p><p>Earlier messages become unread calendar notifications. Deleted or edited notifications are never replaced by an import retry.</p></details>
+      <details class="cal-extra"><summary>How this connection works</summary><p>Google checks this mailbox every five minutes for the exact LC Text sender and subject. Only the message wording is posted, with its original date. Your other emails and the Comments newsletter connection stay unchanged. Messages that cannot be extracted safely wait here for your review.</p><p>Earlier messages become unread messages. Deleted or edited notifications are never replaced by an import retry.</p></details>
       <form class="cal-form cal-inbox-setup"><label class="cal-checkbox"><input type="checkbox" name="includeExisting" ${includeExisting ? 'checked' : ''}>Include existing LC Text messages</label><button class="cal-primary" type="submit">${connection.enabled ? 'Create replacement script' : 'Create connection script'}</button></form>
       <div data-cal-inbox-script ${script ? '' : 'hidden'}><h3>Finish in Google</h3><ol><li>Open a <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer">new Google Apps Script project</a> as ads@neileich.org.</li><li>Copy this script into the new project’s Code.gs file and save it.</li><li>Run <strong>setupLcTextCalendar</strong> and approve Google access.</li></ol><div class="cal-form-actions"><button type="button" data-cal-inbox-copy>Copy script</button><button type="button" data-cal-inbox-download>Download script</button></div><details class="cal-extra"><summary>Show private script</summary><textarea readonly rows="8" aria-label="Private Google connection script"></textarea></details><p class="cal-form-note">Keep the script private. Creating another script replaces this connection key. Use a separate project from Commons Comments.</p></div>
       <details class="cal-extra" data-cal-inbox-review><summary>Messages needing review (${connection.reviewCount || 0})</summary><div data-cal-inbox-review-list></div></details>
@@ -108,7 +108,7 @@ export async function openCalendarEmailImport({ dialog, timeZone }) {
   }
   try {
     const info = await calendarRequest('/api/info'); if (!current()) return;
-    if (!info.emailImport) { status.textContent = 'The email connection is awaiting activation. Your existing calendar is ready to use.'; return; }
+    if (!info.emailImport) { status.textContent = 'The email connection is awaiting activation. Shul Messages is ready to use.'; return; }
     await refresh();
   } catch (error) { if (current()) status.textContent = error.message; }
 }

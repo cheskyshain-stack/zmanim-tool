@@ -57,7 +57,7 @@ export async function googleEvent(event,reminders=0,generation='') {
     location:event.location||'',start,end,visibility:'private',
     reminders:{useDefault:false,overrides:reminders?[{method:'popup',minutes:reminders}]:[]}};
 }
-const publicStatus = (env,c) => ({available:googleReady(env),connected:!!c?.refresh,enabled:!!c?.refresh&&!c.disabling,
+const publicStatus = (env,c) => ({available:env.CALENDAR_EVENTS_ENABLED !== 'false' && googleReady(env),connected:!!c?.refresh,enabled:env.CALENDAR_EVENTS_ENABLED !== 'false' && !!c?.refresh&&!c.disabling,
   disconnecting:!!c?.disabling,reminders:c?.reminders||0,lastSyncedAt:c?.lastSyncedAt||null,error:c?.error||'',name:'Lakewood Commons'});
 
 // Called only after a normal signed-in account check. No Google tokens leave the service.
@@ -70,6 +70,7 @@ export async function manageGoogle(storage,env,request,user,body,send=fetch) {
     for(const [k]of await storage.list({prefix:'google-entry:'+user.id+':'}))await storage.delete(k);
     await storage.delete(key);return json(publicStatus(env,null));
   }
+  if(env.CALENDAR_EVENTS_ENABLED === 'false' && method !== 'DELETE') throw error('Google Calendar sync is paused. Shul Messages is still available.',503);
   if(!googleReady(env) && method !== 'DELETE') throw error('Google Calendar setup has not been completed by the shul admin.',503);
   if(path==='/api/google-calendar/connect'&&method==='POST') {
     if(connection) throw error('Turn off the existing Google connection before connecting again.',409);
@@ -108,6 +109,7 @@ export async function manageGoogle(storage,env,request,user,body,send=fetch) {
   throw error('Google Calendar setting not found.',404);
 }
 export async function googleCallback(storage,env,url) {
+  if(env.CALENDAR_EVENTS_ENABLED === 'false') throw error('Google Calendar sync is paused.',503);
   if(!googleReady(env)) throw error('Google Calendar setup is incomplete.',503);
   const state=url.searchParams.get('state')||'';
   if(!/^[a-f0-9]{64}$/.test(state)) throw error('The Google connection expired.');
@@ -133,6 +135,7 @@ export async function runGoogleSync(storage,env,now=Date.now(),send=fetch) {
   const connections=await storage.list({prefix});
   let next=Infinity,processed=false;
   for(const [key,c] of connections) {
+    if(env.CALENDAR_EVENTS_ENABLED === 'false' && !c.disabling && (await storage.get('user:'+c.userId))?.active) continue;
     if(c.nextAt>now) {next=Math.min(next,c.nextAt);continue;}
     if(processed) {next=Math.min(next,now+1000);continue;} processed=true;
     const entryPrefix='google-entry:'+c.userId+':';

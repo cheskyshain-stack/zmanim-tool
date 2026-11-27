@@ -1,6 +1,6 @@
 let scheduled = false;
 
-/** Warm the real calendar without putting private events in persistent storage. */
+/** Warm public message-page assets without opening private messages or marking them read. */
 export function preloadCalendar() {
   if (scheduled || location.protocol === 'file:' || navigator.connection?.saveData) return;
   scheduled = true;
@@ -10,20 +10,14 @@ export function preloadCalendar() {
       document.addEventListener('visibilitychange', warm, { once: true });
       return;
     }
-    if (HTMLScriptElement.supports?.('speculationrules')) {
-      const rules = document.createElement('script');
-      rules.type = 'speculationrules';
-      rules.textContent = JSON.stringify({ prerender: [{ source: 'list', urls: ['/calendar/'], eagerness: 'immediate' }] });
-      document.head.append(rules);
-    }
-    // Also warm public files when the browser cannot or chooses not to prerender.
+    // Do not prerender the signed-in feed: only warm its public files.
     import('./ui/calendar-view.js').catch(() => {});
-    fetch('/calendar/', { priority: 'low' }).then(async response => {
+    fetch('/messages/', { priority: 'low' }).then(async response => {
       if (!response.ok) return;
       const page = new DOMParser().parseFromString(await response.text(), 'text/html');
       const css = page.querySelector('link[rel="stylesheet"]')?.getAttribute('href');
       if (!css) return;
-      const url = new URL(css, new URL('/calendar/', location.origin));
+      const url = new URL(css, new URL('/messages/', location.origin));
       if (url.origin === location.origin && url.pathname.startsWith('/css/')) {
         await fetch(url, { priority: 'low' }).then(result => result.arrayBuffer());
       }

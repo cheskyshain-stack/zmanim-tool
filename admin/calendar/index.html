@@ -5,14 +5,14 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Community Calendar</title>
+<title>Shul Messages</title>
 <script>
-const calendarUrl = new URL('/calendar/', location.origin);
+const calendarUrl = new URL('/messages/', location.origin);
 calendarUrl.search = location.search;
 calendarUrl.hash = location.hash;
 if (calendarUrl.searchParams.get('view') === 'congregation') calendarUrl.searchParams.delete('view');
 location.replace(calendarUrl.href);
 </script>
 </head>
-<body><p><a href="/calendar/">Open Community Calendar</a></p></body>
+<body><p><a href="/messages/">Open Shul Messages</a></p></body>
 </html>

@@ -5,7 +5,7 @@
   "compatibility_date": "2026-10-01",
   "workers_dev": true,
   "keep_vars": true,
-  "vars": { "ALLOWED_ORIGIN": "https://baismedrashoflakewoodcommons.org", "GOOGLE_CALENDAR_REDIRECT_URI": "https://zmanim-calendar.cheskyshain.workers.dev/api/google-calendar/callback" },
+  "vars": { "CALENDAR_EVENTS_ENABLED": "false", "ALLOWED_ORIGIN": "https://baismedrashoflakewoodcommons.org", "GOOGLE_CALENDAR_REDIRECT_URI": "https://zmanim-calendar.cheskyshain.workers.dev/api/google-calendar/callback" },
   "durable_objects": { "bindings": [{ "name": "CALENDAR", "class_name": "CommunityCalendar" }] },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["CommunityCalendar"] }],
   "observability": { "enabled": false }

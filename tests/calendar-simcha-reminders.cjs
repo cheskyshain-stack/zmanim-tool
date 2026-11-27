@@ -348,14 +348,14 @@ test('phone notifications hide private text and link to the specific event', asy
   assert(!JSON.stringify(notification).includes('Private simcha details'));
   handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
   await pending;
-  assert.equal(opened, origin + '/calendar/?simcha=2026-11-14&event=test-simcha&post=1');
+  assert.equal(opened, origin + '/messages/?simcha=2026-11-14&event=test-simcha&post=1');
   handlers.push({ data: { json: () => ({ date: '2026-11-14', day: '2026-11-13', slot }) }, waitUntil: work => { pending = work; } });
   await pending;
-  assert.equal(notification.data, origin + '/calendar/?simcha=2026-11-14');
+  assert.equal(notification.data, origin + '/messages/?simcha=2026-11-14');
   handlers.push({ data: { json: () => ({ test: true }) }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(notification.title, 'Calendar test alert');
-  assert.equal(notification.data, origin + '/calendar/');
+  assert.equal(notification.data, origin + '/messages/');
   handlers.push({ data: { json: () => ({ messageAlert: true, sequence: 9, text: 'Private announcement' }) }, waitUntil: work => { pending = work; } });
   await pending;
   assert.equal(notification.title, 'New Shul message');
@@ -363,12 +363,12 @@ test('phone notifications hide private text and link to the specific event', asy
   assert(!JSON.stringify(notification).includes('Private announcement'));
   handlers.notificationclick({ notification: { ...notification, close() {} }, waitUntil: work => { pending = work; } });
   await pending;
-  assert.equal(opened, origin + '/calendar/?messages=1');
+  assert.equal(opened, origin + '/messages/?messages=1');
   // Alerts already delivered before the page moved still open the correct event.
   for (const data of [origin + '/admin/calendar/?simcha=2026-11-14&event=test-simcha', origin + '/admin/calendar/?messages=1']) {
     handlers.notificationclick({ notification: { data, close() {} }, waitUntil: work => { pending = work; } });
     await pending;
-    assert.equal(opened, data.replace('/admin/calendar/', '/calendar/'));
+    assert.equal(opened, data.replace('/admin/calendar/', '/messages/'));
   }
   const previous = opened;
   handlers.notificationclick({ notification: { data: 'https://unrelated.example/calendar/', close() {} }, waitUntil: work => { pending = work; } });

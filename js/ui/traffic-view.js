@@ -17,7 +17,7 @@ const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
   '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
-  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/calendar/': 'Calendar', '/calendar/index.html': 'Calendar', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
+  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/messages/': 'Shul Messages', '/messages/index.html': 'Shul Messages', '/calendar/': 'Shul Messages', '/calendar/index.html': 'Shul Messages', '/admin/calendar/': 'Shul Messages', '/admin/calendar/index.html': 'Shul Messages',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -352,7 +352,7 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in calendar page opens. Seats, Schedule messages and calendar tracking begins with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in Shul Messages page opens. Seats, Schedule messages and the former calendar tracking began with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
       <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>

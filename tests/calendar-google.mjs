@@ -172,3 +172,16 @@ test('explicitly skipped older reviews stay skipped while older unclear records 
  const skipped={...message,id:'old-skipped'};await db.put('simcha-source:'+skipped.id,{messageId:skipped.id,revision:1,addedAt:skipped.createdAt,status:'skipped'});
  assert.equal((await syncSimchaMessage(db,skipped)).status,'skipped');
 });
+
+test('paused calendar retains active Google state and permits disconnection cleanup',async()=>{
+ const db=new Storage(),mock=mockGoogle();await connect(db,mock);
+ const paused={...env,CALENDAR_EVENTS_ENABLED:'false'},before=structuredClone([...db.rows]);mock.calls.length=0;
+ assert.equal(await runGoogleSync(db,paused,Date.now()+1000,mock.send),Infinity);
+ assert.equal(mock.calls.length,0);assert.deepEqual([...db.rows],before,'Encrypted tokens and stored events remain intact');
+ const status=await(await manageGoogle(db,paused,request(),user,{},mock.send)).json();assert.equal(status.connected,true);assert.equal(status.enabled,false);assert.equal(status.available,false);
+ await assert.rejects(()=>manageGoogle(db,paused,request('/connect','POST'),user,{},mock.send),/paused/);
+ await manageGoogle(db,paused,request('','DELETE'),user,{},mock.send);
+ await runGoogleSync(db,paused,Date.now()+1000,mock.send);
+ assert.equal((await db.list({prefix:'google-connection:'})).size,0);
+ assert.ok(mock.calls.some(call=>call.url.endsWith('/token')),'Disconnect still cleans up the app-created calendar');
+});

@@ -4,20 +4,19 @@ Kahal Lev Menachem (קהל לב מנחם), 44 Coles Way, Lakewood, NJ 08701.
 
 [Support the shul and donate](https://baismedrashoflakewoodcommons.org/donate/).
 
-## Calendar preview
+## Shul Messages
 
-Open **Admin → Calendar** to test the monthly community calendar. It has English and
-Hebrew dates, parshas, Jewish holidays, previous/next month, Today and a month picker.
-Click a day for its events. Add kiddushim, weddings, bar mitzvahs, other simchas,
-schedules or announcements with distinct colours and labels. Events can include a
-time, location, details and multiple dates. They do not change the minyan schedule.
+Open **Shul Messages** on the congregation homepage, or **Admin → Shul Messages**.
+The private message feed uses the existing accounts, passwords and saved sign-ins.
+New members can create a viewing account. Editors and the main owner keep their
+message permissions. Messages appear oldest first, with the latest at the bottom.
+Use **Phone alerts** along the bottom to receive new-message notifications.
 
-The first preview stays off the congregation pages. Test events are saved only in
-this browser. **Calendar access** offers backup and restore. Example events are
-optional and never saved. The prepared separate-account service must be activated
-before calendar editors can sign in from another device. The main calendar admin
-controls all events and invitations; editors choose their own password and manage
-their own events. See [calendar service setup](worker/calendar/README.md).
+The community calendar is temporarily paused. Existing `/calendar/` and
+`/admin/calendar/` links lead to `/messages/`. Calendar data remains stored, while
+event APIs, automatic event creation, event reminders and Google exports are paused.
+Message imports, shared read-only message links and phone alerts keep working.
+See [service setup and retained calendar documentation](worker/calendar/README.md).
 
 ## CMYK print PDFs
 

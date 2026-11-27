@@ -19,6 +19,7 @@
 User-agent: *
 Disallow: /admin/
 Disallow: /calendar/
+Disallow: /messages/
 Disallow: /seats/
 Disallow: /yahrzeits/
 Disallow: /offline/
