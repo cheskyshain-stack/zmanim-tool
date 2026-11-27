@@ -2,6 +2,7 @@ import { themeAt } from './appearance.js';
 import { MINYAN_HOLD_MS } from './minyan-timing.js';
 import { quarterSchedule } from './quarter-schedules.js';
 import { QuarterPanel } from './quarter-panels.js';
+import { candleLightingForScreen, candleCountdownText } from './candle-lighting.js';
 
 export const escapeHTML = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const esc = escapeHTML;
@@ -25,8 +26,13 @@ export function nextMinyanHTML(next, instant) {
   const units = [hours ? `${hours} hour${hours === 1 ? '' : 's'}` : '', rest ? `${rest} minute${rest === 1 ? '' : 's'}` : ''].filter(Boolean);
   const countdown = remaining <= 0 ? 'now' : `in ${units.join(' ')}`;
   const period = nextPeriod.formatToParts(new Date(next.at)).find(part => part.type === 'dayPeriod')?.value || '';
-  return `${label}<div class="next-service" dir="rtl"><strong lang="he">${esc(next.name)}</strong></div><div class="next-time" dir="ltr"><bdi>${esc(next.time)}</bdi> <span class="next-period">${esc(period)}</span></div>${next.place ? `<div class="next-location"><span class="next-location-label">Location</span><span class="next-place" lang="he" dir="rtl">${esc(next.place)}</span></div>` : ''}<p class="next-countdown">${countdown}</p>`;
+  return `${label}<div class="next-heading"><div class="next-service" dir="rtl"><strong lang="he">${esc(next.name)}</strong></div></div><div class="next-time" dir="ltr"><bdi>${esc(next.time)}</bdi> <span class="next-period">${esc(period)}</span></div>${next.place ? `<div class="next-location"><span class="next-place" lang="he" dir="rtl">${esc(next.place)}</span></div>` : ''}<p class="next-countdown">${countdown}</p>`;
 }
+export function candleLightingHTML(candle, instant) {
+  const period = nextPeriod.formatToParts(new Date(candle.at)).find(part => part.type === 'dayPeriod')?.value || '';
+  return `<div class="next-label">CANDLE LIGHTING</div><div class="next-heading"><div class="candle-title${String(candle.title).length > 16 ? ' is-long' : ''}" lang="he" dir="rtl">${esc(candle.title)}</div><div class="next-service candle-service" lang="he" dir="rtl"><strong>הדלקת נרות</strong></div></div><div class="next-time" dir="ltr"><bdi>${esc(candle.time)}</bdi> <span class="next-period">${esc(period)}</span></div><p class="next-countdown">${esc(candleCountdownText(candle.at, instant))}</p>`;
+}
+
 // Kept for existing editor imports. A notice is always one complete card.
 export function announcementPages(item) { return [item]; }
 export function cardHTML(item) {
@@ -134,7 +140,12 @@ export class DisplayView {
       this.prayerPanel.refit();
     }
     this.prayerPanel.highlightNext(s.next, instant);
-    setHTML(this.next, nextMinyanHTML(s.next, instant));
+    const candle = candleLightingForScreen(s, instant);
+    this.next.classList.toggle('has-candles', Boolean(candle));
+    this.next.setAttribute('aria-label', candle ? 'Next minyan and candle lighting' : 'Next minyan');
+    setHTML(this.next, candle
+      ? `<div class="next-minyan-pane">${nextMinyanHTML(s.next, instant)}</div><div class="next-candle-pane">${candleLightingHTML(candle, instant)}</div>`
+      : nextMinyanHTML(s.next, instant));
     const savedLabel = connection === 'cached' ? 'Using saved information' : stale ? 'Schedule update unavailable' : '';
     if (this.connection.textContent !== savedLabel) this.connection.textContent = savedLabel;
     this.connection.title = savedLabel && lastSyncAt ? `Last synced ${new Date(lastSyncAt).toLocaleString('en-US',{timeZone:'America/New_York'})} (New York)` : '';

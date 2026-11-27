@@ -4,9 +4,10 @@ import { readFile } from 'node:fs/promises';
 import { resolveSettings, WEEKDAY_SHACHARIS } from '../js/settings.js';
 import { dateFromHebrew, excelWeekday } from '../js/hebrew-calendar.js';
 import { dateFromSerial } from '../js/zmanim/solar.js';
+import { chanukahEarlyMincha } from '../js/chanukah-mincha.js';
 import { minchaGedolaLechumra } from '../js/zmanim/zmanim.js';
 import { buildChanukahPoster, chanukahSundayMincha, chanukahSundayOpening } from '../js/posters/chanukah.js';
-import { minyanimForDay } from '../js/upcoming.js';
+import { minyanimForDay, nextMinyan } from '../js/upcoming.js';
 import { buildAutomaticCharts } from '../js/publish.js';
 import { buildWeekdayRow } from '../js/sheets/weekday.js';
 import { weekText } from '../js/week-text.js';
@@ -47,7 +48,11 @@ test('every Chanukah Sunday is included over 51 years, with no extra on other da
       if (!sundays.includes(day)) { assert.equal(extra, null); continue; }
       const minutes = Math.round(extra.value * 1440), limit = minchaGedolaLechumra(dateFromSerial(day), settings) * 1440;
       assert(minutes >= 750 && minutes % 5 === 0 && minutes > limit);
-      assert(minutes === 750 || minutes - 5 <= limit + 1e-7, 'Use the earliest allowed five-minute slot');
+      const early = chanukahEarlyMincha(day, settings);
+      if (early) {
+        assert(minutes - early.value * 1440 >= 15 - 1e-7, 'Keep a quarter hour before the following minyan');
+        assert.deepEqual(poster.sundayMincha.find(extra => extra.serial === day).times.map(time => Math.round(time.value * 1440)), [Math.round(early.value * 1440), minutes]);
+      } else assert(minutes === 750 || minutes - 5 <= limit + 1e-7, 'Archived schedules retain their original opening');
       sawDelayed ||= minutes > 750;
       assert.equal(poster.minyanim.filter(event => event.serial === day && event.name === 'מנחה' && event.mins === minutes && event.place === 'למטה').length, 1);
     }
@@ -64,31 +69,37 @@ test('poster, chart note, daily schedule, weekly agenda, message and API share S
   const index = readerWeekIndex(state), shabbos = sunday + 6, week = index.get(shabbos).week;
   const row = buildWeekdayRow(week, settings);
   assert(!row.C.includes('12:30'), 'The standing weekday menu is unchanged');
-  assert.match(row.printOverrides.C, /12:30.*חנוכה יום א׳.*1:00[^\n]*\n.*1:15.*1:35.*1:50.*4:15/);
-  assert(minyanimForDay(sunday, state, settings).some(event => event.name === 'מנחה' && event.mins === 750 && event.place === 'למטה'));
-  assert(!minyanimForDay(sunday + 1, state, settings).some(event => event.name === 'מנחה' && event.mins === 750));
+  assert.match(row.printOverrides.C, /12:20.*12:35.*חנוכה יום א׳.*1:00[^\n]*\n.*1:15.*1:35.*1:50.*4:15/);
+  assert(minyanimForDay(sunday, state, settings).some(event => event.name === 'מנחה' && [740, 755].includes(event.mins) && event.place === 'למטה'));
+  assert(!minyanimForDay(sunday + 1, state, settings).some(event => event.name === 'מנחה' && [740, 755].includes(event.mins)));
   const message = weekText(WEEKDAY_SHACHARIS, row, "P' Miketz - Chanuka", shabbos, settings);
-  assert.match(message, /\nMincha: \(Sunday: 12:30d\) 1:00d, 1:15d, 1:35d, 1:50m, 4:15d\nMariv:/);
+  assert.match(message, /\nMincha: \(Sunday: 12:20d, 12:35d\) 1:00d, 1:15d, 1:35d, 1:50m, 4:15d\nMariv:/);
   const agenda = weeklyAgenda(weeklyReaderData(shabbos, index, state, settings), shabbos, state, settings, now);
   const events = agenda.sections.flatMap(section => section.events);
-  assert.equal(events.filter(event => event.serial === sunday && event.name === 'מנחה' && event.mins === 750 && !event.auxiliary).length, 1);
-  assert(!events.some(event => event.serial === sunday + 1 && event.name === 'מנחה' && event.mins === 750));
+  assert.equal(events.filter(event => event.serial === sunday && event.name === 'מנחה' && [740, 755].includes(event.mins) && !event.auxiliary).length, 2);
+  assert(!events.some(event => event.serial === sunday + 1 && event.name === 'מנחה' && [740, 755].includes(event.mins)));
+  for (const date of ['2026-12-04', '2026-12-06', '2026-12-11']) {
+    for (const [instant, minutes] of [['T17:19:00Z', 740], ['T17:26:00Z', 755]]) {
+      const next = nextMinyan(new Date(date + instant), state, settings);
+      assert.equal(next.mins, minutes); assert.equal(next.place, 'למטה');
+    }
+  }
   const feed = buildScheduleFeed(config, tables, now);
   assert.equal(feed.days[0].date, '2026-12-06');
-  assert.equal(feed.days[0].events.filter(event => event.category === 'mincha' && event.time === '12:30').length, 1);
-  assert(!feed.days[1].events.some(event => event.category === 'mincha' && event.time === '12:30'));
+  assert.equal(feed.days[0].events.filter(event => event.category === 'mincha' && ['12:20', '12:35'].includes(event.time)).length, 2);
+  assert(!feed.days[1].events.some(event => event.category === 'mincha' && ['12:20', '12:35'].includes(event.time)));
 });
 
 test('two Sundays in 5804 retain their different times on the poster and the public feed', () => {
   const poster = buildChanukahPoster(5804, settings, tables);
-  assert.deepEqual(poster.sundayMincha.map(extra => extra.time.plain()), ['12:30', '12:35']);
+  assert.deepEqual(poster.sundayMincha.map(extra => extra.time.plain()), ['12:45', '12:50']);
   assert.equal(poster.sundayMinchaRows.length, 2);
   assert(poster.sundayMinchaRows[0].label.includes('כסלו'));
   assert(poster.sundayMinchaRows[1].label.includes('טבת'));
   const feed = buildScheduleFeed(config, tables, new Date('2043-12-27T15:00:00Z'));
   const first = feed.days.find(day => day.date === '2043-12-27');
   const second = feed.days.find(day => day.date === '2044-01-03');
-  assert(first.events.some(event => event.category === 'mincha' && event.time === '12:30'));
-  assert(second.events.some(event => event.category === 'mincha' && event.time === '12:35'));
-  assert(!second.events.some(event => event.category === 'mincha' && event.time === '12:30'));
+  assert(first.events.some(event => event.category === 'mincha' && event.time === '12:45'));
+  assert(second.events.some(event => event.category === 'mincha' && event.time === '12:50'));
+  assert(!second.events.some(event => event.category === 'mincha' && event.time === '12:45'));
 });

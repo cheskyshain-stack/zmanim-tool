@@ -121,7 +121,21 @@ A display schedule control stores its name, source, applicable civil dates, opti
 
 The existing code does not provide complete Tisha B'Av-day or Shavuos schedules. Those days show an explicit confirmation notice rather than inferred weekday times. Add accurate information to the shared source before extending those schedules; the display does not invent it.
 
-The Worker reads the congregation site's published settings and saves them with the TV's offline schedule. The code bundles the shared calculations, so deploy a fresh TV build for formula changes. Published schedule settings and new TV announcements and dedications reach the display without a deployment.
+The Worker reads the congregation site's published settings and saves them with the TV's offline schedule. The code bundles the shared calculations, so deploy a fresh TV build for formula changes.
+The TV branch retains its `chartMinyanimForDay` export and source-column filters
+in `js/upcoming.js`; preserve those TV adapters when syncing shared calculations.
+The confirmed Chanukah early Mincha pair and Asara 1:00 opening are included. Published schedule settings and new TV announcements and dedications reach the display without a deployment.
+
+## Center card and candle lighting
+
+The live screen, offline screen and admin preview share the center card. On a date
+with a source candle-lighting time, show Next Minyan alongside Candle Lighting,
+with the incoming Shabbos/Yom Tov title above הדלקת נרות. Use the source time and
+New York AM/PM, plus the congregation-style countdown. Keep it through 25 minutes
+after lighting, then return to the full-width next-minyan card. Do not borrow a
+future day's candle time. Show only the room name, without a Location label.
+The Zmanei Tefillah panel omits the duplicate candle-lighting information row;
+its source event, prayer times, date ownership and expiration rules remain intact.
 
 ## Timing and display behavior
 

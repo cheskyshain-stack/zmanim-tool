@@ -415,21 +415,22 @@ as one block in the white panel, with the usual small gap between their schedule
 economy colour adjustment on desktop and phone PDFs. Printer toner-saving controls can
 still change how light shading appears on paper.
 
-Erev Shabbos Chanukah uses the regular Friday main Mincha list. The extra 12:15
-candidate, usually held back to 12:20, was removed at the shul's request. Keep it off
-the seasonal charts, Chanukah poster, weekly agenda, and Erev Shabbos message.
-
-Every Sunday during Chanukah has an extra downstairs Mincha at 12:30. Move it later
-in five-minute steps until it is strictly after that Sunday's exact Mincha Gedola
-Lechumra, without rounding the limit down. Share this rule between the poster,
-weekday chart's Sunday-only note, daily schedule, next minyan, API, and weekly text.
-On the seasonal weekday chart, show the extra time inline with the other Mincha
-times, using the compact **חנוכה יום א׳** tag. Balance this cell with the tagged time
-and 1:00 on the first line, followed by 1:15 / 1:35 / 1:50 / 4:15 below. Keep the
-original line breaks in other chart cells and poster lists.
-Label the extra time Sunday only on both full-page and half-page Chanukah posters.
-If Chanukah includes two Sundays with different extra times, label each with its
-Hebrew date. Do not add the extra to Friday or ordinary weekday schedules.
+From Chanukah 5787 onward, Fridays and Sundays have an extra downstairs Mincha.
+Start at 12:15 or that day's exact Mincha Gedola Lechumra rounded UP to five minutes,
+whichever is later. Preserve seconds until the upward rounding. Friday includes
+the afternoon before the first candle when 25 Kislev falls on Shabbos. The following
+12:30 downstairs minyan moves later in five-minute steps to leave at least fifteen
+minutes after the new minyan. For 5787, both Fridays and the Sunday use 12:20 and
+12:35. Future years calculate from their actual dates; do not hard-code those times.
+Keep pre-5787 schedules intact. Other weekdays and ordinary Fridays stay unchanged.
+Use `js/chanukah-mincha.js` and the shared Sunday pair for the poster, seasonal charts,
+daily schedule, next minyan, API, weekly agenda and schedule messages. Both times
+carry the downstairs underline. On the weekday chart keep the Sunday pair in one
+compact **חנוכה יום א׳** tag beside 1:00, above the remaining regular times.
+Full-page posters label the Sunday-only pair; compact handouts include it in Sunday's
+complete menu. If separate Fridays or Sundays require different menus, retain their
+date/parsha labels and calculation traces. Tests cover 51 Hebrew years, archived
+schedules, exact limits, rooms, Sunday/Friday scope and the fifteen-minute gap.
 
 Admin Chanukah posters use a 5.5in by 8.5in handout on landscape Letter paper only
 under **New design**. **Old design** keeps the original full-page
@@ -477,7 +478,9 @@ charts. The after-Yom-Kippur and Chol Hamoed lists keep their own 9:00 minyanim.
 
 Asara B'Teves has its own Special Schedule, built from the seasonal chart's fast-day
 Shacharis list. Add `סליחות קודם שחרית` at 6:40 only when sunrise is later than 7:05.
-Weekday Mincha is 12:45 downstairs, 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
+From Asara B'Teves 5787 onward, weekday Mincha begins at 1:00 downstairs, replacing
+the former 12:45. Preserve pre-5787 schedules and the shared summer fast's existing
+opening rules. The remaining list is 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
 3:30 downstairs, and a final main minyan at least 40 minutes before true sunset,
 rounded down to the earlier five-minute mark. Maariv is 35 minutes after sunset in
 the main Bais Medrash, 50 minutes after downstairs, and 10:30 in the main Bais Medrash.
