@@ -61,9 +61,9 @@ jobs:
           const endpoint=JSON.parse(fs.readFileSync('data/calendar.json','utf8')).endpoint;
           const headers={Origin:'https://baismedrashoflakewoodcommons.org'};
           let response;
-          for(let attempt=0;attempt<20;attempt++){
+          for(let attempt=0;attempt<60;attempt++){
             response=await fetch(endpoint+'/api/info?deployment='+Date.now(),{headers,cache:'no-store',signal:AbortSignal.timeout(10000)});
-            if(response.ok&&(await response.clone().json()).messagesPage===true||attempt===19)break;
+            if(response.ok&&(await response.clone().json()).messagesPage===true||attempt===59)break;
             await response.body?.cancel();
             await new Promise(resolve=>setTimeout(resolve,3000));
           }
