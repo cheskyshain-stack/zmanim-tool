@@ -521,7 +521,9 @@ charts. The after-Yom-Kippur and Chol Hamoed lists keep their own 9:00 minyanim.
 
 Asara B'Teves has its own Special Schedule, built from the seasonal chart's fast-day
 Shacharis list. Add `סליחות קודם שחרית` at 6:40 only when sunrise is later than 7:05.
-Weekday Mincha is 12:45 downstairs, 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
+From Asara B'Teves 5787 onward, weekday Mincha begins at 1:00 downstairs, replacing
+the former 12:45. Preserve pre-5787 schedules and the shared summer fast's existing
+opening rules. The remaining list is 1:15 Ezras Nashim, 1:35 downstairs, 1:50 main,
 3:30 downstairs, and a final main minyan at least 40 minutes before true sunset,
 rounded down to the earlier five-minute mark. Maariv is 35 minutes after sunset in
 the main Bais Medrash, 50 minutes after downstairs, and 10:30 in the main Bais Medrash.
