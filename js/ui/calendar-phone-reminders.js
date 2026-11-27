@@ -3,7 +3,7 @@ import { CALENDAR_REMINDER_TYPES, DEFAULT_CALENDAR_REMINDER_RULE } from '../cale
 
 // Retain the existing worker scope so saved phone subscriptions survive the page move.
 const calendarPath = '/admin/calendar/';
-const workerPath = calendarPath + 'phone-reminders.js?v=5';
+const workerPath = calendarPath + 'phone-reminders.js?v=6';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
@@ -117,7 +117,7 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
   const status = view.el.querySelector('[role=status]'), button = view.el.querySelector('.cal-primary');
   const test = view.el.querySelector('[data-reminder-test]'), delivery = view.el.querySelector('[data-reminder-delivery]');
   if (!supported()) {
-    status.textContent = 'On iPhone or iPad, add the calendar to your Home Screen and open it from its icon. On Android, open it in Chrome.';
+    status.textContent = 'On iPhone or iPad, add Shul Messages to your Home Screen and open it from its icon. On Android, open it in Chrome.';
     return;
   }
   try {
@@ -130,7 +130,8 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
       };
       update.addEventListener('statechange', check); check();
     });
-    const registration = registered.active ? registered : await navigator.serviceWorker.ready;
+    if (!registered.active) throw new Error('The phone-alert service could not start. Close this panel and try again.');
+    const registration = registered;
     let subscription = await registration.pushManager.getSubscription();
     const current = subscription && await calendarRequest('/api/phone-reminders/status', { method: 'POST', body: { endpoint: subscription.endpoint } });
     const key = browserKey(publicKey), existingKey = subscription?.options?.applicationServerKey;
@@ -200,7 +201,7 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
             }
           }
           subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-          failure = `The calendar couldn’t save ${setting} for this phone.`;
+          failure = `The shul couldn’t save ${setting} for this phone.`;
           const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { mode, subscription: subscription.toJSON(), ...(previousEndpoint ? { previousEndpoint } : {}) } });
           enabled = messages ? result.messageAlerts : result.enabled;
           previousEndpoint = undefined;
@@ -213,7 +214,7 @@ export async function openCalendarPhoneReminders(dialog, publicKey, schedules = 
     });
     test.addEventListener('click', async () => {
       if (Notification.permission !== 'granted') {
-        paint('Allow calendar notifications in this browser before sending a test alert.');
+        paint('Allow shul notifications in this browser before sending a test alert.');
         return;
       }
       test.disabled = button.disabled = true;

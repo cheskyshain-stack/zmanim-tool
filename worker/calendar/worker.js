@@ -139,6 +139,7 @@ export class CommunityCalendar extends DurableObject {
     const body = await this.body(request, 4096);
     const mode = body.mode;
     if (mode !== undefined && !['simcha', 'messages'].includes(mode) && !(method === 'DELETE' && mode === 'all')) fail('Choose a phone alert setting.');
+    if (this.env.CALENDAR_EVENTS_ENABLED === 'false' && method !== 'DELETE' && (scheduleOnly || !statusOnly && mode !== 'messages')) fail('Calendar reminders are paused. Message alerts are still available.', 503);
     const enrolling = method === 'PUT' && !scheduleOnly;
     const subscription = enrolling ? pushSubscription(body.subscription) : null;
     const endpoint = enrolling ? subscription?.endpoint : pushEndpoint(body.endpoint);
@@ -147,7 +148,7 @@ export class CommunityCalendar extends DurableObject {
     if (statusOnly || testOnly) {
       const device = await storage.get(key);
       const owned = device?.userId === user.id && device.version === user.version;
-      const registered = owned && !device.expiredAt, enabled = registered && device.simchaEnabled !== false;
+      const registered = owned && !device.expiredAt, enabled = this.env.CALENDAR_EVENTS_ENABLED !== 'false' && registered && device.simchaEnabled !== false;
       const messageAlerts = registered && device.messageAlertAfter != null;
       if (statusOnly) return json({ registered, enabled, messageAlerts, ...(owned ? { expired: !!device.expiredAt, lastDelivery: device.lastDelivery || null } : {}),
         ...(enabled ? { schedule: device.reminderSchedule || DEFAULT_CALENDAR_REMINDER_SCHEDULE, nextAt: await nextSimchaReminder(storage, device.reminderSchedule) } : {}) });
@@ -317,7 +318,7 @@ export class CommunityCalendar extends DurableObject {
         await transaction.delete(announcementDateKey(old));
         await transaction.put({ [key]: message, [announcementDateKey(message)]: id, 'announcement-edit-count': editSequence,
           ['announcement-edit-order:' + String(editSequence).padStart(16, '0')]: id, ...activityFields(['announcementsEdited'], now) });
-        await syncSimchaMessage(transaction, message, now);
+        if (this.env.CALENDAR_EVENTS_ENABLED !== 'false') await syncSimchaMessage(transaction, message, now);
       });
       return json({ message: calendarAnnouncementView(message), ...await status() });
     }
@@ -366,7 +367,7 @@ export class CommunityCalendar extends DurableObject {
         [announcementDateKey(message)]: body.id,
         ['announcement-read:' + user.id + ':' + body.id]: sequence, 'announcement-count': sequence, ...activityFields(['announcementsPosted'], message.createdAt),
         ...await this.messageAlertEntry(transaction, message) });
-        await syncSimchaMessage(transaction, message);
+        if (this.env.CALENDAR_EVENTS_ENABLED !== 'false') await syncSimchaMessage(transaction, message);
       });
       return json({ message: calendarAnnouncementView(message), ...await status() }, 201);
     }
@@ -449,7 +450,7 @@ export class CommunityCalendar extends DurableObject {
         'announcement-count': sequence, [receiptKey]: { bodyHash, announcementId: id, receivedAt: now },
         'config:sms-import': { ...config, importedCount: (config.importedCount || 0) + 1, lastCheckedAt: now, lastImportedAt: now },
         ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
-      await syncSimchaMessage(transaction, message, now);
+      if (this.env.CALENDAR_EVENTS_ENABLED !== 'false') await syncSimchaMessage(transaction, message, now);
     });
     return json({ accepted: true, posted: true, duplicate: false, announcementId: id }, 201);
   }
@@ -463,7 +464,7 @@ export class CommunityCalendar extends DurableObject {
         [announcementDateKey(message)]: id,
         'announcement-count': sequence, ['lc-receipt:' + receipt.digest]: { digest: receipt.digest, receivedAt: receipt.receivedAt, status: 'posted', announcementId: id },
         'config:email-import': next, ...activityFields(['announcementsPosted'], now), ...await this.messageAlertEntry(transaction, message, true) });
-      await syncSimchaMessage(transaction, message, now);
+      if (this.env.CALENDAR_EVENTS_ENABLED !== 'false') await syncSimchaMessage(transaction, message, now);
       await transaction.delete('lc-review:' + receipt.digest);
     });
     return { accepted: true, posted: true };
@@ -536,7 +537,7 @@ export class CommunityCalendar extends DurableObject {
     const url = new URL(request.url), path = url.pathname, method = request.method;
     if (path === '/api/google-calendar/callback' && method === 'GET') return this.googleTask(()=>googleCallback(this.ctx.storage,this.env,url));
     if (MESSAGE_FEED_PATHS.includes(path)) return readMessageFeed(this.ctx.storage, request, url);
-    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, googleCalendar: true, announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, simchaImport: true, simchaWordingVersion: 1, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
+    if (path === '/api/info' && method === 'GET') return json({ ready: !!await this.ctx.storage.get('config:owner'), private: true, accounts: true, calendarEnabled: this.env.CALENDAR_EVENTS_ENABLED !== 'false', messagesPage: true, googleCalendar: this.env.CALENDAR_EVENTS_ENABLED !== 'false', announcements: true, announcementDeletion: true, announcementEditing: true, announcementDateEditing: true, announcementHistoryDays: CALENDAR_ANNOUNCEMENT_HISTORY_DAYS, loginHistory: true, selfRegistration: true, activityStatistics: true, customCategories: true, optionalEventTimes: true, eventVisibility: true, eventAudienceDetails: true, emailImport: true, smsImport: true, simchaImport: this.env.CALENDAR_EVENTS_ENABLED !== 'false', simchaWordingVersion: 1, messageFeeds: true, phoneReminders: !!this.reminderKeys, reminderSchedules: !!this.reminderKeys, phoneReminderTest: !!this.reminderKeys, messageAlerts: !!this.reminderKeys });
     if (path === '/api/email-import/receive' && method === 'POST') return this.receiveEmail(request);
     if (path === '/api/sms-import/receive' && method === 'POST') return this.receiveSms(request);
     if (path === '/api/register' && method === 'POST') {
@@ -582,6 +583,7 @@ export class CommunityCalendar extends DurableObject {
       return json(await this.session(next, 'invitation-claimed'));
     }
     const user = await this.signedIn(request, path.startsWith('/api/access') || path === '/api/message-feeds' || path.startsWith('/api/message-feeds/') || path === '/api/activity' || path === '/api/sms-import' || path === '/api/email-import' || path.startsWith('/api/email-import/'));
+    if (this.env.CALENDAR_EVENTS_ENABLED === 'false' && (path === '/api/events' || path.startsWith('/api/events/') || path === '/api/simcha-import' || path.startsWith('/api/simcha-import/'))) fail('The calendar is paused. Shul Messages is still available.', 503);
     if (path === '/api/google-calendar' || path.startsWith('/api/google-calendar/')) {
       if (method !== 'GET') await this.limited(request,'google-calendar:'+user.id,30);
       const body = method === 'GET' ? {} : await this.body(request,4096);
@@ -725,7 +727,7 @@ export class CommunityCalendar extends DurableObject {
     const googleNext=await this.googleTask(()=>runGoogleSync(storage,this.env,now));
     if (!this.reminderKeys) { await scheduleCalendarAlarm(storage, Math.min(cleanup,googleNext)); return; }
     const alerts = await runCalendarMessageAlerts(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, now);
-    const next = await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, Date.now());
+    const next = this.env.CALENDAR_EVENTS_ENABLED === 'false' ? Infinity : await runSimchaReminders(storage, this.reminderKeys, this.env.ALLOWED_ORIGIN, Date.now());
     await scheduleCalendarAlarm(storage, Math.min(cleanup, next, alerts, googleNext));
   }
 }

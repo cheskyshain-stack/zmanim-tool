@@ -1,4 +1,16 @@
-# Private community calendar
+# Private Shul Messages service
+
+As of November 27, 2026, Shul Messages at `/messages/` uses this same service,
+Durable Object, accounts, session storage and phone-alert registration scope.
+`CALENDAR_EVENTS_ENABLED=false` in the existing Wrangler config temporarily pauses
+event routes, automatic simcha imports, event reminders and active Google exports.
+Disconnection cleanup continues. Stored events and encrypted Google connections are
+retained. Do not reset the owner, replace secrets, or create a new Worker for this.
+Existing calendar addresses redirect to Messages. New registration, message imports,
+message permissions, read tracking, shared weekly feeds and phone alerts continue.
+
+The calendar documentation below is retained for future reactivation and recovery.
+
 
 New event categories are Shalom Zachor, Kiddush, Vort, Aufruf, Chasuna, Bar mitzva
 shabbos, Bar mitzva dessert and Custom. Custom events require customCategory, a

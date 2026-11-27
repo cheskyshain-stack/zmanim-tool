@@ -28,7 +28,7 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false, googleReturnState = '' } = {}) {
+export function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false, googleReturnState = '', messagesOnly = true } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
@@ -69,7 +69,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   });
 
   function previewBackupMarkup() {
-    return standalone ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
+    return standalone || messagesOnly ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
   }
   function bindPreviewBackup(scope) {
     scope.querySelector('[data-cal-preview-backup]')?.addEventListener('click', () => {
@@ -187,10 +187,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
     keepPosition(container, draw);
   }
   function viewChoice() {
-    return `<label class="cal-view-choice">View as<select data-cal-view aria-label="View calendar as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Calendar editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>`;
+    return `<label class="cal-view-choice">View as<select data-cal-view aria-label="View messages as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Message editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>`;
   }
   function bindViewChoice(scope, close = () => {}) {
     scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
+      if (messagesOnly && !announcements.canLeave()) { event.target.value = previewRole; return; }
       const next = event.target.value; close(); previewRole = next;
       clearReaderCache();
       if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; preferredDay = Number(today.slice(8)); }
@@ -198,12 +199,20 @@ export function renderCalendar(container, settings, tables, { standalone = false
     });
   }
   async function signOut() {
+    if (messagesOnly && !announcements.canLeave()) return;
     try { await turnOffCalendarPhoneReminders(); } catch { /* Sign-out still ends the session. */ }
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
     calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
   function calendarOptions() {
+    if (messagesOnly) {
+      const view = dialog(`<p>Signed in as ${calEscape(user.name)}.</p>${user.role === 'owner' && !congregation ? viewChoice() : ''}<div class="cal-options-actions">${role() === 'owner' ? '<button type="button" data-cal-access>Message access</button>' : ''}${!reader() ? '<a href="/texts/">Schedule messages</a>' : ''}<button type="button" data-cal-signout>Sign out</button></div>`);
+      view.title('Message options'); bindViewChoice(view.el, view.close);
+      view.el.querySelector('[data-cal-access]')?.addEventListener('click', () => { view.close(); access(); });
+      view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
+      return;
+    }
     const view = dialog(`${user.role === 'owner' && !congregation ? `${viewChoice()}${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin here to make changes.</p>' : ''}` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its messages are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><div class="cal-options-actions">
       ${canAdd() ? `<button type="button" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>Add an event</button>` : ''}
       ${!reader() ? '<button type="button" data-cal-choose-month>Go to month</button>' : ''}
@@ -235,6 +244,13 @@ export function renderCalendar(container, settings, tables, { standalone = false
     }
   }
   async function openCalendarSession(session) {
+    if (messagesOnly) {
+      user = session.user; reminderPublicKey = session.reminderPublicKey || '';
+      messageAlerts = session.messageAlerts === true;
+      openMessages = false; googleReturnState = ''; reminderDate = reminderEventId = '';
+      await loadEvents();
+      return;
+    }
     const googleReturn = /^([a-f0-9]{64}|cancelled)$/.exec(googleReturnState);
     googleReturnState='';
     if (googleReturn) {
@@ -282,6 +298,15 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   function fitReader() {
     if (disposed) return;
+    if (messagesOnly) {
+      const shell = container.querySelector('.cal-messages-shell');
+      if (shell) {
+        const viewport = window.visualViewport;
+        const bottom = (viewport?.height || innerHeight) + (viewport?.offsetTop || 0);
+        shell.style.height = Math.max(140, bottom - shell.getBoundingClientRect().top) + 'px';
+      }
+      return;
+    }
     const calendar = container.querySelector('.shul-calendar');
     if (sharedLayout() && calendar) {
       const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
@@ -308,6 +333,15 @@ export function renderCalendar(container, settings, tables, { standalone = false
     return `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-event-total">${calEscape(text)}</span><span class="cal-event-colors">${types.map(type => `<i class="cal-type-${type}"></i>`).join('')}</span></span>`;
   }
   function draw() {
+    if (messagesOnly) {
+      container.classList.remove('is-cal-congregation');
+      container.classList.add('is-messages-host');
+      if (standalone) document.body.classList.add('cal-messages-body');
+      container.innerHTML = '<section class="cal-messages-shell"><h2>Shul Messages</h2><div data-cal-message-page></div></section>';
+      fitReader();
+      announcements.open({ host: container.querySelector('[data-cal-message-page]'), onOptions: calendarOptions });
+      return;
+    }
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
     const isReader = reader();
@@ -466,7 +500,9 @@ export function renderCalendar(container, settings, tables, { standalone = false
     if (!endpoint) { redraw(); return; }
     if (document.prerendering) document.addEventListener('prerenderingchange', announceCalendarOpen, { once: true });
     else announceCalendarOpen();
+    if (messagesOnly) announcements.stop();
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
+    if (messagesOnly) { draw(); return; }
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
     try {
@@ -599,11 +635,11 @@ export function renderCalendar(container, settings, tables, { standalone = false
       return;
     }
     if (user.role !== 'owner') {
-      const view = dialog(user.role === 'viewer' ? '<p>Your account can view the private calendar and announcements. Calendar admins manage events and posts. Your name, email and successful sign-in times are visible to the calendar owner.</p>' : '<p>Your calendar account can add events and edit or delete the events you created. Other admin pages and account management stay with the main admin.</p>'); view.title('Your calendar access'); return;
+      const view = dialog(user.role === 'viewer' ? '<p>Your account can read private Shul Messages. Message editors manage posts. Your name, email and successful sign-in times are visible to the shul administrator.</p>' : '<p>Your account can post and manage messages. Account management stays with the main admin.</p>'); view.title('Your message access'); return;
     }
-    const view = dialog('<p>Editors choose their own password from a private invitation. They can manage their own events; you can manage every event.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a calendar editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
+    const view = dialog('<p>Editors choose their own password from a private invitation. Message permissions stay tied to their account.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a message editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
     bindPreviewBackup(view.el);
-    view.title('Calendar accounts');
+    view.title('Message accounts');
     const historyButton = document.createElement('button'); historyButton.type = 'button'; historyButton.textContent = 'Sign-in history';
     view.el.querySelector('header').after(historyButton);
     historyButton.addEventListener('click', () => { view.close(); openCalendarActivity({ dialog, timeZone: settings.timezone.id }); });
@@ -611,7 +647,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
       historyButton.after(inboxButton);
       const simchaButton = document.createElement('button'); simchaButton.type = 'button'; simchaButton.textContent = 'Simchos from messages'; simchaButton.dataset.calSimchaImport = '';
-      inboxButton.after(simchaButton);
+      if (!messagesOnly) inboxButton.after(simchaButton);
       simchaButton.addEventListener('click', () => { view.close(); openCalendarSimchaImport({dialog,onSaved:loadEvents}); });
       inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
       const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
@@ -624,23 +660,23 @@ export function renderCalendar(container, settings, tables, { standalone = false
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
       const area = view.el.querySelector('[data-cal-invitation]'); area.hidden = false;
-      area.querySelector('input').value = location.origin + '/calendar/#invite=' + result.token;
+      area.querySelector('input').value = location.origin + '/messages/#invite=' + result.token;
       status.textContent = 'Invitation ready.';
     };
     const list = async () => {
       const result = await calendarRequest('/api/access'); if (!view.el.isConnected) return;
-      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : account.role === 'editor' ? 'Calendar editor' : 'Viewer'}</small></div>${account.role !== 'owner' ? `<div>${!account.pending ? `<button type="button" data-cal-role="${escAttr(account.id)}" data-role="${account.role === 'editor' ? 'viewer' : 'editor'}">${account.role === 'editor' ? 'Make viewer' : 'Allow calendar editing'}</button>` : ''}<button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
+      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : account.role === 'editor' ? 'Message editor' : 'Viewer'}</small></div>${account.role !== 'owner' ? `<div>${!account.pending ? `<button type="button" data-cal-role="${escAttr(account.id)}" data-role="${account.role === 'editor' ? 'viewer' : 'editor'}">${account.role === 'editor' ? 'Make viewer' : 'Allow message editing'}</button>` : ''}<button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
       view.el.querySelectorAll('[data-cal-role]').forEach(button => button.addEventListener('click', async () => {
-        if (!confirm(button.dataset.role === 'editor' ? 'Allow this viewer to add calendar events and post announcements?' : 'Change this calendar editor to viewing access only?')) return;
+        if (!confirm(button.dataset.role === 'editor' ? 'Allow this viewer to post and manage messages?' : 'Change this message editor to viewing access only?')) return;
         button.disabled = true;
         try { await calendarRequest('/api/access/' + button.dataset.calRole + '/role', { method: 'POST', body: { role: button.dataset.role } }); status.textContent = 'Access updated. This person must sign in again.'; await list(); }
         catch (error) { status.textContent = error.message; button.disabled = false; }
       }));
       view.el.querySelectorAll('[data-cal-revoke],[data-cal-reinvite]').forEach(button => button.addEventListener('click', async () => {
         const removing = !!button.dataset.calRevoke, id = button.dataset.calRevoke || button.dataset.calReinvite;
-        if (!confirm(removing ? 'Remove this person’s calendar access?' : 'End this person’s sessions and create a new password invitation?')) return;
+        if (!confirm(removing ? 'Remove this person’s message access?' : 'End this person’s sessions and create a new password invitation?')) return;
         button.disabled = true;
-        try { const result = await calendarRequest('/api/access/' + id, { method: removing ? 'DELETE' : 'POST' }); if (!removing) invitation(result); else status.textContent = 'Calendar access removed.'; await list(); }
+        try { const result = await calendarRequest('/api/access/' + id, { method: removing ? 'DELETE' : 'POST' }); if (!removing) invitation(result); else status.textContent = 'Message access removed.'; await list(); }
         catch (error) { status.textContent = error.message; button.disabled = false; }
       }));
     };
@@ -658,17 +694,18 @@ export function renderCalendar(container, settings, tables, { standalone = false
   }
   function signIn(error = '') {
     requestNumber++; clearReaderCache(); busy = false;
-    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page'); document.body.classList.remove('cal-messages-body');
     container.style.removeProperty('--cal-reader-height');
     if (disposed) return;
     announcements.stop();
     dialogs.forEach(el => el.calDispose());
+    document.body.classList.remove('cal-messages-body'); container.classList.remove('is-messages-host');
     const creating = setupToken || inviteToken || registering;
-    container.innerHTML = `<section class="cal-login"><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : registering ? 'Create a calendar viewing account' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : registering ? 'Enter your name and email, then choose a password. You can view the private calendar and announcements as soon as you register.' : 'Sign in to view the private calendar and announcements.'}</p><form class="cal-form">
+    container.innerHTML = `<section class="cal-login"><h2>${setupToken ? 'Set up message access' : inviteToken ? 'Choose your password' : registering ? 'Create a Shul Messages account' : 'Shul Messages sign in'}</h2><p>${setupToken ? 'Create your main admin account to manage messages and account access.' : inviteToken ? 'Choose a password for your Shul Messages account.' : registering ? 'Enter your name and email, then choose a password. You can read Shul Messages as soon as you register.' : 'Sign in to read messages from the shul.'}</p><form class="cal-form">
       ${setupToken || registering ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
       <label>Password<input name="password" type="password" minlength="12" maxlength="200" required autocomplete="${creating ? 'new-password' : 'current-password'}"></label>
       ${creating ? '<label>Confirm password<input name="confirmation" type="password" minlength="12" maxlength="200" required autocomplete="new-password"></label><p class="cal-form-note">Use at least 12 characters. Save your password for future sign-ins.</p>' : ''}
-      <p class="cal-form-note">Your name, email and successful sign-in times are visible to the calendar owner.</p><p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${!setupToken && !inviteToken ? `<button type="button" class="cal-switch-login" data-cal-switch-login>${registering ? 'Already registered? Sign in' : 'New here? Create a viewing account'}</button>` : ''}${previewBackupMarkup()}</section>`;
+      <p class="cal-form-note">Your name, email and successful sign-in times are visible to the shul administrator.</p><p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${!setupToken && !inviteToken ? `<button type="button" class="cal-switch-login" data-cal-switch-login>${registering ? 'Already registered? Sign in' : 'New here? Create a viewing account'}</button>` : ''}${previewBackupMarkup()}</section>`;
     bindPreviewBackup(container);
     container.querySelector('[data-cal-switch-login]')?.addEventListener('click', () => { registering = !registering; signIn(); });
     container.querySelector('form').addEventListener('submit', async event => {
@@ -727,7 +764,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
   async function startCalendar() {
     const opening = ++requestNumber;
     const current = () => !disposed && opening === requestNumber;
-    container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
+    container.innerHTML = '<p class="hint" role="status">Opening Shul Messages…</p>';
     try {
       endpoint = await calendarConfig(); if (!current()) return;
       if (endpoint) {
@@ -749,8 +786,10 @@ export function renderCalendar(container, settings, tables, { standalone = false
         if (!active) { signIn(); return; }
         if (active.token !== session.token) { startCalendar(); return; }
         await openCalendarSession(result);
+      } else if (messagesOnly) {
+        container.innerHTML = '<section class="cal-login"><h2>Shul Messages</h2><p>Message access is temporarily unavailable. Please try again later.</p></section>';
       } else if (standalone) {
-        container.innerHTML = '<section class="cal-login"><h2>Calendar editor access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
+        container.innerHTML = '<section class="cal-login"><h2>Shul Messages access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
       } else {
         try { events = calendarReadPreview(); } catch (error) { storageError = error.message; }
         draw();
@@ -759,7 +798,7 @@ export function renderCalendar(container, settings, tables, { standalone = false
       if (!current()) return;
       if (error.status === 401) { signIn(error.message); return; }
       const message = endpoint ? 'Couldn’t check your saved sign-in. Try again in a moment.' : error.message;
-      container.innerHTML = `<section class="cal-login"><h2>Calendar connection</h2><p class="cal-error" role="alert">${calEscape(message)}</p><button type="button" data-cal-connection-retry>Try again</button></section>`;
+      container.innerHTML = `<section class="cal-login"><h2>Shul Messages connection</h2><p class="cal-error" role="alert">${calEscape(message)}</p><button type="button" data-cal-connection-retry>Try again</button></section>`;
       container.querySelector('[data-cal-connection-retry]').addEventListener('click', retryConnection);
     }
   }
@@ -773,7 +812,8 @@ export function renderCalendar(container, settings, tables, { standalone = false
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
     window.removeEventListener('online', retryConnection);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
-    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page'); document.body.classList.remove('cal-messages-body');
+    container.classList.remove('is-messages-host');
     container.style.removeProperty('--cal-reader-height'); dialogs.forEach(el => el.calDispose());
   };
 }

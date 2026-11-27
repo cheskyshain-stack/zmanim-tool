@@ -333,3 +333,34 @@
 @media (max-height:680px) { .cal-reader-heading .cal-message-links > :is(button,a) { min-height:44px; height:44px; } }
 @media (max-height:460px) and (max-width:600px) { .cal-manager-heading h2 { display:none; } .cal-manager-heading .cal-reader-actions { width:100%; grid-template-columns:44px minmax(0,1fr) 44px; margin:auto; } .cal-manager-heading [data-cal-announcements] > span:first-of-type { display:inline; } }
 @media print { .cal-admin-heading, .cal-preview-banner, .shul-calendar, .cal-dialog, .cal-login, .cal-status, .cal-example-note { display:none !important; } }
+.cal-messages-body { display:flex; flex-direction:column; height:100dvh; overflow:hidden; }
+.cal-messages-body main { flex:1; min-height:0; width:100%; max-width:52rem; box-sizing:border-box; padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left)); }
+.cal-messages-shell { display:flex; flex-direction:column; min-height:0; height:calc(100dvh - 180px); max-width:52rem; margin:0 auto; }
+.cal-messages-body .cal-messages-shell { height:100%; }
+.cal-messages-shell > h2 { flex:none; margin:0; padding:18px 8px 12px; color:#142b46; font:700 clamp(26px,5vw,34px)/1.2 Georgia,serif; }
+[data-cal-message-page] { display:flex; flex:1; min-height:0; }
+.cal-messages-page { display:flex; flex-direction:column; flex:1; min-height:0; width:100%; }
+.cal-messages-page > :not(.cal-announcement-feed) { flex:none; }
+.cal-messages-page .cal-announcement-feed { flex:1; padding:8px; background:#f5f1e7; border:1px solid #e3dccb; border-radius:14px 14px 0 0; }
+.cal-messages-page .cal-announcement-message { background:#fff; border-color:#e4ddcf; box-shadow:0 2px 8px #142b4605; }
+.cal-messages-page .cal-announcement-message.is-unread { border-left:3px solid #b39754; }
+.cal-messages-page .cal-announcement-compose { margin:0; padding:10px; background:#faf7f0; }
+.cal-messages-toolbar { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin:0; padding:10px 8px max(10px,env(safe-area-inset-bottom)); border-top:2px solid #b39754; background:#faf7f0; }
+.cal-messages-toolbar button,.cal-messages-page > button,.cal-messages-page .cal-announcement-actions button { min-height:44px; box-sizing:border-box; padding:8px 13px; border:1px solid #ded6c5; border-radius:10px; background:#fff; color:#142b46; font:600 14px/1.4 system-ui,sans-serif; cursor:pointer; }
+.cal-messages-toolbar [data-cal-latest] { margin-right:auto; background:#f1ead5; border-color:#b39754; }
+.cal-messages-toolbar [data-cal-message-options] { min-width:44px; font-size:22px; padding:4px 9px; }
+.cal-latest-marker { display:flex; align-items:center; justify-content:center; gap:8px; color:#7d652d; font:600 12px/1.5 system-ui,sans-serif; margin:16px 0 6px; }
+.cal-messages-page [data-cal-new-announcements] { align-self:center; margin:7px; background:#142b46; color:#fff; }
+.cal-messages-page .cal-announcement-status { margin:0; padding:0 8px; color:#64707c; font-size:12px; }
+.cal-messages-page .cal-announcement-status:empty { display:none; }
+.cal-messages-page .cal-announcement-actions:has(button:not([hidden])) { display:flex; }
+.cal-messages-page .cal-announcement-actions:not(:has(button:not([hidden]))) { display:none; }
+.cal-messages-page button:focus-visible { outline:2px solid #a88b43; outline-offset:2px; }
+.cal-messages-page [hidden] { display:none !important; }
+.cal-messages-page .cal-form button { min-height:44px; padding:8px 14px; border:1px solid #ded6c5; border-radius:10px; background:#fff; color:#142b46; font:600 14px/1.4 system-ui,sans-serif; cursor:pointer; }
+.cal-messages-page .cal-form .cal-primary { background:#142b46; border-color:#142b46; color:#fff; }
+.cal-messages-page .cal-announcement-compose-row { align-items:stretch; }
+.cal-messages-page .cal-announcement-message p { font-size:1rem; }
+.cal-messages-page .cal-announcement-message time { font-size:12px; }
+.cal-messages-page .cal-announcement-message .cal-announcement-delete { color:#953b32; }
+.cal-messages-page .cal-announcement-feed:focus-visible { outline:2px solid #a88b43; outline-offset:-2px; }

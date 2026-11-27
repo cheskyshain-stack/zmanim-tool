@@ -3592,7 +3592,7 @@ const ADMIN_TAB_LABELS = {
   home: 'Admin home', week: 'Weekly schedules', charts: 'Seasonal charts',
   generate: 'Print layouts', saved: 'Saved copies', posters: 'Special schedules',
   status: 'Website schedule status', traffic: 'Site statistics',
-  preview: 'Website preview', calendar: 'Calendar',
+  preview: 'Website preview', calendar: 'Shul Messages',
   settings: 'Schedule settings',
   guide: 'Help & instructions', program: 'Offline program',
 };
@@ -3604,7 +3604,7 @@ const ADMIN_NAV_SECTIONS = [
     { tab: 'posters', icon: 'posters', description: 'View and print Yom Tov, fast day, and other special schedules.' },
   ] },
   { title: 'Website & screen', description: 'Manage what people see and read.', items: [
-    { tab: 'calendar', icon: 'calendar', description: 'Test a monthly Hebrew and English calendar with simchas, schedules and announcements.' },
+    { tab: 'calendar', icon: 'calendar', description: 'Read and manage private messages from the shul.' },
     { tab: 'preview', icon: 'site', description: 'Choose a date and time to see how the congregation website will look.' },
     { href: '/admin/display/', label: 'Shul View controls', icon: 'screen', description: 'Edit announcements, Parnes Hayom, screen settings, and date previews.' },
     { href: '/texts/', label: 'Schedule messages', icon: 'texts', description: 'Prepare and copy schedule messages to share.' },
@@ -4507,7 +4507,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
   }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
-    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
+    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your session expired. Sign in again.'); return; }
     const id = actor;
     try {
       const value = await request('/api/announcements/status');
@@ -4540,10 +4540,10 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
   function markup({ label = 'Announcements', icon = false } = {}) {
     return `<button type="button" data-cal-announcements data-cal-announcement-label="${escAttr(label)}">${icon ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>' : ''}<span>${escText(label)}</span><span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>`;
   }
-  async function open() {
+  async function open({ host = null, onOptions = null } = {}) {
     if (!actor || active) return;
     const id = actor, reader = id.role === 'viewer';
-    if (!id.token || calendarSession()?.token !== id.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
+    if (!id.token || calendarSession()?.token !== id.token) { onSessionExpired('Your session expired. Sign in again.'); return; }
     const cached = currentFirstPage();
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
@@ -4557,20 +4557,32 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
       <details class="cal-extra" data-cal-added-date hidden><summary>Set date and time</summary><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></details>
       <div class="cal-announcement-compose-row"><textarea name="message" aria-label="New announcement" dir="auto" maxlength="4000" rows="2" required placeholder="Write a message…"></textarea><button class="cal-primary" type="submit" aria-label="Send announcement">Send</button></div>
     </form>`;
-    const view = dialog(intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${olderControl}<div data-cal-message-list><p>Loading announcements…</p></div></div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`, {
-      onClose: () => {
-        if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
+    const content = intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Shul messages">${olderControl}<div data-cal-message-list><p>Loading messages…</p></div>${host ? '<p class="cal-latest-marker">Latest messages <span aria-hidden="true">↓</span></p>' : ''}</div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`;
+    const canLeave = () => !(posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?'));
+    const canClose = () => {
+        if (!canLeave()) return false;
         cleanup(); active = null; keepFirstPageReady(); return true;
-      },
-    });
+    };
+    let view;
+    if (host) {
+      const el = document.createElement('section');
+      el.className = 'cal-messages-page';
+      el.innerHTML = content + '<footer class="cal-dialog-header cal-messages-toolbar"><button type="button" data-cal-latest>Latest <span aria-hidden="true">↓</span></button><button type="button" data-cal-message-options aria-label="Message options" title="Message options">⋯</button></footer>';
+      host.replaceChildren(el);
+      el.calDispose = () => { cleanup(); el.remove(); };
+      view = { el, title() {}, close() { if (canClose()) el.calDispose(); } };
+      el.querySelector('[data-cal-message-options]').addEventListener('click', () => onOptions?.());
+    } else view = dialog(content, { onClose: canClose });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
     const controls = view.el.querySelector('.cal-dialog-header');
     if (messageAlertsAvailable()) {
       const close = controls.querySelector('[data-cal-close]');
-      close.insertAdjacentHTML('beforebegin', '<button type="button" data-cal-message-alerts>Message alerts</button>');
+      const alertButton = '<button type="button" data-cal-message-alerts>Phone alerts</button>';
+      if (close) close.insertAdjacentHTML('beforebegin', alertButton);
+      else controls.querySelector('[data-cal-message-options]').insertAdjacentHTML('beforebegin', alertButton);
       controls.querySelector('[data-cal-message-alerts]').addEventListener('click', openMessageAlerts);
     }
-    if (reader) {
+    if (reader && !host) {
       view.el.classList.add('cal-announcement-reader');
       view.el.append(controls);
       controls.querySelector('[data-cal-close]').focus({ preventScroll: true });
@@ -4601,7 +4613,11 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
       };
     }
     const editDirty = () => editing && (editing.field.value !== editing.original || editing.dateField && editing.dateField.value !== editing.originalDate);
-    function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); }
+    function unsaved(event) {
+      if (textarea.value.trim() || form.elements.addedAt.value || editDirty()) { event.preventDefault(); event.returnValue = ''; }
+    }
+    if (host) window.addEventListener('beforeunload', unsaved);
+    function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); window.removeEventListener('beforeunload', unsaved); }
     function notice(text, error = false, source = '') {
       messageStatus.textContent = text; messageStatus.classList.toggle('cal-error', error); messageStatus.dataset.source = source;
     }
@@ -4761,7 +4777,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
     function followNew() {
       if (pageLoaded && !editing && !deleting && atLatest()) load(false, true);
     }
-    active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits, followNew }; paint();
+    active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, canLeave, syncDeleted, syncEdits, followNew }; paint();
     async function load(append = false, follow = false, cachedPage = null) {
       if (!current() || loading || posting) return;
       if (!append && editing) {
@@ -4836,6 +4852,9 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
     });
     older.addEventListener('click', () => load(true));
     newButton.addEventListener('click', () => load());
+    view.el.querySelector('[data-cal-latest]')?.addEventListener('click', () => {
+      if (total > active.latest) load(); else { scrollToLatest(); observe(); }
+    });
     retry.addEventListener('click', () => { markRead(); syncDeleted(); syncEdits(); load(); });
     await load(false, false, cached);
     if (!matches(id) || previewing()) return;
@@ -4844,7 +4863,7 @@ function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired, messa
       if (matches(id)) await applyStatus(value);
     } catch (error) { failed(error, id); }
   }
-  return { start, stop, bind, markup, open, dispose: stop };
+  return { start, stop, bind, markup, open, canLeave: () => active?.canLeave() ?? true, dispose: stop };
 }
 
 // ==== ui/calendar-day-facts.js ====
@@ -4908,7 +4927,7 @@ function fitCalendarDayFacts(container, compact) {
 async function openCalendarEmailImport({ dialog, timeZone }) {
   let script = '', connection = null, saving = false, includeExisting = true;
   const drafts = new Map();
-  const view = dialog('<p>Import LC Text messages into calendar notifications.</p><p role="status" aria-live="polite">Checking connection…</p><div data-cal-inbox-content></div>', {
+  const view = dialog('<p>Import LC Text messages into Shul Messages.</p><p role="status" aria-live="polite">Checking connection…</p><div data-cal-inbox-content></div>', {
     onClose: () => { if (saving || [...drafts.values()].some(text => text.trim()) && !confirm('Discard your unsaved notification wording?')) return false; script = ''; drafts.clear(); return true; },
   });
   view.title('LC Text connection'); view.el.classList.add('cal-inbox-dialog');
@@ -4919,7 +4938,7 @@ async function openCalendarEmailImport({ dialog, timeZone }) {
   const paint = () => keepPosition(view.el, draw);
   function draw() {
     content.innerHTML = `<div class="cal-inbox-summary"><strong>${connectionLabel()}</strong><span>ads@neileich.org</span><span>Lc Text (848) 356-4187</span><dl><div><dt>Last checked</dt><dd data-cal-inbox-checked>${escText(date(connection.lastCheckedAt))}</dd></div><div><dt>Notifications imported</dt><dd data-cal-inbox-imported>${connection.importedCount || 0}</dd></div></dl><button type="button" data-cal-inbox-refresh>Refresh connection</button></div>
-      <details class="cal-extra"><summary>How this connection works</summary><p>Google checks this mailbox every five minutes for the exact LC Text sender and subject. Only the message wording is posted, with its original date. Your other emails and the Comments newsletter connection stay unchanged. Messages that cannot be extracted safely wait here for your review.</p><p>Earlier messages become unread calendar notifications. Deleted or edited notifications are never replaced by an import retry.</p></details>
+      <details class="cal-extra"><summary>How this connection works</summary><p>Google checks this mailbox every five minutes for the exact LC Text sender and subject. Only the message wording is posted, with its original date. Your other emails and the Comments newsletter connection stay unchanged. Messages that cannot be extracted safely wait here for your review.</p><p>Earlier messages become unread messages. Deleted or edited notifications are never replaced by an import retry.</p></details>
       <form class="cal-form cal-inbox-setup"><label class="cal-checkbox"><input type="checkbox" name="includeExisting" ${includeExisting ? 'checked' : ''}>Include existing LC Text messages</label><button class="cal-primary" type="submit">${connection.enabled ? 'Create replacement script' : 'Create connection script'}</button></form>
       <div data-cal-inbox-script ${script ? '' : 'hidden'}><h3>Finish in Google</h3><ol><li>Open a <a href="https://script.google.com/home/start" target="_blank" rel="noopener noreferrer">new Google Apps Script project</a> as ads@neileich.org.</li><li>Copy this script into the new project’s Code.gs file and save it.</li><li>Run <strong>setupLcTextCalendar</strong> and approve Google access.</li></ol><div class="cal-form-actions"><button type="button" data-cal-inbox-copy>Copy script</button><button type="button" data-cal-inbox-download>Download script</button></div><details class="cal-extra"><summary>Show private script</summary><textarea readonly rows="8" aria-label="Private Google connection script"></textarea></details><p class="cal-form-note">Keep the script private. Creating another script replaces this connection key. Use a separate project from Commons Comments.</p></div>
       <details class="cal-extra" data-cal-inbox-review><summary>Messages needing review (${connection.reviewCount || 0})</summary><div data-cal-inbox-review-list></div></details>
@@ -5011,7 +5030,7 @@ async function openCalendarEmailImport({ dialog, timeZone }) {
   }
   try {
     const info = await calendarRequest('/api/info'); if (!current()) return;
-    if (!info.emailImport) { status.textContent = 'The email connection is awaiting activation. Your existing calendar is ready to use.'; return; }
+    if (!info.emailImport) { status.textContent = 'The email connection is awaiting activation. Shul Messages is ready to use.'; return; }
     await refresh();
   } catch (error) { if (current()) status.textContent = error.message; }
 }
@@ -5068,7 +5087,7 @@ async function openCalendarGoogle(dialog, returnedState='') {
 
 // ==== ui/calendar-message-feeds.js ====
 function calendarMessageFeedInstructions(endpoint, key) {
-  return `Lakewood Commons posted messages API\n\nPrivate text link:\n${endpoint}/api/v1/messages.txt?key=${key}\n\nJSON API:\nGET ${endpoint}/api/v1/messages\nAuthorization: Bearer ${key}\n\nOnly posted messages are included, never calendar events or account details.\nThe current week runs Sunday through Shabbos in America/New_York.\nMessages are selected by their Added date, oldest first.\nThe same link automatically moves to the new week on Sunday.\n\nText returns UTF-8 wording with line breaks, separated by a blank line.\nAn empty week returns an empty text response or an empty JSON messages array.\nJSON includes schemaVersion, timezone, week.start, week.end, generatedAt and messages.\nEach message has id, text, postedAt, updatedAt and revision. Text contains no HTML.\nRender with textContent or escaped text. Do not interpret messages as HTML.\n\nPoll about once per minute. After a successful response, replace your saved weekly\nlist so edits, deletions and the new week are reflected. Keep your existing list\non a network error. Treat 401 as a missing, invalid or revoked key, 405 as a wrong\nHTTP method, and 5xx as temporary failure. Retry temporary failures with backoff.\n\nA website backend can keep the key in a server secret and send the Authorization\nheader. Browser requests are supported with CORS. Anyone who has the private\nlink or a browser-visible key can read this week's posted messages.\nIt never grants editing, calendar events, accounts or older weeks.\nKeep the link out of public source and analytics. There is no fixed expiry.\nThe calendar owner can revoke it at Calendar access > Share messages.\n\nReading this API does not mark messages read or count as a calendar visit.\n`;
+  return `Lakewood Commons posted messages API\n\nPrivate text link:\n${endpoint}/api/v1/messages.txt?key=${key}\n\nJSON API:\nGET ${endpoint}/api/v1/messages\nAuthorization: Bearer ${key}\n\nOnly posted messages are included, never calendar events or account details.\nThe current week runs Sunday through Shabbos in America/New_York.\nMessages are selected by their Added date, oldest first.\nThe same link automatically moves to the new week on Sunday.\n\nText returns UTF-8 wording with line breaks, separated by a blank line.\nAn empty week returns an empty text response or an empty JSON messages array.\nJSON includes schemaVersion, timezone, week.start, week.end, generatedAt and messages.\nEach message has id, text, postedAt, updatedAt and revision. Text contains no HTML.\nRender with textContent or escaped text. Do not interpret messages as HTML.\n\nPoll about once per minute. After a successful response, replace your saved weekly\nlist so edits, deletions and the new week are reflected. Keep your existing list\non a network error. Treat 401 as a missing, invalid or revoked key, 405 as a wrong\nHTTP method, and 5xx as temporary failure. Retry temporary failures with backoff.\n\nA website backend can keep the key in a server secret and send the Authorization\nheader. Browser requests are supported with CORS. Anyone who has the private\nlink or a browser-visible key can read this week's posted messages.\nIt never grants editing, calendar events, accounts or older weeks.\nKeep the link out of public source and analytics. There is no fixed expiry.\nThe shul administrator can revoke it at Message access > Share messages.\n\nReading this API does not mark messages read or count as a calendar visit.\n`;
 }
 
 async function openCalendarMessageFeeds({ dialog, timeZone }) {
@@ -5146,7 +5165,7 @@ async function openCalendarMessageFeeds({ dialog, timeZone }) {
 // ==== ui/calendar-phone-reminders.js ====
 // Retain the existing worker scope so saved phone subscriptions survive the page move.
 const calendarPath = '/admin/calendar/';
-const workerPath = calendarPath + 'phone-reminders.js?v=5';
+const workerPath = calendarPath + 'phone-reminders.js?v=6';
 const supported = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 const browserKey = key => Uint8Array.from(atob(key.replaceAll('-', '+').replaceAll('_', '/')), char => char.charCodeAt(0));
 const reminderClock = new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', hour: 'numeric', minute: '2-digit' });
@@ -5260,7 +5279,7 @@ async function openCalendarPhoneReminders(dialog, publicKey, schedules = false, 
   const status = view.el.querySelector('[role=status]'), button = view.el.querySelector('.cal-primary');
   const test = view.el.querySelector('[data-reminder-test]'), delivery = view.el.querySelector('[data-reminder-delivery]');
   if (!supported()) {
-    status.textContent = 'On iPhone or iPad, add the calendar to your Home Screen and open it from its icon. On Android, open it in Chrome.';
+    status.textContent = 'On iPhone or iPad, add Shul Messages to your Home Screen and open it from its icon. On Android, open it in Chrome.';
     return;
   }
   try {
@@ -5273,7 +5292,8 @@ async function openCalendarPhoneReminders(dialog, publicKey, schedules = false, 
       };
       update.addEventListener('statechange', check); check();
     });
-    const registration = registered.active ? registered : await navigator.serviceWorker.ready;
+    if (!registered.active) throw new Error('The phone-alert service could not start. Close this panel and try again.');
+    const registration = registered;
     let subscription = await registration.pushManager.getSubscription();
     const current = subscription && await calendarRequest('/api/phone-reminders/status', { method: 'POST', body: { endpoint: subscription.endpoint } });
     const key = browserKey(publicKey), existingKey = subscription?.options?.applicationServerKey;
@@ -5343,7 +5363,7 @@ async function openCalendarPhoneReminders(dialog, publicKey, schedules = false, 
             }
           }
           subscription ||= await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
-          failure = `The calendar couldn’t save ${setting} for this phone.`;
+          failure = `The shul couldn’t save ${setting} for this phone.`;
           const result = await calendarRequest('/api/phone-reminders', { method: 'PUT', body: { mode, subscription: subscription.toJSON(), ...(previousEndpoint ? { previousEndpoint } : {}) } });
           enabled = messages ? result.messageAlerts : result.enabled;
           previousEndpoint = undefined;
@@ -5356,7 +5376,7 @@ async function openCalendarPhoneReminders(dialog, publicKey, schedules = false, 
     });
     test.addEventListener('click', async () => {
       if (Notification.permission !== 'granted') {
-        paint('Allow calendar notifications in this browser before sending a test alert.');
+        paint('Allow shul notifications in this browser before sending a test alert.');
         return;
       }
       test.disabled = button.disabled = true;
@@ -5487,7 +5507,7 @@ const calFullDate = iso => new Intl.DateTimeFormat('en-US', { weekday: 'long', m
 
 // The same view is used by the main admin and the restricted calendar account page.
 // With no service configured, only the main admin gets a clearly labelled device preview.
-function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false, googleReturnState = '' } = {}) {
+function renderCalendar(container, settings, tables, { standalone = false, setupToken = '', inviteToken = '', congregationPreview = false, reminderDate = '', reminderEventId = '', reminderPost = false, openMessages = false, googleReturnState = '', messagesOnly = true } = {}) {
   // The homepage shortcut opens the actual congregation experience, even for an
   // owner/editor. Admin View as remains a separate preview with no read writes.
   const congregation = standalone && congregationPreview;
@@ -5528,7 +5548,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   });
 
   function previewBackupMarkup() {
-    return standalone ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
+    return standalone || messagesOnly ? '' : '<details><summary>Previous device preview</summary><p>Earlier test events stay in the browser that created them. Download a backup from that device to keep a copy. They are not uploaded to the shared calendar.</p><button type="button" data-cal-preview-backup>Download device preview backup</button><p class="cal-error" role="status" data-cal-preview-status></p></details>';
   }
   function bindPreviewBackup(scope) {
     scope.querySelector('[data-cal-preview-backup]')?.addEventListener('click', () => {
@@ -5646,10 +5666,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     keepPosition(container, draw);
   }
   function viewChoice() {
-    return `<label class="cal-view-choice">View as<select data-cal-view aria-label="View calendar as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Calendar editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>`;
+    return `<label class="cal-view-choice">View as<select data-cal-view aria-label="View messages as"><option value="owner" ${previewRole === 'owner' ? 'selected' : ''}>Main admin</option><option value="editor" ${previewRole === 'editor' ? 'selected' : ''}>Message editor</option><option value="viewer" ${previewRole === 'viewer' ? 'selected' : ''}>Congregation</option></select></label>`;
   }
   function bindViewChoice(scope, close = () => {}) {
     scope.querySelector('[data-cal-view]')?.addEventListener('change', event => {
+      if (messagesOnly && !announcements.canLeave()) { event.target.value = previewRole; return; }
       const next = event.target.value; close(); previewRole = next;
       clearReaderCache();
       if (!monthAllowed(month)) { month = today.slice(0, 7); selected = today; preferredDay = Number(today.slice(8)); }
@@ -5657,12 +5678,20 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     });
   }
   async function signOut() {
+    if (messagesOnly && !announcements.canLeave()) return;
     try { await turnOffCalendarPhoneReminders(); } catch { /* Sign-out still ends the session. */ }
     try { await calendarRequest('/api/session', { method: 'DELETE' }); } catch { /* The local session is always removed. */ }
     calendarSession(null); user = null; events = []; messageEvents=[]; simchaReview=[]; signIn();
   }
   const phoneRemindersAvailable = () => standalone && !!reminderPublicKey;
   function calendarOptions() {
+    if (messagesOnly) {
+      const view = dialog(`<p>Signed in as ${calEscape(user.name)}.</p>${user.role === 'owner' && !congregation ? viewChoice() : ''}<div class="cal-options-actions">${role() === 'owner' ? '<button type="button" data-cal-access>Message access</button>' : ''}${!reader() ? '<a href="/texts/">Schedule messages</a>' : ''}<button type="button" data-cal-signout>Sign out</button></div>`);
+      view.title('Message options'); bindViewChoice(view.el, view.close);
+      view.el.querySelector('[data-cal-access]')?.addEventListener('click', () => { view.close(); access(); });
+      view.el.querySelector('[data-cal-signout]').addEventListener('click', signOut);
+      return;
+    }
     const view = dialog(`${user.role === 'owner' && !congregation ? `${viewChoice()}${previewing() ? '<p class="cal-form-note">Preview only. Choose Main admin here to make changes.</p>' : ''}` : ''}<p><strong>Bais Medrash of Lakewood Commons</strong></p><p>This calendar and its messages are visible only to signed-in calendar accounts.</p><p>Signed in as ${calEscape(user.name)}.</p><div class="cal-options-actions">
       ${canAdd() ? `<button type="button" data-cal-add="${selected}" ${busy || storageError || loadError ? 'disabled' : ''}>Add an event</button>` : ''}
       ${!reader() ? '<button type="button" data-cal-choose-month>Go to month</button>' : ''}
@@ -5694,6 +5723,13 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     }
   }
   async function openCalendarSession(session) {
+    if (messagesOnly) {
+      user = session.user; reminderPublicKey = session.reminderPublicKey || '';
+      messageAlerts = session.messageAlerts === true;
+      openMessages = false; googleReturnState = ''; reminderDate = reminderEventId = '';
+      await loadEvents();
+      return;
+    }
     const googleReturn = /^([a-f0-9]{64}|cancelled)$/.exec(googleReturnState);
     googleReturnState='';
     if (googleReturn) {
@@ -5741,6 +5777,15 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   }
   function fitReader() {
     if (disposed) return;
+    if (messagesOnly) {
+      const shell = container.querySelector('.cal-messages-shell');
+      if (shell) {
+        const viewport = window.visualViewport;
+        const bottom = (viewport?.height || innerHeight) + (viewport?.offsetTop || 0);
+        shell.style.height = Math.max(140, bottom - shell.getBoundingClientRect().top) + 'px';
+      }
+      return;
+    }
     const calendar = container.querySelector('.shul-calendar');
     if (sharedLayout() && calendar) {
       const top = Math.max(0, calendar.getBoundingClientRect().top), bottom = parseFloat(getComputedStyle(container).paddingBottom) || 0;
@@ -5767,6 +5812,15 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     return `<span class="cal-mobile-events" aria-hidden="true"><span class="cal-event-total">${calEscape(text)}</span><span class="cal-event-colors">${types.map(type => `<i class="cal-type-${type}"></i>`).join('')}</span></span>`;
   }
   function draw() {
+    if (messagesOnly) {
+      container.classList.remove('is-cal-congregation');
+      container.classList.add('is-messages-host');
+      if (standalone) document.body.classList.add('cal-messages-body');
+      container.innerHTML = '<section class="cal-messages-shell"><h2>Shul Messages</h2><div data-cal-message-page></div></section>';
+      fitReader();
+      announcements.open({ host: container.querySelector('[data-cal-message-page]'), onOptions: calendarOptions });
+      return;
+    }
     const info = calendarMonth(month, settings, tables), all = visibleEvents();
     const weeks = Array.from({ length: info.days.length / 7 }, (_, i) => info.days.slice(i * 7, i * 7 + 7));
     const isReader = reader();
@@ -5925,7 +5979,9 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     if (!endpoint) { redraw(); return; }
     if (document.prerendering) document.addEventListener('prerenderingchange', announceCalendarOpen, { once: true });
     else announceCalendarOpen();
+    if (messagesOnly) announcements.stop();
     announcements.start(user, { previewRole: previewing() ? previewRole : '', readOnly: congregation });
+    if (messagesOnly) { draw(); return; }
     const isReader = reader(), saved = isReader ? readerCache.get(month) : null;
     busy = !saved; loadError = ''; events = saved ? saved.events : []; redraw();
     try {
@@ -6058,11 +6114,11 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       return;
     }
     if (user.role !== 'owner') {
-      const view = dialog(user.role === 'viewer' ? '<p>Your account can view the private calendar and announcements. Calendar admins manage events and posts. Your name, email and successful sign-in times are visible to the calendar owner.</p>' : '<p>Your calendar account can add events and edit or delete the events you created. Other admin pages and account management stay with the main admin.</p>'); view.title('Your calendar access'); return;
+      const view = dialog(user.role === 'viewer' ? '<p>Your account can read private Shul Messages. Message editors manage posts. Your name, email and successful sign-in times are visible to the shul administrator.</p>' : '<p>Your account can post and manage messages. Account management stays with the main admin.</p>'); view.title('Your message access'); return;
     }
-    const view = dialog('<p>Editors choose their own password from a private invitation. They can manage their own events; you can manage every event.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a calendar editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
+    const view = dialog('<p>Editors choose their own password from a private invitation. Message permissions stay tied to their account.</p><div data-cal-users>Loading accounts…</div><form class="cal-form cal-invite-form"><h3>Invite a message editor</h3><label>Name<input name="name" required maxlength="60" autocomplete="off"></label><label>Email<input name="email" type="email" required autocomplete="off"></label><button class="cal-primary" type="submit">Create invitation</button></form><p role="status" class="cal-error"></p><div data-cal-invitation hidden><label>Private invitation link<input readonly aria-label="Private invitation link"></label><button type="button" data-cal-copy-invite>Copy invitation</button><p class="cal-form-note">Share this link privately. It expires after seven days and works once.</p></div>' + previewBackupMarkup());
     bindPreviewBackup(view.el);
-    view.title('Calendar accounts');
+    view.title('Message accounts');
     const historyButton = document.createElement('button'); historyButton.type = 'button'; historyButton.textContent = 'Sign-in history';
     view.el.querySelector('header').after(historyButton);
     historyButton.addEventListener('click', () => { view.close(); openCalendarActivity({ dialog, timeZone: settings.timezone.id }); });
@@ -6070,7 +6126,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       const inboxButton = document.createElement('button'); inboxButton.type = 'button'; inboxButton.textContent = 'LC Text connection'; inboxButton.dataset.calEmailImport = '';
       historyButton.after(inboxButton);
       const simchaButton = document.createElement('button'); simchaButton.type = 'button'; simchaButton.textContent = 'Simchos from messages'; simchaButton.dataset.calSimchaImport = '';
-      inboxButton.after(simchaButton);
+      if (!messagesOnly) inboxButton.after(simchaButton);
       simchaButton.addEventListener('click', () => { view.close(); openCalendarSimchaImport({dialog,onSaved:loadEvents}); });
       inboxButton.addEventListener('click', () => { view.close(); openCalendarEmailImport({ dialog, timeZone: settings.timezone.id }); });
       const smsButton = document.createElement('button'); smsButton.type = 'button'; smsButton.textContent = 'Shul SMS connection'; smsButton.dataset.calSmsImport = '';
@@ -6083,23 +6139,23 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     const status = view.el.querySelector('[role=status]');
     const invitation = result => {
       const area = view.el.querySelector('[data-cal-invitation]'); area.hidden = false;
-      area.querySelector('input').value = location.origin + '/calendar/#invite=' + result.token;
+      area.querySelector('input').value = location.origin + '/messages/#invite=' + result.token;
       status.textContent = 'Invitation ready.';
     };
     const list = async () => {
       const result = await calendarRequest('/api/access'); if (!view.el.isConnected) return;
-      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : account.role === 'editor' ? 'Calendar editor' : 'Viewer'}</small></div>${account.role !== 'owner' ? `<div>${!account.pending ? `<button type="button" data-cal-role="${escAttr(account.id)}" data-role="${account.role === 'editor' ? 'viewer' : 'editor'}">${account.role === 'editor' ? 'Make viewer' : 'Allow calendar editing'}</button>` : ''}<button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
+      view.el.querySelector('[data-cal-users]').innerHTML = result.users.map(account => `<div class="cal-account"><div><strong>${calEscape(account.name)}</strong><span>${calEscape(account.email)}</span><small>${account.role === 'owner' ? 'Main admin' : account.pending ? 'Invitation pending' : account.role === 'editor' ? 'Message editor' : 'Viewer'}</small></div>${account.role !== 'owner' ? `<div>${!account.pending ? `<button type="button" data-cal-role="${escAttr(account.id)}" data-role="${account.role === 'editor' ? 'viewer' : 'editor'}">${account.role === 'editor' ? 'Make viewer' : 'Allow message editing'}</button>` : ''}<button type="button" data-cal-reinvite="${escAttr(account.id)}">New invite / reset password</button><button type="button" data-cal-revoke="${escAttr(account.id)}">Remove access</button></div>` : ''}</div>`).join('');
       view.el.querySelectorAll('[data-cal-role]').forEach(button => button.addEventListener('click', async () => {
-        if (!confirm(button.dataset.role === 'editor' ? 'Allow this viewer to add calendar events and post announcements?' : 'Change this calendar editor to viewing access only?')) return;
+        if (!confirm(button.dataset.role === 'editor' ? 'Allow this viewer to post and manage messages?' : 'Change this message editor to viewing access only?')) return;
         button.disabled = true;
         try { await calendarRequest('/api/access/' + button.dataset.calRole + '/role', { method: 'POST', body: { role: button.dataset.role } }); status.textContent = 'Access updated. This person must sign in again.'; await list(); }
         catch (error) { status.textContent = error.message; button.disabled = false; }
       }));
       view.el.querySelectorAll('[data-cal-revoke],[data-cal-reinvite]').forEach(button => button.addEventListener('click', async () => {
         const removing = !!button.dataset.calRevoke, id = button.dataset.calRevoke || button.dataset.calReinvite;
-        if (!confirm(removing ? 'Remove this person’s calendar access?' : 'End this person’s sessions and create a new password invitation?')) return;
+        if (!confirm(removing ? 'Remove this person’s message access?' : 'End this person’s sessions and create a new password invitation?')) return;
         button.disabled = true;
-        try { const result = await calendarRequest('/api/access/' + id, { method: removing ? 'DELETE' : 'POST' }); if (!removing) invitation(result); else status.textContent = 'Calendar access removed.'; await list(); }
+        try { const result = await calendarRequest('/api/access/' + id, { method: removing ? 'DELETE' : 'POST' }); if (!removing) invitation(result); else status.textContent = 'Message access removed.'; await list(); }
         catch (error) { status.textContent = error.message; button.disabled = false; }
       }));
     };
@@ -6117,17 +6173,18 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   }
   function signIn(error = '') {
     requestNumber++; clearReaderCache(); busy = false;
-    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page'); document.body.classList.remove('cal-messages-body');
     container.style.removeProperty('--cal-reader-height');
     if (disposed) return;
     announcements.stop();
     dialogs.forEach(el => el.calDispose());
+    document.body.classList.remove('cal-messages-body'); container.classList.remove('is-messages-host');
     const creating = setupToken || inviteToken || registering;
-    container.innerHTML = `<section class="cal-login"><h2>${setupToken ? 'Set up calendar access' : inviteToken ? 'Choose your calendar password' : registering ? 'Create a calendar viewing account' : 'Calendar sign in'}</h2><p>${setupToken ? 'Create your main admin account. You will control all calendar events and editor access.' : inviteToken ? 'Create your own password for your calendar-only account.' : registering ? 'Enter your name and email, then choose a password. You can view the private calendar and announcements as soon as you register.' : 'Sign in to view the private calendar and announcements.'}</p><form class="cal-form">
+    container.innerHTML = `<section class="cal-login"><h2>${setupToken ? 'Set up message access' : inviteToken ? 'Choose your password' : registering ? 'Create a Shul Messages account' : 'Shul Messages sign in'}</h2><p>${setupToken ? 'Create your main admin account to manage messages and account access.' : inviteToken ? 'Choose a password for your Shul Messages account.' : registering ? 'Enter your name and email, then choose a password. You can read Shul Messages as soon as you register.' : 'Sign in to read messages from the shul.'}</p><form class="cal-form">
       ${setupToken || registering ? '<label>Your name<input name="name" maxlength="60" required autocomplete="name"></label>' : ''}${!inviteToken ? '<label>Email<input name="email" type="email" required autocomplete="username"></label>' : ''}
       <label>Password<input name="password" type="password" minlength="12" maxlength="200" required autocomplete="${creating ? 'new-password' : 'current-password'}"></label>
       ${creating ? '<label>Confirm password<input name="confirmation" type="password" minlength="12" maxlength="200" required autocomplete="new-password"></label><p class="cal-form-note">Use at least 12 characters. Save your password for future sign-ins.</p>' : ''}
-      <p class="cal-form-note">Your name, email and successful sign-in times are visible to the calendar owner.</p><p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${!setupToken && !inviteToken ? `<button type="button" class="cal-switch-login" data-cal-switch-login>${registering ? 'Already registered? Sign in' : 'New here? Create a viewing account'}</button>` : ''}${previewBackupMarkup()}</section>`;
+      <p class="cal-form-note">Your name, email and successful sign-in times are visible to the shul administrator.</p><p class="cal-error" role="status">${calEscape(error)}</p><button class="cal-primary" type="submit">${creating ? 'Create account' : 'Sign in'}</button></form>${!setupToken && !inviteToken ? `<button type="button" class="cal-switch-login" data-cal-switch-login>${registering ? 'Already registered? Sign in' : 'New here? Create a viewing account'}</button>` : ''}${previewBackupMarkup()}</section>`;
     bindPreviewBackup(container);
     container.querySelector('[data-cal-switch-login]')?.addEventListener('click', () => { registering = !registering; signIn(); });
     container.querySelector('form').addEventListener('submit', async event => {
@@ -6186,7 +6243,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
   async function startCalendar() {
     const opening = ++requestNumber;
     const current = () => !disposed && opening === requestNumber;
-    container.innerHTML = '<p class="hint" role="status">Opening calendar…</p>';
+    container.innerHTML = '<p class="hint" role="status">Opening Shul Messages…</p>';
     try {
       endpoint = await calendarConfig(); if (!current()) return;
       if (endpoint) {
@@ -6208,8 +6265,10 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
         if (!active) { signIn(); return; }
         if (active.token !== session.token) { startCalendar(); return; }
         await openCalendarSession(result);
+      } else if (messagesOnly) {
+        container.innerHTML = '<section class="cal-login"><h2>Shul Messages</h2><p>Message access is temporarily unavailable. Please try again later.</p></section>';
       } else if (standalone) {
-        container.innerHTML = '<section class="cal-login"><h2>Calendar editor access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
+        container.innerHTML = '<section class="cal-login"><h2>Shul Messages access</h2><p>Separate calendar accounts are not active yet. The main admin can test the calendar under Admin → Calendar.</p><a href="/admin/#calendar">Open main admin</a></section>';
       } else {
         try { events = calendarReadPreview(); } catch (error) { storageError = error.message; }
         draw();
@@ -6218,7 +6277,7 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
       if (!current()) return;
       if (error.status === 401) { signIn(error.message); return; }
       const message = endpoint ? 'Couldn’t check your saved sign-in. Try again in a moment.' : error.message;
-      container.innerHTML = `<section class="cal-login"><h2>Calendar connection</h2><p class="cal-error" role="alert">${calEscape(message)}</p><button type="button" data-cal-connection-retry>Try again</button></section>`;
+      container.innerHTML = `<section class="cal-login"><h2>Shul Messages connection</h2><p class="cal-error" role="alert">${calEscape(message)}</p><button type="button" data-cal-connection-retry>Try again</button></section>`;
       container.querySelector('[data-cal-connection-retry]').addEventListener('click', retryConnection);
     }
   }
@@ -6232,7 +6291,8 @@ function renderCalendar(container, settings, tables, { standalone = false, setup
     document.removeEventListener('visibilitychange', updateToday); window.removeEventListener('storage', storageListener);
     window.removeEventListener('online', retryConnection);
     window.removeEventListener('resize', fitReader); window.visualViewport?.removeEventListener('resize', fitReader);
-    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page');
+    container.classList.remove('is-cal-congregation'); document.body.classList.remove('cal-reader-page'); document.body.classList.remove('cal-messages-body');
+    container.classList.remove('is-messages-host');
     container.style.removeProperty('--cal-reader-height'); dialogs.forEach(el => el.calDispose());
   };
 }
@@ -25914,7 +25974,7 @@ const TRAFFIC_PAGES = {
   '/': 'Home', '/week/': 'Weekly zmanim', '/chart/': 'Zmanim chart',
   '/schedules/': 'Special schedules', '/donate/': 'Donate', '/tv/': 'Shul View',
   '/display/': 'Former display address', '/texts/': 'Messages', '/admin/': 'Admin', '/admin/index.html': 'Admin',
-  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/calendar/': 'Calendar', '/calendar/index.html': 'Calendar', '/admin/calendar/': 'Calendar', '/admin/calendar/index.html': 'Calendar',
+  '/seats/': 'Seats', '/seats/index.html': 'Seats', '/texts/index.html': 'Schedule messages', '/messages/': 'Shul Messages', '/messages/index.html': 'Shul Messages', '/calendar/': 'Shul Messages', '/calendar/index.html': 'Shul Messages', '/admin/calendar/': 'Shul Messages', '/admin/calendar/index.html': 'Shul Messages',
 };
 const TRAFFIC_DEVICES = { mobile: 'Phone', desktop: 'Desktop', tablet: 'Tablet' };
 let trafficSelection = { preset: '7', start: '', end: '' };
@@ -26249,7 +26309,7 @@ function trafficMethodology(data, range) {
   const retryAt = trafficCooldown(data);
   return `<details class="traffic-panel traffic-method"><summary>How these numbers work and collection status</summary><div class="traffic-method-content">
     <h3>What is counted</h3><dl class="traffic-definition-list">
-      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in calendar page opens. Seats, Schedule messages and calendar tracking begins with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
+      <div><dt>Pages included</dt><dd>This report counts Home, Weekly Zmanim, Zmanim Chart, Special Schedules, Donate, Schedule messages, unlocked Seats and signed-in Shul Messages page opens. Seats, Schedule messages and the former calendar tracking began with the November 5, 2026 update; earlier opens were not recorded. Admin tracking began October 1, 2026. Shul View uses a separate service and is not tracked here. Historical records can include the site's former address.</dd></div>
       <div><dt>Admin page opens</dt><dd>Page views of /admin/ or /admin/index.html after the admin is unlocked or its remembered access is accepted. Reloads can count again; changing tabs within the admin does not. The existing browser exclusion also applies. Counts can be delayed and do not reveal names, identities, or individual actions. Earlier admin activity was not recorded.</dd></div>
       <div><dt>Page views</dt><dd>Views reported by the website's Cloudflare Web Analytics beacon, including repeated views. This is the primary count used in every chart and percentage.</dd></div>
       <div><dt>Entry visits</dt><dd>Cloudflare counts a visit when a page view arrives from another site or without a referrer. This is not a unique-person count or a count of everyone in the shul. Repeat entries can count again.</dd></div>

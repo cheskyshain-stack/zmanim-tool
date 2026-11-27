@@ -51,6 +51,26 @@ It was on lczmanim.cjaffa.com until the shul took a domain of its own. The addre
 in `SITE_URL` in `build-offline.py` and in `CNAME`, and everything else is stamped from there.
 Read `README.md` for how a user runs it. This file is about changing it.
 
+## Shul Messages, November 27, 2026
+
+The calendar is temporarily paused. Its public entry is now **Shul Messages** at
+`/messages/`, a full-page private feed using the existing calendar account/session
+system, roles and registration. Existing `/calendar/` and `/admin/calendar/` links
+preserve account hashes and query strings while redirecting to `/messages/`.
+Do not rename session storage keys, the Durable Object, PWA id, or the phone-alert
+service worker scope. Existing accounts and push subscriptions must keep working.
+The main admin's legacy calendar tab opens this same messages-only renderer.
+Show the matching public header, oldest messages first, latest at the bottom,
+initially scrolled to the latest. Keep the bottom Phone alerts, Latest and account
+controls, read tracking, source wording, history cutoff, imports and shared API.
+Calendar grid/events/Google connection controls stay hidden. Archived calendar code
+and stored events remain for recovery. `CALENDAR_EVENTS_ENABLED=false` pauses event
+APIs, automatic event imports, event reminders and active Google exports while
+preserving stored data and allowing disconnection cleanup. Message alerts continue.
+This supersedes the older calendar layout/navigation instructions below while paused.
+Verify with `tests/shul-messages.cjs` and `tests/shul-messages-service.cjs` using only
+isolated synthetic accounts/messages, never production test records.
+
 ## Ground rules
 
 **No em dashes.** Anywhere. Not in the interface, not in comments, not in commit

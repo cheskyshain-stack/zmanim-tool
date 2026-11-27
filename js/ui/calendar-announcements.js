@@ -100,7 +100,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   }
   async function refresh() {
     if (!actor || document.visibilityState !== 'visible') return;
-    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
+    if (calendarSession()?.token !== actor.token) { onSessionExpired('Your session expired. Sign in again.'); return; }
     const id = actor;
     try {
       const value = await request('/api/announcements/status');
@@ -133,10 +133,10 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
   function markup({ label = 'Announcements', icon = false } = {}) {
     return `<button type="button" data-cal-announcements data-cal-announcement-label="${escAttr(label)}">${icon ? '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>' : ''}<span>${escText(label)}</span><span class="cal-unread-count" data-cal-announcement-count hidden aria-hidden="true"></span></button>`;
   }
-  async function open() {
+  async function open({ host = null, onOptions = null } = {}) {
     if (!actor || active) return;
     const id = actor, reader = id.role === 'viewer';
-    if (!id.token || calendarSession()?.token !== id.token) { onSessionExpired('Your calendar session expired. Sign in again.'); return; }
+    if (!id.token || calendarSession()?.token !== id.token) { onSessionExpired('Your session expired. Sign in again.'); return; }
     const cached = currentFirstPage();
     let posting = false, deleting = false, reading = false, pendingTimer = null, operation = null, nextBefore = null, nextCursor = null, loading = false, syncing = null, knownDeletedCount = 0;
     const pending = new Set(), messages = new Map(), deletedIds = new Set();
@@ -150,20 +150,32 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       <details class="cal-extra" data-cal-added-date hidden><summary>Set date and time</summary><label>Added date and time (optional)<input type="datetime-local" name="addedAt" step="60" disabled></label><p class="cal-form-note">${escText(timeZone.replaceAll('_', ' '))} time. Leave blank to use now.</p></details>
       <div class="cal-announcement-compose-row"><textarea name="message" aria-label="New announcement" dir="auto" maxlength="4000" rows="2" required placeholder="Write a message…"></textarea><button class="cal-primary" type="submit" aria-label="Send announcement">Send</button></div>
     </form>`;
-    const view = dialog(intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Announcement messages">${olderControl}<div data-cal-message-list><p>Loading announcements…</p></div></div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`, {
-      onClose: () => {
-        if (posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?')) return false;
+    const content = intro + `<div class="cal-announcement-feed" tabindex="0" aria-label="Shul messages">${olderControl}<div data-cal-message-list><p>Loading messages…</p></div>${host ? '<p class="cal-latest-marker">Latest messages <span aria-hidden="true">↓</span></p>' : ''}</div>${newControl}<p class="cal-announcement-status" role="status" aria-live="polite"></p><button type="button" data-cal-announcement-retry hidden>Try again</button>${composer}`;
+    const canLeave = () => !(posting || deleting || editing?.saving || (textarea.value.trim() || form.elements.addedAt.value || editDirty()) && !confirm('Discard your unsaved announcement changes?'));
+    const canClose = () => {
+        if (!canLeave()) return false;
         cleanup(); active = null; keepFirstPageReady(); return true;
-      },
-    });
+    };
+    let view;
+    if (host) {
+      const el = document.createElement('section');
+      el.className = 'cal-messages-page';
+      el.innerHTML = content + '<footer class="cal-dialog-header cal-messages-toolbar"><button type="button" data-cal-latest>Latest <span aria-hidden="true">↓</span></button><button type="button" data-cal-message-options aria-label="Message options" title="Message options">⋯</button></footer>';
+      host.replaceChildren(el);
+      el.calDispose = () => { cleanup(); el.remove(); };
+      view = { el, title() {}, close() { if (canClose()) el.calDispose(); } };
+      el.querySelector('[data-cal-message-options]').addEventListener('click', () => onOptions?.());
+    } else view = dialog(content, { onClose: canClose });
     view.title(button?.dataset.calAnnouncementLabel || 'Announcements'); view.el.classList.add('cal-announcements-dialog');
     const controls = view.el.querySelector('.cal-dialog-header');
     if (messageAlertsAvailable()) {
       const close = controls.querySelector('[data-cal-close]');
-      close.insertAdjacentHTML('beforebegin', '<button type="button" data-cal-message-alerts>Message alerts</button>');
+      const alertButton = '<button type="button" data-cal-message-alerts>Phone alerts</button>';
+      if (close) close.insertAdjacentHTML('beforebegin', alertButton);
+      else controls.querySelector('[data-cal-message-options]').insertAdjacentHTML('beforebegin', alertButton);
       controls.querySelector('[data-cal-message-alerts]').addEventListener('click', openMessageAlerts);
     }
-    if (reader) {
+    if (reader && !host) {
       view.el.classList.add('cal-announcement-reader');
       view.el.append(controls);
       controls.querySelector('[data-cal-close]').focus({ preventScroll: true });
@@ -194,7 +206,11 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       };
     }
     const editDirty = () => editing && (editing.field.value !== editing.original || editing.dateField && editing.dateField.value !== editing.originalDate);
-    function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); }
+    function unsaved(event) {
+      if (textarea.value.trim() || form.elements.addedAt.value || editDirty()) { event.preventDefault(); event.returnValue = ''; }
+    }
+    if (host) window.addEventListener('beforeunload', unsaved);
+    function cleanup() { observer?.disconnect(); clearTimeout(pendingTimer); window.removeEventListener('beforeunload', unsaved); }
     function notice(text, error = false, source = '') {
       messageStatus.textContent = text; messageStatus.classList.toggle('cal-error', error); messageStatus.dataset.source = source;
     }
@@ -354,7 +370,7 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     function followNew() {
       if (pageLoaded && !editing && !deleting && atLatest()) load(false, true);
     }
-    active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, syncDeleted, syncEdits, followNew }; paint();
+    active = { view, latest: 0, following: false, form, feed, newButton, expire, observe, cleanup, canLeave, syncDeleted, syncEdits, followNew }; paint();
     async function load(append = false, follow = false, cachedPage = null) {
       if (!current() || loading || posting) return;
       if (!append && editing) {
@@ -429,6 +445,9 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
     });
     older.addEventListener('click', () => load(true));
     newButton.addEventListener('click', () => load());
+    view.el.querySelector('[data-cal-latest]')?.addEventListener('click', () => {
+      if (total > active.latest) load(); else { scrollToLatest(); observe(); }
+    });
     retry.addEventListener('click', () => { markRead(); syncDeleted(); syncEdits(); load(); });
     await load(false, false, cached);
     if (!matches(id) || previewing()) return;
@@ -437,5 +456,5 @@ export function createCalendarAnnouncements({ dialog, timeZone, onSessionExpired
       if (matches(id)) await applyStatus(value);
     } catch (error) { failed(error, id); }
   }
-  return { start, stop, bind, markup, open, dispose: stop };
+  return { start, stop, bind, markup, open, canLeave: () => active?.canLeave() ?? true, dispose: stop };
 }

@@ -1,4 +1,3 @@
-import { loadTables } from './data-loader.js';
 import { resolveSettings } from './settings.js';
 import { renderCalendar } from './ui/calendar-view.js';
 import { refreshCalendarPhoneReminderWorker } from './ui/calendar-phone-reminders.js';
@@ -17,11 +16,12 @@ if (document.prerendering) document.addEventListener('prerenderingchange', refre
 else refreshReminders();
 (async () => {
   try {
-    const [tables, response] = await Promise.all([loadTables(), fetch('/data/published.json', { cache: 'no-cache' })]);
-    if (!response.ok) throw new Error('Calendar settings could not be loaded. Reload to try again.');
+    if (document.prerendering) await new Promise(resolve => document.addEventListener('prerenderingchange', resolve, { once: true }));
+    const response = await fetch('/data/published.json', { cache: 'no-cache' });
+    if (!response.ok) throw new Error('Message settings could not be loaded. Reload to try again.');
     const config = await response.json();
-    renderCalendar(calendarHost, resolveSettings(config.settings), tables, { standalone: true, setupToken: calendarSetupToken, inviteToken: calendarInviteToken, googleReturnState: calendarLink.get('google-calendar') || '', congregationPreview: calendarCongregationPreview,
+    renderCalendar(calendarHost, resolveSettings(config.settings), null, { standalone: true, setupToken: calendarSetupToken, inviteToken: calendarInviteToken, googleReturnState: calendarLink.get('google-calendar') || '', congregationPreview: calendarCongregationPreview,
       reminderDate: calendarQuery.get('simcha') || '', reminderEventId: calendarQuery.get('event') || '', reminderPost: calendarQuery.get('post') === '1',
       openMessages: calendarQuery.get('messages') === '1' });
-  } catch (error) { calendarHost.textContent = error.message || 'The calendar could not be loaded. Reload to try again.'; }
+  } catch (error) { calendarHost.textContent = error.message || 'Shul Messages could not be loaded. Reload to try again.'; }
 })();
